@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "straystation-18e8c",
+    "site": "straystation",
     "public": ".",
     "ignore": [
       "firebase.json",
