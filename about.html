@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>關於簡媽媽 · 浪浪轉運站</title>
+<link rel="stylesheet" href="assets/css/styles.css" />
+<script defer src="assets/js/ui.js"></script>
+<script defer src="assets/js/dataService.js"></script>
+<script defer src="assets/js/app.js"></script>
+<script defer src="assets/js/auth.js"></script>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-JTTJH33M4X"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-JTTJH33M4X');
+</script>
+</head>
+<body>
+
+<div class="navbar">
+  <div class="navbar-inner">
+    <div class="brand">浪浪轉運站 · 台中簡媽媽狗園</div>
+    <button class="hamburger" onclick="window.UI.toggleMenu()">☰</button>
+  </div>
+  <div id="mobileMenu" class="menu">
+    <a href="cats.html">我想養貓</a>
+    <a href="dogs.html">我想養狗</a>
+    <a href="about.html">關於簡媽媽</a>
+    <a href="admin.html" id="adminLoginLink">管理員登入</a>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="panel" style="text-align:center;">
+    <img src="assets/img/jianmama-avatar.png" alt="簡媽媽" style="width:160px; height:160px; object-fit:cover; border-radius:50%; margin: 10px auto;">
+    <div style="white-space:pre-line; text-align:left; max-width:720px; margin:0 auto;">
+這裡，是浪浪等家的地方。
+簡媽媽救援浪浪近二十年，租下土地，搭起簡單狗舍，安置那些無法在街頭生存的毛孩們。
+從幾隻開始，到如今百餘孩子在這等待家。需要的照顧、醫療和資源也越來越多，於是簡媽在幾位志工協助下成立社團法人簡媽媽愛護動物協會，努力撐起送醫、結紮、照顧與送養的每一步。
+沒有華麗設施，只有溫暖守護。
+我們相信：買得到的是寵物，認養到的是家人。邀請你，和我們一起，讓更多等待的孩子回家。
+📌 中市社團字第1140036732號
+    </div>
+  </div>
+
+</div>
+<div class="footer">© 2025 浪浪轉運站 · 台中簡媽媽狗園</div>
+<div id="animalModalBackdrop" class="modal-backdrop">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-close" onclick="window.UI.closeModal()" title="關閉"><span class="icon">✕</span></div>
+    <div class="modal-edit" id="modalEditBtn" title="編輯" style="display:none;"><span class="icon">✎</span></div>
+    <div class="modal-delete" id="modalDeleteBtn" title="刪除" style="display:none;"><span class="icon">🗑</span></div>
+    <div class="left">
+      <div class="hero"><img id="modalHero" alt="animal" style="width:100%; height:100%; object-fit:cover;"></div>
+      <div id="modalThumbs" class="thumbs"></div>
+    </div>
+    <div class="right">
+      <h3 id="modalName">動物名稱</h3>
+      <div class="meta" id="modalMeta"></div>
+      <div id="modalDesc" class="helper"></div>
+      <div id="modalActions" class="actions" style="margin-top:12px;"></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
