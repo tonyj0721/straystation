@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>管理員 · 浪浪轉運站</title>
+<link rel="stylesheet" href="assets/css/styles.css" />
+<script defer src="assets/js/ui.js"></script>
+<script defer src="assets/js/dataService.js"></script>
+<script defer src="assets/js/app.js"></script>
+<script defer src="assets/js/auth.js"></script>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-YBC0MQBC2F"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-JTTJH33M4X');
+</script>
+</head>
+<body>
+
+<div class="navbar">
+  <div class="navbar-inner">
+    <div class="brand">浪浪轉運站 · 台中簡媽媽狗園</div>
+    <button class="hamburger" onclick="window.UI.toggleMenu()">☰</button>
+  </div>
+  <div id="mobileMenu" class="menu">
+    <a href="cats.html">我想養貓</a>
+    <a href="dogs.html">我想養狗</a>
+    <a href="about.html">關於簡媽媽</a>
+    <a href="admin.html" id="adminLoginLink">管理員登入</a>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="panel">
+    <h2>管理員登入</h2>
+    <p class="helper">使用 Google 登入（自訂按鈕樣式）。</p>
+    <button class="btn" id="googleSignInBtn">管理員登入</button>
+    <span id="loginStatus" class="badge" style="margin-left:8px;">未登入</span>
+  </div>
+
+  <div class="panel">
+    <h2>GitHub 設定（僅前端，需個人存取權杖）</h2>
+    <div class="form-row">
+      <label>GitHub 個人存取權杖 (repo 或 public_repo 權限)</label>
+      <input type="text" id="ghToken" placeholder="ghp_xxx 或 fine-grained token" />
+    </div>
+    <div class="form-row">
+      <label>擁有者（Owner / Org）</label>
+      <input type="text" id="ghOwner" placeholder="your-github-username-or-org" />
+    </div>
+    <div class="form-row">
+      <label>Repository 名稱</label>
+      <input type="text" id="ghRepo" placeholder="e.g. shelter-data" />
+    </div>
+    <div class="form-row">
+      <label>Branch</label>
+      <input type="text" id="ghBranch" placeholder="main" value="main" />
+    </div>
+    <div class="form-row">
+      <button class="btn" onclick="window.DataService.saveGitHubConfig()">儲存 GitHub 設定</button>
+      <span class="helper">會保存於 localStorage。</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>新增動物資料</h2>
+    <div class="form-row">
+      <label>名字</label>
+      <input id="aName" type="text" placeholder="名字" />
+    </div>
+    <div class="form-row">
+      <label>類別</label>
+      <select id="aType">
+        <option value="cat">貓</option>
+        <option value="dog">狗</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label>主品種 / 次品種</label>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+        <select id="aBreedMain"></select>
+        <select id="aBreedSub"></select>
+      </div>
+      <div class="helper">例如：米克斯 / 三花貓 → 會顯示為「米克斯/三花貓」</div>
+    </div>
+    <div class="form-row">
+      <label>年齡（文字輸入）</label>
+      <input id="aAgeText" type="text" placeholder="例如：2歲" />
+    </div>
+    <div class="form-row">
+      <label>性別</label>
+      <select id="aGender">
+        <option value="公">公</option>
+        <option value="母">母</option>
+        <option value="未知">未知</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label>簡介</label>
+      <textarea id="aDesc" placeholder="簡單介紹"></textarea>
+    </div>
+    <div class="form-row">
+      <label>上傳照片（最多 6 張）</label>
+      <input id="aPhotos" type="file" accept="image/*" multiple />
+      <div class="helper">圖片會上傳到您指定的 GitHub repo（/images/{動物ID}/檔名）。</div>
+    </div>
+    <div class="form-row">
+      <button class="btn primary" onclick="window.App.submitAnimal()">登錄</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>已登入動物資料</h2>
+    <table class="table">
+      <thead><tr><th>名字</th><th>類別</th><th>品種</th></tr></thead>
+      <tbody id="adminTable"></tbody>
+    </table>
+  </div>
+
+</div>
+<div class="footer">© 2025 浪浪轉運站 · 台中簡媽媽狗園</div>
+<div id="animalModalBackdrop" class="modal-backdrop">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-close" onclick="window.UI.closeModal()" title="關閉"><span class="icon">✕</span></div>
+    <div class="modal-edit" id="modalEditBtn" title="編輯" style="display:none;"><span class="icon">✎</span></div>
+    <div class="modal-delete" id="modalDeleteBtn" title="刪除" style="display:none;"><span class="icon">🗑</span></div>
+    <div class="left">
+      <div class="hero"><img id="modalHero" alt="animal" style="width:100%; height:100%; object-fit:cover;"></div>
+      <div id="modalThumbs" class="thumbs"></div>
+    </div>
+    <div class="right">
+      <h3 id="modalName">動物名稱</h3>
+      <div class="meta" id="modalMeta"></div>
+      <div id="modalDesc" class="helper"></div>
+      <div id="modalActions" class="actions" style="margin-top:12px;"></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
