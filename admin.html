@@ -1,144 +1,450 @@
-<!doctype html>
-<html lang="zh-Hant-TW">
+<!DOCTYPE html>
+<html lang="zh-Hant">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>管理員 · 浪浪轉運站</title>
-<link rel="stylesheet" href="assets/css/styles.css" />
-<script defer src="assets/js/ui.js"></script>
-<script defer src="assets/js/dataService.js"></script>
-<script defer src="assets/js/app.js"></script>
-<script defer src="assets/js/auth.js"></script>
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-YBC0MQBC2F"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-JTTJH33M4X');
-</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>管理員後台｜浪浪轉運站 × 台中簡媽媽狗園</title>
+  <style>
+    :root { --brand:#0f766e; --danger:#b91c1c; --muted:#6b7280; }
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Noto Sans TC",sans-serif;background:#f7fafc;color:#0f172a;margin:0}
+    header{position:sticky;top:0;background:#fff;border-bottom:1px solid #e5e7eb;z-index:10}
+    .wrap{max-width:1100px;margin:0 auto;padding:16px}
+    h1{font-size:20px;margin:8px 0}
+    .bar{display:flex;gap:12px;align-items:center;justify-content:space-between}
+    .btn{appearance:none;border:1px solid #e5e7eb;background:#fff;color:#111827;padding:8px 12px;border-radius:8px;cursor:pointer}
+    .btn.primary{background:var(--brand);color:#fff;border-color:var(--brand)}
+    .btn.danger{background:var(--danger);border-color:var(--danger);color:#fff}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+    .grid{display:grid;grid-template-columns:1fr;gap:16px}
+    @media(min-width:960px){.grid{grid-template-columns:1fr 1fr}}
+    .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    .card h2{font-size:16px;margin:0;padding:12px 16px;border-bottom:1px solid #e5e7eb}
+    .card .content{padding:16px}
+    .row{display:grid;grid-template-columns:140px 1fr;align-items:center;gap:8px;margin:8px 0}
+    input[type=text], select, textarea{width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:8px}
+    textarea{min-height:92px}
+    .hint{color:var(--muted);font-size:12px}
+    table{width:100%;border-collapse:collapse}
+    th,td{border-bottom:1px solid #e5e7eb;padding:10px;text-align:left;font-size:14px}
+    tr:hover{background:#f8fafc}
+    .tag{display:inline-block;padding:2px 6px;border-radius:999px;background:#ecfeff;color:#155e75;font-size:12px;border:1px solid #a5f3fc}
+
+    /* Modal */
+    .modal{position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;align-items:center;justify-content:center;padding:16px}
+    .modal.open{display:flex}
+    .sheet{background:#fff;border-radius:16px;max-width:1000px;width:100%;display:grid;grid-template-columns:1fr;overflow:hidden}
+    @media(min-width:960px){.sheet{grid-template-columns:1fr 1fr}}
+    .sheet .media{background:#0b1020;display:flex;flex-direction:column}
+    .sheet .media img{width:100%;height:360px;object-fit:cover;background:#111}
+    .thumbs{display:flex;gap:6px;flex-wrap:wrap;padding:8px;background:#0b1020}
+    .thumbs img{width:60px;height:60px;object-fit:cover;border-radius:6px;opacity:.75;border:2px solid transparent;cursor:pointer}
+    .thumbs img.active{opacity:1;border-color:#22d3ee}
+    .sheet .body{max-height:70vh;overflow:auto;padding:16px}
+    .sheet header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e5e7eb}
+    .iconbtn{border:none;background:transparent;cursor:pointer;font-size:20px}
+    .right-actions{display:flex;gap:8px}
+  </style>
 </head>
 <body>
-
-<div class="navbar">
-  <div class="navbar-inner">
-    <div class="brand">浪浪轉運站 · 台中簡媽媽狗園</div>
-    <button class="hamburger" onclick="window.UI.toggleMenu()">☰</button>
-  </div>
-  <div id="mobileMenu" class="menu">
-    <a href="cats.html">我想養貓</a>
-    <a href="dogs.html">我想養狗</a>
-    <a href="about.html">關於簡媽媽</a>
-    <a href="admin.html" id="adminLoginLink">管理員登入</a>
-  </div>
-</div>
-
-<div class="container">
-
-  <div class="panel">
-    <h2>管理員登入</h2>
-    <p class="helper">使用 Google 登入（自訂按鈕樣式）。</p>
-    <button class="btn" id="googleSignInBtn">管理員登入</button>
-    <span id="loginStatus" class="badge" style="margin-left:8px;">未登入</span>
-  </div>
-
-  <div class="panel">
-    <h2>GitHub 設定（僅前端，需個人存取權杖）</h2>
-    <div class="form-row">
-      <label>GitHub 個人存取權杖 (repo 或 public_repo 權限)</label>
-      <input type="text" id="ghToken" placeholder="ghp_xxx 或 fine-grained token" />
-    </div>
-    <div class="form-row">
-      <label>擁有者（Owner / Org）</label>
-      <input type="text" id="ghOwner" placeholder="your-github-username-or-org" />
-    </div>
-    <div class="form-row">
-      <label>Repository 名稱</label>
-      <input type="text" id="ghRepo" placeholder="e.g. shelter-data" />
-    </div>
-    <div class="form-row">
-      <label>Branch</label>
-      <input type="text" id="ghBranch" placeholder="main" value="main" />
-    </div>
-    <div class="form-row">
-      <button class="btn" onclick="window.DataService.saveGitHubConfig()">儲存 GitHub 設定</button>
-      <span class="helper">會保存於 localStorage。</span>
-    </div>
-  </div>
-
-  <div class="panel">
-    <h2>新增動物資料</h2>
-    <div class="form-row">
-      <label>名字</label>
-      <input id="aName" type="text" placeholder="名字" />
-    </div>
-    <div class="form-row">
-      <label>類別</label>
-      <select id="aType">
-        <option value="cat">貓</option>
-        <option value="dog">狗</option>
-      </select>
-    </div>
-    <div class="form-row">
-      <label>主品種 / 次品種</label>
-      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
-        <select id="aBreedMain"></select>
-        <select id="aBreedSub"></select>
+  <header>
+    <div class="wrap bar">
+      <h1>管理員後台</h1>
+      <div>
+        <span id="who" class="hint"></span>
+        <button id="loginBtn" class="btn">管理員登入（Google）</button>
+        <button id="logoutBtn" class="btn" style="display:none">登出</button>
       </div>
-      <div class="helper">例如：米克斯 / 三花貓 → 會顯示為「米克斯/三花貓」</div>
     </div>
-    <div class="form-row">
-      <label>年齡（文字輸入）</label>
-      <input id="aAgeText" type="text" placeholder="例如：2歲" />
+  </header>
+
+  <main class="wrap">
+    <div id="loginGate" class="card" style="display:none">
+      <div class="content">
+        <p>請先以 Google 帳號登入，限管理員使用。</p>
+        <button id="loginBtn2" class="btn primary">管理員登入</button>
+      </div>
     </div>
-    <div class="form-row">
-      <label>性別</label>
-      <select id="aGender">
-        <option value="公">公</option>
-        <option value="母">母</option>
-        <option value="未知">未知</option>
-      </select>
+
+    <div class="grid">
+      <!-- 新增動物資料 -->
+      <section id="adminArea" class="card" style="display:none">
+        <h2>新增動物資料</h2>
+        <div class="content">
+          <div class="row"><label>名字</label><input id="fName" type="text" placeholder="例如：奈奈" /></div>
+          <div class="row"><label>類別</label>
+            <select id="fType">
+              <option value="">請選擇</option>
+              <option value="貓">貓</option>
+              <option value="狗">狗</option>
+            </select>
+          </div>
+          <div class="row"><label>主品種</label>
+            <select id="fBreedMain">
+              <option value="">請先選類別</option>
+            </select>
+          </div>
+          <div class="row"><label>次品種</label>
+            <select id="fBreedSub">
+              <option value="">請先選主品種</option>
+            </select>
+          </div>
+          <div class="row"><label>年齡</label><input id="fAge" type="text" placeholder="3個月 / 5歲 / 不到1歲" /></div>
+          <div class="row"><label>性別</label>
+            <select id="fGender">
+              <option value="">請選擇</option>
+              <option value="男生">男生</option>
+              <option value="女生">女生</option>
+            </select>
+          </div>
+          <div class="row"><label>簡介</label><textarea id="fDesc" placeholder="個性、習慣、注意事項…"></textarea></div>
+          <div class="row"><label>上傳照片</label>
+            <input id="fImages" type="file" accept="image/*" multiple />
+            <div class="hint">最多 6 張，建議 1200×900 以上。</div>
+          </div>
+          <div class="row">
+            <div></div>
+            <button id="submitBtn" class="btn primary">登錄</button>
+          </div>
+          <div id="formMsg" class="hint"></div>
+        </div>
+      </section>
+
+      <!-- 已登入資料列表 -->
+      <section class="card">
+        <h2>已登錄資料</h2>
+        <div class="content">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:32%">名字</th>
+                <th style="width:18%">類別</th>
+                <th style="width:36%">品種</th>
+                <th style="width:14%">狀態</th>
+              </tr>
+            </thead>
+            <tbody id="listBody"></tbody>
+          </table>
+          <div class="hint" id="emptyHint" style="display:none">目前沒有資料。</div>
+        </div>
+      </section>
     </div>
-    <div class="form-row">
-      <label>簡介</label>
-      <textarea id="aDesc" placeholder="簡單介紹"></textarea>
-    </div>
-    <div class="form-row">
-      <label>上傳照片（最多 6 張）</label>
-      <input id="aPhotos" type="file" accept="image/*" multiple />
-      <div class="helper">圖片會上傳到您指定的 GitHub repo（/images/{動物ID}/檔名）。</div>
-    </div>
-    <div class="form-row">
-      <button class="btn primary" onclick="window.App.submitAnimal()">登錄</button>
+  </main>
+
+  <!-- 動物卡片 Modal -->
+  <div id="modal" class="modal">
+    <div class="sheet">
+      <div class="media">
+        <img id="modalHero" src="" alt="" />
+        <div id="modalThumbs" class="thumbs"></div>
+      </div>
+      <div class="body">
+        <header>
+          <strong id="modalTitle">—</strong>
+          <div class="right-actions">
+            <button id="editBtn" class="iconbtn" title="編輯">✏️</button>
+            <button id="deleteBtn" class="iconbtn" title="刪除">🗑️</button>
+            <button id="closeBtn" class="iconbtn" title="關閉">✖</button>
+          </div>
+        </header>
+        <div style="padding:12px 16px">
+          <p><span class="tag" id="modalType">—</span></p>
+          <p id="modalBreed">—</p>
+          <p id="modalAgeGender">—</p>
+          <p id="modalDesc" style="white-space:pre-wrap"></p>
+          <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+            <button id="adoptedBtn" class="btn">標記為「已領養」</button>
+            <a id="viewOnSite" class="btn" target="_blank">前往前台預覽</a>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div class="panel">
-    <h2>已登入動物資料</h2>
-    <table class="table">
-      <thead><tr><th>名字</th><th>類別</th><th>品種</th></tr></thead>
-      <tbody id="adminTable"></tbody>
-    </table>
-  </div>
+  <!-- Firebase SDK (modular) -->
+  <script type="module">
+    /***** ✅ Firebase 初始化 *****/
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js';
+    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js';
+    import { getFirestore, collection, addDoc, doc, getDocs, orderBy, query, serverTimestamp, updateDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js';
+    import { getStorage, ref, uploadBytes, getDownloadURL, listAll } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-storage.js';
 
-</div>
-<div class="footer">© 2025 浪浪轉運站 · 台中簡媽媽狗園</div>
-<div id="animalModalBackdrop" class="modal-backdrop">
-  <div class="modal" role="dialog" aria-modal="true">
-    <div class="modal-close" onclick="window.UI.closeModal()" title="關閉"><span class="icon">✕</span></div>
-    <div class="modal-edit" id="modalEditBtn" title="編輯" style="display:none;"><span class="icon">✎</span></div>
-    <div class="modal-delete" id="modalDeleteBtn" title="刪除" style="display:none;"><span class="icon">🗑</span></div>
-    <div class="left">
-      <div class="hero"><img id="modalHero" alt="animal" style="width:100%; height:100%; object-fit:cover;"></div>
-      <div id="modalThumbs" class="thumbs"></div>
-    </div>
-    <div class="right">
-      <h3 id="modalName">動物名稱</h3>
-      <div class="meta" id="modalMeta"></div>
-      <div id="modalDesc" class="helper"></div>
-      <div id="modalActions" class="actions" style="margin-top:12px;"></div>
-    </div>
-  </div>
-</div>
+    // ⚠️ 依照你提供的設定。如果上傳遇到 bucket 錯誤，可把 storageBucket 改成 `straystation.appspot.com`。
+    const firebaseConfig = { 
+      apiKey: "AIzaSyAoqT5ynGi7KlrCF7UZ0TrD4lbRR8T8lT0",
+      authDomain: "straystation.firebaseapp.com",
+      projectId: "straystation",
+      storageBucket: "straystation.firebasestorage.app",
+      messagingSenderId: "611366379195",
+      appId: "1:611366379195:web:ef5a632e88d8bba1d6139e",
+      measurementId: "G-YBC0MQBC2F"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+    const provider = new GoogleAuthProvider();
+
+    const adminEmails = ["tonyj0721@gmail.com", "cookiech0926@gmail.com"]; // 可日後擴充
+
+    /***** ✅ UI 元件 *****/
+    const who = document.getElementById('who');
+    const loginBtn = document.getElementById('loginBtn');
+    const loginBtn2 = document.getElementById('loginBtn2');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const loginGate = document.getElementById('loginGate');
+    const adminArea = document.getElementById('adminArea');
+    const formMsg = document.getElementById('formMsg');
+
+    const fName = document.getElementById('fName');
+    const fType = document.getElementById('fType');
+    const fBreedMain = document.getElementById('fBreedMain');
+    const fBreedSub = document.getElementById('fBreedSub');
+    const fAge = document.getElementById('fAge');
+    const fGender = document.getElementById('fGender');
+    const fDesc = document.getElementById('fDesc');
+    const fImages = document.getElementById('fImages');
+    const submitBtn = document.getElementById('submitBtn');
+
+    const listBody = document.getElementById('listBody');
+    const emptyHint = document.getElementById('emptyHint');
+
+    // Modal
+    const modal = document.getElementById('modal');
+    const modalHero = document.getElementById('modalHero');
+    const modalThumbs = document.getElementById('modalThumbs');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalType = document.getElementById('modalType');
+    const modalBreed = document.getElementById('modalBreed');
+    const modalAgeGender = document.getElementById('modalAgeGender');
+    const modalDesc = document.getElementById('modalDesc');
+    const closeBtn = document.getElementById('closeBtn');
+    const deleteBtn = document.getElementById('deleteBtn');
+    const editBtn = document.getElementById('editBtn');
+    const adoptedBtn = document.getElementById('adoptedBtn');
+    const viewOnSite = document.getElementById('viewOnSite');
+
+    let currentDoc = null; // 目前在 modal 的文件快取
+
+    /***** ✅ Google 登入流程 *****/
+    const doLogin = async () => {
+      try {
+        await signInWithPopup(auth, provider);
+      } catch (e) {
+        alert('登入失敗：' + e.message);
+      }
+    };
+    loginBtn.onclick = doLogin;
+    if (loginBtn2) loginBtn2.onclick = doLogin;
+    logoutBtn.onclick = () => signOut(auth);
+
+    onAuthStateChanged(auth, (user) => {
+      if (user && adminEmails.includes(user.email)) {
+        who.textContent = `已登入：${user.displayName ?? ''} (${user.email})`;
+        loginBtn.style.display = 'none';
+        logoutBtn.style.display = 'inline-block';
+        loginGate.style.display = 'none';
+        adminArea.style.display = 'block';
+      } else {
+        if (user && !adminEmails.includes(user.email)) {
+          alert('你不是管理員，已登出');
+          signOut(auth);
+        }
+        who.textContent = '';
+        loginBtn.style.display = 'inline-block';
+        logoutBtn.style.display = 'none';
+        loginGate.style.display = 'block';
+        adminArea.style.display = 'none';
+      }
+    });
+
+    /***** ✅ 品種選單：主/次級動態 *****/
+    const options = {
+      貓: {
+        主: ['品種貓', '米克斯'],
+        次: {
+          品種貓: ['美短','英短','藍貓','暹羅貓','波斯貓','布偶貓','曼赤肯'],
+          米克斯: ['橘貓','黑貓','虎斑貓','白底虎斑貓','三花貓','玳瑁貓','白貓']
+        }
+      },
+      狗: {
+        主: ['品種犬', '米克斯'],
+        次: {
+          品種犬: ['博美','貴賓','吉娃娃','馬爾濟斯','柯基','柴犬','哈士奇','高山犬','黃金獵犬'],
+          米克斯: ['黑色','白色','黃色','棕色','虎斑','花花']
+        }
+      }
+    };
+
+    function fillBreedMain(){
+      const type = fType.value || '';
+      fBreedMain.innerHTML = '<option value="">請選擇</option>';
+      fBreedSub.innerHTML = '<option value="">請先選主品種</option>';
+      if(!type) return;
+      options[type].主.forEach(v=>{
+        const opt = document.createElement('option');
+        opt.value = v; opt.textContent = v; fBreedMain.appendChild(opt);
+      });
+    }
+    function fillBreedSub(){
+      const type = fType.value;
+      const main = fBreedMain.value;
+      fBreedSub.innerHTML = '<option value="">請選擇</option>';
+      if(!type || !main) return;
+      options[type].次[main].forEach(v=>{
+        const opt = document.createElement('option');
+        opt.value = v; opt.textContent = v; fBreedSub.appendChild(opt);
+      });
+    }
+    fType.addEventListener('change', fillBreedMain);
+    fBreedMain.addEventListener('change', fillBreedSub);
+
+    /***** ✅ 建立品種顯示字串 *****/
+    function composeBreed(main, sub){
+      if (!main) return '';
+      if (main === '米克斯' && sub) return `米克斯/${sub}`;
+      if ((main === '品種貓' || main === '品種犬') && sub) return sub;
+      return main;
+    }
+
+    /***** ✅ 新增動物 *****/
+    submitBtn.addEventListener('click', async ()=>{
+      const name = fName.value.trim();
+      const type = fType.value;
+      const breedMain = fBreedMain.value;
+      const breedSub = fBreedSub.value;
+      const age = fAge.value.trim();
+      const gender = fGender.value;
+      const desc = fDesc.value.trim();
+      const files = Array.from(fImages.files||[]).slice(0,6);
+
+      if(!name || !type || !breedMain || !gender){
+        formMsg.textContent = '請至少填：名字、類別、主品種、性別。';
+        return;
+      }
+      submitBtn.disabled = true;
+      formMsg.textContent = '上傳中…';
+
+      try {
+        // 先建立 doc 以取得 ID
+        const base = {
+          name, type, breedMain, breedSub, age, gender, desc,
+          imageUrls: [], available: true, createdAt: serverTimestamp()
+        };
+        const docRef = await addDoc(collection(db,'pets'), base);
+
+        // 上傳圖片（若有）到 pets/{docId}/
+        const urls = [];
+        for (const f of files){
+          const path = `pets/${docRef.id}/${Date.now()}_${f.name}`;
+          const r = ref(storage, path);
+          await uploadBytes(r, f);
+          const url = await getDownloadURL(r);
+          urls.push(url);
+        }
+        if (urls.length){
+          await updateDoc(doc(db,'pets',docRef.id), { imageUrls: urls });
+        }
+        formMsg.textContent = '新增完成！';
+        // 清表單
+        [fName, fAge, fDesc].forEach(i=>i.value='');
+        fType.value = ''; fillBreedMain(); fGender.value=''; fImages.value='';
+        await loadList();
+      } catch (e){
+        console.error(e);
+        alert('新增失敗：'+e.message);
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    /***** ✅ 載入列表 *****/
+    async function loadList(){
+      listBody.innerHTML = '';
+      const q = query(collection(db,'pets'), orderBy('createdAt','desc'));
+      const snap = await getDocs(q);
+      if (snap.empty){ emptyHint.style.display='block'; return; }
+      emptyHint.style.display='none';
+      snap.forEach(d=>{
+        const v = d.data();
+        const tr = document.createElement('tr');
+        const breedText = composeBreed(v.breedMain, v.breedSub);
+        tr.innerHTML = `
+          <td>${v.name||''}</td>
+          <td>${v.type||''}</td>
+          <td>${breedText||''}</td>
+          <td>${v.available===false?'<span class="tag">已領養</span>':'—'}</td>
+        `;
+        tr.style.cursor='pointer';
+        tr.addEventListener('click', ()=>openModal(d.id, v));
+        listBody.appendChild(tr);
+      });
+    }
+
+    /***** ✅ Modal 開關與內容 *****/
+    function openModal(id, v){
+      currentDoc = { id, data: v };
+      modal.classList.add('open');
+      modalTitle.textContent = v.name || '—';
+      modalType.textContent = v.type || '';
+      modalBreed.textContent = composeBreed(v.breedMain, v.breedSub) || '';
+      modalAgeGender.textContent = `${v.age? v.age+'・':''}${v.gender||''}`;
+      modalDesc.textContent = v.desc || '';
+      viewOnSite.href = `./home.html#${id}`; // 可自訂前台定位規則
+
+      const imgs = Array.isArray(v.imageUrls)? v.imageUrls: [];
+      modalHero.src = imgs[0] || '';
+      modalThumbs.innerHTML = '';
+      imgs.forEach((u,idx)=>{
+        const i = document.createElement('img'); i.src = u; if(idx===0)i.classList.add('active');
+        i.onclick = ()=>{ modalHero.src=u; [...modalThumbs.children].forEach(c=>c.classList.remove('active')); i.classList.add('active'); };
+        modalThumbs.appendChild(i);
+      });
+    }
+    function closeModal(){ modal.classList.remove('open'); currentDoc=null; }
+    closeBtn.onclick = closeModal;
+    modal.addEventListener('click', (e)=>{ if(e.target===modal) closeModal(); });
+
+    /***** ✅ 編輯（快速改「已領養」與刪除」） *****/
+    adoptedBtn.onclick = async ()=>{
+      if(!currentDoc) return;
+      try{
+        await updateDoc(doc(db,'pets',currentDoc.id), { available:false });
+        alert('已標記為「已領養」。');
+        closeModal();
+        loadList();
+      }catch(e){ alert('更新失敗：'+e.message); }
+    };
+
+    deleteBtn.onclick = async ()=>{
+      if(!currentDoc) return;
+      if(!confirm('確定要刪除這筆資料？（圖片檔需於 Storage 手動清理）')) return;
+      try{
+        await deleteDoc(doc(db,'pets',currentDoc.id));
+        alert('已刪除。');
+        closeModal();
+        loadList();
+      }catch(e){ alert('刪除失敗：'+e.message); }
+    };
+
+    editBtn.onclick = ()=>{
+      if(!currentDoc) return;
+      const v = currentDoc.data;
+      // 將資料帶回表單以便快速修改
+      fName.value = v.name||'';
+      fType.value = v.type||''; fillBreedMain();
+      fBreedMain.value = v.breedMain||''; fillBreedSub();
+      fBreedSub.value = v.breedSub||'';
+      fAge.value = v.age||'';
+      fGender.value = v.gender||'';
+      fDesc.value = v.desc||'';
+      closeModal();
+      window.scrollTo({top:0,behavior:'smooth'});
+      formMsg.textContent = '（從列表帶入了資料，如需覆蓋請直接重新提交建立新版本，或另行撰寫「覆蓋更新」流程）';
+    };
+
+    // 初次載入列表
+    loadList();
+  </script>
 </body>
 </html>
