@@ -1,83 +1,187 @@
+// assets/js/admin.js (module)
+import {
+  db, auth, provider, signInWithPopup, signOut, onAuthStateChanged,
+  collection, doc, addDoc, setDoc, getDocs, getDoc, updateDoc, deleteDoc, serverTimestamp, query, orderBy,
+  storage, ref, uploadBytes, getDownloadURL
+} from './firebase.js';
 
-import { app, auth, provider, db, storage } from './firebase.js';
-import { signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-import { collection, addDoc, serverTimestamp, getDocs, orderBy, query, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
-import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-storage.js";
+const ADMINS = new Set(["tonyj0721@gmail.com","cookiech0926@gmail.com"]);
+const qs = (s,p=document)=>p.querySelector(s);
+const qsa = (s,p=document)=>[...p.querySelectorAll(s)];
 
-const admins = ["tonyj0721@gmail.com", "cookiech0926@gmail.com"];
-const el = (id)=>document.getElementById(id);
-const breeds = {
-  "貓": { main:["品種貓","米克斯"], sub:{ "品種貓":["美短","英短","藍貓","暹羅貓","波斯貓","布偶貓","曼赤肯"], "米克斯":["橘貓","黑貓","虎斑貓","白底虎斑貓","三花貓","玳瑁貓","白貓"] } },
-  "狗": { main:["品種犬","米克斯"], sub:{ "品種犬":["博美","貴賓","吉娃娃","馬爾濟斯","柯基","柴犬","哈士奇","高山犬","黃金獵犬"], "米克斯":["黑色","白色","黃色","棕色","虎斑","花花"] } }
-};
-function fillMain(){ const t=el('fType').value; const m=el('fBreedMain'); const s=el('fBreedSub'); m.innerHTML='<option value="">請選擇</option>'; s.innerHTML='<option value="">請先選主品種</option>'; if(!t) return; breeds[t].main.forEach(v=>{ const o=document.createElement('option'); o.value=v; o.textContent=v; m.appendChild(o); }); }
-function fillSub(){ const t=el('fType').value; const m=el('fBreedMain').value; const s=el('fBreedSub'); s.innerHTML='<option value="">請選擇</option>'; if(!t||!m) return; breeds[t].sub[m].forEach(v=>{ const o=document.createElement('option'); o.value=v; o.textContent=v; s.appendChild(o); }); }
-el('fType')?.addEventListener('change', fillMain); el('fBreedMain')?.addEventListener('change', fillSub);
+const state = { user:null, list:[] };
 
-el('loginBtn')?.addEventListener('click', ()=> signInWithPopup(auth, provider));
-el('loginBtn2')?.addEventListener('click', ()=> signInWithPopup(auth, provider));
-el('logoutBtn')?.addEventListener('click', ()=> signOut(auth));
+function guard(){
+  if(!state.user || !ADMINS.has(state.user.email)) throw new Error('no-permission');
+}
+function setAuthUI(){
+  const as = qs('#authState');
+  const lb = qs('#loginBtn'), lo = qs('#logoutBtn');
+  if(state.user){
+    as.textContent = `已登入：${state.user.email}`;
+    lb.style.display='none'; lo.style.display='';
+  }else{
+    as.textContent = '尚未登入';
+    lb.style.display=''; lo.style.display='none';
+  }
+}
+function bindAuth(){
+  qs('#loginBtn').onclick = async ()=>{
+    try{ await signInWithPopup(auth, provider); }catch(e){ alert('登入失敗'); }
+  };
+  qs('#logoutBtn').onclick = ()=>signOut(auth);
+  onAuthStateChanged(auth, u=>{ state.user=u; setAuthUI(); renderTable(); });
+}
 
-onAuthStateChanged(auth, async(u)=>{
-  const gate=el('loginGate'), area=el('adminArea'), who=el('who');
-  if(u && admins.includes(u.email)){ who.textContent=`已登入：${u.email}`; gate.style.display='none'; area.style.display='block'; await loadList(); }
-  else{ who.textContent=''; gate.style.display='block'; area.style.display='none'; if(u && !admins.includes(u.email)) await signOut(auth); }
-});
+function buildBreedSelects(){
+  const main = qs('#breedMain'), sub = qs('#breedSub'), type = qs('#type');
+  const map = {
+    貓:{'品種貓':['美短','英短','藍貓','暹羅貓','波斯貓','布偶貓','曼赤肯'],'米克斯':['橘貓','黑貓','虎斑貓','白底虎斑貓','三花貓','玳瑁貓','白貓']},
+    狗:{'品種犬':['博美','貴賓','吉娃娃','馬爾濟斯','柯基','柴犬','哈士奇','高山犬','黃金獵犬'],'米克斯':['黑色','白色','黃色','棕色','虎斑','花花']}
+  };
+  const fillMain=()=>{
+    main.innerHTML='';
+    Object.keys(map[type.value]).forEach(k=> main.innerHTML+=`<option>${k}</option>`);
+    fillSub();
+  };
+  const fillSub=()=>{
+    sub.innerHTML='';
+    (map[type.value][main.value]||[]).forEach(k=> sub.innerHTML+=`<option>${k}</option>`);
+  };
+  type.addEventListener('change', fillMain);
+  main.addEventListener('change', fillSub);
+  fillMain();
+}
 
-el('submitBtn')?.addEventListener('click', async()=>{
-  const name=el('fName').value.trim(); const type=el('fType').value; const bm=el('fBreedMain').value; const bs=el('fBreedSub').value; const age=el('fAge').value.trim(); const gender=el('fGender').value; const desc=el('fDesc').value.trim(); const files=Array.from(el('fImages').files||[]).slice(0,6);
-  if(!name||!type||!bm||!gender){ el('formMsg').textContent='請至少填：名字、類別、主品種、性別。'; return; }
-  el('submitBtn').disabled=true; el('formMsg').textContent='上傳中…';
+async function uploadImages(petId, files){
+  const urls=[];
+  for(let i=0;i<Math.min(files.length,6);i++){
+    const f = files[i];
+    const r = ref(storage, `pets/${petId}/${Date.now()}-${i}-${f.name}`);
+    await uploadBytes(r, f);
+    urls.push(await getDownloadURL(r));
+  }
+  return urls;
+}
+
+async function savePet(e){
+  e.preventDefault();
   try{
-    const docRef = await addDoc(collection(db,'pets'), { name, type, breedMain: bm, breedSub: bs, age, gender, desc, imageUrls: [], available:true, createdAt: serverTimestamp() });
-    const urls=[];
-    for(const f of files){ const path = `pets/${docRef.id}/${Date.now()}_${f.name}`; const r = ref(storage, path); await uploadBytes(r,f); urls.push(await getDownloadURL(r)); }
-    if(urls.length) await updateDoc(docRef, { imageUrls: urls });
-    el('formMsg').textContent='新增完成！'; ['fName','fType','fBreedMain','fBreedSub','fAge','fGender','fDesc'].forEach(i=>el(i).value=''); el('fImages').value=''; fillMain(); await loadList();
-  }catch(e){ alert('新增失敗：'+e.message); } finally{ el('submitBtn').disabled=false; }
-});
+    guard();
+    const id = qs('#petId').value.trim();
+    const payload = {
+      name: qs('#name').value.trim(),
+      type: qs('#type').value,
+      breedMain: qs('#breedMain').value,
+      breedSub: qs('#breedSub').value,
+      age: qs('#age').value.trim(),
+      gender: qs('#gender').value,
+      desc: qs('#desc').value.trim(),
+      available: true,
+    };
+    if(!id){
+      // 新增
+      const refDoc = await addDoc(collection(db,'pets'), {...payload, createdAt: serverTimestamp(), imageUrls:[]});
+      const imgs = qs('#images').files;
+      let urls = [];
+      if(imgs.length) urls = await uploadImages(refDoc.id, imgs);
+      await updateDoc(refDoc, { imageUrls: urls });
+      resetForm();
+    }else{
+      // 編輯
+      await updateDoc(doc(db,'pets',id), payload);
+      const imgs = qs('#images').files;
+      if(imgs.length){
+        const urls = await uploadImages(id, imgs);
+        await updateDoc(doc(db,'pets',id), { imageUrls: urls });
+      }
+      resetForm();
+    }
+    await reload();
+  }catch(err){
+    if(err.message==='no-permission') alert('你不是管理員，無權操作。');
+    else alert('儲存失敗：'+err.message);
+  }
+}
+function resetForm(){
+  qs('#petForm').reset(); qs('#petId').value='';
+}
 
-async function loadList(){
-  const body=el('listBody'); const hint=el('emptyHint'); body.innerHTML='';
-  const snap = await getDocs(query(collection(db,'pets'), orderBy('createdAt','desc')));
-  if(snap.empty){ hint.style.display='block'; return; } hint.style.display='none';
-  snap.forEach(d=>{
-    const v=d.data(); const tr=document.createElement('tr'); const breed=(v.breedMain==='米克斯'&&v.breedSub)?`米克斯/${v.breedSub}`:(v.breedSub||v.breedMain||''); tr.innerHTML=`<td data-label="名字">${v.name||''}</td><td data-label="類別">${v.type||''}</td><td data-label="品種">${breed}</td><td data-label="狀態">${v.available===false?'<span class="badge">已領養</span>':'—'}</td>`; tr.style.cursor='pointer'; tr.onclick=()=> openModal(d.id, v); body.appendChild(tr);
+async function reload(){
+  const q = query(collection(db,'pets'), orderBy('createdAt','desc'));
+  const snap = await getDocs(q);
+  state.list = snap.docs.map(d=>({id:d.id, ...d.data()}));
+  renderTable();
+}
+
+function renderTable(){
+  const tb = qs('#petsTable tbody'); tb.innerHTML='';
+  state.list.forEach(p=>{
+    const tr = document.createElement('tr');
+    const breed = p.breedMain==='米克斯'&&p.breedSub?`米克斯/${p.breedSub}`:(p.breedSub||p.breedMain||'');
+    tr.innerHTML = `<td>${p.name||''}</td><td>${p.type||''}</td><td>${breed}</td><td>${p.available===false?'已領養':'—'}</td>`;
+    tr.addEventListener('click', ()=>openModalForAdmin(p));
+    tb.appendChild(tr);
   });
 }
 
-let currentId=null, currentData=null;
-function openModal(id, data){
-  currentId=id; currentData=data;
-  document.getElementById('modalTitle').textContent=data.name||'';
-  document.getElementById('modalType').textContent=data.type||'';
-  document.getElementById('modalBreed').textContent=(data.breedMain==='米克斯'&&data.breedSub)?`米克斯/${data.breedSub}`:(data.breedSub||data.breedMain||'');
-  document.getElementById('modalAgeGender').textContent=`${data.age||''}${data.gender?'・'+data.gender:''}`;
-  document.getElementById('modalDesc').textContent=data.desc||'';
-  const hero=document.getElementById('modalHero'); const thumbs=document.getElementById('modalThumbs'); const imgs=Array.isArray(data.imageUrls)?data.imageUrls:[];
-  hero.src=imgs[0]||'assets/img/placeholder.jpg'; thumbs.innerHTML='';
-  imgs.forEach((u,i)=>{ const im=document.createElement('img'); im.src=u; if(i===0) im.classList.add('active'); im.onclick=()=>{ hero.src=u; [...thumbs.children].forEach(x=>x.classList.remove('active')); im.classList.add('active'); }; thumbs.appendChild(im); });
-  document.querySelector('.modal-backdrop').classList.add('active');
-  document.body.style.overflow='hidden';
+function fillForm(p){
+  qs('#petId').value=p.id;
+  qs('#name').value=p.name||'';
+  qs('#type').value=p.type||'貓';
+  const event = new Event('change'); qs('#type').dispatchEvent(event);
+  qs('#breedMain').value=p.breedMain||qs('#breedMain').value;
+  qs('#breedMain').dispatchEvent(new Event('change'));
+  qs('#breedSub').value=p.breedSub||qs('#breedSub').value;
+  qs('#age').value=p.age||'';
+  qs('#gender').value=p.gender||'男生';
+  qs('#desc').value=p.desc||'';
+  window.scrollTo({top:0,behavior:'smooth'});
 }
-function closeModal(){ document.querySelector('.modal-backdrop').classList.remove('active'); document.body.style.overflow=''; currentId=null; currentData=null; }
-document.getElementById('closeBtn')?.addEventListener('click', closeModal);
-document.querySelector('.modal-backdrop')?.addEventListener('click', (e)=>{ if(e.target.classList.contains('modal-backdrop')) closeModal(); });
 
-document.getElementById('adoptedBtn')?.addEventListener('click', async()=>{
-  if(!currentId) return; await updateDoc(doc(collection(db,'pets'), currentId), { available:false }); alert('已標記為已領養'); closeModal(); loadList();
-});
-document.getElementById('deleteBtn')?.addEventListener('click', async()=>{
-  if(!currentId) return; if(!confirm('刪除此動物？（圖片請至 Storage 手動清理）')) return; await deleteDoc(doc(collection(db,'pets'), currentId)); alert('已刪除'); closeModal(); loadList();
-});
-document.getElementById('editBtn')?.addEventListener('click', ()=>{
-  if(!currentData) return;
-  document.getElementById('fName').value=currentData.name||'';
-  document.getElementById('fType').value=currentData.type||''; fillMain();
-  document.getElementById('fBreedMain').value=currentData.breedMain||''; fillSub();
-  document.getElementById('fBreedSub').value=currentData.breedSub||'';
-  document.getElementById('fAge').value=currentData.age||'';
-  document.getElementById('fGender').value=currentData.gender||'';
-  document.getElementById('fDesc').value=currentData.desc||'';
-  closeModal(); window.scrollTo({top:0,behavior:'smooth'});
-});
+function openModalForAdmin(p){
+  // 填入並開啟共用 Modal
+  const bd = document.getElementById('animalModalBackdrop');
+  const hero = document.getElementById('modalHero');
+  const thumbs = document.getElementById('modalThumbs');
+  const name = document.getElementById('modalName');
+  const meta = document.getElementById('modalMeta');
+  const desc = document.getElementById('modalDesc');
+  const editBtn = document.getElementById('modalEditBtn');
+  const delBtn = document.getElementById('modalDeleteBtn');
+  const adoptBtn = document.getElementById('adoptedBtn');
+
+  const pics = (p.imageUrls && p.imageUrls.length)? p.imageUrls : ['assets/img/placeholder.jpg'];
+  hero.src = pics[0]; thumbs.innerHTML='';
+  pics.forEach((u,i)=>{ const im=document.createElement('img'); im.src=u; if(i===0) im.classList.add('active'); im.onclick=()=>{hero.src=u; [...thumbs.children].forEach(c=>c.classList.remove('active')); im.classList.add('active');}; thumbs.appendChild(im);});
+  name.textContent = p.name||'—';
+  const breed = p.breedMain==='米克斯'&&p.breedSub?`米克斯/${p.breedSub}`:(p.breedSub||p.breedMain||'');
+  meta.textContent = `${p.type||''}・${breed||''}・${p.age||''}・${p.gender||''}${p.available===false?'（已領養）':''}`;
+  desc.textContent = p.desc||'';
+
+  editBtn.onclick = ()=>{ fillForm(p); bd.classList.remove('show'); };
+  delBtn.onclick = async ()=>{
+    if(!confirm('確定刪除？')) return;
+    try{ guard(); await deleteDoc(doc(db,'pets',p.id)); await reload(); bd.classList.remove('show'); }catch(e){ alert('刪除失敗'); }
+  };
+  adoptBtn.onclick = async ()=>{
+    try{ guard(); await updateDoc(doc(db,'pets',p.id), {available: !(p.available!==false)}); await reload(); bd.classList.remove('show'); }catch(e){ alert('更新失敗'); }
+  };
+
+  bd.classList.add('show');
+}
+
+function bindModalClose(){
+  window.addEventListener('click', e=>{ if(e.target.id==='animalModalBackdrop') document.getElementById('animalModalBackdrop').classList.remove('show'); });
+}
+
+function init(){
+  bindAuth();
+  buildBreedSelects();
+  qs('#petForm').addEventListener('submit', savePet);
+  qs('#resetBtn').addEventListener('click', resetForm);
+  bindModalClose();
+  reload();
+}
+window.UI = { closeModal(){ document.getElementById('animalModalBackdrop').classList.remove('show'); } };
+init();
