@@ -6,79 +6,59 @@
 <title>我要領養 · 浪浪轉運站</title>
 <link rel="stylesheet" href="assets/css/styles.css" />
 <script type="module">
-import { db } from './assets/js/firebase.js';
-import { doc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
-const params = new URLSearchParams(location.search);
-const id = params.get('id'); let petName = params.get('name')||'';
-async function init(){
-  if(id){
+  import { db, doc, getDoc } from './assets/js/firebase.js';
+  const nameEl = document.getElementById('petName');
+  const url = new URL(location.href); const id = url.searchParams.get('id');
+  async function init(){
+    if(!id){nameEl.textContent='（未指定）';return;}
     const d = await getDoc(doc(db,'pets',id));
-    if(d.exists()) petName = d.data().name || petName;
+    nameEl.textContent = d.exists()? d.data().name : '（未找到資料）';
   }
-  document.getElementById('petName').textContent = petName ? `我要領養「${petName}」` : '我要領養';
-}
-init();
-function val(id){ return document.getElementById(id).value.trim(); }
-window.copyAndOpen = ()=>{
-  const txt = `我要領養：${petName||''}
-
-姓名：${val('fName')}
-年齡：${val('fAge')}
-居住地（縣市／區域）：${val('fArea')}
-居住環境（租屋或自宅／透天或公寓）：${val('fEnv')}
-職業：${val('fJob')}
-月收入（大約即可）：${val('fIncome')}
-家庭成員：${val('fFamily')}
-家庭成員總人數：${val('fFamilyCount')}
-現居住狀況（與人同住或獨居）：${val('fLive')}
-同居成員：${val('fRoommates')}
-
-飼養寵物經驗：${val('fExp')}
-
-現有寵物狀況：${val('fPets')}
-
-認養動機：${val('fMotivation')}
-
-飼養方式：${val('fCare')}
-
-飼養花費認知：${val('fCost')}
-
-環境參考：${val('fEnvMedia')}`;
-  navigator.clipboard?.writeText(txt);
-  window.open('https://m.me/', '_blank');
-};
+  init();
+  window.copyAndOpen = async ()=>{
+    const txt = document.getElementById('formText').value.trim();
+    try{await navigator.clipboard.writeText(txt)}catch(e){}
+    location.href='https://m.me/';
+  };
 </script>
 </head>
 <body>
-<div class="navbar">
-  <div class="navbar-inner">
-    <div class="brand">浪浪轉運站 · 台中簡媽媽狗園</div>
-    <button class="hamburger" onclick="window.UI?.toggleMenu()">☰</button>
-  </div>
-</div>
-<div class="container">
-  <h2 id="petName">我要領養</h2>
-  <div class="panel">
-    <div class="content">
-      <div class="form-row"><label>姓名</label><input id="fName" type="text"></div>
-      <div class="form-row"><label>年齡</label><input id="fAge" type="text"></div>
-      <div class="form-row"><label>居住地（縣市／區域）</label><input id="fArea" type="text"></div>
-      <div class="form-row"><label>居住環境</label><input id="fEnv" type="text" placeholder="租屋或自宅／透天或公寓"></div>
-      <div class="form-row"><label>職業</label><input id="fJob" type="text"></div>
-      <div class="form-row"><label>月收入</label><input id="fIncome" type="text" placeholder="大約即可"></div>
-      <div class="form-row"><label>家庭成員</label><input id="fFamily" type="text"></div>
-      <div class="form-row"><label>家庭成員總人數</label><input id="fFamilyCount" type="text"></div>
-      <div class="form-row"><label>現居住狀況</label><input id="fLive" type="text" placeholder="與人同住或獨居"></div>
-      <div class="form-row"><label>同居成員</label><input id="fRoommates" type="text" placeholder="伴侶、配偶、父母等"></div>
-      <div class="form-row"><label>飼養寵物經驗</label><textarea id="fExp"></textarea></div>
-      <div class="form-row"><label>現有寵物狀況</label><textarea id="fPets"></textarea></div>
-      <div class="form-row"><label>認養動機</label><textarea id="fMotivation"></textarea></div>
-      <div class="form-row"><label>飼養方式</label><textarea id="fCare"></textarea></div>
-      <div class="form-row"><label>飼養花費認知</label><textarea id="fCost"></textarea></div>
-      <div class="form-row"><label>環境參考</label><textarea id="fEnvMedia" placeholder="請描述或貼上連結"></textarea></div>
-      <div class="form-row"><div></div><button class="btn primary" onclick="copyAndOpen()">複製並打開 Messenger</button></div>
-    </div>
-  </div>
+<div class="navbar"><div class="navbar-inner"><div class="brand">浪浪轉運站 · 台中簡媽媽狗園</div></div></div>
+<div class="container narrow">
+  <h2>我要領養 <span id="petName">—</span></h2>
+  <textarea id="formText" rows="22" class="textarea" placeholder="請在此輸入完整申請…">【我要領養】（自動帶入名字：請送出後勿刪）
+姓名：
+年齡：
+居住地（縣市／區域）：
+居住環境（租屋或自宅／透天或公寓）：
+職業：
+月收入（大約即可）：
+家庭成員：
+家庭成員總人數：
+現居住狀況（與人同住或獨居）：
+同居成員（例如：伴侶、配偶、父母等）：
+
+飼養寵物經驗：
+是否曾經飼養過寵物？
+若有，飼養過什麼寵物？
+
+現有寵物狀況：
+目前家中是否有寵物？
+若有，請提供寵物種類、性別、是否已結紮等資訊
+
+認養動機：
+為什麼想認養這隻毛孩呢？
+
+飼養方式：
+您會如何照顧這隻毛孩？（例如：飲食安排、居住空間、教育方式等）
+
+飼養花費認知：
+您認為飼養寵物需要哪些支出？（請舉例說明）
+
+環境參考：
+請拍攝或錄製毛孩未來的生活區域，供我們審核參考～謝謝！
+</textarea>
+  <button class="btn primary" onclick="copyAndOpen()">複製並打開 Messenger</button>
 </div>
 <div class="footer">© 2025 浪浪轉運站 · 台中簡媽媽狗園</div>
 </body>
