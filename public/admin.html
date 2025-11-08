@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>暖心窩｜後台管理</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-pink-50 min-h-screen flex flex-col items-center p-6">
+
+  <!-- 標題 -->
+  <h1 class="text-3xl font-bold text-pink-600 mb-6">🐾 暖心窩後台管理</h1>
+
+  <!-- 登入按鈕 -->
+  <button id="loginBtn"
+          class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-semibold">
+    使用 Google 登入
+  </button>
+
+  <!-- 登出按鈕 -->
+  <button id="logoutBtn"
+          class="hidden bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg mb-6">
+    登出
+  </button>
+
+  <!-- 管理介面 -->
+  <div id="adminPanel" class="hidden w-full max-w-3xl bg-white shadow-lg rounded-2xl p-6">
+    <h2 class="text-2xl font-bold text-gray-800 mb-4">送養資料管理</h2>
+
+    <!-- 新增 / 編輯表單 -->
+    <form id="petForm" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <input type="hidden" id="petId">
+      <input id="petName" placeholder="名字" class="border p-2 rounded" required>
+      <select id="petType" class="border p-2 rounded" required>
+        <option value="">選擇種類</option>
+        <option value="cat">貓</option>
+        <option value="dog">狗</option>
+      </select>
+      <input id="petAge" placeholder="年齡" class="border p-2 rounded">
+      <input id="petImage" placeholder="圖片網址" class="border p-2 rounded">
+      <textarea id="petDesc" placeholder="簡介" class="border p-2 rounded md:col-span-2"></textarea>
+
+      <div class="md:col-span-2 flex justify-end">
+        <button id="saveBtn" class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg">
+          💾 儲存
+        </button>
+      </div>
+    </form>
+
+    <!-- 列表區 -->
+    <div id="petList" class="space-y-4"></div>
+  </div>
+
+  <!-- Firebase 模組 -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js";
+    import { getFirestore, collection, addDoc, getDocs, deleteDoc, updateDoc, doc } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+
+    // 🔧 TODO: 這裡換成你的 Firebase 專案設定
+    const firebaseConfig = {
+      apiKey: "AIzaSyBw9GBw5-LZkKD34qTiwBtZXdwONHLqG_s",
+      authDomain: "straystation.firebaseapp.com",
+      projectId: "straystation",
+      storageBucket: "straystation.firebasestorage.app",
+      messagingSenderId: "611366379195",
+      appId: "1:611366379195:web:ef5a632e88d8bba1d6139e"
+    };
+
+    // 初始化 Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const provider = new GoogleAuthProvider();
+
+    const loginBtn = document.getElementById("loginBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const adminPanel = document.getElementById("adminPanel");
+    const form = document.getElementById("petForm");
+    const petList = document.getElementById("petList");
+
+    // 🔐 Google 登入
+    loginBtn.addEventListener("click", async () => {
+      try {
+        await signInWithPopup(auth, provider);
+        toggleUI(true);
+        loadPets();
+      } catch (err) {
+        alert("登入失敗：" + err.message);
+      }
+    });
+
+    // 🚪 登出
+    logoutBtn.addEventListener("click", async () => {
+      await signOut(auth);
+      toggleUI(false);
+    });
+
+    function toggleUI(isLoggedIn) {
+      loginBtn.classList.toggle("hidden", isLoggedIn);
+      logoutBtn.classList.toggle("hidden", !isLoggedIn);
+      adminPanel.classList.toggle("hidden", !isLoggedIn);
+    }
+
+    // 📦 載入資料
+    async function loadPets() {
+      petList.innerHTML = "";
+      const querySnapshot = await getDocs(collection(db, "pets"));
+      querySnapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        const card = document.createElement("div");
+        card.className = "border rounded-lg p-4 flex flex-col md:flex-row justify-between items-center gap-4";
+        card.innerHTML = `
+          <div>
+            <h3 class="text-lg font-semibold">${data.name} (${data.type})</h3>
+            <p class="text-sm text-gray-500">${data.age || ''}</p>
+            <p class="text-gray-700">${data.desc || ''}</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="edit bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded" data-id="${docSnap.id}">編輯</button>
+            <button class="del bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded" data-id="${docSnap.id}">刪除</button>
+          </div>
+        `;
+        petList.appendChild(card);
+      });
+
+      // 綁定按鈕事件
+      document.querySelectorAll(".edit").forEach(btn => {
+        btn.addEventListener("click", () => editPet(btn.dataset.id));
+      });
+      document.querySelectorAll(".del").forEach(btn => {
+        btn.addEventListener("click", () => deletePet(btn.dataset.id));
+      });
+    }
+
+    // ➕ 新增 / 編輯
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const id = form.petId.value;
+      const pet = {
+        name: form.petName.value,
+        type: form.petType.value,
+        age: form.petAge.value,
+        image: form.petImage.value,
+        desc: form.petDesc.value,
+      };
+      if (id) {
+        await updateDoc(doc(db, "pets", id), pet);
+      } else {
+        await addDoc(collection(db, "pets"), pet);
+      }
+      form.reset();
+      form.petId.value = "";
+      loadPets();
+    });
+
+    // ✏️ 編輯功能
+    async function editPet(id) {
+      const querySnapshot = await getDocs(collection(db, "pets"));
+      querySnapshot.forEach(docSnap => {
+        if (docSnap.id === id) {
+          const data = docSnap.data();
+          form.petId.value = id;
+          form.petName.value = data.name;
+          form.petType.value = data.type;
+          form.petAge.value = data.age;
+          form.petImage.value = data.image;
+          form.petDesc.value = data.desc;
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+      });
+    }
+
+    // 🗑 刪除功能
+    async function deletePet(id) {
+      if (confirm("確定要刪除這筆資料嗎？")) {
+        await deleteDoc(doc(db, "pets", id));
+        loadPets();
+      }
+    }
+  </script>
+
+</body>
+</html>
