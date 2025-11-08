@@ -7,55 +7,60 @@
 <link rel="stylesheet" href="assets/css/styles.css" />
 <script type="module" src="assets/js/ui.js"></script>
 <script type="module" src="assets/js/app.js"></script>
+<!-- GA4 -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-JTTJH33M4X"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-JTTJH33M4X');</script>
 </head>
 <body>
-<div class="navbar">
-  <div class="navbar-inner">
-    <div class="brand">浪浪轉運站 · 台中簡媽媽狗園</div>
-    <button class="hamburger" onclick="window.UI.toggleMenu()">☰</button>
-  </div>
-  <div id="mobileMenu" class="menu">
-    <a href="cats.html">我想養貓</a>
-    <a href="dogs.html">我想養狗</a>
-    <a href="about.html">關於簡媽媽</a>
-    <a href="admin.html" id="adminLoginLink">管理員登入</a>
-  </div>
-</div>
-<div class="container">
-  <div class="grid-two">
-    <section>
-      <div class="section-header">
-        <div class="section-title">新的貓咪 🐱</div>
-        <div class="section-actions"><a href="cats.html">看全部 →</a></div>
-      </div>
-      <div id="homeCats" class="cards-2"></div>
-    </section>
-    <section>
-      <div class="section-header">
-        <div class="section-title">新的狗狗 🐶</div>
-        <div class="section-actions"><a href="dogs.html">看全部 →</a></div>
-      </div>
-      <div id="homeDogs" class="cards-2"></div>
-    </section>
-  </div>
-</div>
-<div class="footer">© 2025 浪浪轉運站 · 台中簡媽媽狗園</div>
-<div id="animalModalBackdrop" class="modal-backdrop">
-  <div class="modal" role="dialog" aria-modal="true">
-    <div id="closeModal" class="modal-close" title="關閉">✕</div>
-    <div class="left">
-      <div class="hero"><img id="modalHero" alt="animal"></div>
-      <div id="modalThumbs" class="thumbs"></div>
+  <div class="navbar">
+    <div class="navbar-inner">
+      <div class="brand">浪浪轉運站 · 台中簡媽媽狗園</div>
+      <button class="hamburger" onclick="UI.toggleMenu()">☰</button>
     </div>
-    <div class="right">
-      <h3 id="modalName">動物名稱</h3>
-      <div class="meta" id="modalMeta" style="margin-bottom:8px;"></div>
-      <div id="modalDesc" class="helper" style="white-space:pre-wrap"></div>
-      <div style="margin-top:12px;">
-        <a id="adoptBtn" class="btn primary">我要領養</a>
-      </div>
+    <div id="mobileMenu" class="menu">
+      <a href="cats.html">我想養貓</a>
+      <a href="dogs.html">我想養狗</a>
+      <a href="about.html">關於簡媽媽</a>
+      <a href="admin.html" id="adminLoginLink">管理員登入</a>
     </div>
   </div>
-</div>
+
+  <div class="container">
+    <div class="grid-two">
+      <section>
+        <div class="section-header">
+          <div class="section-title">新的貓咪 🐱</div>
+          <div class="section-actions"><a href="cats.html">看全部 →</a></div>
+        </div>
+        <div id="homeCats" class="cards-2"></div>
+      </section>
+      <section>
+        <div class="section-header">
+          <div class="section-title">新的狗狗 🐶</div>
+          <div class="section-actions"><a href="dogs.html">看全部 →</a></div>
+        </div>
+        <div id="homeDogs" class="cards-2"></div>
+      </section>
+    </div>
+  </div>
+
+  <div class="footer">© 2025 浪浪轉運站 · 台中簡媽媽狗園</div>
+
+  <!-- 詳細視窗（首頁/列表共用） -->
+  <div id="animalModalBackdrop" class="modal-backdrop">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-close" onclick="UI.closeModal()" title="關閉">✕</div>
+      <div class="left">
+        <div class="hero"><img id="modalHero" alt="" /></div>
+        <div id="modalThumbs" class="thumbs"></div>
+      </div>
+      <div class="right">
+        <h3 id="modalName">—</h3>
+        <div id="modalMeta" class="meta"></div>
+        <div id="modalDesc" class="helper"></div>
+        <div id="modalActions" class="actions"></div>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
