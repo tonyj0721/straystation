@@ -1,184 +1,238 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-Hant">\>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>暖心窩｜後台管理</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>台中簡媽媽狗園｜後台管理</title>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-pink-50 min-h-screen flex flex-col items-center p-6">
-
-  <!-- 標題 -->
-  <h1 class="text-3xl font-bold text-pink-600 mb-6">🐾 暖心窩後台管理</h1>
-
-  <!-- 登入按鈕 -->
-  <button id="loginBtn"
-          class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-semibold">
-    使用 Google 登入
-  </button>
-
-  <!-- 登出按鈕 -->
-  <button id="logoutBtn"
-          class="hidden bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg mb-6">
-    登出
-  </button>
-
-  <!-- 管理介面 -->
-  <div id="adminPanel" class="hidden w-full max-w-3xl bg-white shadow-lg rounded-2xl p-6">
-    <h2 class="text-2xl font-bold text-gray-800 mb-4">送養資料管理</h2>
-
-    <!-- 新增 / 編輯表單 -->
-    <form id="petForm" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-      <input type="hidden" id="petId">
-      <input id="petName" placeholder="名字" class="border p-2 rounded" required>
-      <select id="petType" class="border p-2 rounded" required>
-        <option value="">選擇種類</option>
-        <option value="cat">貓</option>
-        <option value="dog">狗</option>
-      </select>
-      <input id="petAge" placeholder="年齡" class="border p-2 rounded">
-      <input id="petImage" placeholder="圖片網址" class="border p-2 rounded">
-      <textarea id="petDesc" placeholder="簡介" class="border p-2 rounded md:col-span-2"></textarea>
-
-      <div class="md:col-span-2 flex justify-end">
-        <button id="saveBtn" class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg">
-          💾 儲存
-        </button>
-      </div>
-    </form>
-
-    <!-- 列表區 -->
-    <div id="petList" class="space-y-4"></div>
+<body class="bg-gray-50 min-h-screen">
+  <div id="login-section" class="flex flex-col items-center justify-center min-h-screen">
+    <h1 class="text-3xl font-bold mb-6">台中簡媽媽狗園｜後台管理</h1>
+    <button id="login-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-xl">使用 Google 登入</button>
   </div>
 
-  <!-- Firebase 模組 -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
-    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js";
-    import { getFirestore, collection, addDoc, getDocs, deleteDoc, updateDoc, doc } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+  <div id="admin-section" class="hidden p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-2xl font-bold">送養資料管理</h2>
+      <div>
+        <span id="user-email" class="mr-4 text-gray-600"></span>
+        <button id="logout-btn" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">登出</button>
+      </div>
+    </div>
 
-    // 🔧 TODO: 這裡換成你的 Firebase 專案設定
+    <form id="pet-form" class="bg-white p-6 rounded-2xl shadow mb-6">
+      <div class="grid grid-cols-2 gap-4">
+        <input id="name" type="text" placeholder="名字" class="border p-2 rounded" required>
+        <select id="type" class="border p-2 rounded" required>
+          <option value="">選擇類別</option>
+          <option value="cat">貓</option>
+          <option value="dog">狗</option>
+        </select>
+
+        <select id="category" class="border p-2 rounded" required>
+          <option value="">選擇品種類型</option>
+          <option value="breed">品種貓/犬</option>
+          <option value="mix">米克斯</option>
+        </select>
+
+        <select id="breed" class="border p-2 rounded" required>
+          <option value="">請先選擇類別與品種類型</option>
+        </select>
+
+        <input id="age" type="text" placeholder="年齡 (幾個月或幾歲)" class="border p-2 rounded" required>
+        <select id="gender" class="border p-2 rounded" required>
+          <option value="">選擇性別</option>
+          <option value="男生">男生</option>
+          <option value="女生">女生</option>
+        </select>
+      </div>
+
+      <textarea id="desc" placeholder="簡介 (個性、習慣、故事等)" class="border p-2 rounded w-full mt-4" rows="3"></textarea>
+
+      <div class="mt-4">
+        <label class="font-semibold">上傳圖片（最多 5 張）：</label>
+        <input id="images" type="file" accept="image/*" multiple class="block mt-2">
+        <div id="preview" class="flex gap-2 mt-2 flex-wrap"></div>
+      </div>
+
+      <button type="submit" class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg mt-4">儲存送養資料</button>
+    </form>
+
+    <table class="w-full bg-white shadow rounded-2xl">
+      <thead class="bg-gray-100">
+        <tr>
+          <th class="p-2">圖片</th>
+          <th class="p-2">名字</th>
+          <th class="p-2">類別</th>
+          <th class="p-2">品種/毛色</th>
+          <th class="p-2">年齡</th>
+          <th class="p-2">性別</th>
+          <th class="p-2">動作</th>
+        </tr>
+      </thead>
+      <tbody id="pets-list"></tbody>
+    </table>
+  </div>
+
+  <script>
     const firebaseConfig = {
-      apiKey: "AIzaSyBw9GBw5-LZkKD34qTiwBtZXdwONHLqG_s",
+      apiKey: "YOUR_API_KEY",
       authDomain: "straystation.firebaseapp.com",
       projectId: "straystation",
-      storageBucket: "straystation.firebasestorage.app",
-      messagingSenderId: "611366379195",
-      appId: "1:611366379195:web:ef5a632e88d8bba1d6139e"
+      storageBucket: "straystation.appspot.com",
+      messagingSenderId: "",
+      appId: ""
+    };
+    firebase.initializeApp(firebaseConfig);
+
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+
+    const loginBtn = document.getElementById('login-btn');
+    const logoutBtn = document.getElementById('logout-btn');
+    const loginSection = document.getElementById('login-section');
+    const adminSection = document.getElementById('admin-section');
+
+    loginBtn.onclick = () => {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      auth.signInWithPopup(provider);
     };
 
-    // 初始化 Firebase
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-    const provider = new GoogleAuthProvider();
+    logoutBtn.onclick = () => auth.signOut();
 
-    const loginBtn = document.getElementById("loginBtn");
-    const logoutBtn = document.getElementById("logoutBtn");
-    const adminPanel = document.getElementById("adminPanel");
-    const form = document.getElementById("petForm");
-    const petList = document.getElementById("petList");
-
-    // 🔐 Google 登入
-    loginBtn.addEventListener("click", async () => {
-      try {
-        await signInWithPopup(auth, provider);
-        toggleUI(true);
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        loginSection.classList.add('hidden');
+        adminSection.classList.remove('hidden');
+        document.getElementById('user-email').textContent = user.email;
         loadPets();
-      } catch (err) {
-        alert("登入失敗：" + err.message);
-      }
-    });
-
-    // 🚪 登出
-    logoutBtn.addEventListener("click", async () => {
-      await signOut(auth);
-      toggleUI(false);
-    });
-
-    function toggleUI(isLoggedIn) {
-      loginBtn.classList.toggle("hidden", isLoggedIn);
-      logoutBtn.classList.toggle("hidden", !isLoggedIn);
-      adminPanel.classList.toggle("hidden", !isLoggedIn);
-    }
-
-    // 📦 載入資料
-    async function loadPets() {
-      petList.innerHTML = "";
-      const querySnapshot = await getDocs(collection(db, "pets"));
-      querySnapshot.forEach(docSnap => {
-        const data = docSnap.data();
-        const card = document.createElement("div");
-        card.className = "border rounded-lg p-4 flex flex-col md:flex-row justify-between items-center gap-4";
-        card.innerHTML = `
-          <div>
-            <h3 class="text-lg font-semibold">${data.name} (${data.type})</h3>
-            <p class="text-sm text-gray-500">${data.age || ''}</p>
-            <p class="text-gray-700">${data.desc || ''}</p>
-          </div>
-          <div class="flex items-center gap-2">
-            <button class="edit bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded" data-id="${docSnap.id}">編輯</button>
-            <button class="del bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded" data-id="${docSnap.id}">刪除</button>
-          </div>
-        `;
-        petList.appendChild(card);
-      });
-
-      // 綁定按鈕事件
-      document.querySelectorAll(".edit").forEach(btn => {
-        btn.addEventListener("click", () => editPet(btn.dataset.id));
-      });
-      document.querySelectorAll(".del").forEach(btn => {
-        btn.addEventListener("click", () => deletePet(btn.dataset.id));
-      });
-    }
-
-    // ➕ 新增 / 編輯
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const id = form.petId.value;
-      const pet = {
-        name: form.petName.value,
-        type: form.petType.value,
-        age: form.petAge.value,
-        image: form.petImage.value,
-        desc: form.petDesc.value,
-      };
-      if (id) {
-        await updateDoc(doc(db, "pets", id), pet);
       } else {
-        await addDoc(collection(db, "pets"), pet);
+        adminSection.classList.add('hidden');
+        loginSection.classList.remove('hidden');
       }
+    });
+
+    // 🧠 動態更新品種/毛色下拉選單
+    const typeSelect = document.getElementById('type');
+    const categorySelect = document.getElementById('category');
+    const breedSelect = document.getElementById('breed');
+
+    const breeds = {
+      cat: {
+        breed: ['美短','英短','藍貓','暹羅貓','波斯貓','布偶貓','曼赤肯'],
+        mix: ['橘貓','黑貓','虎斑貓','白底虎斑貓','三花貓','玳瑁貓','白貓']
+      },
+      dog: {
+        breed: ['博美','貴賓','吉娃娃','馬爾濟斯','柯基','柴犬','哈士奇','高山犬','黃金獵犬'],
+        mix: ['黑色','白色','黃色','棕色','虎斑','花花']
+      }
+    };
+
+    function updateBreedOptions() {
+      const type = typeSelect.value;
+      const category = categorySelect.value;
+      breedSelect.innerHTML = '<option value="">請選擇</option>';
+      if (type && category && breeds[type][category]) {
+        breeds[type][category].forEach(b => {
+          const opt = document.createElement('option');
+          opt.value = b;
+          opt.textContent = b;
+          breedSelect.appendChild(opt);
+        });
+      }
+    }
+
+    typeSelect.onchange = updateBreedOptions;
+    categorySelect.onchange = updateBreedOptions;
+
+    // 📸 圖片預覽與上傳
+    const imageInput = document.getElementById('images');
+    const preview = document.getElementById('preview');
+    let imageFiles = [];
+
+    imageInput.addEventListener('change', e => {
+      preview.innerHTML = '';
+      imageFiles = Array.from(e.target.files).slice(0, 5);
+      imageFiles.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = e2 => {
+          const img = document.createElement('img');
+          img.src = e2.target.result;
+          img.className = 'w-20 h-20 object-cover rounded';
+          preview.appendChild(img);
+        };
+        reader.readAsDataURL(file);
+      });
+    });
+
+    // 🧾 表單送出
+    const form = document.getElementById('pet-form');
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const name = document.getElementById('name').value;
+      const type = document.getElementById('type').value;
+      const category = document.getElementById('category').value;
+      const breed = document.getElementById('breed').value;
+      const age = document.getElementById('age').value;
+      const gender = document.getElementById('gender').value;
+      const desc = document.getElementById('desc').value;
+
+      const petRef = db.collection('pets').doc();
+      const imageUrls = [];
+      for (const file of imageFiles) {
+        const ref = storage.ref(`pets_images/${petRef.id}/${file.name}`);
+        await ref.put(file);
+        const url = await ref.getDownloadURL();
+        imageUrls.push(url);
+      }
+
+      await petRef.set({
+        name, type, category, breed, age, gender, desc,
+        images: imageUrls,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      alert('資料已儲存！');
       form.reset();
-      form.petId.value = "";
+      preview.innerHTML = '';
       loadPets();
     });
 
-    // ✏️ 編輯功能
-    async function editPet(id) {
-      const querySnapshot = await getDocs(collection(db, "pets"));
-      querySnapshot.forEach(docSnap => {
-        if (docSnap.id === id) {
-          const data = docSnap.data();
-          form.petId.value = id;
-          form.petName.value = data.name;
-          form.petType.value = data.type;
-          form.petAge.value = data.age;
-          form.petImage.value = data.image;
-          form.petDesc.value = data.desc;
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        }
+    // 📋 顯示資料
+    async function loadPets() {
+      const tbody = document.getElementById('pets-list');
+      tbody.innerHTML = '';
+      const snap = await db.collection('pets').orderBy('createdAt','desc').get();
+      snap.forEach(doc => {
+        const d = doc.data();
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class='p-2'><img src='${d.images?.[0] || ''}' class='w-16 h-16 object-cover rounded'></td>
+          <td class='p-2'>${d.name}</td>
+          <td class='p-2'>${d.type === 'cat' ? '貓' : '狗'}</td>
+          <td class='p-2'>${d.breed}</td>
+          <td class='p-2'>${d.age}</td>
+          <td class='p-2'>${d.gender}</td>
+          <td class='p-2'>
+            <button onclick="deletePet('${doc.id}')" class='bg-red-500 text-white px-3 py-1 rounded'>刪除</button>
+          </td>`;
+        tbody.appendChild(tr);
       });
     }
 
-    // 🗑 刪除功能
+    // ❌ 刪除
     async function deletePet(id) {
-      if (confirm("確定要刪除這筆資料嗎？")) {
-        await deleteDoc(doc(db, "pets", id));
-        loadPets();
-      }
+      if (!confirm('確定刪除此資料？')) return;
+      await db.collection('pets').doc(id).delete();
+      alert('已刪除');
+      loadPets();
     }
   </script>
-
 </body>
 </html>
