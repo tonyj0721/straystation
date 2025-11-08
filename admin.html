@@ -8,72 +8,80 @@
 <script type="module" src="assets/js/admin.js"></script>
 </head>
 <body>
-<div class="navbar">
-  <div class="navbar-inner">
-    <div class="brand">管理員後台</div>
-    <div>
-      <span id="who" class="helper"></span>
-      <button id="loginBtn" class="btn">管理員登入</button>
-      <button id="logoutBtn" class="btn" style="display:none">登出</button>
+  <div class="navbar"><div class="navbar-inner"><div class="brand">管理員後台 · 浪浪轉運站</div></div></div>
+
+  <div class="container">
+    <div class="admin-top">
+      <div id="authState">尚未登入</div>
+      <button class="btn" id="loginBtn">管理員登入</button>
+      <button class="btn" id="logoutBtn" style="display:none;">登出</button>
     </div>
-  </div>
-</div>
-<div class="container">
-  <div id="loginGate" class="panel" style="display:none">
-    <div class="content">
-      <p>請先以 Google 帳號登入（僅限管理員）。</p>
-      <button id="loginBtn2" class="btn primary">管理員登入</button>
+
+    <div class="card">
+      <h3>新增 / 編輯動物</h3>
+      <form id="petForm">
+        <input type="hidden" id="petId" />
+        <label>名字<input id="name" required></label>
+        <label>類別
+          <select id="type" required>
+            <option value="貓">貓</option><option value="狗">狗</option>
+          </select>
+        </label>
+        <div class="grid-two">
+          <label>主品種
+            <select id="breedMain" required></select>
+          </label>
+          <label>次品種
+            <select id="breedSub" required></select>
+          </label>
+        </div>
+        <div class="grid-two">
+          <label>年齡（文字）<input id="age" placeholder="例：3個月 / 5歲 / 不到1歲" required></label>
+          <label>性別
+            <select id="gender" required><option>男生</option><option>女生</option></select>
+          </label>
+        </div>
+        <label>簡介<textarea id="desc" rows="4" placeholder="簡單介紹個性、健康、適合家庭…"></textarea></label>
+
+        <div class="uploader">
+          <div>上傳照片（最多 6 張，建議 1200×900 以上）</div>
+          <input type="file" id="images" accept="image/*" multiple />
+        </div>
+        <button class="btn primary" id="submitBtn" type="submit">登錄</button>
+        <button class="btn" id="resetBtn" type="button">清空表單</button>
+      </form>
     </div>
-  </div>
-  <section id="adminArea" class="panel" style="display:none">
-    <h2>新增動物資料</h2>
-    <div class="content">
-      <div class="form-row"><label>名字</label><input id="fName" type="text" placeholder="例如：奈奈"></div>
-      <div class="form-row"><label>類別</label><select id="fType"><option value="">請選擇</option><option value="貓">貓</option><option value="狗">狗</option></select></div>
-      <div class="form-row"><label>主品種</label><select id="fBreedMain"><option value="">請先選類別</option></select></div>
-      <div class="form-row"><label>次品種</label><select id="fBreedSub"><option value="">請先選主品種</option></select></div>
-      <div class="form-row"><label>年齡</label><input id="fAge" type="text" placeholder="3個月 / 5歲 / 不到1歲"></div>
-      <div class="form-row"><label>性別</label><select id="fGender"><option value="">請選擇</option><option value="男生">男生</option><option value="女生">女生</option></select></div>
-      <div class="form-row"><label>簡介</label><textarea id="fDesc" placeholder="個性、習慣、注意事項…"></textarea></div>
-      <div class="form-row"><label>上傳照片</label><input id="fImages" type="file" accept="image/*" multiple><div class="helper">最多 6 張，建議 1200×900 以上</div></div>
-      <div class="form-row"><div></div><button id="submitBtn" class="btn primary">登錄</button></div>
-      <div id="formMsg" class="helper"></div>
-    </div>
-  </section>
-  <section class="panel">
-    <h2>已登錄資料</h2>
-    <div class="content">
-      <table class="table">
-        <thead><tr><th style="width:32%">名字</th><th style="width:18%">類別</th><th style="width:36%">品種</th><th style="width:14%">狀態</th></tr></thead>
-        <tbody id="listBody"></tbody>
+
+    <div class="card">
+      <h3>已登錄資料</h3>
+      <table class="table" id="petsTable">
+        <thead><tr><th>名字</th><th>類別</th><th>品種</th><th>狀態</th></tr></thead>
+        <tbody></tbody>
       </table>
-      <div id="emptyHint" class="helper" style="display:none">目前沒有資料。</div>
     </div>
-  </section>
-</div>
-<div class="footer">© 2025 浪浪轉運站 · 台中簡媽媽狗園</div>
-<div class="modal-backdrop">
-  <div id="modal" class="modal">
-    <div id="closeBtn" class="modal-close" title="關閉">✕</div>
-    <div id="editBtn" class="modal-edit" title="編輯">✎</div>
-    <div id="deleteBtn" class="modal-delete" title="刪除">🗑</div>
-    <div class="left">
-      <div class="hero"><img id="modalHero" alt="animal"></div>
-      <div id="modalThumbs" class="thumbs"></div>
-    </div>
-    <div class="right">
-      <header style="display:flex;justify-content:space-between;align-items:center">
-        <strong id="modalTitle">—</strong>
-      </header>
-      <p><span class="badge" id="modalType">—</span></p>
-      <p id="modalBreed">—</p>
-      <p id="modalAgeGender">—</p>
-      <p id="modalDesc" style="white-space:pre-wrap"></p>
-      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-        <button id="adoptedBtn" class="btn">標記為「已領養」</button>
+  </div>
+
+  <!-- 詳細視窗（管理後台專用） -->
+  <div id="animalModalBackdrop" class="modal-backdrop">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-close" onclick="UI.closeModal()" title="關閉">✕</div>
+      <div class="modal-tools">
+        <button id="modalEditBtn" class="icon-btn" title="編輯">✎</button>
+        <button id="modalDeleteBtn" class="icon-btn danger" title="刪除">🗑</button>
+      </div>
+      <div class="left">
+        <div class="hero"><img id="modalHero" alt=""></div>
+        <div id="modalThumbs" class="thumbs"></div>
+      </div>
+      <div class="right">
+        <h3 id="modalName">—</h3>
+        <div id="modalMeta" class="meta"></div>
+        <div id="modalDesc" class="helper"></div>
+        <div id="modalActions" class="actions">
+          <button id="adoptedBtn" class="btn">標記為已領養 / 取消</button>
+        </div>
       </div>
     </div>
   </div>
-</div>
 </body>
 </html>
