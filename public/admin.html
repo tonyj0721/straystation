@@ -125,7 +125,16 @@ catSel.addEventListener('change',()=>{
   const t=typeSel.value,c=catSel.value;
   breedSel.innerHTML='<option value="">請選擇</option>';
   if(!t||!c)return;
-  OPTIONS[t].breed[c].forEach(b=>{const opt=document.createElement('option');opt.value=b;opt.textContent=b;breedSel.appendChild(opt);});
+
+  // ⭐ 延遲 100ms 再插入新選項（避免立即關閉）
+  setTimeout(()=>{
+    OPTIONS[t].breed[c].forEach(b=>{
+      const opt=document.createElement('option');
+      opt.value=b;
+      opt.textContent=b;
+      breedSel.appendChild(opt);
+    });
+  },100);
 });
 
 // --- 圖片壓縮 ---
