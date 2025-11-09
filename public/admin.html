@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>台中簡媽媽狗園｜後台管理</title>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -13,98 +13,230 @@
   <style>
     body.modal-open { overflow: hidden; }
     #cards { min-height: 40vh; }
+    #thumbs img { width: 60px; height: 60px; object-fit: cover; border-radius: .5rem; cursor: pointer; }
   </style>
 </head>
 <body class="bg-[#fdf6f7] text-gray-800 min-h-screen">
 
-  <!-- 登入畫面 -->
-  <div id="login-section" class="flex flex-col items-center justify-center min-h-screen">
-    <h1 class="text-3xl font-bold mb-6 text-rose-600">台中簡媽媽狗園｜後台管理</h1>
-    <button id="login-btn" class="bg-rose-500 hover:bg-rose-600 text-white px-6 py-3 rounded-xl">使用 Google 登入</button>
-  </div>
+<!-- 登入畫面 -->
+<div id="login-section" class="flex flex-col items-center justify-center min-h-screen">
+  <h1 class="text-3xl font-bold mb-6 text-rose-600">台中簡媽媽狗園｜後台管理</h1>
+  <button id="login-btn" class="bg-rose-500 hover:bg-rose-600 text-white px-6 py-3 rounded-xl">使用 Google 登入</button>
+</div>
 
-  <!-- 管理畫面 -->
-  <div id="admin-section" class="hidden p-4 md:p-8 space-y-6">
-    <div class="flex flex-col md:flex-row justify-between items-center gap-4">
-      <h2 class="text-2xl font-bold text-rose-600">送養資料管理</h2>
-      <div class="flex items-center gap-3">
-        <span id="user-email" class="text-gray-600 text-sm"></span>
-        <button id="logout-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg">登出</button>
-      </div>
-    </div>
-
-    <!-- 表單區 -->
-    <form id="pet-form" class="bg-white p-6 rounded-2xl shadow space-y-4">
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <input id="name" type="text" placeholder="名字" class="border p-2 rounded" required>
-        <select id="type" class="border p-2 rounded" required>
-          <option value="">選擇類別</option>
-          <option value="cat">貓</option>
-          <option value="dog">狗</option>
-        </select>
-        <select id="category" class="border p-2 rounded" required>
-          <option value="">請先選擇類別</option>
-        </select>
-        <select id="breed" class="border p-2 rounded" required>
-          <option value="">請先選擇類別與品種類型</option>
-        </select>
-        <input id="age" type="text" placeholder="年齡（例如 6個月、2歲）" class="border p-2 rounded">
-        <select id="gender" class="border p-2 rounded" required>
-          <option value="">選擇性別</option>
-          <option value="男生">男生</option>
-          <option value="女生">女生</option>
-        </select>
-      </div>
-
-      <textarea id="desc" placeholder="簡介（個性、習慣、故事等）" class="border p-2 rounded w-full" rows="3"></textarea>
-
-      <div>
-        <label class="font-semibold">上傳圖片（最多 5 張，可分次追加）：</label>
-        <input id="images" type="file" accept="image/*" multiple class="block mt-2">
-        <div id="preview" class="flex flex-wrap gap-2 mt-2"></div>
-      </div>
-
-      <button id="submit-btn" type="submit" class="bg-rose-500 hover:bg-rose-600 text-white px-6 py-2 rounded-lg w-full sm:w-auto">登錄</button>
-    </form>
-
-    <!-- 已登錄區 -->
-    <div class="bg-white p-4 md:p-6 rounded-2xl shadow">
-      <div class="flex flex-col md:flex-row items-center justify-between gap-3">
-        <h3 class="text-xl font-semibold text-rose-600">已登錄動物</h3>
-        <input id="search" type="text" placeholder="搜尋名字…" class="w-full md:w-80 border rounded px-3 py-2">
-      </div>
-      <div id="cards" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mt-4"></div>
-      <p id="empty-tip" class="text-gray-500 text-sm mt-3">輸入名字以搜尋並顯示卡片</p>
+<!-- 管理畫面 -->
+<div id="admin-section" class="hidden p-4 md:p-8 space-y-6">
+  <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+    <h2 class="text-2xl font-bold text-rose-600">送養資料管理</h2>
+    <div class="flex items-center gap-3">
+      <span id="user-email" class="text-gray-600 text-sm"></span>
+      <button id="logout-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg">登出</button>
     </div>
   </div>
 
-  <!-- 詳細資料 Modal -->
-  <div id="modal" class="hidden fixed inset-0 bg-[#fdf6f7]/90 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl relative flex flex-col md:flex-row overflow-hidden">
-      <button id="close-modal" class="absolute top-3 left-3 text-gray-600 text-2xl">✖</button>
-      <div class="absolute top-3 right-4 flex gap-3 text-xl">
-        <button id="edit-btn">✏️</button>
-        <button id="delete-btn">🗑️</button>
-      </div>
+  <!-- 表單 -->
+  <form id="pet-form" class="bg-white p-6 rounded-2xl shadow space-y-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <input id="name" type="text" placeholder="名字" class="border p-2 rounded" required />
+      <select id="type" class="border p-2 rounded" required>
+        <option value="">選擇類別</option>
+        <option value="cat">貓</option>
+        <option value="dog">狗</option>
+      </select>
+      <select id="category" class="border p-2 rounded" required>
+        <option value="">請先選擇類別</option>
+      </select>
+      <select id="breed" class="border p-2 rounded" required>
+        <option value="">請先選擇品種類型</option>
+      </select>
+      <input id="age" type="text" placeholder="年齡（可略）" class="border p-2 rounded" />
+      <select id="gender" class="border p-2 rounded" required>
+        <option value="">選擇性別</option>
+        <option value="男生">男生</option>
+        <option value="女生">女生</option>
+      </select>
+    </div>
+    <textarea id="desc" placeholder="簡介（個性、習慣、故事等）" class="border p-2 rounded w-full" rows="3"></textarea>
+    <div>
+      <label class="font-semibold">上傳圖片（最多 5 張，可分次追加）：</label>
+      <input id="images" type="file" accept="image/*" multiple class="block mt-2" />
+      <div id="preview" class="flex flex-wrap gap-2 mt-2"></div>
+    </div>
+    <button id="submit-btn" type="submit" class="bg-rose-500 hover:bg-rose-600 text-white px-6 py-2 rounded-lg w-full sm:w-auto">登錄</button>
+  </form>
 
-      <div class="md:w-1/2 bg-gray-100 flex flex-col items-center p-4">
-        <img id="main-img" src="" class="w-full rounded-lg mb-3 object-cover aspect-square">
-        <div id="thumbs" class="flex gap-2 overflow-x-auto"></div>
-      </div>
+  <!-- 搜尋 -->
+  <div class="bg-white p-4 md:p-6 rounded-2xl shadow">
+    <div class="flex flex-col md:flex-row items-center justify-between gap-3">
+      <h3 class="text-xl font-semibold text-rose-600">已登錄動物</h3>
+      <input id="search" type="text" placeholder="搜尋名字…" class="w-full md:w-80 border rounded px-3 py-2" />
+    </div>
+    <div id="cards" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mt-4"></div>
+  </div>
+</div>
 
-      <div class="md:w-1/2 p-4 flex flex-col">
-        <h3 id="modal-name" class="text-2xl font-bold text-rose-600 mb-2"></h3>
-        <p id="modal-info" class="text-gray-600 text-sm mb-4"></p>
-        <div id="modal-desc" class="text-gray-700 text-sm flex-1 overflow-y-auto max-h-[70vh] mb-4"></div>
-        <button id="adopt-btn" class="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg w-full">已領養</button>
-
-        <div id="adopt-upload" class="hidden mt-4 p-4 bg-gray-50 rounded-xl shadow-inner">
-          <label class="font-semibold block mb-2">上傳合照（最多 5 張，可略過）</label>
-          <input id="adopt-photos" type="file" accept="image/*" multiple>
-          <button id="save-adopt" class="mt-3 bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg w-full">要幸福喔 💕</button>
-        </div>
+<!-- Modal -->
+<div id="modal" class="hidden fixed inset-0 bg-[#fdf6f7]/90 flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl relative flex flex-col md:flex-row overflow-hidden">
+    <button id="close-modal" class="absolute top-3 left-3 text-gray-600 text-2xl">✖</button>
+    <div class="absolute top-3 right-4 flex gap-3 text-xl">
+      <button id="edit-btn">✏️</button>
+      <button id="delete-btn">🗑️</button>
+    </div>
+    <div class="md:w-1/2 bg-gray-100 flex flex-col items-center p-4">
+      <img id="main-img" src="" class="w-full rounded-lg mb-3 object-cover aspect-square" />
+      <div id="thumbs" class="flex gap-2 overflow-x-auto"></div>
+    </div>
+    <div class="md:w-1/2 p-4 flex flex-col">
+      <h3 id="modal-name" class="text-2xl font-bold text-rose-600 mb-2"></h3>
+      <p id="modal-info" class="text-gray-600 text-sm mb-4"></p>
+      <div id="modal-desc" class="text-gray-700 text-sm flex-1 overflow-y-auto max-h-[70vh] mb-4"></div>
+      <button id="adopt-btn" class="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg w-full">已領養</button>
+      <div id="adopt-upload" class="hidden mt-4 p-4 bg-gray-50 rounded-xl shadow-inner">
+        <label class="font-semibold block mb-2">上傳合照（最多 5 張，可略過）</label>
+        <input id="adopt-photos" type="file" accept="image/*" multiple />
+        <button id="save-adopt" class="mt-3 bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg w-full">要幸福喔 💕</button>
       </div>
     </div>
   </div>
+</div>
+
+<script>
+const auth=firebase.auth(),db=firebase.firestore(),storage=firebase.storage();
+const loginBtn=document.getElementById('login-btn'),logoutBtn=document.getElementById('logout-btn');
+const loginSection=document.getElementById('login-section'),adminSection=document.getElementById('admin-section');
+loginBtn.onclick=()=>auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+logoutBtn.onclick=()=>auth.signOut().then(()=>location.href='index.html');
+auth.onAuthStateChanged(user=>{
+ if(user){loginSection.classList.add('hidden');adminSection.classList.remove('hidden');document.getElementById('user-email').textContent=user.email;}
+ else{adminSection.classList.add('hidden');loginSection.classList.remove('hidden');}
+});
+
+// --- 分類選單 ---
+const OPTIONS={cat:{category:[{v:'breed',t:'品種貓'},{v:'mix',t:'米克斯'}],breed:{breed:['美短','英短','藍貓','暹羅貓','波斯貓','布偶貓','曼赤肯'],mix:['橘貓','黑貓','虎斑貓','白底虎斑貓','三花貓','玳瑁貓','白貓']}},dog:{category:[{v:'breed',t:'品種犬'},{v:'mix',t:'米克斯'}],breed:{breed:['博美','貴賓','吉娃娃','馬爾濟斯','柯基','柴犬','哈士奇','高山犬','黃金獵犬'],mix:['黑色','白色','黃色','棕色','虎斑','花花']}}};
+const typeSel=document.getElementById('type'),catSel=document.getElementById('category'),breedSel=document.getElementById('breed');
+typeSel.addEventListener('change',()=>{
+  catSel.innerHTML='<option value="">選擇品種類型</option>';
+  breedSel.innerHTML='<option value="">請先選擇品種類型</option>';
+  const t=typeSel.value;if(!t)return;
+  OPTIONS[t].category.forEach(o=>{const opt=document.createElement('option');opt.value=o.v;opt.textContent=o.t;catSel.appendChild(opt);});
+});
+catSel.addEventListener('change',()=>{
+  const t=typeSel.value,c=catSel.value;
+  breedSel.innerHTML='<option value="">請選擇</option>';
+  if(!t||!c)return;
+  OPTIONS[t].breed[c].forEach(b=>{const opt=document.createElement('option');opt.value=b;opt.textContent=b;breedSel.appendChild(opt);});
+});
+
+// --- 上傳預覽 ---
+let imagesArr=[];
+document.getElementById('images').addEventListener('change',e=>{
+  const files=[...e.target.files];
+  imagesArr=[...imagesArr,...files].slice(0,5);
+  const preview=document.getElementById('preview');
+  preview.innerHTML='';
+  imagesArr.forEach(f=>{
+    const img=document.createElement('img');
+    img.src=URL.createObjectURL(f);
+    img.className='w-20 h-20 object-cover rounded-lg';
+    preview.appendChild(img);
+  });
+});
+
+// --- 登錄 ---
+const form=document.getElementById('pet-form');
+form.addEventListener('submit',async e=>{
+  e.preventDefault();
+  const btn=document.getElementById('submit-btn');
+  btn.disabled=true;
+  const name=document.getElementById('name').value.trim();
+  const type=document.getElementById('type').value;
+  const category=document.getElementById('category').value;
+  const breed=document.getElementById('breed').value;
+  const age=document.getElementById('age').value.trim();
+  const gender=document.getElementById('gender').value;
+  const desc=document.getElementById('desc').value.trim();
+  const docRef=db.collection('pets').doc();
+  const folder=`pets_images/${docRef.id}`;
+  const urls=[];
+  for(let i=0;i<imagesArr.length;i++){
+    btn.textContent=`登錄中... 圖片 ${i+1}/${imagesArr.length}`;
+    const ref=storage.ref(`${folder}/${imagesArr[i].name}`);
+    await ref.put(imagesArr[i]);
+    urls.push(await ref.getDownloadURL());
+  }
+  await docRef.set({name,type,category,breed,age,gender,desc,images:urls});
+  alert('登錄完成！');
+  form.reset();imagesArr=[];document.getElementById('preview').innerHTML='';btn.textContent='登錄';btn.disabled=false;
+});
+
+// --- 搜尋與顯示 ---
+const search=document.getElementById('search'),cards=document.getElementById('cards');
+let timeout=null;
+search.addEventListener('input',()=>{
+  clearTimeout(timeout);
+  timeout=setTimeout(async()=>{
+    const q=search.value.trim();
+    cards.innerHTML='';
+    if(!q)return;
+    const snap=await db.collection('pets').where('name','>=',q).where('name','<=',q+'\uf8ff').get();
+    if(snap.empty){cards.innerHTML='<p class="text-gray-500 text-sm col-span-full">無結果</p>';return;}
+    snap.forEach(doc=>{
+      const d=doc.data();
+      const card=document.createElement('div');
+      card.className='bg-white rounded-xl shadow cursor-pointer hover:shadow-lg transition p-2';
+      card.innerHTML=`<img src="${d.images?.[0]||''}" class="w-full aspect-square object-cover rounded-lg mb-2"/><p class="text-center text-sm font-medium">${d.name}</p>`;
+      card.onclick=()=>openModal(doc.id,d);
+      cards.appendChild(card);
+    });
+  },400);
+});
+
+// --- Modal 控制 ---
+const modal=document.getElementById('modal');
+const mainImg=document.getElementById('main-img'),thumbs=document.getElementById('thumbs');
+const modalName=document.getElementById('modal-name'),modalInfo=document.getElementById('modal-info'),modalDesc=document.getElementById('modal-desc');
+let currentId=null,currentData=null;
+function openModal(id,data){
+  document.body.classList.add('modal-open');
+  modal.classList.remove('hidden');
+  currentId=id;currentData=data;
+  mainImg.src=data.images?.[0]||'';
+  thumbs.innerHTML='';
+  data.images.forEach(u=>{
+    const img=document.createElement('img');img.src=u;
+    img.onclick=()=>mainImg.src=u;thumbs.appendChild(img);
+  });
+  modalName.textContent=data.name;
+  modalInfo.textContent=`${data.type==='cat'?'貓':'狗'}｜${data.breed}｜${data.gender}${data.age?`｜${data.age}`:''}`;
+  modalDesc.textContent=data.desc||'';
+}
+document.getElementById('close-modal').onclick=()=>{modal.classList.add('hidden');document.body.classList.remove('modal-open');};
+
+// --- 刪除 ---
+document.getElementById('delete-btn').onclick=async()=>{
+  if(confirm('確定要刪除此資料嗎？')){
+    await db.collection('pets').doc(currentId).delete();
+    alert('已刪除');modal.classList.add('hidden');search.dispatchEvent(new Event('input'));
+  }
+};
+
+// --- 已領養 ---
+document.getElementById('adopt-btn').onclick=()=>{
+  document.getElementById('adopt-upload').classList.toggle('hidden');
+};
+document.getElementById('save-adopt').onclick=async()=>{
+  const files=[...document.getElementById('adopt-photos').files];
+  const urls=[];
+  for(let f of files){
+    const ref=storage.ref(`adopted_photos/${currentId}/${f.name}`);
+    await ref.put(f);
+    urls.push(await ref.getDownloadURL());
+  }
+  await db.collection('adopted').doc(currentId).set({...currentData,adoptPhotos:urls});
+  await db.collection('pets').doc(currentId).delete();
+  alert('已標記為已領養！');modal.classList.add('hidden');search.dispatchEvent(new Event('input'));
+};
+</script>
 </body>
 </html>
