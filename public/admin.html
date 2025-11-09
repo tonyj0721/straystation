@@ -77,17 +77,24 @@
     <div>
       <label class="font-semibold block mb-2">上傳圖片（最多 5 張）：</label>
 
-      <!-- 自訂上傳按鈕 -->
-      <label for="images" class="inline-block bg-gray-200 text-gray-700 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-300 transition">
-        選擇照片
-      </label>
-      <input id="images" type="file" accept="image/*" multiple class="hidden" />
+      <!-- 自訂上傳按鈕與清空按鈕 -->
+      <div class="flex items-center gap-3">
+        <label for="images" class="inline-block bg-gray-200 text-gray-700 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-300 transition">
+          選擇照片
+        </label>
+        <button id="clear-images" type="button" class="bg-gray-100 text-gray-600 px-3 py-2 rounded-lg hover:bg-gray-200 transition">
+          🗑 清空照片
+        </button>
+      </div>
 
       <!-- 顯示已選擇照片數量 -->
-      <span id="upload-status" class="ml-2 text-sm text-gray-500">尚未選擇照片</span>
+      <span id="upload-status" class="ml-1 text-sm text-gray-500">尚未選擇照片</span>
 
       <!-- 預覽區 -->
       <div id="preview" class="flex flex-wrap gap-2 mt-3"></div>
+
+      <!-- 隱藏原生輸入 -->
+      <input id="images" type="file" accept="image/*" multiple class="hidden" />
     </div>
     <button id="submit-btn" type="submit" class="bg-rose-500 hover:bg-rose-600 text-white px-6 py-2 rounded-lg w-full sm:w-auto">登錄</button>
   </form>
