@@ -216,38 +216,46 @@ async function compressImage(file, quality = 0.7, maxSize = 800) {
   });
 }
 
-// --- 上傳預覽 + 清空功能 ---
+// --- 上傳預覽（可逐張刪除）---
 let imagesArr = [];
 const imgInput = document.getElementById('images');
 const preview = document.getElementById('preview');
 const uploadStatus = document.getElementById('upload-status');
-const clearBtn = document.getElementById('clear-images');
 
-imgInput.addEventListener('change', e => {
-  const files = [...e.target.files];
-  imagesArr = [...imagesArr, ...files].slice(0, 5);
-
-  // 更新提示
+// 更新預覽
+function renderPreview() {
+  preview.innerHTML = '';
   uploadStatus.textContent = imagesArr.length > 0
     ? `已選擇 ${imagesArr.length} 張照片`
     : '尚未選擇照片';
 
-  // 更新預覽
-  preview.innerHTML = '';
-  imagesArr.forEach(f => {
-    const img = document.createElement('img');
-    img.src = URL.createObjectURL(f);
-    img.className = 'w-20 h-20 object-cover rounded-lg';
-    preview.appendChild(img);
-  });
-});
+  imagesArr.forEach((file, index) => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'preview-item';
 
-// --- 清空照片 ---
-clearBtn.addEventListener('click', () => {
-  imagesArr = [];
-  imgInput.value = '';
-  preview.innerHTML = '';
-  uploadStatus.textContent = '尚未選擇照片';
+    const img = document.createElement('img');
+    img.src = URL.createObjectURL(file);
+
+    const del = document.createElement('button');
+    del.textContent = '×';
+    del.onclick = () => {
+      imagesArr.splice(index, 1);
+      renderPreview();
+    };
+
+    wrapper.appendChild(img);
+    wrapper.appendChild(del);
+    preview.appendChild(wrapper);
+  });
+}
+
+imgInput.addEventListener('change', e => {
+  const files = [...e.target.files];
+  if (imagesArr.length + files.length > 5) {
+    alert('最多只能上傳 5 張喔！');
+  }
+  imagesArr = [...imagesArr, ...files].slice(0, 5);
+  renderPreview();
 });
 
 // --- 登錄（壓縮 + 同步上傳 + 提示） ---
