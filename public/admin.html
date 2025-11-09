@@ -108,14 +108,37 @@ body.modal-open { overflow: hidden; }
 </div>
 
 <script>
-const auth=firebase.auth(),db=firebase.firestore(),storage=firebase.storage();
-const loginBtn=document.getElementById('login-btn'),logoutBtn=document.getElementById('logout-btn');
-const loginSection=document.getElementById('login-section'),adminSection=document.getElementById('admin-section');
-loginBtn.onclick=()=>auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
-logoutBtn.onclick=()=>auth.signOut().then(()=>location.href='index.html');
-auth.onAuthStateChanged(user=>{
- if(user){loginSection.classList.add('hidden');adminSection.classList.remove('hidden');document.getElementById('user-email').textContent=user.email;}
- else{adminSection.classList.add('hidden');loginSection.classList.remove('hidden');}
+const auth = firebase.auth();
+const db = firebase.firestore();
+const storage = firebase.storage();
+
+const loginBtn = document.getElementById('login-btn');
+const logoutBtn = document.getElementById('logout-btn');
+const loginSection = document.getElementById('login-section');
+const adminSection = document.getElementById('admin-section');
+const userEmail = document.getElementById('user-email');
+
+const provider = new firebase.auth.GoogleAuthProvider();
+
+loginBtn.addEventListener('click', () => {
+  auth.signInWithPopup(provider).catch(err => {
+    alert("登入失敗：" + err.message);
+  });
+});
+
+logoutBtn.addEventListener('click', () => {
+  auth.signOut().then(() => location.href = "index.html");
+});
+
+auth.onAuthStateChanged(user => {
+  if (user) {
+    loginSection.classList.add('hidden');
+    adminSection.classList.remove('hidden');
+    userEmail.textContent = user.email;
+  } else {
+    adminSection.classList.add('hidden');
+    loginSection.classList.remove('hidden');
+  }
 });
 
 const OPTIONS={cat:{category:[{v:'breed',t:'品種貓'},{v:'mix',t:'米克斯'}],breed:{breed:['美短','英短','藍貓','暹羅貓','波斯貓','布偶貓','曼赤肯'],mix:['橘貓','黑貓','虎斑貓','白底虎斑貓','三花貓','玳瑁貓','白貓']}},dog:{category:[{v:'breed',t:'品種犬'},{v:'mix',t:'米克斯'}],breed:{breed:['博美','貴賓','吉娃娃','馬爾濟斯','柯基','柴犬','哈士奇','高山犬','黃金獵犬'],mix:['黑色','白色','黃色','棕色','虎斑','花花']}}};
