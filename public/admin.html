@@ -13,7 +13,7 @@
   <style>
     body.modal-open { overflow: hidden; }
     #cards { min-height: 40vh; }
-    #thumbs img { width: 60px; height: 60px; object-fit: cover; border-radius: .5rem; cursor: pointer; }
+    #thumbs img { width: 60px; height: 60px; object-fit: contain; background: #f3f3f3; border-radius: .5rem; cursor: pointer; }
   </style>
 </head>
 <body class="bg-[#fdf6f7] text-gray-800 min-h-screen">
@@ -84,7 +84,7 @@
       <button id="delete-btn">🗑️</button>
     </div>
     <div class="md:w-1/2 bg-gray-100 flex flex-col items-center p-4">
-      <img id="main-img" src="" class="w-full rounded-lg mb-3 object-cover aspect-square" />
+      <img id="main-img" src="" class="w-full rounded-lg mb-3 object-contain bg-gray-100 aspect-square" />
       <div id="thumbs" class="flex gap-2 overflow-x-auto"></div>
     </div>
     <div class="md:w-1/2 p-4 flex flex-col">
@@ -138,7 +138,7 @@ document.getElementById('images').addEventListener('change',e=>{
   imagesArr.forEach(f=>{
     const img=document.createElement('img');
     img.src=URL.createObjectURL(f);
-    img.className='w-20 h-20 object-cover rounded-lg';
+    img.className='w-20 h-20 object-contain bg-gray-100 rounded-lg';
     preview.appendChild(img);
   });
 });
@@ -185,7 +185,7 @@ search.addEventListener('input',()=>{
       const d=doc.data();
       const card=document.createElement('div');
       card.className='bg-white rounded-xl shadow cursor-pointer hover:shadow-lg transition p-2';
-      card.innerHTML=`<img src="${d.images?.[0]||''}" class="w-full aspect-square object-cover rounded-lg mb-2"/><p class="text-center text-sm font-medium">${d.name}</p>`;
+      card.innerHTML=`<img src="${d.images?.[0]||''}" class="w-full aspect-square object-contain bg-gray-100 rounded-lg mb-2"/>`
       card.onclick=()=>openModal(doc.id,d);
       cards.appendChild(card);
     });
