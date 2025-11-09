@@ -1,33 +1,29 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>台中簡媽媽狗園｜後台管理</title>
-
-  <!-- Firebase & Tailwind -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
   <script src="firebase-config.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
-
   <style>
-    /* 防止搜尋結果重繪跳動 */
+    body.modal-open { overflow: hidden; }
     #cards { min-height: 40vh; }
   </style>
 </head>
+<body class="bg-[#fdf6f7] text-gray-800 min-h-screen">
 
-<body class="bg-[#fdf6f7] min-h-screen text-gray-800">
-
-  <!-- 未登入 -->
+  <!-- 登入畫面 -->
   <div id="login-section" class="flex flex-col items-center justify-center min-h-screen">
     <h1 class="text-3xl font-bold mb-6 text-rose-600">台中簡媽媽狗園｜後台管理</h1>
     <button id="login-btn" class="bg-rose-500 hover:bg-rose-600 text-white px-6 py-3 rounded-xl">使用 Google 登入</button>
   </div>
 
-  <!-- 已登入 -->
+  <!-- 管理畫面 -->
   <div id="admin-section" class="hidden p-4 md:p-8 space-y-6">
     <div class="flex flex-col md:flex-row justify-between items-center gap-4">
       <h2 class="text-2xl font-bold text-rose-600">送養資料管理</h2>
@@ -37,7 +33,7 @@
       </div>
     </div>
 
-    <!-- 表單 -->
+    <!-- 表單區 -->
     <form id="pet-form" class="bg-white p-6 rounded-2xl shadow space-y-4">
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <input id="name" type="text" placeholder="名字" class="border p-2 rounded" required>
@@ -46,18 +42,12 @@
           <option value="cat">貓</option>
           <option value="dog">狗</option>
         </select>
-
-        <!-- 品種類型 -->
         <select id="category" class="border p-2 rounded" required>
           <option value="">請先選擇類別</option>
         </select>
-
-        <!-- 品種 / 毛色 -->
         <select id="breed" class="border p-2 rounded" required>
           <option value="">請先選擇類別與品種類型</option>
         </select>
-
-        <!-- 年齡改為「非必填」 -->
         <input id="age" type="text" placeholder="年齡（例如 6個月、2歲）" class="border p-2 rounded">
         <select id="gender" class="border p-2 rounded" required>
           <option value="">選擇性別</option>
@@ -74,12 +64,10 @@
         <div id="preview" class="flex flex-wrap gap-2 mt-2"></div>
       </div>
 
-      <button id="submit-btn" type="submit" class="bg-rose-500 hover:bg-rose-600 text-white px-6 py-2 rounded-lg w-full sm:w-auto">
-        登錄
-      </button>
+      <button id="submit-btn" type="submit" class="bg-rose-500 hover:bg-rose-600 text-white px-6 py-2 rounded-lg w-full sm:w-auto">登錄</button>
     </form>
 
-    <!-- 已登錄動物 -->
+    <!-- 已登錄區 -->
     <div class="bg-white p-4 md:p-6 rounded-2xl shadow">
       <div class="flex flex-col md:flex-row items-center justify-between gap-3">
         <h3 class="text-xl font-semibold text-rose-600">已登錄動物</h3>
@@ -90,112 +78,33 @@
     </div>
   </div>
 
-  <!-- Firebase 腳本 -->
-  <script>
-    const auth = firebase.auth();
-    const db = firebase.firestore();
-    const storage = firebase.storage();
+  <!-- 詳細資料 Modal -->
+  <div id="modal" class="hidden fixed inset-0 bg-[#fdf6f7]/90 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl relative flex flex-col md:flex-row overflow-hidden">
+      <button id="close-modal" class="absolute top-3 left-3 text-gray-600 text-2xl">✖</button>
+      <div class="absolute top-3 right-4 flex gap-3 text-xl">
+        <button id="edit-btn">✏️</button>
+        <button id="delete-btn">🗑️</button>
+      </div>
 
-    // 登入 / 登出
-    const loginBtn = document.getElementById('login-btn');
-    const logoutBtn = document.getElementById('logout-btn');
-    const loginSection = document.getElementById('login-section');
-    const adminSection = document.getElementById('admin-section');
+      <div class="md:w-1/2 bg-gray-100 flex flex-col items-center p-4">
+        <img id="main-img" src="" class="w-full rounded-lg mb-3 object-cover aspect-square">
+        <div id="thumbs" class="flex gap-2 overflow-x-auto"></div>
+      </div>
 
-    loginBtn.onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
-    logoutBtn.onclick = () => auth.signOut().then(() => location.href = 'index.html');
+      <div class="md:w-1/2 p-4 flex flex-col">
+        <h3 id="modal-name" class="text-2xl font-bold text-rose-600 mb-2"></h3>
+        <p id="modal-info" class="text-gray-600 text-sm mb-4"></p>
+        <div id="modal-desc" class="text-gray-700 text-sm flex-1 overflow-y-auto max-h-[70vh] mb-4"></div>
+        <button id="adopt-btn" class="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg w-full">已領養</button>
 
-    auth.onAuthStateChanged(user => {
-      if (user) {
-        loginSection.classList.add('hidden');
-        adminSection.classList.remove('hidden');
-        document.getElementById('user-email').textContent = user.email;
-      } else {
-        adminSection.classList.add('hidden');
-        loginSection.classList.remove('hidden');
-      }
-    });
-
-    // 品種選單邏輯
-    const typeSel = document.getElementById('type');
-    const catSel = document.getElementById('category');
-    const breedSel = document.getElementById('breed');
-    const OPTIONS = {
-      cat: {
-        category: [{ v: 'breed', t: '品種貓' }, { v: 'mix', t: '米克斯' }],
-        breed: {
-          breed: ['美短', '英短', '藍貓', '暹羅貓', '波斯貓', '布偶貓', '曼赤肯'],
-          mix: ['橘貓', '黑貓', '虎斑貓', '白底虎斑貓', '三花貓', '玳瑁貓', '白貓']
-        }
-      },
-      dog: {
-        category: [{ v: 'breed', t: '品種犬' }, { v: 'mix', t: '米克斯' }],
-        breed: {
-          breed: ['博美', '貴賓', '吉娃娃', '馬爾濟斯', '柯基', '柴犬', '哈士奇', '高山犬', '黃金獵犬'],
-          mix: ['黑色', '白色', '黃色', '棕色', '虎斑', '花花']
-        }
-      }
-    };
-
-    function renderCategory() {
-      const t = typeSel.value;
-      catSel.innerHTML = '<option value="">選擇品種類型</option>';
-      breedSel.innerHTML = '<option value="">請先選擇品種類型</option>';
-      if (!t) return;
-      OPTIONS[t].category.forEach(o => {
-        const opt = document.createElement('option');
-        opt.value = o.v; opt.textContent = o.t;
-        catSel.appendChild(opt);
-      });
-      setTimeout(() => catSel.focus(), 100);
-    }
-
-    function renderBreed() {
-      const t = typeSel.value, c = catSel.value;
-      breedSel.innerHTML = '<option value="">請選擇</option>';
-      if (!t || !c) return;
-      OPTIONS[t].breed[c].forEach(b => {
-        const opt = document.createElement('option');
-        opt.value = b; opt.textContent = b;
-        breedSel.appendChild(opt);
-      });
-      setTimeout(() => breedSel.focus(), 100);
-    }
-
-    typeSel.addEventListener('change', renderCategory);
-    catSel.addEventListener('change', renderBreed);
-  </script>
-
-  <!-- 搜尋區防抖與顯示 -->
-  <script>
-    const searchInput = document.getElementById('search');
-    const cards = document.getElementById('cards');
-    const emptyTip = document.getElementById('empty-tip');
-    let debounceTimer = null;
-
-    searchInput.addEventListener('input', () => {
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(searchPets, 300);
-    });
-
-    async function searchPets() {
-      const q = searchInput.value.trim();
-      cards.innerHTML = '';
-      if (!q) { emptyTip.textContent = '輸入名字以搜尋並顯示卡片'; return; }
-      const snap = await db.collection('pets').orderBy('name').startAt(q).endAt(q + '\uf8ff').get();
-      if (snap.empty) { emptyTip.textContent = '找不到符合的動物'; return; }
-      emptyTip.textContent = '';
-      snap.forEach(doc => {
-        const d = doc.data();
-        const el = document.createElement('div');
-        el.className = 'rounded-xl border bg-white overflow-hidden shadow-sm hover:shadow-md cursor-pointer';
-        el.innerHTML = `
-          <img src="${d.images?.[0] || ''}" class="w-full aspect-square object-cover">
-          <div class="p-3"><div class="font-semibold">${d.name}</div>
-          <div class="text-sm text-gray-500">${d.type === 'cat' ? '貓' : '狗'}・${d.gender || '-'}・${d.age || '-'}</div></div>`;
-        cards.appendChild(el);
-      });
-    }
-  </script>
+        <div id="adopt-upload" class="hidden mt-4 p-4 bg-gray-50 rounded-xl shadow-inner">
+          <label class="font-semibold block mb-2">上傳合照（最多 5 張，可略過）</label>
+          <input id="adopt-photos" type="file" accept="image/*" multiple>
+          <button id="save-adopt" class="mt-3 bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg w-full">要幸福喔 💕</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
