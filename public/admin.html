@@ -31,6 +31,37 @@
     input[type="file"] {
       color: transparent;
     }
+
+    /* 預覽圖片外層 */
+    .preview-item {
+      position: relative;
+      display: inline-block;
+    }
+
+    /* 預覽圖片 */
+    .preview-item img {
+      width: 80px;
+      height: 80px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+    }
+
+    /* 單張刪除按鈕 */
+    .preview-item button {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      background: rgba(255, 255, 255, 0.9);
+      color: #dc2626;
+      border: none;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      font-size: 12px;
+      cursor: pointer;
+      line-height: 1;
+    }
   </style>
 </head>
 <body class="bg-[#fdf6f7] text-gray-800 min-h-screen">
