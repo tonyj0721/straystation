@@ -192,6 +192,19 @@ form.addEventListener('submit', async e => {
   }, 400);
 
   const name = document.getElementById('name').value.trim();
+  // 🧠 防重複檢查
+  const dupCheck = await db.collection('pets')
+    .where('name', '==', name)
+    .get();
+
+  if (!dupCheck.empty) {
+    const confirmContinue = confirm(`「${name}」已存在於送養名單中。\n是否仍要繼續登錄？`);
+    if (!confirmContinue) {
+      btn.textContent = '登錄';
+      btn.disabled = false;
+      return; // ❌ 使用者選擇取消 → 中止登錄
+    }
+  }
   const type = document.getElementById('type').value;
   const category = document.getElementById('category').value;
   const breed = document.getElementById('breed').value;
