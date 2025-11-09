@@ -21,6 +21,16 @@
     }
     #cards { min-height: 40vh; }
     #thumbs img { width: 60px; height: 60px; object-fit: contain; background: #f3f3f3; border-radius: .5rem; cursor: pointer; }
+    /* 🧩 避免 Safari/iOS 顯示黑框預設按鈕 */
+    input[type="file"]::-webkit-file-upload-button {
+      visibility: hidden;
+    }
+    input[type="file"]::file-selector-button {
+      visibility: hidden;
+    }
+    input[type="file"] {
+      color: transparent;
+    }
   </style>
 </head>
 <body class="bg-[#fdf6f7] text-gray-800 min-h-screen">
