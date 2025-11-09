@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">\>
+<html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -10,23 +10,32 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-50 min-h-screen">
+
+<body class="bg-[#fdf6f7] min-h-screen text-gray-800">
+
+  <!-- 登入畫面 -->
   <div id="login-section" class="flex flex-col items-center justify-center min-h-screen">
-    <h1 class="text-3xl font-bold mb-6">台中簡媽媽狗園｜後台管理</h1>
-    <button id="login-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-xl">使用 Google 登入</button>
+    <h1 class="text-3xl font-bold mb-6 text-rose-600">台中簡媽媽狗園｜後台管理</h1>
+    <button id="login-btn" class="bg-rose-500 hover:bg-rose-600 text-white px-6 py-3 rounded-xl">
+      使用 Google 登入
+    </button>
   </div>
 
-  <div id="admin-section" class="hidden p-6">
-    <div class="flex justify-between items-center mb-4">
-      <h2 class="text-2xl font-bold">送養資料管理</h2>
-      <div>
-        <span id="user-email" class="mr-4 text-gray-600"></span>
-        <button id="logout-btn" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">登出</button>
+  <!-- 管理畫面 -->
+  <div id="admin-section" class="hidden p-4 md:p-8 space-y-6">
+    <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+      <h2 class="text-2xl font-bold text-rose-600">送養資料管理</h2>
+      <div class="flex items-center gap-3">
+        <span id="user-email" class="text-gray-600 text-sm"></span>
+        <button id="logout-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg">
+          登出
+        </button>
       </div>
     </div>
 
-    <form id="pet-form" class="bg-white p-6 rounded-2xl shadow mb-6">
-      <div class="grid grid-cols-2 gap-4">
+    <!-- 表單區 -->
+    <form id="pet-form" class="bg-white p-6 rounded-2xl shadow space-y-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <input id="name" type="text" placeholder="名字" class="border p-2 rounded" required>
         <select id="type" class="border p-2 rounded" required>
           <option value="">選擇類別</option>
@@ -52,31 +61,37 @@
         </select>
       </div>
 
-      <textarea id="desc" placeholder="簡介 (個性、習慣、故事等)" class="border p-2 rounded w-full mt-4" rows="3"></textarea>
+      <textarea id="desc" placeholder="簡介 (個性、習慣、故事等)" class="border p-2 rounded w-full" rows="3"></textarea>
 
-      <div class="mt-4">
+      <div>
         <label class="font-semibold">上傳圖片（最多 5 張）：</label>
         <input id="images" type="file" accept="image/*" multiple class="block mt-2">
-        <div id="preview" class="flex gap-2 mt-2 flex-wrap"></div>
+        <div id="preview" class="flex flex-wrap gap-2 mt-2"></div>
       </div>
 
-      <button type="submit" class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg mt-4">儲存送養資料</button>
+      <button id="submit-btn" type="submit"
+        class="bg-rose-500 hover:bg-rose-600 text-white px-6 py-2 rounded-lg w-full sm:w-auto">
+        登錄
+      </button>
     </form>
 
-    <table class="w-full bg-white shadow rounded-2xl">
-      <thead class="bg-gray-100">
-        <tr>
-          <th class="p-2">圖片</th>
-          <th class="p-2">名字</th>
-          <th class="p-2">類別</th>
-          <th class="p-2">品種/毛色</th>
-          <th class="p-2">年齡</th>
-          <th class="p-2">性別</th>
-          <th class="p-2">動作</th>
-        </tr>
-      </thead>
-      <tbody id="pets-list"></tbody>
-    </table>
+    <!-- 資料表 -->
+    <div class="overflow-x-auto">
+      <table class="w-full bg-white shadow rounded-2xl">
+        <thead class="bg-rose-100">
+          <tr>
+            <th class="p-2">圖片</th>
+            <th class="p-2">名字</th>
+            <th class="p-2">類別</th>
+            <th class="p-2">品種/毛色</th>
+            <th class="p-2">年齡</th>
+            <th class="p-2">性別</th>
+            <th class="p-2">動作</th>
+          </tr>
+        </thead>
+        <tbody id="pets-list"></tbody>
+      </table>
+    </div>
   </div>
 
   <script>
@@ -85,8 +100,6 @@
       authDomain: "straystation.firebaseapp.com",
       projectId: "straystation",
       storageBucket: "straystation.firebasestorage.app",
-      messagingSenderId: "",
-      appId: ""
     };
     firebase.initializeApp(firebaseConfig);
 
@@ -104,7 +117,11 @@
       auth.signInWithPopup(provider);
     };
 
-    logoutBtn.onclick = () => auth.signOut();
+    logoutBtn.onclick = () => {
+      auth.signOut().then(() => {
+        window.location.href = "index.html";
+      });
+    };
 
     auth.onAuthStateChanged(user => {
       if (user) {
@@ -118,19 +135,17 @@
       }
     });
 
-    // 🧠 動態更新品種/毛色下拉選單
     const typeSelect = document.getElementById('type');
     const categorySelect = document.getElementById('category');
     const breedSelect = document.getElementById('breed');
-
     const breeds = {
       cat: {
-        breed: ['美短','英短','藍貓','暹羅貓','波斯貓','布偶貓','曼赤肯'],
-        mix: ['橘貓','黑貓','虎斑貓','白底虎斑貓','三花貓','玳瑁貓','白貓']
+        breed: ['美短', '英短', '藍貓', '暹羅貓', '波斯貓', '布偶貓', '曼赤肯'],
+        mix: ['橘貓', '黑貓', '虎斑貓', '白底虎斑貓', '三花貓', '玳瑁貓', '白貓']
       },
       dog: {
-        breed: ['博美','貴賓','吉娃娃','馬爾濟斯','柯基','柴犬','哈士奇','高山犬','黃金獵犬'],
-        mix: ['黑色','白色','黃色','棕色','虎斑','花花']
+        breed: ['博美', '貴賓', '吉娃娃', '馬爾濟斯', '柯基', '柴犬', '哈士奇', '高山犬', '黃金獵犬'],
+        mix: ['黑色', '白色', '黃色', '棕色', '虎斑', '花花']
       }
     };
 
@@ -147,11 +162,9 @@
         });
       }
     }
-
     typeSelect.onchange = updateBreedOptions;
     categorySelect.onchange = updateBreedOptions;
 
-    // 📸 圖片預覽與上傳
     const imageInput = document.getElementById('images');
     const preview = document.getElementById('preview');
     let imageFiles = [];
@@ -164,17 +177,23 @@
         reader.onload = e2 => {
           const img = document.createElement('img');
           img.src = e2.target.result;
-          img.className = 'w-20 h-20 object-cover rounded';
+          img.className = 'w-24 h-24 object-cover rounded border';
           preview.appendChild(img);
         };
         reader.readAsDataURL(file);
       });
     });
 
-    // 🧾 表單送出
     const form = document.getElementById('pet-form');
+    const submitBtn = document.getElementById('submit-btn');
+
     form.addEventListener('submit', async e => {
       e.preventDefault();
+      submitBtn.disabled = true;
+      let total = imageFiles.length;
+      let count = 0;
+      submitBtn.textContent = `登錄中... 圖片 0/${total}`;
+
       const name = document.getElementById('name').value;
       const type = document.getElementById('type').value;
       const category = document.getElementById('category').value;
@@ -183,50 +202,65 @@
       const gender = document.getElementById('gender').value;
       const desc = document.getElementById('desc').value;
 
-      const petRef = db.collection('pets').doc();
-      const imageUrls = [];
-      for (const file of imageFiles) {
-        const ref = storage.ref(`pets_images/${petRef.id}/${file.name}`);
-        await ref.put(file);
-        const url = await ref.getDownloadURL();
-        imageUrls.push(url);
+      try {
+        const petRef = db.collection('pets').doc();
+        const imageUrls = [];
+
+        for (const file of imageFiles) {
+          const ref = storage.ref(`pets_images/${petRef.id}/${file.name}`);
+          await ref.put(file);
+          count++;
+          submitBtn.textContent = `登錄中... 圖片 ${count}/${total}`;
+          const url = await ref.getDownloadURL();
+          imageUrls.push(url);
+        }
+
+        await petRef.set({
+          name, type, category, breed, age, gender, desc,
+          images: imageUrls,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        submitBtn.textContent = '登錄完成！';
+        setTimeout(() => {
+          submitBtn.textContent = '登錄';
+          submitBtn.disabled = false;
+        }, 2000);
+
+        form.reset();
+        preview.innerHTML = '';
+        loadPets();
+      } catch (error) {
+        console.error(error);
+        alert('上傳失敗，請重試');
+        submitBtn.disabled = false;
+        submitBtn.textContent = '登錄';
       }
-
-      await petRef.set({
-        name, type, category, breed, age, gender, desc,
-        images: imageUrls,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-
-      alert('資料已儲存！');
-      form.reset();
-      preview.innerHTML = '';
-      loadPets();
     });
 
-    // 📋 顯示資料
     async function loadPets() {
       const tbody = document.getElementById('pets-list');
       tbody.innerHTML = '';
-      const snap = await db.collection('pets').orderBy('createdAt','desc').get();
+      const snap = await db.collection('pets').orderBy('createdAt', 'desc').get();
       snap.forEach(doc => {
         const d = doc.data();
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td class='p-2'><img src='${d.images?.[0] || ''}' class='w-16 h-16 object-cover rounded'></td>
-          <td class='p-2'>${d.name}</td>
-          <td class='p-2'>${d.type === 'cat' ? '貓' : '狗'}</td>
-          <td class='p-2'>${d.breed}</td>
-          <td class='p-2'>${d.age}</td>
-          <td class='p-2'>${d.gender}</td>
-          <td class='p-2'>
-            <button onclick="deletePet('${doc.id}')" class='bg-red-500 text-white px-3 py-1 rounded'>刪除</button>
+          <td class='p-2 text-center'><img src='${d.images?.[0] || ''}' class='w-16 h-16 object-cover rounded mx-auto'></td>
+          <td class='p-2 text-center'>${d.name}</td>
+          <td class='p-2 text-center'>${d.type === 'cat' ? '貓' : '狗'}</td>
+          <td class='p-2 text-center'>${d.breed}</td>
+          <td class='p-2 text-center'>${d.age}</td>
+          <td class='p-2 text-center'>${d.gender}</td>
+          <td class='p-2 text-center'>
+            <button onclick="deletePet('${doc.id}')" class='bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded'>
+              刪除
+            </button>
           </td>`;
         tbody.appendChild(tr);
       });
     }
 
-    // ❌ 刪除
     async function deletePet(id) {
       if (!confirm('確定刪除此資料？')) return;
       await db.collection('pets').doc(id).delete();
