@@ -213,6 +213,19 @@ function openModal(id,data){
 }
 document.getElementById('close-modal').onclick=()=>{modal.classList.add('hidden');document.body.classList.remove('modal-open');};
 
+// --- 編輯 ---
+document.getElementById('edit-btn').onclick = () => {
+  const newName = prompt('修改名字：', currentData.name);
+  if (newName !== null && newName.trim() !== '') {
+    db.collection('pets').doc(currentId).update({ name: newName.trim() })
+      .then(() => {
+        alert('已更新！');
+        modal.classList.add('hidden');
+        search.dispatchEvent(new Event('input')); // 重新載入搜尋結果
+      });
+  }
+};
+
 // --- 刪除 ---
 document.getElementById('delete-btn').onclick=async()=>{
   if(confirm('確定要刪除此資料嗎？')){
@@ -223,7 +236,8 @@ document.getElementById('delete-btn').onclick=async()=>{
 
 // --- 已領養 ---
 document.getElementById('adopt-btn').onclick=()=>{
-  document.getElementById('adopt-upload').classList.toggle('hidden');
+  document.getElementById('adopt-btn').classList.add('hidden');
+  document.getElementById('adopt-upload').classList.remove('hidden');
 };
 document.getElementById('save-adopt').onclick=async()=>{
   const files=[...document.getElementById('adopt-photos').files];
@@ -235,7 +249,10 @@ document.getElementById('save-adopt').onclick=async()=>{
   }
   await db.collection('adopted').doc(currentId).set({...currentData,adoptPhotos:urls});
   await db.collection('pets').doc(currentId).delete();
-  alert('已標記為已領養！');modal.classList.add('hidden');search.dispatchEvent(new Event('input'));
+  alert('要幸福喔 💕');
+  modal.classList.add('hidden');
+  document.body.classList.remove('modal-open');
+  search.dispatchEvent(new Event('input'));
 };
 </script>
 </body>
