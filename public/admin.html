@@ -346,63 +346,144 @@ search.addEventListener('input',()=>{
 });
 
 // --- Modal 控制 ---
-const modal=document.getElementById('modal');
-const mainImg=document.getElementById('main-img'),thumbs=document.getElementById('thumbs');
-const modalName=document.getElementById('modal-name'),modalInfo=document.getElementById('modal-info'),modalDesc=document.getElementById('modal-desc');
-let currentId=null,currentData=null;
-function openModal(id,data){
+const modal = document.getElementById('modal');
+const mainImg = document.getElementById('main-img'),
+      thumbs = document.getElementById('thumbs');
+const modalName = document.getElementById('modal-name'),
+      modalInfo = document.getElementById('modal-info'),
+      modalDesc = document.getElementById('modal-desc');
+let currentId = null, currentData = null;
+
+// 打開 Modal
+function openModal(id, data) {
   document.body.classList.add('modal-open');
-  document.documentElement.classList.add('modal-open');
   modal.classList.remove('hidden');
-  currentId=id;currentData=data;
-  mainImg.src=data.images?.[0]||'';
-  thumbs.innerHTML='';
-  data.images.forEach(u=>{
-    const img=document.createElement('img');img.src=u;
-    img.onclick=()=>mainImg.src=u;thumbs.appendChild(img);
-  });
-  modalName.textContent=data.name;
-  modalInfo.textContent=`${data.type==='cat'?'貓':'狗'}｜${data.breed}｜${data.gender}${data.age?`｜${data.age}`:''}`;
-  modalDesc.textContent=data.desc||'';
+  currentId = id;
+  currentData = data;
+  renderViewMode();
 }
-document.getElementById('close-modal').onclick=()=>{modal.classList.add('hidden');document.body.classList.remove('modal-open');document.documentElement.classList.remove('modal-open');};
 
-// --- 編輯 ---
-document.getElementById('edit-btn').onclick=()=>{
-  const newName=prompt('修改名字：',currentData.name);
-  if(newName!==null){
-    db.collection('pets').doc(currentId).update({name:newName}).then(()=>{
-      alert('已更新！');
-      modal.classList.add('hidden');
-      search.dispatchEvent(new Event('input'));
-    });
-  }
+// 關閉 Modal
+document.getElementById('close-modal').onclick = () => {
+  modal.classList.add('hidden');
+  document.body.classList.remove('modal-open');
 };
 
-// --- 刪除 ---
-document.getElementById('delete-btn').onclick=async()=>{
-  if(confirm('確定要刪除此資料嗎？')){
+// 🔹 檢視模式
+function renderViewMode() {
+  modal.innerHTML = `
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl relative flex flex-col md:flex-row overflow-hidden">
+      <button id="close-modal" class="absolute top-3 left-3 text-gray-600 text-2xl">✖</button>
+      <div class="absolute top-3 right-4 flex gap-3 text-xl">
+        <button id="edit-btn">✏️</button>
+        <button id="delete-btn">🗑️</button>
+      </div>
+      <div class="md:w-1/2 bg-gray-100 flex flex-col items-center p-4">
+        <img id="main-img" src="${currentData.images?.[0] || ''}" class="w-full rounded-lg mb-3 object-cover aspect-square" />
+        <div id="thumbs" class="flex gap-2 overflow-x-auto">
+          ${currentData.images.map(u => `<img src="${u}" class="w-16 h-16 rounded cursor-pointer object-cover"/>`).join('')}
+        </div>
+      </div>
+      <div class="md:w-1/2 p-4 flex flex-col">
+        <h3 id="modal-name" class="text-2xl font-bold text-rose-600 mb-2">${currentData.name}</h3>
+        <p id="modal-info" class="text-gray-600 text-sm mb-4">${currentData.type === 'cat' ? '貓' : '狗'}｜${currentData.breed}｜${currentData.gender}${currentData.age ? `｜${currentData.age}` : ''}</p>
+        <div id="modal-desc" class="text-gray-700 text-sm flex-1 overflow-y-auto max-h-[70vh] mb-4">${currentData.desc || ''}</div>
+        <button id="adopt-btn" class="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg w-full">已領養</button>
+        <div id="adopt-upload" class="hidden mt-4 p-4 bg-gray-50 rounded-xl shadow-inner">
+          <label class="font-semibold block mb-2">上傳合照（最多 5 張，可略過）</label>
+          <input id="adopt-photos" type="file" accept="image/*" multiple />
+          <button id="save-adopt" class="mt-3 bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg w-full">要幸福喔 💕</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // 綁定事件
+  document.getElementById('close-modal').onclick = () => {
+    modal.classList.add('hidden');
+    document.body.classList.remove('modal-open');
+  };
+  document.getElementById('edit-btn').onclick = enableEditMode;
+  document.getElementById('delete-btn').onclick = deletePet;
+  document.getElementById('adopt-btn').onclick = () => {
+    document.getElementById('adopt-upload').classList.toggle('hidden');
+  };
+  document.getElementById('save-adopt').onclick = saveAdopt;
+}
+
+// 🔹 編輯模式
+function enableEditMode() {
+  modal.querySelector('.md\\:w-1\\/2.p-4').innerHTML = `
+    <h3 class="text-2xl font-bold text-rose-600 mb-2">
+      <input id="edit-name" value="${currentData.name}" class="border rounded p-1 w-full"/>
+    </h3>
+    <div class="space-y-2 mb-4">
+      <input id="edit-breed" value="${currentData.breed}" class="border rounded p-1 w-full" placeholder="品種/毛色"/>
+      <input id="edit-age" value="${currentData.age || ''}" placeholder="年齡（可略）" class="border rounded p-1 w-full"/>
+      <textarea id="edit-desc" class="border rounded p-2 w-full" rows="4" placeholder="簡介">${currentData.desc || ''}</textarea>
+    </div>
+    <label for="edit-images" class="inline-block bg-gray-200 text-gray-700 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-300 transition mb-3">重新上傳圖片（可略過）</label>
+    <input id="edit-images" type="file" accept="image/*" multiple class="hidden"/>
+    <div class="flex gap-2">
+      <button id="save-edit" class="bg-rose-500 text-white px-4 py-2 rounded-lg flex-1">💾 儲存修改</button>
+      <button id="cancel-edit" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg flex-1">取消</button>
+    </div>
+  `;
+
+  document.getElementById('save-edit').onclick = saveEdit;
+  document.getElementById('cancel-edit').onclick = () => renderViewMode();
+}
+
+// 🔹 儲存修改
+async function saveEdit() {
+  const updated = {
+    name: document.getElementById('edit-name').value.trim(),
+    breed: document.getElementById('edit-breed').value.trim(),
+    age: document.getElementById('edit-age').value.trim(),
+    desc: document.getElementById('edit-desc').value.trim()
+  };
+
+  const files = [...document.getElementById('edit-images').files];
+  if (files.length) {
+    const folder = `pets_images/${currentId}`;
+    const urls = await Promise.all(files.map(async f => {
+      const ref = storage.ref(`${folder}/${f.name}`);
+      await ref.put(f);
+      return await ref.getDownloadURL();
+    }));
+    updated.images = urls;
+  }
+
+  await db.collection('pets').doc(currentId).update(updated);
+  alert('已更新資料！');
+
+  const snap = await db.collection('pets').doc(currentId).get();
+  currentData = snap.data();
+  renderViewMode();
+}
+
+// 🔹 刪除
+async function deletePet() {
+  if (confirm('確定要刪除此資料嗎？')) {
     await db.collection('pets').doc(currentId).delete();
-    alert('已刪除');modal.classList.add('hidden');search.dispatchEvent(new Event('input'));
+    alert('已刪除');
+    modal.classList.add('hidden');
+    document.body.classList.remove('modal-open');
+    search.dispatchEvent(new Event('input'));
   }
-};
+}
 
-// --- 已領養 ---
-document.getElementById('adopt-btn').onclick=()=>{
-  document.getElementById('adopt-btn').classList.add('hidden');
-  document.getElementById('adopt-upload').classList.remove('hidden');
-};
-document.getElementById('save-adopt').onclick=async()=>{
-  const files=[...document.getElementById('adopt-photos').files];
-  const urls=[];
-  for(let f of files){
-    const ref=storage.ref(`adopted_photos/${currentId}/${f.name}`);
+// 🔹 已領養
+async function saveAdopt() {
+  const files = [...document.getElementById('adopt-photos').files];
+  const urls = await Promise.all(files.map(async f => {
+    const ref = storage.ref(`adopted_photos/${currentId}/${f.name}`);
     await ref.put(f);
-    urls.push(await ref.getDownloadURL());
-  }
-  await db.collection('adopted').doc(currentId).set({...currentData,adoptPhotos:urls});
+    return await ref.getDownloadURL();
+  }));
+  await db.collection('adopted').doc(currentId).set({ ...currentData, adoptPhotos: urls });
   await db.collection('pets').doc(currentId).delete();
-  alert('要幸福喔 💕');
+  alert('已標記為已領養！');
   modal.classList.add('hidden');
   document.body.classList.remove('modal-open');
   search.dispatchEvent(new Event('input'));
