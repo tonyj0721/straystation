@@ -183,17 +183,29 @@ async function compressImage(file, quality = 0.7, maxSize = 800) {
   });
 }
 
-// --- 上傳預覽 ---
-let imagesArr=[];
-document.getElementById('images').addEventListener('change',e=>{
-  const files=[...e.target.files];
-  imagesArr=[...imagesArr,...files].slice(0,5);
-  const preview=document.getElementById('preview');
-  preview.innerHTML='';
-  imagesArr.forEach(f=>{
-    const img=document.createElement('img');
-    img.src=URL.createObjectURL(f);
-    img.className='w-20 h-20 object-contain bg-gray-100 rounded-lg';
+// --- 上傳預覽 + 已選擇提示 ---
+let imagesArr = [];
+const imgInput = document.getElementById('images');
+const preview = document.getElementById('preview');
+const uploadStatus = document.getElementById('upload-status');
+
+imgInput.addEventListener('change', e => {
+  const files = [...e.target.files];
+  imagesArr = [...imagesArr, ...files].slice(0, 5);
+
+  // 更新提示文字
+  if (imagesArr.length > 0) {
+    uploadStatus.textContent = `已選擇 ${imagesArr.length} 張照片`;
+  } else {
+    uploadStatus.textContent = '尚未選擇照片';
+  }
+
+  // 更新預覽
+  preview.innerHTML = '';
+  imagesArr.forEach(f => {
+    const img = document.createElement('img');
+    img.src = URL.createObjectURL(f);
+    img.className = 'w-20 h-20 object-cover rounded-lg';
     preview.appendChild(img);
   });
 });
