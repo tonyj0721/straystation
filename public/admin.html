@@ -214,15 +214,14 @@ function openModal(id,data){
 document.getElementById('close-modal').onclick=()=>{modal.classList.add('hidden');document.body.classList.remove('modal-open');};
 
 // --- 編輯 ---
-document.getElementById('edit-btn').onclick = () => {
-  const newName = prompt('修改名字：', currentData.name);
-  if (newName !== null && newName.trim() !== '') {
-    db.collection('pets').doc(currentId).update({ name: newName.trim() })
-      .then(() => {
-        alert('已更新！');
-        modal.classList.add('hidden');
-        search.dispatchEvent(new Event('input')); // 重新載入搜尋結果
-      });
+document.getElementById('edit-btn').onclick=()=>{
+  const newName=prompt('修改名字：',currentData.name);
+  if(newName!==null){
+    db.collection('pets').doc(currentId).update({name:newName}).then(()=>{
+      alert('已更新！');
+      modal.classList.add('hidden');
+      search.dispatchEvent(new Event('input'));
+    });
   }
 };
 
