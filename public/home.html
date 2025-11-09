@@ -4,10 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>台中簡媽媽狗園｜已領養</title>
+
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
+
 <body class="bg-[#fdf6f7] min-h-screen">
   <header class="p-6 text-center">
     <h1 class="text-3xl font-bold text-rose-600">他們都找到幸福的家 🏡</h1>
@@ -15,89 +18,22 @@
   </header>
 
   <main class="p-4 md:p-8">
-    <div id="list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    <div id="list" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"></div>
   </main>
 
-  <!-- 詳細視窗 -->
-  <div id="h-modal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
-    <div class="bg-white w-[95vw] max-w-5xl rounded-2xl shadow-lg overflow-hidden">
-      <div class="relative">
-        <button id="h-close" class="absolute left-3 top-3 text-gray-600 hover:text-black text-2xl">✖</button>
-      </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-0 md:gap-6 p-4 md:p-6">
-        <div>
-          <img id="h-hero" class="w-full aspect-[4/3] object-cover rounded-xl border" src="">
-          <div id="h-thumbs" class="flex gap-2 mt-2 overflow-x-auto"></div>
-        </div>
-        <div class="flex flex-col h-[60vh] md:h-[70vh]">
-          <h4 id="h-name" class="text-2xl font-bold mb-2"></h4>
-          <div class="space-y-1 overflow-y-auto pr-2 flex-1">
-            <p><span class="text-gray-500">類別：</span><span id="h-type"></span></p>
-            <p><span class="text-gray-500">品種/毛色：</span><span id="h-breed"></span></p>
-            <p><span class="text-gray-500">年齡：</span><span id="h-age"></span></p>
-            <p><span class="text-gray-500">性別：</span><span id="h-gender"></span></p>
-            <p class="pt-2 whitespace-pre-line"><span class="text-gray-500">簡介：</span><span id="h-desc"></span></p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyBw9GBw5-LZkKD34qTiwBtZXdwONHLqG_s",
-      authDomain: "straystation.firebaseapp.com",
-      projectId: "straystation",
-    };
-    firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
-
     const list = document.getElementById('list');
-    const hModal = document.getElementById('h-modal');
-    const hClose = document.getElementById('h-close');
-    const hHero = document.getElementById('h-hero');
-    const hThumbs = document.getElementById('h-thumbs');
-    const hName = document.getElementById('h-name');
-    const hType = document.getElementById('h-type');
-    const hBreed= document.getElementById('h-breed');
-    const hAge  = document.getElementById('h-age');
-    const hGender=document.getElementById('h-gender');
-    const hDesc = document.getElementById('h-desc');
-
-    function openHModal(d){
-      hName.textContent = d.name;
-      hType.textContent = d.type==='cat'?'貓':'狗';
-      hBreed.textContent= d.breed||'-';
-      hAge.textContent  = d.age||'-';
-      hGender.textContent=d.gender||'-';
-      hDesc.textContent = d.desc||'';
-      const imgs = d.images||[];
-      hHero.src = imgs[0]||'';
-      hThumbs.innerHTML='';
-      imgs.forEach(u=>{
-        const b=document.createElement('button'); b.type='button'; b.className='border rounded overflow-hidden';
-        b.innerHTML=`<img src="${u}" class="w-20 h-16 object-cover">`;
-        b.onclick=()=> hHero.src=u;
-        hThumbs.appendChild(b);
-      });
-      hModal.classList.remove('hidden'); hModal.classList.add('flex');
-    }
-    hClose.onclick=()=>{ hModal.classList.add('hidden'); hModal.classList.remove('flex'); };
-
-    // 讀取 adopted 集合
-    db.collection('adopted').orderBy('adoptedAt','desc').onSnapshot(snap=>{
-      list.innerHTML='';
-      snap.forEach(doc=>{
-        const d=doc.data();
-        const card=document.createElement('div');
-        card.className='rounded-xl border shadow-sm bg-white overflow-hidden hover:shadow-md transition cursor-pointer';
-        const img=d.images?.[0]||'';
-        card.innerHTML=`<img src="${img}" class="w-full aspect-[4/3] object-cover">
-          <div class="p-3">
-            <div class="font-semibold">${d.name}</div>
-            <div class="text-sm text-gray-500">${d.type==='cat'?'貓':'狗'}・${d.gender||'-'}・${d.age||'-'}</div>
-          </div>`;
-        card.onclick=()=>openHModal(d);
+    db.collection('adopted').orderBy('adoptedAt', 'desc').onSnapshot(snap => {
+      list.innerHTML = '';
+      snap.forEach(doc => {
+        const d = doc.data();
+        const card = document.createElement('div');
+        card.className = 'rounded-xl border bg-white overflow-hidden shadow-sm hover:shadow-md cursor-pointer';
+        const img = d.images?.[0] || '';
+        card.innerHTML = `<img src="${img}" class="w-full aspect-square object-cover">
+          <div class="p-3"><div class="font-semibold">${d.name}</div>
+          <div class="text-sm text-gray-500">${d.type === 'cat' ? '貓' : '狗'}・${d.gender || '-'}・${d.age || '-'}</div></div>`;
         list.appendChild(card);
       });
     });
