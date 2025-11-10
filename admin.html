@@ -112,59 +112,29 @@
 
     .remove-btn {
       position: absolute;
-      top: 6px;
-      right: 6px;
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
+      top: 5px;
+      right: 5px;
       background: rgba(0, 0, 0, 0.6);
       color: white;
       border: none;
-      font-size: 16px;
-      font-weight: bold;
-      line-height: 24px; /* ✕ 垂直置中 */
-      text-align: center;
+      font-size: 12px;
+      border-radius: 50%;
+      width: 22px;
+      height: 22px;
       cursor: pointer;
-      transition: all 0.2s ease;
+      line-height: 20px;
+      text-align: center;
     }
 
-    .remove-btn:hover {
-      background: rgba(249, 115, 22, 0.9); /* 橘色 hover 效果 */
-      transform: scale(1.1);
+    .note {
+      font-size: 0.85rem;
+      color: #6b7280;
+      margin-top: 0.25rem;
     }
 
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(20px); }
       to { opacity: 1; transform: translateY(0); }
-    }
-    /* ✅ 統一欄位寬度與樣式 */
-    input,
-    select,
-    textarea {
-      width: 100%;
-      box-sizing: border-box;
-      border: 1px solid #e5e7eb;
-      border-radius: 8px;
-      padding: 10px 12px;
-      font-size: 1rem;
-      transition: all 0.2s;
-    }
-
-    /* ✅ 讓 select 跟 input 一樣寬 */
-    select {
-      appearance: none;
-      -webkit-appearance: none;
-      -moz-appearance: none;
-      background-color: white;
-    }
-
-    /* ✅ 聚焦時橘色高亮（溫暖橘） */
-    input:focus,
-    select:focus,
-    textarea:focus {
-      outline: none;
-      border-color: #f97316;
-      box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2);
     }
   </style>
 
@@ -190,61 +160,44 @@
       const form = document.getElementById("addPetForm");
       const speciesSelect = document.getElementById("species");
       const breedTypeWrap = document.getElementById("breedTypeWrap");
-      const breedType = document.getElementById("breedType");
       const breedWrap = document.getElementById("breedWrap");
+      const breedType = document.getElementById("breedType");
       const breed = document.getElementById("breed");
       const photoInput = document.getElementById("photos");
       const preview = document.getElementById("preview");
 
       let selectedFiles = [];
 
-      // 🧹 重置函數
-      function resetBreed() {
-        breedType.value = "";
-        breed.innerHTML = "";
-        breedTypeWrap.classList.add("hidden");
-        breedWrap.classList.add("hidden");
-        breedType.disabled = true;
-        breed.disabled = true;
-      }
-
-      // 🐾 類別切換
+      // 🐾 類別選擇
       speciesSelect.addEventListener("change", () => {
-        resetBreed();
-        if (speciesSelect.value === "貓" || speciesSelect.value === "狗") {
+        if (speciesSelect.value) {
           breedTypeWrap.classList.remove("hidden");
           breedType.disabled = false;
-          // 根據選擇的類別更新選項文字
-          breedType.innerHTML = `
-            <option value="">請選擇</option>
-            ${speciesSelect.value === "貓" 
-              ? '<option value="品種貓">品種貓</option><option value="米克斯">米克斯</option>'
-              : '<option value="品種犬">品種犬</option><option value="米克斯">米克斯</option>'}
-          `;
+        } else {
+          breedType.value = "";
+          breedTypeWrap.classList.add("hidden");
+          breedWrap.classList.add("hidden");
         }
       });
 
-      // 🐱🐶 第二層：品種類別
+      // 🐶🐱 品種選擇
       breedType.addEventListener("change", () => {
         breed.innerHTML = `<option value="">請選擇</option>`;
         let options = [];
 
         if (speciesSelect.value === "貓") {
-          if (breedType.value === "品種貓")
-            options = ["美短","英短","藍貓","暹羅貓","波斯貓","布偶貓","曼赤肯"];
-          else if (breedType.value === "米克斯")
-            options = ["橘貓","黑貓","虎斑貓","白底虎斑貓","三花貓","玳瑁貓","白貓"];
+          if (breedType.value === "品種貓") options = ["美短","英短","藍貓","暹羅貓","波斯貓","布偶貓","曼赤肯"];
+          if (breedType.value === "米克斯") options = ["橘貓","黑貓","虎斑貓","白底虎斑貓","三花貓","玳瑁貓","白貓"];
         } else if (speciesSelect.value === "狗") {
-          if (breedType.value === "品種犬")
-            options = ["博美","貴賓","吉娃娃","馬爾濟斯","柯基","柴犬","哈士奇","高山犬","黃金獵犬"];
-          else if (breedType.value === "米克斯")
-            options = ["黑色","白色","黃色","棕色","虎斑","花花"];
+          if (breedType.value === "品種犬") options = ["博美","貴賓","吉娃娃","馬爾濟斯","柯基","柴犬","哈士奇","高山犬","黃金獵犬"];
+          if (breedType.value === "米克斯") options = ["黑色","白色","黃色","棕色","虎斑","花花"];
         }
 
-        if (options.length) {
+        if (options.length > 0) {
           options.forEach(opt => {
             const option = document.createElement("option");
-            option.value = option.textContent = opt;
+            option.value = opt;
+            option.textContent = opt;
             breed.appendChild(option);
           });
           breedWrap.classList.remove("hidden");
@@ -255,7 +208,7 @@
         }
       });
 
-      // 📸 圖片預覽（可累加）
+      // 📸 圖片預覽
       photoInput.addEventListener("change", () => {
         const newFiles = Array.from(photoInput.files);
         selectedFiles = [...selectedFiles, ...newFiles].slice(0, 5);
@@ -319,7 +272,6 @@
           form.reset();
           selectedFiles = [];
           preview.innerHTML = "";
-          resetBreed();
         } catch (err) {
           console.error("❌ 新增失敗：", err);
           alert("上傳或新增失敗，請檢查 Console。");
@@ -373,6 +325,7 @@
 
       <label>上傳照片（最多 5 張，可分次上傳）</label>
       <input type="file" id="photos" accept="image/*" multiple />
+      <div class="note">建議尺寸 800×800px 以上，檔案大小不超過 2MB</div>
 
       <div id="preview"></div>
 
