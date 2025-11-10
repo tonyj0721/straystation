@@ -266,24 +266,24 @@
     const preview = document.getElementById('preview');
     let filesState = [];
 
-    pickBtn.addEventListener('click', ()=> input.click());
+    pickBtn.addEventListener('click', () => input.click());
 
-    input.addEventListener('change', (e)=>{
+    input.addEventListener('change', e => {
       const incoming = Array.from(e.target.files);
-      for(const f of incoming){
-        if(filesState.length>=5) break;
+      for (const f of incoming) {
+        if (filesState.length >= 5) break;
         filesState.push(f);
       }
       render();
       syncBackToInput();
-      input.value = "";
+      input.value = ''; // 清除上次選取
     });
 
-    function render(){
-      preview.innerHTML = "";
-      filesState.forEach((file, idx)=>{
+    function render() {
+      preview.innerHTML = '';
+      filesState.forEach((file, idx) => {
         const reader = new FileReader();
-        reader.onload = ev=>{
+        reader.onload = ev => {
           const box = document.createElement('div');
           box.className = 'preview-item';
 
@@ -293,10 +293,8 @@
           const btn = document.createElement('button');
           btn.className = 'remove-btn';
           btn.textContent = '✕';
-          Object.assign(btn.style,{position:'absolute',top:'6px',right:'6px',left:'auto',bottom:'auto',transform:'none'});
-
-          btn.addEventListener('click', ()=>{
-            filesState.splice(idx,1);
+          btn.addEventListener('click', () => {
+            filesState.splice(idx, 1);
             render();
             syncBackToInput();
           });
@@ -308,12 +306,14 @@
         reader.readAsDataURL(file);
       });
 
-      status.textContent = filesState.length ? `已選擇 ${filesState.length} 張照片` : '尚未選擇';
+      status.textContent = filesState.length
+        ? `已選擇 ${filesState.length} 張照片`
+        : '尚未選擇';
     }
 
-    function syncBackToInput(){
+    function syncBackToInput() {
       const dt = new DataTransfer();
-      filesState.forEach(f=>dt.items.add(f));
+      filesState.forEach(f => dt.items.add(f));
       input.files = dt.files;
     }
   })();
