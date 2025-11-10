@@ -221,6 +221,8 @@
       // 🐱🐶 第二層：品種類別
       breedType.addEventListener("change", () => {
         breed.innerHTML = `<option value="">請選擇</option>`;
+        const breedLabel = document.querySelector('#breedWrap label');
+        breedLabel.textContent = (breedType.value === "米克斯") ? "毛色" : "品種";
         let options = [];
 
         if (speciesSelect.value === "貓") {
