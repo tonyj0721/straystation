@@ -90,40 +90,49 @@
       margin-top: 10px;
     }
 
-    .preview-item {
-      position: relative;
-      width: 110px;
-      height: 110px;
-      overflow: hidden;
-      border-radius: 10px;
-      border: 2px solid #fed7aa;
-      background: #fff7ed;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    /* ---- 強制把預覽容器設為定位基準 ---- */
+    .preview-item{
+      position: relative !important;
+      width: 110px !important;
+      height: 110px !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+      border: 2px solid #fed7aa !important;
+      border-radius: 10px !important;
+      background: #fff7ed !important;
+      display: inline-block !important;
     }
 
-    .preview-item img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
+    /* 圖片鋪滿，不留白邊 */
+    .preview-item img{
+      display: block !important;
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover !important;
     }
 
-    .remove-btn {
-      position: absolute;
-      top: 5px;
-      right: 5px;
-      background: rgba(0, 0, 0, 0.6);
-      color: white;
-      border: none;
-      font-size: 12px;
-      border-radius: 50%;
-      width: 22px;
-      height: 22px;
-      cursor: pointer;
-      line-height: 20px;
-      text-align: center;
+    /* ---- 刪除鈕固定右上角（強制覆寫所有殘留）---- */
+    .remove-btn{
+      position: absolute !important;
+      top: 6px !important;
+      right: 6px !important;
+      left: auto !important;
+      bottom: auto !important;
+      transform: none !important;
+      margin: 0 !important;
+      width: 26px !important;
+      height: 26px !important;
+      border-radius: 50% !important;
+      background: rgba(0,0,0,.75) !important;
+      color: #fff !important;
+      font-size: 16px !important;
+      font-weight: 700 !important;
+      line-height: 1 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      z-index: 99 !important;
+      cursor: pointer !important;
     }
 
     @keyframes fadeIn {
@@ -262,10 +271,42 @@
           reader.onload = (e) => {
             const div = document.createElement("div");
             div.className = "preview-item";
-            div.innerHTML = `
-              <img src="${e.target.result}" alt="預覽圖">
-              <button type="button" data-index="${index}" class="remove-btn">✕</button>
-            `;
+
+            const img = document.createElement("img");
+            img.src = e.target.result;
+            img.alt = "預覽圖";
+
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.dataset.index = index;
+            btn.className = "remove-btn";
+            btn.textContent = "✕";
+
+            // ✅ 這裡是強制置於右上角的「行內樣式」
+            Object.assign(btn.style, {
+              position: "absolute",
+              top: "6px",
+              right: "6px",
+              left: "auto",
+              bottom: "auto",
+              transform: "none",
+              width: "26px",
+              height: "26px",
+              borderRadius: "50%",
+              background: "rgba(0, 0, 0, 0.75)",
+              color: "#fff",
+              fontSize: "16px",
+              fontWeight: "700",
+              lineHeight: "1",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              zIndex: "99",
+            });
+
+            div.appendChild(img);
+            div.appendChild(btn);
             preview.appendChild(div);
           };
           reader.readAsDataURL(file);
