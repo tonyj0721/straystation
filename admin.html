@@ -259,114 +259,64 @@
   </style>
 
   <script>
-    // 這段放這裡就對了！在 Firebase 初始化之前
+  (function(){
+    const input = document.getElementById('photo');
+    const pickBtn = document.getElementById('pickBtn');
+    const status = document.getElementById('photoStatus');
+    const preview = document.getElementById('preview');
+    let filesState = [];
 
-    const uploadInput = document.getElementById("photoUpload");
-    const previewContainer = document.getElementById("previewContainer");
-    let selectedFiles = [];
+    pickBtn.addEventListener('click', ()=> input.click());
 
-    uploadInput.addEventListener("change", (e) => {
-      const files = Array.from(e.target.files);
-      files.forEach((file) => {
-        if (selectedFiles.length >= 5) return;
-        selectedFiles.push(file);
+    input.addEventListener('change', (e)=>{
+      const incoming = Array.from(e.target.files);
+      for(const f of incoming){
+        if(filesState.length>=5) break;
+        filesState.push(f);
+      }
+      render();
+      syncBackToInput();
+      input.value = "";
+    });
 
+    function render(){
+      preview.innerHTML = "";
+      filesState.forEach((file, idx)=>{
         const reader = new FileReader();
-        reader.onload = function (event) {
-          const div = document.createElement("div");
-          div.className = "preview-item";
+        reader.onload = ev=>{
+          const box = document.createElement('div');
+          box.className = 'preview-item';
 
-          const img = document.createElement("img");
-          img.src = event.target.result;
+          const img = document.createElement('img');
+          img.src = ev.target.result;
 
-          const btn = document.createElement("button");
-          btn.textContent = "✕";
-          btn.className = "remove-btn";
-          btn.onclick = function () {
-            previewContainer.removeChild(div);
-            selectedFiles = selectedFiles.filter((f) => f !== file);
-            updateInputFiles();
-          };
+          const btn = document.createElement('button');
+          btn.className = 'remove-btn';
+          btn.textContent = '✕';
+          Object.assign(btn.style,{position:'absolute',top:'6px',right:'6px',left:'auto',bottom:'auto',transform:'none'});
 
-          div.appendChild(img);
-          div.appendChild(btn);
-          previewContainer.appendChild(div);
+          btn.addEventListener('click', ()=>{
+            filesState.splice(idx,1);
+            render();
+            syncBackToInput();
+          });
+
+          box.appendChild(img);
+          box.appendChild(btn);
+          preview.appendChild(box);
         };
         reader.readAsDataURL(file);
       });
 
-      updateInputFiles();
-      uploadInput.value = "";
-    });
-
-    function updateInputFiles() {
-      const dataTransfer = new DataTransfer();
-      selectedFiles.forEach((f) => dataTransfer.items.add(f));
-      uploadInput.files = dataTransfer.files;
-    }
-  </script>
-
-  <script>
-  document.addEventListener("DOMContentLoaded", () => {
-    const uploadInput = document.getElementById("photoUpload");
-    const customBtn = document.getElementById("customUploadBtn");
-    const previewContainer = document.getElementById("previewContainer");
-    const statusText = document.getElementById("photoStatus");
-    let selectedFiles = [];
-
-    // 開啟檔案選擇視窗
-    customBtn.addEventListener("click", () => uploadInput.click());
-
-    // 選擇檔案後處理
-    uploadInput.addEventListener("change", (e) => {
-      const files = Array.from(e.target.files);
-
-      // 新增照片，但不超過 5 張
-      for (const file of files) {
-        if (selectedFiles.length >= 5) break;
-        selectedFiles.push(file);
-      }
-
-      renderPreviews();
-      updateStatus();
-      uploadInput.value = ""; // 清除原生檔名顯示
-    });
-
-    function renderPreviews() {
-      previewContainer.innerHTML = "";
-      selectedFiles.forEach((file, index) => {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const div = document.createElement("div");
-          div.className = "preview-item";
-          div.innerHTML = `
-            <img src="${event.target.result}" alt="preview">
-            <button class="remove-btn" data-index="${index}">✕</button>
-          `;
-          previewContainer.appendChild(div);
-        };
-        reader.readAsDataURL(file);
-      });
+      status.textContent = filesState.length ? `已選擇 ${filesState.length} 張照片` : '尚未選擇';
     }
 
-    // 點 ✕ 移除
-    previewContainer.addEventListener("click", (e) => {
-      if (e.target.classList.contains("remove-btn")) {
-        const index = e.target.dataset.index;
-        selectedFiles.splice(index, 1);
-        renderPreviews();
-        updateStatus();
-      }
-    });
-
-    function updateStatus() {
-      if (selectedFiles.length === 0) {
-        statusText.textContent = "尚未選擇";
-      } else {
-        statusText.textContent = `已選擇 ${selectedFiles.length} 張照片`;
-      }
+    function syncBackToInput(){
+      const dt = new DataTransfer();
+      filesState.forEach(f=>dt.items.add(f));
+      input.files = dt.files;
     }
-  });
+  })();
   </script>
   
   <script type="module">
