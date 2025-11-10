@@ -112,18 +112,21 @@
 
     .remove-btn {
       position: absolute;
-      top: 5px;
-      right: 5px;
+      top: 6px;
+      right: 6px;
       background: rgba(0, 0, 0, 0.6);
       color: white;
       border: none;
-      font-size: 12px;
+      font-size: 14px;
       border-radius: 50%;
-      width: 22px;
-      height: 22px;
+      width: 24px;
+      height: 24px;
       cursor: pointer;
-      line-height: 20px;
+      line-height: 22px;
       text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     @keyframes fadeIn {
@@ -251,11 +254,17 @@
         }
       });
 
-      // 📸 圖片預覽（可累加）
       photoInput.addEventListener("change", () => {
         const newFiles = Array.from(photoInput.files);
         selectedFiles = [...selectedFiles, ...newFiles].slice(0, 5);
 
+        // ✅ 更新圖片數量顯示
+        const countText = document.getElementById("photo-count");
+        countText.textContent = selectedFiles.length > 0
+          ? `已選擇 ${selectedFiles.length} 張照片`
+          : "尚未選擇";
+
+        // ✅ 預覽區更新
         preview.innerHTML = "";
         selectedFiles.forEach((file, index) => {
           const reader = new FileReader();
@@ -368,8 +377,10 @@
       <textarea name="desc" rows="3" placeholder="輸入個性、故事、習慣等..."></textarea>
 
       <label>上傳照片（最多 5 張，可分次上傳）</label>
-      <input type="file" id="photos" accept="image/*" multiple />
-
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <input type="file" id="photos" accept="image/*" multiple style="flex: none;" />
+        <span id="photo-count" style="font-size: 0.9rem; color: #6b7280;">尚未選擇</span>
+      </div>
       <div id="preview"></div>
 
       <button>新增浪浪</button>
