@@ -82,56 +82,98 @@
       background-color: #ea580c;
     }
 
-    /* 照片預覽 */
+    /* === 上傳照片區塊樣式 === */
+    .upload-btn {
+      background-color: #fb923c;      /* 橘色主色 */
+      color: #fff;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 600;
+      transition: background-color 0.2s ease;
+    }
+
+    .upload-btn:hover {
+      background-color: #f97316;      /* 滑過更深一點的橘色 */
+    }
+
+    .note {
+      display: inline-block;
+      margin-left: 10px;
+      font-size: 0.9rem;
+      color: #6b7280;                 /* 灰色提示文字 */
+    }
+
+    /* === 照片預覽區 === */
     #preview {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 10px;
+      gap: 12px;
+      margin-top: 12px;
     }
 
-    .preview-item{
-      position: relative !important;
-      width: 110px !important;
-      height: 110px !important;
-      padding: 0 !important;
-      overflow: hidden !important;
-      border: 2px solid #fed7aa !important;
-      border-radius: 10px !important;
-      background: #fff7ed !important;
-      display: inline-block !important;
+    .preview-item {
+      position: relative;
+      width: 110px;
+      height: 110px;
+      border: 2px solid #fed7aa;       /* 淡橘邊框 */
+      border-radius: 10px;
+      overflow: hidden;
+      background-color: #fff7ed;       /* 米色背景 */
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+      transition: transform 0.15s ease;
     }
 
-    /* 圖片鋪滿，不留白邊 */
-    .preview-item img{
-      display: block !important;
-      width: 100% !important;
-      height: 100% !important;
-      object-fit: cover !important;
+    .preview-item:hover {
+      transform: translateY(-3px);     /* 滑過時微微浮起 */
     }
 
-    /* ---- 刪除鈕固定右上角（強制覆寫所有殘留）---- */
-    .remove-btn{
-      position: absolute !important;
-      top: 6px !important;
-      right: 6px !important;
-      left: auto !important;
-      bottom: auto !important;
-      transform: none !important;
-      margin: 0 !important;
-      width: 26px !important;
-      height: 26px !important;
-      border-radius: 50% !important;
-      background: rgba(0,0,0,.75) !important;
-      color: #fff !important;
-      font-size: 16px !important;
-      font-weight: 700 !important;
-      line-height: 1 !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      z-index: 99 !important;
-      cursor: pointer !important;
+    .preview-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    /* === 刪除按鈕（固定右上角） === */
+    .remove-btn {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 26px;
+      height: 26px;
+      border: none;
+      border-radius: 50%;
+      background-color: rgba(0, 0, 0, 0.75);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      line-height: 1;
+      transition: background-color 0.2s ease;
+      z-index: 10;
+    }
+
+    .remove-btn:hover {
+      background-color: rgba(0, 0, 0, 0.9);
+    }
+
+    /* === 手機端微調 === */
+    @media (max-width: 600px) {
+      .preview-item {
+        width: 90px;
+        height: 90px;
+      }
+      .remove-btn {
+        width: 24px;
+        height: 24px;
+        font-size: 14px;
+      }
     }
 
     @keyframes fadeIn {
