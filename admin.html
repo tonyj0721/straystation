@@ -408,8 +408,9 @@
       <textarea name="desc" rows="3" placeholder="輸入個性、故事、習慣等..."></textarea>
 
       <label>上傳照片（最多 5 張，可分次上傳）</label>
-      <input type="file" id="photos" accept="image/*" multiple />
-
+      <input type="file" id="photo" accept="image/*" multiple style="display:none;">
+      <button type="button" id="pickBtn" class="upload-btn">選擇照片</button>
+      <span id="photoStatus" class="note">尚未選擇</span>
       <div id="preview"></div>
 
       <button>新增浪浪</button>
