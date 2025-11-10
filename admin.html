@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
->
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -32,13 +31,13 @@
       const breedWrap = document.getElementById("breedWrap");
       const breed = document.getElementById("breed");
       const photoInput = document.getElementById("photos");
+      const preview = document.getElementById("preview");
 
-      // 🐾 重置品種選單
+      // 🧹 重置品種
       function resetBreed() {
         breedType.value = "";
         breed.innerHTML = "";
         breed.value = "";
-
         breedTypeWrap.classList.add("hidden");
         breedWrap.classList.add("hidden");
         breedType.disabled = true;
@@ -51,7 +50,7 @@
           breedTypeWrap.classList.remove("hidden");
           breedType.disabled = false;
         } else {
-          resetBreed(); // 選狗或清空時全部收回
+          resetBreed();
         }
       });
 
@@ -79,11 +78,54 @@
         }
       });
 
-      // 📸 表單送出
+      // 📸 圖片預覽
+      photoInput.addEventListener("change", () => {
+        preview.innerHTML = "";
+        const files = Array.from(photoInput.files);
+
+        if (files.length > 5) {
+          alert("最多只能上傳 5 張圖片！");
+          photoInput.value = "";
+          return;
+        }
+
+        files.forEach((file, index) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const div = document.createElement("div");
+            div.className = "relative inline-block m-1";
+            div.innerHTML = `
+              <img src="${e.target.result}" class="w-24 h-24 object-cover rounded border" />
+              <button type="button" data-index="${index}" class="absolute top-0 right-0 bg-red-600 text-white text-xs px-1 rounded">✕</button>
+            `;
+            preview.appendChild(div);
+          };
+          reader.readAsDataURL(file);
+        });
+      });
+
+      // 🗑️ 刪除單張預覽
+      preview.addEventListener("click", (e) => {
+        if (e.target.tagName === "BUTTON") {
+          const index = parseInt(e.target.dataset.index);
+          const files = Array.from(photoInput.files);
+          files.splice(index, 1);
+
+          // 重新建一個 FileList
+          const dt = new DataTransfer();
+          files.forEach((f) => dt.items.add(f));
+          photoInput.files = dt.files;
+
+          // 重新觸發預覽更新
+          const event = new Event("change");
+          photoInput.dispatchEvent(event);
+        }
+      });
+
+      // 🚀 送出表單
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
 
-        // 非貓時清空貓品種欄位
         if (speciesSelect.value !== "貓") {
           breedType.value = "";
           breed.value = "";
@@ -99,7 +141,6 @@
         }
 
         try {
-          // 上傳照片
           for (let i = 0; i < files.length; i++) {
             const file = files[i];
             const fileRef = ref(storage, `pets/${Date.now()}_${file.name}`);
@@ -114,6 +155,7 @@
           await addDoc(collection(db, "pets"), data);
           alert(`🐾 已成功新增 ${data.name}！`);
           form.reset();
+          preview.innerHTML = "";
           resetBreed();
         } catch (err) {
           console.error("❌ 新增失敗：", err);
@@ -175,6 +217,9 @@
     <label>上傳照片（最多5張）
       <input type="file" id="photos" accept="image/*" multiple class="border rounded w-full p-2" />
     </label>
+
+    <!-- 照片預覽區 -->
+    <div id="preview" class="flex flex-wrap mt-2"></div>
 
     <button class="bg-brand-500 hover:bg-brand-600 text-white py-2 rounded">新增浪浪</button>
   </form>
