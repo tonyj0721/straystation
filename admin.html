@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
+>
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -9,9 +10,9 @@
     import { getFirestore, addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
     import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
 
-    // ⚠️ 替換成你的 Firebase 設定
+    // ⚠️ 替換為你的 Firebase 設定
     const firebaseConfig = {
-      apiKey: "AIzaSyC4NT2KOm_Cw2OEdaaOimxI0ruoNv_u_9g",
+      apiKey: "你的 API KEY",
       authDomain: "straystation.firebaseapp.com",
       projectId: "straystation",
       storageBucket: "straystation.firebasestorage.app",
@@ -26,41 +27,68 @@
     document.addEventListener("DOMContentLoaded", () => {
       const form = document.getElementById("addPetForm");
       const speciesSelect = document.getElementById("species");
+      const breedTypeWrap = document.getElementById("breedTypeWrap");
       const breedType = document.getElementById("breedType");
-      const breedSelect = document.getElementById("breed");
+      const breedWrap = document.getElementById("breedWrap");
+      const breed = document.getElementById("breed");
       const photoInput = document.getElementById("photos");
+
+      // 🐾 重置品種選單
+      function resetBreed() {
+        breedType.value = "";
+        breed.innerHTML = "";
+        breed.value = "";
+
+        breedTypeWrap.classList.add("hidden");
+        breedWrap.classList.add("hidden");
+        breedType.disabled = true;
+        breed.disabled = true;
+      }
 
       // 🐾 類別選擇
       speciesSelect.addEventListener("change", () => {
         if (speciesSelect.value === "貓") {
-          breedType.parentElement.classList.remove("hidden");
+          breedTypeWrap.classList.remove("hidden");
+          breedType.disabled = false;
         } else {
-          breedType.parentElement.classList.add("hidden");
-          breedSelect.parentElement.classList.add("hidden");
-          breedSelect.innerHTML = "";
+          resetBreed(); // 選狗或清空時全部收回
         }
       });
 
-      // 🐱 貓品種第二層
+      // 🐱 品種第二層
       breedType.addEventListener("change", () => {
-        breedSelect.parentElement.classList.remove("hidden");
-        breedSelect.innerHTML = `<option value="">請選擇</option>`;
+        breed.innerHTML = `<option value="">請選擇</option>`;
         let options = [];
         if (breedType.value === "品種貓") {
           options = ["美短", "英短", "藍貓", "暹羅貓", "波斯貓", "布偶貓", "曼赤肯"];
         } else if (breedType.value === "米克斯") {
           options = ["橘貓", "黑貓", "虎斑貓", "白底虎斑貓", "三花貓", "玳瑁貓", "白貓"];
         }
-        options.forEach(opt => {
-          const o = document.createElement("option");
-          o.value = o.textContent = opt;
-          breedSelect.appendChild(o);
-        });
+
+        if (options.length > 0) {
+          options.forEach((opt) => {
+            const option = document.createElement("option");
+            option.value = option.textContent = opt;
+            breed.appendChild(option);
+          });
+          breedWrap.classList.remove("hidden");
+          breed.disabled = false;
+        } else {
+          breedWrap.classList.add("hidden");
+          breed.disabled = true;
+        }
       });
 
-      // 📸 上傳圖片（最多5張）
+      // 📸 表單送出
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
+
+        // 非貓時清空貓品種欄位
+        if (speciesSelect.value !== "貓") {
+          breedType.value = "";
+          breed.value = "";
+        }
+
         const data = Object.fromEntries(new FormData(form).entries());
         const files = photoInput.files;
         const imageUrls = [];
@@ -71,7 +99,7 @@
         }
 
         try {
-          // 上傳每張圖片
+          // 上傳照片
           for (let i = 0; i < files.length; i++) {
             const file = files[i];
             const fileRef = ref(storage, `pets/${Date.now()}_${file.name}`);
@@ -86,8 +114,7 @@
           await addDoc(collection(db, "pets"), data);
           alert(`🐾 已成功新增 ${data.name}！`);
           form.reset();
-          breedType.parentElement.classList.add("hidden");
-          breedSelect.parentElement.classList.add("hidden");
+          resetBreed();
         } catch (err) {
           console.error("❌ 新增失敗：", err);
           alert("上傳或新增失敗，請檢查 Console。");
@@ -113,24 +140,28 @@
       </select>
     </label>
 
-    <label class="hidden">品種類別
-      <select id="breedType" name="breedType" class="border rounded w-full p-2">
-        <option value="">請選擇</option>
-        <option value="品種貓">品種貓</option>
-        <option value="米克斯">米克斯</option>
-      </select>
-    </label>
+    <div id="breedTypeWrap" class="hidden">
+      <label>品種類別
+        <select id="breedType" name="breedType" class="border rounded w-full p-2" disabled>
+          <option value="">請選擇</option>
+          <option value="品種貓">品種貓</option>
+          <option value="米克斯">米克斯</option>
+        </select>
+      </label>
+    </div>
 
-    <label class="hidden">品種
-      <select id="breed" name="breed" class="border rounded w-full p-2"></select>
-    </label>
+    <div id="breedWrap" class="hidden">
+      <label>品種
+        <select id="breed" name="breed" class="border rounded w-full p-2" disabled></select>
+      </label>
+    </div>
 
     <label>年齡
-      <input name="age" class="border rounded w-full p-2" placeholder="幾個月或幾歲" />
+      <input name="age" class="border rounded w-full p-2" />
     </label>
 
     <label>性別
-      <select name="gender" class="border rounded w-full p-2" required>
+      <select name="gender" class="border rounded w-full p-2">
         <option value="">請選擇</option>
         <option value="男生">男生</option>
         <option value="女生">女生</option>
@@ -138,7 +169,7 @@
     </label>
 
     <label>簡介
-      <textarea name="desc" class="border rounded w-full p-2" rows="3" placeholder="個性、故事、習慣等"></textarea>
+      <textarea name="desc" class="border rounded w-full p-2" rows="3"></textarea>
     </label>
 
     <label>上傳照片（最多5張）
