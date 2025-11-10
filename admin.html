@@ -447,10 +447,42 @@
           reader.onload = (e) => {
             const div = document.createElement("div");
             div.className = "preview-item";
-            div.innerHTML = `
-              <img src="${e.target.result}" alt="預覽圖">
-              <button type="button" data-index="${index}" class="remove-btn">✕</button>
-            `;
+
+            const img = document.createElement("img");
+            img.src = e.target.result;
+            img.alt = "預覽圖";
+
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.dataset.index = index;
+            btn.className = "remove-btn";
+            btn.textContent = "✕";
+
+            // ✅ 這裡是強制置於右上角的「行內樣式」
+            Object.assign(btn.style, {
+              position: "absolute",
+              top: "6px",
+              right: "6px",
+              left: "auto",
+              bottom: "auto",
+              transform: "none",
+              width: "26px",
+              height: "26px",
+              borderRadius: "50%",
+              background: "rgba(0, 0, 0, 0.75)",
+              color: "#fff",
+              fontSize: "16px",
+              fontWeight: "700",
+              lineHeight: "1",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              zIndex: "99",
+            });
+
+            div.appendChild(img);
+            div.appendChild(btn);
             preview.appendChild(div);
           };
           reader.readAsDataURL(file);
