@@ -202,52 +202,56 @@
         breed.disabled = true;
       }
 
-      // 🐾 類別切換
+      // 🐾 類別切換（直接生成選項）
       speciesSelect.addEventListener("change", () => {
-        resetBreed();
-        if (speciesSelect.value === "貓" || speciesSelect.value === "狗") {
-          breedTypeWrap.classList.remove("hidden");
-          breedType.disabled = false;
-          // 根據選擇的類別更新選項文字
-          breedType.innerHTML = `
-            <option value="">請選擇</option>
-            ${speciesSelect.value === "貓" 
-              ? '<option value="品種貓">品種貓</option><option value="米克斯">米克斯</option>'
-              : '<option value="品種犬">品種犬</option><option value="米克斯">米克斯</option>'}
-          `;
-        }
-      });
+        breed.innerHTML = "";
+        breedWrap.classList.add("hidden");
+        if (!speciesSelect.value) return;
 
-      // 🐱🐶 第二層：品種類別
-      breedType.addEventListener("change", () => {
-        breed.innerHTML = `<option value="">請選擇</option>`;
         let options = [];
-
+        let isMix = false;
         if (speciesSelect.value === "貓") {
-          if (breedType.value === "品種貓")
-            options = ["美短","英短","藍貓","暹羅貓","波斯貓","布偶貓","曼赤肯"];
-          else if (breedType.value === "米克斯")
-            options = ["橘貓","黑貓","虎斑貓","白底虎斑貓","三花貓","玳瑁貓","白貓"];
+          options = [
+            { group: "品種", list: ["美短","英短","藍貓","暹羅貓","波斯貓","布偶貓","曼赤肯"] },
+            { group: "毛色", list: ["橘貓","黑貓","虎斑貓","白底虎斑貓","三花貓","玳瑁貓","白貓"] }
+          ];
         } else if (speciesSelect.value === "狗") {
-          if (breedType.value === "品種犬")
-            options = ["博美","貴賓","吉娃娃","馬爾濟斯","柯基","柴犬","哈士奇","高山犬","黃金獵犬"];
-          else if (breedType.value === "米克斯")
-            options = ["黑色","白色","黃色","棕色","虎斑","花花"];
+          options = [
+            { group: "品種", list: ["博美","貴賓","吉娃娃","馬爾濟斯","柯基","柴犬","哈士奇","高山犬","黃金獵犬"] },
+            { group: "毛色", list: ["黑色","白色","黃色","棕色","虎斑","花花"] }
+          ];
         }
-        
-        if (options.length) {
-          options.forEach(opt => {
+
+        // 建立 optgroup
+        options.forEach(group => {
+          const optgroup = document.createElement("optgroup");
+          optgroup.label = group.group;
+          group.list.forEach(item => {
             const option = document.createElement("option");
-            option.value = option.textContent = opt;
-            breed.appendChild(option);
+            option.value = item;
+            option.textContent = item;
+            optgroup.appendChild(option);
           });
-          breedWrap.classList.remove("hidden");
-          breed.disabled = false;
-        } else {
-          breedWrap.classList.add("hidden");
-          breed.disabled = true;
-        }
+          breed.appendChild(optgroup);
+        });
+      
+        breed.disabled = false;
+        breedWrap.classList.remove("hidden");
+        updateBreedLabel();
       });
+
+      // 🏷️ 根據選擇更新 label
+      breed.addEventListener("change", updateBreedLabel);
+
+      function updateBreedLabel() {
+        const selected = breed.selectedOptions[0];
+        const breedLabel = document.querySelector('label[for="breed"]');
+        if (selected && selected.parentNode.label === "毛色") {
+          breedLabel.textContent = "毛色";
+        } else {
+          breedLabel.textContent = "品種";
+        }
+      }
 
       // 📸 圖片預覽（可累加）
       photoInput.addEventListener("change", () => {
@@ -336,16 +340,6 @@
         <option value="貓">貓咪</option>
         <option value="狗">狗狗</option>
       </select>
-
-      <div id="breedTypeWrap" class="hidden">
-        <label>品種類別</label>
-        <select id="breedType" name="breedType" disabled>
-          <option value="">請選擇</option>
-          <option value="品種貓">品種貓</option>
-          <option value="品種犬">品種犬</option>
-          <option value="米克斯">米克斯</option>
-        </select>
-      </div>
 
       <div id="breedWrap" class="hidden">
         <label>品種</label>
