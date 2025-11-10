@@ -167,6 +167,54 @@
     }
   </style>
 
+  <script>
+    // 這段放這裡就對了！在 Firebase 初始化之前
+
+    const uploadInput = document.getElementById("photoUpload");
+    const previewContainer = document.getElementById("previewContainer");
+    let selectedFiles = [];
+
+    uploadInput.addEventListener("change", (e) => {
+      const files = Array.from(e.target.files);
+      files.forEach((file) => {
+        if (selectedFiles.length >= 5) return;
+        selectedFiles.push(file);
+
+        const reader = new FileReader();
+        reader.onload = function (event) {
+          const div = document.createElement("div");
+          div.className = "preview-item";
+
+          const img = document.createElement("img");
+          img.src = event.target.result;
+
+          const btn = document.createElement("button");
+          btn.textContent = "✕";
+          btn.className = "remove-btn";
+          btn.onclick = function () {
+            previewContainer.removeChild(div);
+            selectedFiles = selectedFiles.filter((f) => f !== file);
+            updateInputFiles();
+          };
+
+          div.appendChild(img);
+          div.appendChild(btn);
+          previewContainer.appendChild(div);
+        };
+        reader.readAsDataURL(file);
+      });
+
+      updateInputFiles();
+      uploadInput.value = "";
+    });
+
+    function updateInputFiles() {
+      const dataTransfer = new DataTransfer();
+      selectedFiles.forEach((f) => dataTransfer.items.add(f));
+      uploadInput.files = dataTransfer.files;
+    }
+  </script>
+  
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
     import { getFirestore, addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
