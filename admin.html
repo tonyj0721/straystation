@@ -112,18 +112,25 @@
 
     .remove-btn {
       position: absolute;
-      top: 5px;
-      right: 5px;
+      top: 6px;
+      right: 6px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
       background: rgba(0, 0, 0, 0.6);
       color: white;
       border: none;
-      font-size: 12px;
-      border-radius: 50%;
-      width: 22px;
-      height: 22px;
-      cursor: pointer;
-      line-height: 20px;
+      font-size: 16px;
+      font-weight: bold;
+      line-height: 24px; /* ✕ 垂直置中 */
       text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .remove-btn:hover {
+      background: rgba(249, 115, 22, 0.9); /* 橘色 hover 效果 */
+      transform: scale(1.1);
     }
 
     .note {
