@@ -4,12 +4,138 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>浪浪轉運站｜管理員新增動物資料</title>
+  <style>
+    body {
+      font-family: "Noto Sans TC", sans-serif;
+      background-color: #f9fafb;
+      color: #333;
+      padding: 40px 16px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .form-card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+      padding: 32px;
+      width: 100%;
+      max-width: 520px;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 1.5rem;
+      color: #2c3e50;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin-top: 1rem;
+      margin-bottom: 0.25rem;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 1rem;
+      transition: all 0.2s;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #0077cc;
+      box-shadow: 0 0 0 3px rgba(0, 119, 204, 0.15);
+    }
+
+    textarea {
+      resize: vertical;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 1.5rem;
+      background-color: #0077cc;
+      color: white;
+      border: none;
+      padding: 12px 0;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    button:hover {
+      background-color: #005fa3;
+    }
+
+    /* 預覽區塊 */
+    #preview {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .preview-item {
+      position: relative;
+      width: 110px;
+      height: 110px;
+      overflow: hidden;
+      border-radius: 10px;
+      border: 2px solid #e5e7eb;
+      background: #fafafa;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    }
+
+    .preview-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .remove-btn {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      background: rgba(0, 0, 0, 0.6);
+      color: white;
+      border: none;
+      font-size: 12px;
+      border-radius: 50%;
+      width: 22px;
+      height: 22px;
+      cursor: pointer;
+      line-height: 20px;
+      text-align: center;
+    }
+
+    .note {
+      font-size: 0.85rem;
+      color: #6b7280;
+      margin-top: 0.25rem;
+    }
+  </style>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
     import { getFirestore, addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
     import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
 
-    // ⚠️ 替換為你的 Firebase 設定
+    // ⚠️ 改成你的 Firebase 設定
     const firebaseConfig = {
       apiKey: "你的 API KEY",
       authDomain: "straystation.firebaseapp.com",
@@ -25,60 +151,10 @@
 
     document.addEventListener("DOMContentLoaded", () => {
       const form = document.getElementById("addPetForm");
-      const speciesSelect = document.getElementById("species");
-      const breedTypeWrap = document.getElementById("breedTypeWrap");
-      const breedType = document.getElementById("breedType");
-      const breedWrap = document.getElementById("breedWrap");
-      const breed = document.getElementById("breed");
       const photoInput = document.getElementById("photos");
       const preview = document.getElementById("preview");
 
-      // 🧹 重置品種
-      function resetBreed() {
-        breedType.value = "";
-        breed.innerHTML = "";
-        breed.value = "";
-        breedTypeWrap.classList.add("hidden");
-        breedWrap.classList.add("hidden");
-        breedType.disabled = true;
-        breed.disabled = true;
-      }
-
-      // 🐾 類別選擇
-      speciesSelect.addEventListener("change", () => {
-        if (speciesSelect.value === "貓") {
-          breedTypeWrap.classList.remove("hidden");
-          breedType.disabled = false;
-        } else {
-          resetBreed();
-        }
-      });
-
-      // 🐱 品種第二層
-      breedType.addEventListener("change", () => {
-        breed.innerHTML = `<option value="">請選擇</option>`;
-        let options = [];
-        if (breedType.value === "品種貓") {
-          options = ["美短", "英短", "藍貓", "暹羅貓", "波斯貓", "布偶貓", "曼赤肯"];
-        } else if (breedType.value === "米克斯") {
-          options = ["橘貓", "黑貓", "虎斑貓", "白底虎斑貓", "三花貓", "玳瑁貓", "白貓"];
-        }
-
-        if (options.length > 0) {
-          options.forEach((opt) => {
-            const option = document.createElement("option");
-            option.value = option.textContent = opt;
-            breed.appendChild(option);
-          });
-          breedWrap.classList.remove("hidden");
-          breed.disabled = false;
-        } else {
-          breedWrap.classList.add("hidden");
-          breed.disabled = true;
-        }
-      });
-
-      // 📸 圖片預覽
+      // 照片預覽
       photoInput.addEventListener("change", () => {
         preview.innerHTML = "";
         const files = Array.from(photoInput.files);
@@ -93,10 +169,10 @@
           const reader = new FileReader();
           reader.onload = (e) => {
             const div = document.createElement("div");
-            div.className = "relative inline-block m-1";
+            div.className = "preview-item";
             div.innerHTML = `
-              <img src="${e.target.result}" class="w-24 h-24 object-cover rounded border" />
-              <button type="button" data-index="${index}" class="absolute top-0 right-0 bg-red-600 text-white text-xs px-1 rounded">✕</button>
+              <img src="${e.target.result}" alt="預覽圖">
+              <button type="button" data-index="${index}" class="remove-btn">✕</button>
             `;
             preview.appendChild(div);
           };
@@ -104,32 +180,22 @@
         });
       });
 
-      // 🗑️ 刪除單張預覽
+      // 刪除單張預覽
       preview.addEventListener("click", (e) => {
-        if (e.target.tagName === "BUTTON") {
+        if (e.target.classList.contains("remove-btn")) {
           const index = parseInt(e.target.dataset.index);
           const files = Array.from(photoInput.files);
           files.splice(index, 1);
-
-          // 重新建一個 FileList
           const dt = new DataTransfer();
           files.forEach((f) => dt.items.add(f));
           photoInput.files = dt.files;
-
-          // 重新觸發預覽更新
-          const event = new Event("change");
-          photoInput.dispatchEvent(event);
+          photoInput.dispatchEvent(new Event("change"));
         }
       });
 
-      // 🚀 送出表單
+      // 送出表單
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
-
-        if (speciesSelect.value !== "貓") {
-          breedType.value = "";
-          breed.value = "";
-        }
 
         const data = Object.fromEntries(new FormData(form).entries());
         const files = photoInput.files;
@@ -151,12 +217,11 @@
 
           data.images = imageUrls;
           data.createdAt = serverTimestamp();
-
           await addDoc(collection(db, "pets"), data);
+
           alert(`🐾 已成功新增 ${data.name}！`);
           form.reset();
           preview.innerHTML = "";
-          resetBreed();
         } catch (err) {
           console.error("❌ 新增失敗：", err);
           alert("上傳或新增失敗，請檢查 Console。");
@@ -166,62 +231,42 @@
   </script>
 </head>
 
-<body class="p-6 bg-gray-50 font-sans">
-  <h1 class="text-2xl font-bold mb-4">🐶 新增浪浪資料</h1>
+<body>
+  <div class="form-card">
+    <h1>🐾 新增浪浪資料</h1>
 
-  <form id="addPetForm" class="grid gap-4 max-w-md bg-white p-6 rounded-lg shadow">
-    <label>名字
-      <input name="name" class="border rounded w-full p-2" required />
-    </label>
+    <form id="addPetForm">
+      <label>名字</label>
+      <input name="name" required />
 
-    <label>類別
-      <select name="species" id="species" class="border rounded w-full p-2" required>
+      <label>類別</label>
+      <select name="species" required>
         <option value="">請選擇</option>
         <option value="貓">貓咪</option>
         <option value="狗">狗狗</option>
       </select>
-    </label>
 
-    <div id="breedTypeWrap" class="hidden">
-      <label>品種類別
-        <select id="breedType" name="breedType" class="border rounded w-full p-2" disabled>
-          <option value="">請選擇</option>
-          <option value="品種貓">品種貓</option>
-          <option value="米克斯">米克斯</option>
-        </select>
-      </label>
-    </div>
+      <label>年齡</label>
+      <input name="age" placeholder="例如：1歲 或 幼年" />
 
-    <div id="breedWrap" class="hidden">
-      <label>品種
-        <select id="breed" name="breed" class="border rounded w-full p-2" disabled></select>
-      </label>
-    </div>
-
-    <label>年齡
-      <input name="age" class="border rounded w-full p-2" />
-    </label>
-
-    <label>性別
-      <select name="gender" class="border rounded w-full p-2">
+      <label>性別</label>
+      <select name="gender">
         <option value="">請選擇</option>
         <option value="男生">男生</option>
         <option value="女生">女生</option>
       </select>
-    </label>
 
-    <label>簡介
-      <textarea name="desc" class="border rounded w-full p-2" rows="3"></textarea>
-    </label>
+      <label>簡介</label>
+      <textarea name="desc" rows="3" placeholder="輸入個性、故事、習慣等..."></textarea>
 
-    <label>上傳照片（最多5張）
-      <input type="file" id="photos" accept="image/*" multiple class="border rounded w-full p-2" />
-    </label>
+      <label>上傳照片（最多 5 張）</label>
+      <input type="file" id="photos" accept="image/*" multiple />
+      <div class="note">建議尺寸 800×800px 以上，檔案大小不超過 2MB</div>
 
-    <!-- 照片預覽區 -->
-    <div id="preview" class="flex flex-wrap mt-2"></div>
+      <div id="preview"></div>
 
-    <button class="bg-brand-500 hover:bg-brand-600 text-white py-2 rounded">新增浪浪</button>
-  </form>
+      <button>新增浪浪</button>
+    </form>
+  </div>
 </body>
 </html>
