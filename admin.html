@@ -83,10 +83,10 @@
     }
 
     /* 照片預覽 */
-    #preview {
+    #previewContainer {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
+      gap: 8px;
       margin-top: 10px;
     }
 
@@ -94,47 +94,41 @@
       position: relative;
       width: 110px;
       height: 110px;
-      overflow: hidden;
-      border-radius: 10px;
       border: 2px solid #fed7aa;
+      border-radius: 10px;
+      overflow: hidden;
       background: #fff7ed;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-      margin: 4px;
-      vertical-align: top;
     }
 
     .preview-item img {
       width: 100%;
       height: 100%;
       object-fit: cover;
-      display: block;
       border-radius: 8px;
     }
 
     .remove-btn {
       position: absolute;
-      top: 6px;
-      right: 6px;
+      top: 5px;
+      right: 5px;
       width: 26px;
       height: 26px;
       border-radius: 50%;
       background: rgba(0, 0, 0, 0.65);
       color: white;
-      border: none;
       font-size: 18px;
       font-weight: bold;
+      border: none;
       line-height: 26px;
       text-align: center;
       cursor: pointer;
-      transition: background 0.2s ease;
       z-index: 10;
+      transition: background 0.2s;
     }
 
     .remove-btn:hover {
-      background: rgba(0, 0, 0, 0.8);
+      background: rgba(0, 0, 0, 0.85);
     }
 
     @keyframes fadeIn {
@@ -379,11 +373,9 @@
       <label>簡介</label>
       <textarea name="desc" rows="3" placeholder="輸入個性、故事、習慣等..."></textarea>
 
-      <label>上傳照片（最多 5 張，可分次上傳）</label>
-      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;">
-        <input type="file" id="photos" accept="image/*" multiple style="flex: none;" />
-      </div>
-      <div id="preview"></div>
+      <label>上傳照片（最多 5 張，可分次上傳）</label><br>
+      <input type="file" id="photoUpload" accept="image/*" multiple />
+      <div id="previewContainer"></div>
 
       <button>新增浪浪</button>
     </form>
