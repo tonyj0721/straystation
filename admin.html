@@ -160,44 +160,61 @@
       const form = document.getElementById("addPetForm");
       const speciesSelect = document.getElementById("species");
       const breedTypeWrap = document.getElementById("breedTypeWrap");
-      const breedWrap = document.getElementById("breedWrap");
       const breedType = document.getElementById("breedType");
+      const breedWrap = document.getElementById("breedWrap");
       const breed = document.getElementById("breed");
       const photoInput = document.getElementById("photos");
       const preview = document.getElementById("preview");
 
       let selectedFiles = [];
 
-      // 🐾 類別選擇
+      // 🧹 重置函數
+      function resetBreed() {
+        breedType.value = "";
+        breed.innerHTML = "";
+        breedTypeWrap.classList.add("hidden");
+        breedWrap.classList.add("hidden");
+        breedType.disabled = true;
+        breed.disabled = true;
+      }
+
+      // 🐾 類別切換
       speciesSelect.addEventListener("change", () => {
-        if (speciesSelect.value) {
+        resetBreed();
+        if (speciesSelect.value === "貓" || speciesSelect.value === "狗") {
           breedTypeWrap.classList.remove("hidden");
           breedType.disabled = false;
-        } else {
-          breedType.value = "";
-          breedTypeWrap.classList.add("hidden");
-          breedWrap.classList.add("hidden");
+          // 根據選擇的類別更新選項文字
+          breedType.innerHTML = `
+            <option value="">請選擇</option>
+            ${speciesSelect.value === "貓" 
+              ? '<option value="品種貓">品種貓</option><option value="米克斯">米克斯</option>'
+              : '<option value="品種犬">品種犬</option><option value="米克斯">米克斯</option>'}
+          `;
         }
       });
 
-      // 🐶🐱 品種選擇
+      // 🐱🐶 第二層：品種類別
       breedType.addEventListener("change", () => {
         breed.innerHTML = `<option value="">請選擇</option>`;
         let options = [];
 
         if (speciesSelect.value === "貓") {
-          if (breedType.value === "品種貓") options = ["美短","英短","藍貓","暹羅貓","波斯貓","布偶貓","曼赤肯"];
-          if (breedType.value === "米克斯") options = ["橘貓","黑貓","虎斑貓","白底虎斑貓","三花貓","玳瑁貓","白貓"];
+          if (breedType.value === "品種貓")
+            options = ["美短","英短","藍貓","暹羅貓","波斯貓","布偶貓","曼赤肯"];
+          else if (breedType.value === "米克斯")
+            options = ["橘貓","黑貓","虎斑貓","白底虎斑貓","三花貓","玳瑁貓","白貓"];
         } else if (speciesSelect.value === "狗") {
-          if (breedType.value === "品種犬") options = ["博美","貴賓","吉娃娃","馬爾濟斯","柯基","柴犬","哈士奇","高山犬","黃金獵犬"];
-          if (breedType.value === "米克斯") options = ["黑色","白色","黃色","棕色","虎斑","花花"];
+          if (breedType.value === "品種犬")
+            options = ["博美","貴賓","吉娃娃","馬爾濟斯","柯基","柴犬","哈士奇","高山犬","黃金獵犬"];
+          else if (breedType.value === "米克斯")
+            options = ["黑色","白色","黃色","棕色","虎斑","花花"];
         }
 
-        if (options.length > 0) {
+        if (options.length) {
           options.forEach(opt => {
             const option = document.createElement("option");
-            option.value = opt;
-            option.textContent = opt;
+            option.value = option.textContent = opt;
             breed.appendChild(option);
           });
           breedWrap.classList.remove("hidden");
@@ -208,7 +225,7 @@
         }
       });
 
-      // 📸 圖片預覽
+      // 📸 圖片預覽（可累加）
       photoInput.addEventListener("change", () => {
         const newFiles = Array.from(photoInput.files);
         selectedFiles = [...selectedFiles, ...newFiles].slice(0, 5);
@@ -272,6 +289,7 @@
           form.reset();
           selectedFiles = [];
           preview.innerHTML = "";
+          resetBreed();
         } catch (err) {
           console.error("❌ 新增失敗：", err);
           alert("上傳或新增失敗，請檢查 Console。");
