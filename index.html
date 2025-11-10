@@ -465,5 +465,25 @@
     "sameAs": ["https://www.facebook.com/", "https://www.instagram.com/"]
   }
   </script>
+  <!-- Firebase SDK -->
+  <script type="module">
+    // 匯入 Firebase 核心與 Firestore
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+    import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+
+    // 🔧 這裡貼上你的設定碼
+    const firebaseConfig = {
+      apiKey: "AIzaSyBxxxxx",
+      authDomain: "straystation.firebaseapp.com",
+      projectId: "straystation",
+      storageBucket: "straystation.appspot.com",
+      messagingSenderId: "1234567890",
+      appId: "1:1234567890:web:abcd1234"
+    };
+
+    // 初始化
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+  </script>
 </body>
 </html>
