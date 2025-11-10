@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>浪浪轉運站｜管理員新增動物資料</title>
+  <script type="module">
+    // === 初始化 Firebase ===
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+    import { getFirestore, addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+
+    // ⚠️ 替換成你自己的 Firebase 設定（firebaseConfig）
+    const firebaseConfig = {
+      apiKey: "AIzaSyC4NT2KOm_Cw2OEdaaOimxI0ruoNv_u_9g",
+      authDomain: "straystation.firebaseapp.com",
+      projectId: "straystation",
+      storageBucket: "straystation.firebasestorage.app",
+      messagingSenderId: "611366379195",
+      appId: "1:611366379195:web:ef5a632e88d8bba1d6139e"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // === 表單提交事件 ===
+    document.addEventListener("DOMContentLoaded", () => {
+      const form = document.getElementById("addPetForm");
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const data = Object.fromEntries(new FormData(form).entries());
+        data.vaccinated = form.vaccinated.checked;
+        data.neutered = form.neutered.checked;
+        data.goodWithKids = form.goodWithKids.checked;
+        data.createdAt = serverTimestamp();
+
+        try {
+          await addDoc(collection(db, "pets"), data);
+          alert(`🐾 已成功新增 ${data.name}！`);
+          form.reset();
+        } catch (error) {
+          console.error("新增失敗：", error);
+          alert("❌ 新增資料失敗，請檢查 Console。");
+        }
+      });
+    });
+  </script>
+</head>
+
+<body class="p-6 bg-gray-50 font-sans">
+  <h1 class="text-2xl font-bold mb-4">🐶 新增浪浪資料</h1>
+  <form id="addPetForm" class="grid gap-4 max-w-md bg-white p-6 rounded-lg shadow">
+    <label>
+      名字：
+      <input name="name" class="border rounded w-full p-2" placeholder="例：小虎" required />
+    </label>
+
+    <label>
+      類別：
+      <select name="species" class="border rounded w-full p-2" required>
+        <option value="">請選擇</option>
+        <option value="貓">貓咪</option>
+        <option value="狗">狗狗</option>
+      </select>
+    </label>
+
+    <label>
+      年齡：
+      <input name="age" class="border rounded w-full p-2" placeholder="例：幼年、成犬" />
+    </label>
+
+    <label>
+      性別：
+      <select name="gender" class="border rounded w-full p-2">
+        <option value="">未指定</option>
+        <option value="公">公</option>
+        <option value="母">母</option>
+      </select>
+    </label>
+
+    <label>
+      城市／地區：
+      <input name="city" class="border rounded w-full p-2" placeholder="例：台中市" />
+    </label>
+
+    <label>
+      照片網址：
+      <input name="image" class="border rounded w-full p-2" placeholder="https://..." />
+    </label>
+
+    <label>
+      簡介／描述：
+      <textarea name="desc" class="border rounded w-full p-2" rows="3" placeholder="介紹一下這位浪浪..."></textarea>
+    </label>
+
+    <div class="grid grid-cols-3 gap-2">
+      <label><input type="checkbox" name="vaccinated" /> 已施打疫苗</label>
+      <label><input type="checkbox" name="neutered" /> 已結紮</label>
+      <label><input type="checkbox" name="goodWithKids" /> 親人／親小孩</label>
+    </div>
+
+    <button class="bg-brand-500 hover:bg-brand-600 text-white py-2 rounded">新增浪浪</button>
+  </form>
+</body>
+</html>
