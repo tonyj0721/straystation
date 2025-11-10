@@ -258,6 +258,63 @@
     }
   </style>
 
+
+</head>
+
+<body>
+  <div class="form-card">
+    <h1>🐾 新增浪浪資料</h1>
+    <form id="addPetForm">
+      <label>名字</label>
+      <input name="name" required />
+
+      <label>類別</label>
+      <select name="species" id="species" required>
+        <option value="">請選擇</option>
+        <option value="貓">貓咪</option>
+        <option value="狗">狗狗</option>
+      </select>
+
+      <div id="breedTypeWrap" class="hidden">
+        <label>品種類別</label>
+        <select id="breedType" name="breedType" disabled>
+          <option value="">請選擇</option>
+          <option value="品種貓">品種貓</option>
+          <option value="品種犬">品種犬</option>
+          <option value="米克斯">米克斯</option>
+        </select>
+      </div>
+
+      <div id="breedWrap" class="hidden">
+        <label>品種</label>
+        <select id="breed" name="breed" disabled></select>
+      </div>
+
+      <label>年齡</label>
+      <input name="age" placeholder="例如：1歲 或 幼年" />
+
+      <label>性別</label>
+      <select name="gender">
+        <option value="">請選擇</option>
+        <option value="男生">男生</option>
+        <option value="女生">女生</option>
+      </select>
+
+      <label>簡介</label>
+      <textarea name="desc" rows="3" placeholder="輸入個性、故事、習慣等..."></textarea>
+
+      <div class="photo-upload">
+        <label>上傳照片（最多 5 張，可分次上傳）</label>
+        <input type="file" id="photo" accept="image/*" multiple style="display:none;">
+        <button type="button" id="pickBtn" class="upload-btn">選擇照片</button>
+        <span id="photoStatus" class="note">尚未選擇</span>
+        <div id="preview"></div>
+      </div>
+
+      <button>新增浪浪</button>
+    </form>
+  </div>
+
   <script>
   (function(){
     const input = document.getElementById('photo');
@@ -513,60 +570,5 @@
       });
     });
   </script>
-</head>
-
-<body>
-  <div class="form-card">
-    <h1>🐾 新增浪浪資料</h1>
-    <form id="addPetForm">
-      <label>名字</label>
-      <input name="name" required />
-
-      <label>類別</label>
-      <select name="species" id="species" required>
-        <option value="">請選擇</option>
-        <option value="貓">貓咪</option>
-        <option value="狗">狗狗</option>
-      </select>
-
-      <div id="breedTypeWrap" class="hidden">
-        <label>品種類別</label>
-        <select id="breedType" name="breedType" disabled>
-          <option value="">請選擇</option>
-          <option value="品種貓">品種貓</option>
-          <option value="品種犬">品種犬</option>
-          <option value="米克斯">米克斯</option>
-        </select>
-      </div>
-
-      <div id="breedWrap" class="hidden">
-        <label>品種</label>
-        <select id="breed" name="breed" disabled></select>
-      </div>
-
-      <label>年齡</label>
-      <input name="age" placeholder="例如：1歲 或 幼年" />
-
-      <label>性別</label>
-      <select name="gender">
-        <option value="">請選擇</option>
-        <option value="男生">男生</option>
-        <option value="女生">女生</option>
-      </select>
-
-      <label>簡介</label>
-      <textarea name="desc" rows="3" placeholder="輸入個性、故事、習慣等..."></textarea>
-
-      <div class="photo-upload">
-        <label>上傳照片（最多 5 張，可分次上傳）</label>
-        <input type="file" id="photo" accept="image/*" multiple style="display:none;">
-        <button type="button" id="pickBtn" class="upload-btn">選擇照片</button>
-        <span id="photoStatus" class="note">尚未選擇</span>
-        <div id="preview"></div>
-      </div>
-
-      <button>新增浪浪</button>
-    </form>
-  </div>
 </body>
 </html>
