@@ -186,6 +186,53 @@
       border-color: #f97316;
       box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2);
     }
+
+    /* ---- 強制把預覽容器設為定位基準 ---- */
+    .preview-item{
+      position: relative !important;
+      width: 110px !important;
+      height: 110px !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+      border: 2px solid #fed7aa !important;
+      border-radius: 10px !important;
+      background: #fff7ed !important;
+      display: inline-block !important;
+    }
+
+    /* 圖片鋪滿，不留白邊 */
+    .preview-item img{
+      display: block !important;
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover !important;
+    }
+
+    /* ---- 刪除鈕固定右上角（強制覆寫所有殘留）---- */
+    .remove-btn{
+      position: absolute !important;
+      top: 6px !important;
+      right: 6px !important;
+      left: auto !important;
+      bottom: auto !important;
+      transform: none !important;
+      margin: 0 !important;
+
+      width: 26px !important;
+      height: 26px !important;
+      border-radius: 50% !important;
+      background: rgba(0,0,0,.75) !important;
+      color: #fff !important;
+      font-size: 16px !important;
+      font-weight: 700 !important;
+      line-height: 1 !important;
+
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      z-index: 99 !important;
+      cursor: pointer !important;
+    }
   </style>
 
   <script>
