@@ -136,6 +136,36 @@
       from { opacity: 0; transform: translateY(20px); }
       to { opacity: 1; transform: translateY(0); }
     }
+    
+    /* ✅ 統一欄位寬度與樣式 */
+    input,
+    select,
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 1rem;
+      transition: all 0.2s;
+    }
+
+    /* ✅ 讓 select 跟 input 一樣寬 */
+    select {
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      background-color: white;
+    }
+
+    /* ✅ 聚焦時橘色高亮（溫暖橘） */
+    input:focus,
+    select:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #f97316;
+      box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2);
+    }
   </style>
 
   <script type="module">
