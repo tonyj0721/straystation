@@ -82,11 +82,24 @@
       background-color: #ea580c;
     }
 
+    .upload-btn {
+      background-color: #fb923c;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .upload-btn:hover {
+      background-color: #f97316;
+    }
+
     /* 照片預覽 */
     #previewContainer {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
+      gap: 10px;
       margin-top: 10px;
     }
 
@@ -105,30 +118,37 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
-      border-radius: 8px;
+      display: block;
     }
 
     .remove-btn {
       position: absolute;
-      top: 5px;
-      right: 5px;
+      top: 4px;
+      right: 4px;
       width: 26px;
       height: 26px;
       border-radius: 50%;
       background: rgba(0, 0, 0, 0.65);
       color: white;
+      border: none;
       font-size: 18px;
       font-weight: bold;
-      border: none;
-      line-height: 26px;
-      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
+      transition: background 0.2s ease;
       z-index: 10;
-      transition: background 0.2s;
+    }
+    
+    .remove-btn:hover {
+      background: rgba(0, 0, 0, 0.8);
     }
 
-    .remove-btn:hover {
-      background: rgba(0, 0, 0, 0.85);
+    .note {
+      font-size: 0.9rem;
+      color: #6b7280;
+      margin-left: 8px;
     }
 
     @keyframes fadeIn {
@@ -212,6 +232,67 @@
       const dataTransfer = new DataTransfer();
       selectedFiles.forEach((f) => dataTransfer.items.add(f));
       uploadInput.files = dataTransfer.files;
+    }
+  </script>
+
+  <script>
+    const uploadInput = document.getElementById("photoUpload");
+    const customBtn = document.getElementById("customUploadBtn");
+    const previewContainer = document.getElementById("previewContainer");
+    const statusText = document.getElementById("photoStatus");
+    let selectedFiles = [];
+
+    // 開啟檔案選擇視窗
+    customBtn.addEventListener("click", () => uploadInput.click());
+
+    // 選擇檔案後處理
+    uploadInput.addEventListener("change", (e) => {
+      const files = Array.from(e.target.files);
+
+      // 新增照片，但不超過 5 張
+      for (const file of files) {
+        if (selectedFiles.length >= 5) break;
+        selectedFiles.push(file);
+      }
+
+      renderPreviews();
+      updateStatus();
+      uploadInput.value = ""; // 清除原生檔名顯示
+    });
+
+    function renderPreviews() {
+      previewContainer.innerHTML = "";
+      selectedFiles.forEach((file, index) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const div = document.createElement("div");
+          div.className = "preview-item";
+          div.innerHTML = `
+            <img src="${event.target.result}" alt="preview">
+            <button class="remove-btn" data-index="${index}">✕</button>
+          `;
+          previewContainer.appendChild(div);
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // 點 ✕ 移除
+    previewContainer.addEventListener("click", (e) => {
+      if (e.target.classList.contains("remove-btn")) {
+        const index = e.target.dataset.index;
+        selectedFiles.splice(index, 1);
+        renderPreviews();
+        updateStatus();
+      }
+    });
+
+    function updateStatus() {
+      if (selectedFiles.length === 0) {
+        statusText.textContent = "尚未選擇";
+      } else {
+        statusText.textContent = `已選擇 ${selectedFiles.length} 張照片`;
+      }
     }
   </script>
   
@@ -422,7 +503,9 @@
       <textarea name="desc" rows="3" placeholder="輸入個性、故事、習慣等..."></textarea>
 
       <label>上傳照片（最多 5 張，可分次上傳）</label><br>
-      <input type="file" id="photoUpload" accept="image/*" multiple />
+      <input type="file" id="photoUpload" accept="image/*" multiple style="display:none;" />
+      <button type="button" id="customUploadBtn" class="upload-btn">選擇照片</button>
+      <span id="photoStatus" class="note">尚未選擇</span>
       <div id="previewContainer"></div>
 
       <button>新增浪浪</button>
