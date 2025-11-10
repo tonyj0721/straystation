@@ -112,12 +112,12 @@
 
     .remove-btn {
       position: absolute;
-      top: 4px;
-      right: 4px;
+      top: 3px;
+      right: 3px;
       width: 26px;
       height: 26px;
       border-radius: 50%;
-      background: rgba(0, 0, 0, 0.6);
+      background: rgba(0, 0, 0, 0.65);
       color: white;
       border: none;
       font-size: 16px;
@@ -127,7 +127,7 @@
       justify-content: center;
       cursor: pointer;
       transition: background 0.2s ease;
-      z-index: 10;
+      z-index: 5;
     }
 
     .remove-btn:hover {
@@ -383,9 +383,9 @@
       <textarea name="desc" rows="3" placeholder="輸入個性、故事、習慣等..."></textarea>
 
       <label>上傳照片（最多 5 張，可分次上傳）</label>
-      <div style="display: flex; align-items: center; gap: 10px;">
+      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;">
         <input type="file" id="photos" accept="image/*" multiple style="flex: none;" />
-        <span id="photo-count" style="font-size: 0.9rem; color: #6b7280;">尚未選擇</span>
+        <span id="photo-count" style="font-size: 0.9rem; color: #6b7280; white-space: nowrap;">尚未選擇</span>
       </div>
       <div id="preview"></div>
 
