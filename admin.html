@@ -112,21 +112,26 @@
 
     .remove-btn {
       position: absolute;
-      top: 6px;
-      right: 6px;
+      top: 4px;
+      right: 4px;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
       background: rgba(0, 0, 0, 0.6);
       color: white;
       border: none;
-      font-size: 14px;
-      border-radius: 50%;
-      width: 24px;
-      height: 24px;
-      cursor: pointer;
-      line-height: 22px;
-      text-align: center;
+      font-size: 16px;
+      font-weight: bold;
       display: flex;
       align-items: center;
       justify-content: center;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      z-index: 10;
+    }
+
+    .remove-btn:hover {
+      background: rgba(0, 0, 0, 0.8);
     }
 
     @keyframes fadeIn {
