@@ -112,32 +112,27 @@
     }
 
     /* ---- 刪除鈕固定右上角（強制覆寫所有殘留）---- */
-    .remove-btn {
+    .remove-btn{
       position: absolute !important;
       top: 6px !important;
       right: 6px !important;
+      left: auto !important;
+      bottom: auto !important;
+      transform: none !important;
+      margin: 0 !important;
       width: 26px !important;
       height: 26px !important;
       border-radius: 50% !important;
-      background: rgba(0, 0, 0, 0.75) !important;
+      background: rgba(0,0,0,.75) !important;
       color: #fff !important;
-      font-size: 18px !important;
+      font-size: 16px !important;
       font-weight: 700 !important;
-
-      /* ✅ 絕對垂直水平置中 */
+      line-height: 1 !important;
       display: flex !important;
       align-items: center !important;
       justify-content: center !important;
-
-      /* ✅ 去除系統預設內距與邊框 */
-      border: none !important;
-      padding: 0 !important;
-      line-height: 1 !important;
-      cursor: pointer !important;
-
-      /* ✅ 提高相容性 */
-      box-sizing: border-box !important;
       z-index: 99 !important;
+      cursor: pointer !important;
     }
 
     @media (max-width: 768px) {
