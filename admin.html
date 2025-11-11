@@ -102,6 +102,12 @@
       align-items: center;
       justify-content: center;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    .preview-item.removing {
+      opacity: 0;
+      transform: scale(0.8);
     }
 
     .preview-item img {
