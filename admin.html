@@ -263,12 +263,16 @@
       });
     }
 
-    document.getElementById("dlgClose").addEventListener("click", () => dlg.close());
+    // 🐾 Modal 控制（與 index.html 相同）
+    const dlg = document.getElementById("petDialog");
+    const dlgClose = document.getElementById("dlgClose");
+
+    dlgClose.addEventListener("click", () => dlg.close());
 
     function openDialog(p) {
       document.getElementById("dlgImg").src = (p.images && p.images[0]) || "https://placehold.co/600x400?text=No+Image";
-      document.getElementById("dlgName").textContent = p.name;
-      document.getElementById("dlgMeta").textContent = `${p.species}・${p.gender}・${p.age}`;
+      document.getElementById("dlgName").textContent = p.name || "—";
+      document.getElementById("dlgMeta").textContent = `${p.species || "—"}・${p.gender || "—"}・${p.age || "—"}`;
       document.getElementById("dlgDesc").textContent = p.desc || "尚無介紹";
       dlg.showModal();
     }
@@ -501,14 +505,8 @@
             <h3 id="dlgName" class="text-xl font-semibold">—</h3>
             <p id="dlgMeta" class="text-gray-500">—</p>
           </div>
-          <span id="dlgCity" class="inline-flex items-center px-2 py-1 text-xs bg-gray-100 dark:bg-gray-800 rounded">—</span>
         </div>
         <p id="dlgDesc" class="text-gray-700 dark:text-gray-200">—</p>
-        <ul id="dlgBadges" class="flex flex-wrap gap-2 text-sm"></ul>
-        <div class="flex justify-end gap-3 pt-2">
-          <button id="dlgAdopt" class="px-4 py-2 rounded-xl bg-brand-600 text-white">我要認養</button>
-          <button id="dlgShare" class="px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-700">分享</button>
-        </div>
       </div>
     </div>
   </dialog>
