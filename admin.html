@@ -181,6 +181,29 @@
     const db = getFirestore(app);
     const storage = getStorage(app);
 
+    // === 顯示 Firestore pets 資料 ===
+    async function loadPets() {
+      const tbody = document.querySelector("#petTable tbody");
+      tbody.innerHTML = "<tr><td colspan='4' style='text-align:center'>讀取中...</td></tr>";
+
+      const querySnapshot = await getDocs(collection(db, "pets"));
+      tbody.innerHTML = "";
+
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        const tr = document.createElement("tr");
+        tr.style.cursor = "pointer";
+        tr.innerHTML = `
+          <td>${data.name || "—"}</td>
+          <td>${data.breed || "—"}</td>
+          <td>${data.age || "—"}</td>
+          <td>${data.gender || "—"}</td>
+        `;
+        tr.addEventListener("click", () => openModal(data));
+        tbody.appendChild(tr);
+      });
+    }
+
     document.addEventListener("DOMContentLoaded", () => {
       const form = document.getElementById("addPetForm");
       const speciesSelect = document.getElementById("species");
