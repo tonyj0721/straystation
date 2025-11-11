@@ -423,6 +423,9 @@
           Object.assign(btn.style,{position:'absolute',top:'6px',right:'6px',left:'auto',bottom:'auto',transform:'none'});
 
           btn.addEventListener('click', ()=>{
+            // 先讓目前按鈕失去焦點（避免跳回輸入框）
+            document.activeElement.blur();
+            
             // 加上淡出動畫 class
             box.classList.add('removing');
 
