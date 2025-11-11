@@ -242,6 +242,43 @@ td button {
     const db = getFirestore(app);
     const storage = getStorage(app);
 
+    import { collection, getDocs } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+
+const petList = document.getElementById("petList");
+const dlg = document.getElementById("petDialog");
+const dlgClose = document.getElementById("dlgClose");
+dlgClose.addEventListener("click", ()=>dlg.close());
+
+async function loadPets(){
+  const snapshot = await getDocs(collection(db, "pets"));
+  petList.innerHTML = "";
+  snapshot.forEach((doc)=>{
+    const p = doc.data();
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${p.name}</td>
+      <td>${p.species}</td>
+      <td>${p.breed||'-'}</td>
+      <td>${p.age||'-'}</td>
+      <td>${p.gender||'-'}</td>
+      <td><button class="detailBtn">查看</button></td>
+    `;
+    tr.querySelector(".detailBtn").addEventListener("click", ()=>openDialog(p));
+    petList.appendChild(tr);
+  });
+}
+
+function openDialog(p){
+  document.getElementById("dlgName").textContent = p.name;
+  document.getElementById("dlgMeta").textContent = `${p.species}・${p.gender}・${p.age}`;
+  document.getElementById("dlgDesc").textContent = p.desc || "尚無介紹";
+  document.getElementById("dlgImg").src = (p.images && p.images[0]) || "https://placehold.co/600x400?text=No+Image";
+  dlg.showModal();
+}
+
+loadPets();
+
+
     document.addEventListener("DOMContentLoaded", () => {
       const form = document.getElementById("addPetForm");
       const speciesSelect = document.getElementById("species");
