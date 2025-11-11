@@ -394,6 +394,20 @@
     </div>
 
   </div>
+  <!-- 🐾 Modal（照 index.html 樣式） -->
+  <dialog id="petDialog" class="w-full max-w-2xl rounded-2xl p-0 overflow-hidden">
+    <div class="bg-white">
+      <div class="relative aspect-video bg-gray-100">
+        <img id="dlgImg" alt="動物照片" class="w-full h-full object-cover"/>
+        <button id="dlgClose" class="absolute top-3 right-3 bg-black/60 text-white p-2 rounded-full" aria-label="關閉">✕</button>
+      </div>
+      <div class="p-5 space-y-4">
+        <h3 id="dlgName" class="text-xl font-semibold">—</h3>
+        <p id="dlgMeta" class="text-gray-500">—</p>
+        <p id="dlgDesc" class="text-gray-700">—</p>
+      </div>
+    </div>
+  </dialog>
   <script>
   (function(){
     const input = document.getElementById('photo');
