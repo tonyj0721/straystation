@@ -423,8 +423,8 @@
           Object.assign(btn.style,{position:'absolute',top:'6px',right:'6px',left:'auto',bottom:'auto',transform:'none'});
 
           btn.addEventListener('click', ()=>{
-            // 記住目前滾動位置
-            const scrollY = window.scrollY;
+            // 🔥 把焦點移到隱藏元素（防止跳回輸入框）
+            document.getElementById('focus-dummy').focus();
 
             // 加上淡出動畫
             box.classList.add('removing');
@@ -433,9 +433,6 @@
               filesState.splice(idx,1);
               render();
               syncBackToInput();
-
-              // 🔥 關鍵：刪除後立即回復滾動位置
-              window.scrollTo(0, scrollY);
             },200);
           });
 
@@ -456,5 +453,7 @@
     }
   })();
   </script>
+  
+  <div id="focus-dummy" tabindex="-1" style="outline:none;position:fixed;opacity:0;"></div>
 </body>
 </html>
