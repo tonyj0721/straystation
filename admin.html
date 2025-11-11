@@ -423,9 +423,15 @@
           Object.assign(btn.style,{position:'absolute',top:'6px',right:'6px',left:'auto',bottom:'auto',transform:'none'});
 
           btn.addEventListener('click', ()=>{
-            filesState.splice(idx,1);
-            render();
-            syncBackToInput();
+            // 加上淡出動畫 class
+            box.classList.add('removing');
+
+            // 等動畫跑完再刪除
+            setTimeout(()=>{
+              filesState.splice(idx,1);
+              render();
+              syncBackToInput();
+            },200);
           });
 
           box.appendChild(img);
