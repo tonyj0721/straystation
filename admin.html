@@ -161,6 +161,66 @@
       border-color: #f97316;
       box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2);
     }
+    /* 🌈 新增左右欄佈局 */
+    .admin-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 24px;
+      padding: 20px;
+    }
+
+    .form-card, .registered-card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+      padding: 32px;
+    }
+
+    .form-card {
+      flex: 1 1 360px;
+      max-width: 480px;
+    }
+
+    .registered-card {
+      flex: 1 1 600px;
+      max-width: 720px;
+    }
+
+    /* 表格樣式 */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid #eee;
+    }
+    th {
+      background-color: #fed7aa;
+      color: #c2410c;
+    }
+    td button {
+      background: #f97316;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    /* 📱 手機版上下排列 */
+    @media (max-width: 768px) {
+      .admin-container {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .form-card, .registered-card {
+        width: 100%;
+        max-width: none;
+      }
+    }
   </style>
 
   <script type="module">
@@ -180,6 +240,42 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const storage = getStorage(app);
+
+    import { collection, getDocs } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+
+    const petList = document.getElementById("petList");
+    const dlg = document.getElementById("petDialog");
+    const dlgClose = document.getElementById("dlgClose");
+    dlgClose.addEventListener("click", ()=>dlg.close());
+
+    async function loadPets(){
+      const snapshot = await getDocs(collection(db, "pets"));
+      petList.innerHTML = "";
+      snapshot.forEach((doc)=>{
+        const p = doc.data();
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${p.name}</td>
+          <td>${p.species}</td>
+          <td>${p.breed||'-'}</td>
+          <td>${p.age||'-'}</td>
+          <td>${p.gender||'-'}</td>
+          <td><button class="detailBtn">查看</button></td>
+        `;
+        tr.querySelector(".detailBtn").addEventListener("click", ()=>openDialog(p));
+        petList.appendChild(tr);
+      });
+    }
+
+    function openDialog(p){
+      document.getElementById("dlgName").textContent = p.name;
+      document.getElementById("dlgMeta").textContent = `${p.species}・${p.gender}・${p.age}`;
+      document.getElementById("dlgDesc").textContent = p.desc || "尚無介紹";
+      document.getElementById("dlgImg").src = (p.images && p.images[0]) || "https://placehold.co/600x400?text=No+Image";
+      dlg.showModal();
+    }
+
+    loadPets();
 
     document.addEventListener("DOMContentLoaded", () => {
       const form = document.getElementById("addPetForm");
@@ -330,56 +426,86 @@
 </head>
 
 <body>
-  <div class="form-card">
-    <h1>🐾 新增浪浪資料</h1>
-    <form id="addPetForm">
-      <label>名字</label>
-      <input name="name" required />
+  <div class="admin-container">
+    <div class="form-card">
+      <h1>🐾 新增浪浪資料</h1>
+      <form id="addPetForm">
+        <label>名字</label>
+        <input name="name" required />
 
-      <label>類別</label>
-      <select name="species" id="species" required>
-        <option value="">請選擇</option>
-        <option value="貓">貓咪</option>
-        <option value="狗">狗狗</option>
-      </select>
-
-      <div id="breedTypeWrap" class="hidden">
-        <label>品種類別</label>
-        <select id="breedType" name="breedType" disabled>
+        <label>類別</label>
+        <select name="species" id="species" required>
           <option value="">請選擇</option>
-          <option value="品種貓">品種貓</option>
-          <option value="品種犬">品種犬</option>
-          <option value="米克斯">米克斯</option>
+          <option value="貓">貓咪</option>
+          <option value="狗">狗狗</option>
         </select>
-      </div>
 
-      <div id="breedWrap" class="hidden">
-        <label>品種</label>
-        <select id="breed" name="breed" disabled></select>
-      </div>
+        <div id="breedTypeWrap" class="hidden">
+          <label>品種類別</label>
+          <select id="breedType" name="breedType" disabled>
+            <option value="">請選擇</option>
+            <option value="品種貓">品種貓</option>
+            <option value="品種犬">品種犬</option>
+            <option value="米克斯">米克斯</option>
+          </select>
+        </div>
 
-      <label>年齡</label>
-      <input name="age" placeholder="例如：1歲 或 幼年" />
+        <div id="breedWrap" class="hidden">
+          <label>品種</label>
+          <select id="breed" name="breed" disabled></select>
+        </div>
 
-      <label>性別</label>
-      <select name="gender">
-        <option value="">請選擇</option>
-        <option value="男生">男生</option>
-        <option value="女生">女生</option>
-      </select>
+        <label>年齡</label>
+        <input name="age" placeholder="例如：1歲 或 幼年" />
 
-      <label>簡介</label>
-      <textarea name="desc" rows="3" placeholder="輸入個性、故事、習慣等..."></textarea>
+        <label>性別</label>
+        <select name="gender">
+          <option value="">請選擇</option>
+          <option value="男生">男生</option>
+          <option value="女生">女生</option>
+        </select>
 
-      <label>上傳照片（最多 5 張，可分次上傳）</label>
-      <input type="file" id="photo" accept="image/*" multiple style="display:none;">
-      <button type="button" id="pickBtn" class="upload-btn">選擇照片</button>
-      <span id="photoStatus" class="note">尚未選擇</span>
-      <div id="preview"></div>
+        <label>簡介</label>
+        <textarea name="desc" rows="3" placeholder="輸入個性、故事、習慣等..."></textarea>
 
-      <button>新增浪浪</button>
-    </form>
+        <label>上傳照片（最多 5 張，可分次上傳）</label>
+        <input type="file" id="photo" accept="image/*" multiple style="display:none;">
+        <button type="button" id="pickBtn" class="upload-btn">選擇照片</button>
+        <span id="photoStatus" class="note">尚未選擇</span>
+        <div id="preview"></div>
+
+        <button>新增浪浪</button>
+      </form>
+    </div>
+    <!-- 右邊：已登錄動物表格 -->
+    <div class="registered-card">
+      <h2>已登錄動物</h2>
+      <table id="petTable">
+        <thead>
+          <tr>
+            <th>名字</th><th>類別</th><th>品種</th><th>年齡</th><th>性別</th><th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="petList"></tbody>
+      </table>
+    </div>
+
   </div>
+
+  <!-- 🐾 Modal（照 index.html 樣式） -->
+  <dialog id="petDialog" class="w-full max-w-2xl rounded-2xl p-0 overflow-hidden">
+    <div class="bg-white">
+      <div class="relative aspect-video bg-gray-100">
+        <img id="dlgImg" alt="動物照片" class="w-full h-full object-cover"/>
+        <button id="dlgClose" class="absolute top-3 right-3 bg-black/60 text-white p-2 rounded-full" aria-label="關閉">✕</button>
+      </div>
+      <div class="p-5 space-y-4">
+        <h3 id="dlgName" class="text-xl font-semibold">—</h3>
+        <p id="dlgMeta" class="text-gray-500">—</p>
+        <p id="dlgDesc" class="text-gray-700">—</p>
+      </div>
+    </div>
+  </dialog>
   <script>
   (function(){
     const input = document.getElementById('photo');
