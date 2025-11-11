@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>浪浪轉運站｜管理員新增浪浪資料</title>
+  <style>
+    body {
+      font-family: "Noto Sans TC", sans-serif;
+      background-color: #fff7ed;
+      color: #333;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .form-card {
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+      padding: 32px;
+      width: 100%;
+      max-width: 540px;
+      animation: fadeIn 0.3s ease-in-out;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 1.5rem;
+      color: #c2410c;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin-top: 1rem;
+      margin-bottom: 0.25rem;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 1rem;
+      transition: all 0.2s;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #f97316;
+      box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2);
+    }
+
+    textarea {
+      resize: vertical;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 1.5rem;
+      background-color: #f97316;
+      color: white;
+      border: none;
+      padding: 12px 0;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    button:hover {
+      background-color: #ea580c;
+    }
+
+    /* 照片預覽 */
+    #preview {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .preview-item {
+      position: relative;
+      width: 110px;
+      height: 110px;
+      overflow: hidden;
+      border-radius: 10px;
+      border: 2px solid #fed7aa;
+      background: #fff7ed;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    }
+
+    .preview-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .remove-btn {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      margin: 0 ;
+      background: rgba(0, 0, 0, 0.6);
+      color: white;
+      border: none;
+      font-size: 12px;
+      border-radius: 50%;
+      width: 22px;
+      height: 22px;
+      cursor: pointer;
+      line-height: 0px;
+      text-align: center;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    /* ✅ 統一欄位寬度與樣式 */
+    input,
+    select,
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 1rem;
+      transition: all 0.2s;
+    }
+
+    /* ✅ 讓 select 跟 input 一樣寬 */
+    select {
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      background-color: white;
+    }
+
+    /* ✅ 聚焦時橘色高亮（溫暖橘） */
+    input:focus,
+    select:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #f97316;
+      box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2);
+    }
+  </style>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+    import { getFirestore, addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyC4NT2KOm_Cw2OEdaaOimxI0ruoNv_u_9g",
+      authDomain: "straystation.firebaseapp.com",
+      projectId: "straystation",
+      storageBucket: "straystation.firebasestorage.app",
+      messagingSenderId: "611366379195",
+      appId: "1:611366379195:web:ef5a632e88d8bba1d6139e"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const form = document.getElementById("addPetForm");
+      const speciesSelect = document.getElementById("species");
+      const breedTypeWrap = document.getElementById("breedTypeWrap");
+      const breedType = document.getElementById("breedType");
+      const breedWrap = document.getElementById("breedWrap");
+      const breed = document.getElementById("breed");
+      const photoInput = document.getElementById("photos");
+      const preview = document.getElementById("preview");
+
+      let selectedFiles = [];
+
+      // 🧹 重置函數
+      function resetBreed() {
+        breedType.value = "";
+        breed.innerHTML = "";
+        breedTypeWrap.classList.add("hidden");
+        breedWrap.classList.add("hidden");
+        breedType.disabled = true;
+        breed.disabled = true;
+      }
+
+      // 🐾 類別切換
+      speciesSelect.addEventListener("change", () => {
+        resetBreed();
+        if (speciesSelect.value === "貓" || speciesSelect.value === "狗") {
+          breedTypeWrap.classList.remove("hidden");
+          breedType.disabled = false;
+          // 根據選擇的類別更新選項文字
+          breedType.innerHTML = `
+            <option value="">請選擇</option>
+            ${speciesSelect.value === "貓" 
+              ? '<option value="品種貓">品種貓</option><option value="米克斯">米克斯</option>'
+              : '<option value="品種犬">品種犬</option><option value="米克斯">米克斯</option>'}
+          `;
+        }
+      });
+
+      // 🐱🐶 第二層：品種類別
+      breedType.addEventListener("change", () => {
+        breed.innerHTML = `<option value="">請選擇</option>`;
+        const breedLabel = document.querySelector('#breedWrap label');
+        breedLabel.textContent = (breedType.value === "米克斯") ? "毛色" : "品種";
+        let options = [];
+
+        if (speciesSelect.value === "貓") {
+          if (breedType.value === "品種貓")
+            options = ["美短","英短","藍貓","暹羅貓","波斯貓","布偶貓","曼赤肯"];
+          else if (breedType.value === "米克斯")
+            options = ["橘貓","黑貓","虎斑貓","白底虎斑貓","三花貓","玳瑁貓","白貓"];
+        } else if (speciesSelect.value === "狗") {
+          if (breedType.value === "品種犬")
+            options = ["博美","貴賓","吉娃娃","馬爾濟斯","柯基","柴犬","哈士奇","高山犬","黃金獵犬"];
+          else if (breedType.value === "米克斯")
+            options = ["黑色","白色","黃色","棕色","虎斑","花花"];
+        }
+        
+        if (options.length) {
+          options.forEach(opt => {
+            const option = document.createElement("option");
+            option.value = option.textContent = opt;
+            breed.appendChild(option);
+          });
+          breedWrap.classList.remove("hidden");
+          breed.disabled = false;
+        } else {
+          breedWrap.classList.add("hidden");
+          breed.disabled = true;
+        }
+      });
+
+      // 📸 圖片預覽（可累加）
+      photoInput.addEventListener("change", () => {
+        const newFiles = Array.from(photoInput.files);
+        selectedFiles = [...selectedFiles, ...newFiles].slice(0, 5);
+
+        preview.innerHTML = "";
+        selectedFiles.forEach((file, index) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const div = document.createElement("div");
+            div.className = "preview-item";
+            div.innerHTML = `
+              <img src="${e.target.result}" alt="預覽圖">
+              <button type="button" data-index="${index}" class="remove-btn">✕</button>
+            `;
+            preview.appendChild(div);
+          };
+          reader.readAsDataURL(file);
+        });
+      });
+
+      // 🗑️ 刪除單張預覽
+      preview.addEventListener("click", (e) => {
+        if (e.target.classList.contains("remove-btn")) {
+          const index = parseInt(e.target.dataset.index);
+          selectedFiles.splice(index, 1);
+          preview.innerHTML = "";
+          selectedFiles.forEach((file, i) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+              const div = document.createElement("div");
+              div.className = "preview-item";
+              div.innerHTML = `
+                <img src="${ev.target.result}">
+                <button type="button" data-index="${i}" class="remove-btn">✕</button>`;
+              preview.appendChild(div);
+            };
+            reader.readAsDataURL(file);
+          });
+        }
+      });
+
+      // 🚀 送出表單
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const data = Object.fromEntries(new FormData(form).entries());
+        const imageUrls = [];
+
+        try {
+          for (let file of selectedFiles) {
+            const fileRef = ref(storage, `pets/${Date.now()}_${file.name}`);
+            await uploadBytes(fileRef, file);
+            const url = await getDownloadURL(fileRef);
+            imageUrls.push(url);
+          }
+
+          data.images = imageUrls;
+          data.createdAt = serverTimestamp();
+          await addDoc(collection(db, "pets"), data);
+
+          alert(`🐾 已成功新增 ${data.name}！`);
+          form.reset();
+          selectedFiles = [];
+          preview.innerHTML = "";
+          resetBreed();
+        } catch (err) {
+          console.error("❌ 新增失敗：", err);
+          alert("上傳或新增失敗，請檢查 Console。");
+        }
+      });
+    });
+  </script>
+</head>
+
+<body>
+  <div class="form-card">
+    <h1>🐾 新增浪浪資料</h1>
+    <form id="addPetForm">
+      <label>名字</label>
+      <input name="name" required />
+
+      <label>類別</label>
+      <select name="species" id="species" required>
+        <option value="">請選擇</option>
+        <option value="貓">貓咪</option>
+        <option value="狗">狗狗</option>
+      </select>
+
+      <div id="breedTypeWrap" class="hidden">
+        <label>品種類別</label>
+        <select id="breedType" name="breedType" disabled>
+          <option value="">請選擇</option>
+          <option value="品種貓">品種貓</option>
+          <option value="品種犬">品種犬</option>
+          <option value="米克斯">米克斯</option>
+        </select>
+      </div>
+
+      <div id="breedWrap" class="hidden">
+        <label>品種</label>
+        <select id="breed" name="breed" disabled></select>
+      </div>
+
+      <label>年齡</label>
+      <input name="age" placeholder="例如：1歲 或 幼年" />
+
+      <label>性別</label>
+      <select name="gender">
+        <option value="">請選擇</option>
+        <option value="男生">男生</option>
+        <option value="女生">女生</option>
+      </select>
+
+      <label>簡介</label>
+      <textarea name="desc" rows="3" placeholder="輸入個性、故事、習慣等..."></textarea>
+
+      <label>上傳照片（最多 5 張，可分次上傳）</label>
+      <input type="file" id="photo" accept="image/*" multiple style="display:none;">
+      <button type="button" id="pickBtn" class="upload-btn">選擇照片</button>
+      <span id="photoStatus" class="note">尚未選擇</span>
+      <div id="preview"></div>
+
+      <div id="preview"></div>
+
+      <button>新增浪浪</button>
+    </form>
+  </div>
+  <script>
+  (function(){
+    const input = document.getElementById('photo');
+    const pickBtn = document.getElementById('pickBtn');
+    const status = document.getElementById('photoStatus');
+    const preview = document.getElementById('preview');
+    let filesState = [];
+
+    pickBtn.addEventListener('click', ()=> input.click());
+
+    input.addEventListener('change', (e)=>{
+      const incoming = Array.from(e.target.files);
+      for(const f of incoming){
+        if(filesState.length>=5) break;
+        filesState.push(f);
+      }
+      render();
+      syncBackToInput();
+      input.value = "";
+    });
+
+    function render(){
+      preview.innerHTML = "";
+      filesState.forEach((file, idx)=>{
+        const reader = new FileReader();
+        reader.onload = ev=>{
+          const box = document.createElement('div');
+          box.className = 'preview-item';
+
+          const img = document.createElement('img');
+          img.src = ev.target.result;
+
+          const btn = document.createElement('button');
+          btn.className = 'remove-btn';
+          btn.textContent = '✕';
+          Object.assign(btn.style,{position:'absolute',top:'6px',right:'6px',left:'auto',bottom:'auto',transform:'none'});
+
+          btn.addEventListener('click', ()=>{
+            filesState.splice(idx,1);
+            render();
+            syncBackToInput();
+          });
+
+          box.appendChild(img);
+          box.appendChild(btn);
+          preview.appendChild(box);
+        };
+        reader.readAsDataURL(file);
+      });
+
+      status.textContent = filesState.length ? `已選擇 ${filesState.length} 張照片` : '尚未選擇';
+    }
+
+    function syncBackToInput(){
+      const dt = new DataTransfer();
+      filesState.forEach(f=>dt.items.add(f));
+      input.files = dt.files;
+    }
+  })();
+  </script>
+</body>
+</html>
