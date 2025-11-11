@@ -161,11 +161,90 @@
       border-color: #f97316;
       box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2);
     }
+
+    .container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      width: 100%;
+      justify-content: center;
+    }
+
+    .form-card, .list-card {
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+      padding: 24px;
+    }
+
+    .form-card {
+      flex: 1 1 40%;
+      max-width: 480px;
+    }
+
+    .list-card {
+      flex: 1 1 50%;
+      max-width: 720px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 10px;
+      text-align: center;
+      border-bottom: 1px solid #eee;
+    }
+
+    tr:hover {
+      background-color: #fff7ed;
+      cursor: pointer;
+    }
+
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.4);
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-content {
+      background: #fff;
+      padding: 24px;
+      border-radius: 12px;
+      width: 400px;
+      max-width: 90%;
+    }
+
+    .close {
+      float: right;
+      font-size: 24px;
+      cursor: pointer;
+    }
+
+    .modal-actions {
+      margin-top: 16px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    button.danger {
+      background-color: #dc2626;
+    }
+    button.success {
+      background-color: #16a34a;
+    }
   </style>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-    import { getFirestore, addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+    import { getFirestore, addDoc, collection, serverTimestamp, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
     import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
 
     const firebaseConfig = {
@@ -180,6 +259,54 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const storage = getStorage(app);
+
+    const listEl = document.getElementById("petList");
+    const modal = document.getElementById("detailModal");
+    const closeBtn = modal.querySelector(".close");
+
+    // 顯示資料
+    async function loadPets() {
+      const querySnapshot = await getDocs(collection(db, "pets"));
+      listEl.innerHTML = "";
+      querySnapshot.forEach((docSnap) => {
+        const pet = docSnap.data();
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${pet.name}</td>
+          <td>${pet.species}</td>
+          <td>${pet.breed}</td>
+          <td>${pet.age || "-"}</td>
+          <td>${pet.gender || "-"}</td>
+        `;
+        row.addEventListener("click", () => openModal(docSnap.id, pet));
+        listEl.appendChild(row);
+      });
+    }
+
+    function openModal(id, pet) {
+      modal.style.display = "flex";
+      document.getElementById("modalName").textContent = pet.name;
+      document.getElementById("modalSpecies").textContent = pet.species;
+      document.getElementById("modalBreed").textContent = pet.breed;
+      document.getElementById("modalAge").textContent = pet.age;
+      document.getElementById("modalGender").textContent = pet.gender;
+      document.getElementById("modalDesc").textContent = pet.desc;
+
+      document.getElementById("deleteBtn").onclick = async () => {
+        await deleteDoc(doc(db, "pets", id));
+        modal.style.display = "none";
+        loadPets();
+      };
+
+      document.getElementById("adoptBtn").onclick = () => {
+        window.location.href = "home.html";
+      };
+    }
+
+    closeBtn.onclick = () => (modal.style.display = "none");
+    window.onclick = (e) => { if (e.target === modal) modal.style.display = "none"; };
+
+    loadPets();
 
     document.addEventListener("DOMContentLoaded", () => {
       const form = document.getElementById("addPetForm");
@@ -330,55 +457,93 @@
 </head>
 
 <body>
-  <div class="form-card">
-    <h1>🐾 新增浪浪資料</h1>
-    <form id="addPetForm">
-      <label>名字</label>
-      <input name="name" required />
+  <div class="container">
+    <!-- 左邊：新增動物 -->
+    <div class="form-card">
+      <h1>🐾 新增浪浪資料</h1>
+      <form id="addPetForm">
+        <label>名字</label>
+        <input name="name" required />
 
-      <label>類別</label>
-      <select name="species" id="species" required>
-        <option value="">請選擇</option>
-        <option value="貓">貓咪</option>
-        <option value="狗">狗狗</option>
-      </select>
-
-      <div id="breedTypeWrap" class="hidden">
-        <label>品種類別</label>
-        <select id="breedType" name="breedType" disabled>
+        <label>類別</label>
+        <select name="species" id="species" required>
           <option value="">請選擇</option>
-          <option value="品種貓">品種貓</option>
-          <option value="品種犬">品種犬</option>
-          <option value="米克斯">米克斯</option>
+          <option value="貓">貓咪</option>
+          <option value="狗">狗狗</option>
         </select>
+
+        <div id="breedTypeWrap" class="hidden">
+          <label>品種類別</label>
+          <select id="breedType" name="breedType" disabled>
+            <option value="">請選擇</option>
+            <option value="品種貓">品種貓</option>
+            <option value="品種犬">品種犬</option>
+            <option value="米克斯">米克斯</option>
+          </select>
+        </div>
+
+        <div id="breedWrap" class="hidden">
+          <label>品種</label>
+          <select id="breed" name="breed" disabled></select>
+        </div>
+
+        <label>年齡</label>
+        <input name="age" placeholder="例如：1歲 或 幼年" />
+
+        <label>性別</label>
+        <select name="gender">
+          <option value="">請選擇</option>
+          <option value="男生">男生</option>
+          <option value="女生">女生</option>
+        </select>
+
+        <label>簡介</label>
+        <textarea name="desc" rows="3" placeholder="輸入個性、故事、習慣等..."></textarea>
+
+        <label>上傳照片（最多 5 張，可分次上傳）</label>
+        <input type="file" id="photo" accept="image/*" multiple style="display:none;">
+        <button type="button" id="pickBtn" class="upload-btn">選擇照片</button>
+        <span id="photoStatus" class="note">尚未選擇</span>
+        <div id="preview"></div>
+
+        <button>新增浪浪</button>
+      </form>
+    </div>
+
+    <!-- 右邊：已登錄動物 -->
+    <div class="list-card">
+      <h2>📋 已登錄動物</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>名字</th>
+            <th>類別</th>
+            <th>品種</th>
+            <th>年齡</th>
+            <th>性別</th>
+          </tr>
+        </thead>
+        <tbody id="petList"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div id="detailModal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h3 id="modalName"></h3>
+      <p><strong>類別：</strong><span id="modalSpecies"></span></p>
+      <p><strong>品種：</strong><span id="modalBreed"></span></p>
+      <p><strong>年齡：</strong><span id="modalAge"></span></p>
+      <p><strong>性別：</strong><span id="modalGender"></span></p>
+      <p><strong>簡介：</strong><span id="modalDesc"></span></p>
+      <div class="modal-actions">
+        <button id="editBtn">編輯</button>
+        <button id="deleteBtn" class="danger">刪除</button>
+        <button id="adoptBtn" class="success">已領養</button>
       </div>
-
-      <div id="breedWrap" class="hidden">
-        <label>品種</label>
-        <select id="breed" name="breed" disabled></select>
-      </div>
-
-      <label>年齡</label>
-      <input name="age" placeholder="例如：1歲 或 幼年" />
-
-      <label>性別</label>
-      <select name="gender">
-        <option value="">請選擇</option>
-        <option value="男生">男生</option>
-        <option value="女生">女生</option>
-      </select>
-
-      <label>簡介</label>
-      <textarea name="desc" rows="3" placeholder="輸入個性、故事、習慣等..."></textarea>
-
-      <label>上傳照片（最多 5 張，可分次上傳）</label>
-      <input type="file" id="photo" accept="image/*" multiple style="display:none;">
-      <button type="button" id="pickBtn" class="upload-btn">選擇照片</button>
-      <span id="photoStatus" class="note">尚未選擇</span>
-      <div id="preview"></div>
-
-      <button>新增浪浪</button>
-    </form>
+    </div>
   </div>
   <script>
   (function(){
