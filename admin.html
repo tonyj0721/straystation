@@ -263,11 +263,14 @@
       });
     }
 
-    function openDialog(p){
+    const dlg = document.getElementById("petDialog");
+    document.getElementById("dlgClose").addEventListener("click", () => dlg.close());
+
+    function openDialog(p) {
+      document.getElementById("dlgImg").src = (p.images && p.images[0]) || "https://placehold.co/600x400?text=No+Image";
       document.getElementById("dlgName").textContent = p.name;
       document.getElementById("dlgMeta").textContent = `${p.species}・${p.gender}・${p.age}`;
       document.getElementById("dlgDesc").textContent = p.desc || "尚無介紹";
-      document.getElementById("dlgImg").src = (p.images && p.images[0]) || "https://placehold.co/600x400?text=No+Image";
       dlg.showModal();
     }
 
