@@ -521,13 +521,13 @@
   <!-- 🐾 Modal（主圖＋縮圖版） -->
   <dialog id="petDialog"
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <!-- ✳️ Modal 內容容器 -->
     <div
-      class="w-full max-w-2xl rounded-2xl bg-white dark:bg-gray-900 overflow-y-auto max-h-[80vh] shadow-xl">
-    
+      class="w-[90%] sm:w-full max-w-2xl rounded-2xl bg-white dark:bg-gray-900 overflow-y-auto max-h-[80vh] shadow-xl">
+
       <!-- 主圖 -->
       <div class="relative bg-gray-100 dark:bg-gray-800 aspect-[4/3] overflow-hidden">
-        <img id="dlgMainImg"
-          class="w-full h-full object-cover transition-all duration-300" />
+        <img id="dlgMainImg" class="w-full h-full object-cover transition-all duration-300" />
         <button id="dlgClose"
           class="absolute top-3 right-3 bg-white/70 hover:bg-white/90 text-gray-700 rounded-full w-7 h-7 flex items-center justify-center shadow-sm transition"
           aria-label="關閉">✕</button>
@@ -544,8 +544,7 @@
           <h3 id="dlgName" class="text-lg font-semibold text-gray-900 dark:text-white">—</h3>
           <p id="dlgMeta" class="text-sm text-gray-500 dark:text-gray-400">—</p>
         </div>
-        <p id="dlgDesc"
-          class="text-gray-700 dark:text-gray-200 leading-relaxed whitespace-pre-line">
+        <p id="dlgDesc" class="text-gray-700 dark:text-gray-200 leading-relaxed whitespace-pre-line">
           尚無介紹
         </p>
       </div>
