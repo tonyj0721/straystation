@@ -301,6 +301,7 @@
         const imageUrls = [];
 
         try {
+          console.log("準備上傳：", selectedFiles);
           for (let file of selectedFiles) {
             const fileRef = ref(storage, `pets/${Date.now()}_${file.name}`);
             await uploadBytes(fileRef, file);
