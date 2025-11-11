@@ -301,10 +301,13 @@
         const imageUrls = [];
 
         try {
-          for (let file of selectedFiles) {
+          const files = window.filesState || [];
+          console.log("準備上傳：", files);
+
+          for (let file of files) {
             const fileRef = ref(storage, `pets/${Date.now()}_${file.name}`);
-            await uploadBytes(fileRef, file);
-            const url = await getDownloadURL(fileRef);
+            const snapshot = await uploadBytes(fileRef, file);
+            const url = await getDownloadURL(snapshot.ref);
             imageUrls.push(url);
           }
 
