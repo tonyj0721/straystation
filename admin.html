@@ -519,11 +519,15 @@
     </div>
   </div>
   <!-- 🐾 Modal（主圖＋縮圖版） -->
-  <dialog id="petDialog" class="fixed inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm w-full max-w-2xl rounded-2xl p-0 overflow-y-auto max-h-[80vh] shadow-xl mx-auto">
-    <div class="bg-white dark:bg-gray-900">
+  <dialog id="petDialog"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div
+      class="w-full max-w-2xl rounded-2xl bg-white dark:bg-gray-900 overflow-y-auto max-h-[80vh] shadow-xl">
+    
       <!-- 主圖 -->
       <div class="relative bg-gray-100 dark:bg-gray-800 aspect-[4/3] overflow-hidden">
-        <img id="dlgMainImg" class="w-full h-full object-cover transition-all duration-300 rounded-b-none shadow-sm" />
+        <img id="dlgMainImg"
+          class="w-full h-full object-cover transition-all duration-300" />
         <button id="dlgClose"
           class="absolute top-3 right-3 bg-white/70 hover:bg-white/90 text-gray-700 rounded-full w-7 h-7 flex items-center justify-center shadow-sm transition"
           aria-label="關閉">✕</button>
@@ -532,7 +536,6 @@
       <!-- 縮圖 -->
       <div id="dlgThumbnails"
         class="flex gap-1.5 sm:gap-2 p-2 sm:p-3 overflow-x-auto bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <!-- JS 生成 -->
       </div>
 
       <!-- 文字內容 -->
@@ -541,7 +544,8 @@
           <h3 id="dlgName" class="text-lg font-semibold text-gray-900 dark:text-white">—</h3>
           <p id="dlgMeta" class="text-sm text-gray-500 dark:text-gray-400">—</p>
         </div>
-        <p id="dlgDesc" class="text-gray-700 dark:text-gray-200 leading-relaxed whitespace-pre-line">
+        <p id="dlgDesc"
+          class="text-gray-700 dark:text-gray-200 leading-relaxed whitespace-pre-line">
           尚無介紹
         </p>
       </div>
