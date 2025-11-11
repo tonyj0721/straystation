@@ -423,17 +423,19 @@
           Object.assign(btn.style,{position:'absolute',top:'6px',right:'6px',left:'auto',bottom:'auto',transform:'none'});
 
           btn.addEventListener('click', ()=>{
-            // 先讓目前按鈕失去焦點（避免跳回輸入框）
-            document.activeElement.blur();
-            
-            // 加上淡出動畫 class
+            // 記住目前滾動位置
+            const scrollY = window.scrollY;
+
+            // 加上淡出動畫
             box.classList.add('removing');
 
-            // 等動畫跑完再刪除
             setTimeout(()=>{
               filesState.splice(idx,1);
               render();
               syncBackToInput();
+
+              // 🔥 關鍵：刪除後立即回復滾動位置
+              window.scrollTo(0, scrollY);
             },200);
           });
 
