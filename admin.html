@@ -469,8 +469,11 @@
       modal.classList.remove("hidden");
     }
 
-    document.getElementById("closeModal").addEventListener("click", () => {
-      document.getElementById("petModal").classList.add("hidden");
+    document.addEventListener("DOMContentLoaded", () => {
+      const closeModalBtn = document.getElementById("closeModal");
+      closeModalBtn.addEventListener("click", () => {
+        document.getElementById("petModal").classList.add("hidden");
+      });
     });
 
     loadPets();
