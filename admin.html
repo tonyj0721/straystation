@@ -102,12 +102,6 @@
       align-items: center;
       justify-content: center;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-      transition: opacity 0.2s ease, transform 0.2s ease;
-    }
-
-    .preview-item.removing {
-      opacity: 0;
-      transform: scale(0.8);
     }
 
     .preview-item img {
@@ -423,17 +417,9 @@
           Object.assign(btn.style,{position:'absolute',top:'6px',right:'6px',left:'auto',bottom:'auto',transform:'none'});
 
           btn.addEventListener('click', ()=>{
-            // 🔥 把焦點移到隱藏元素（防止跳回輸入框）
-            document.getElementById('focus-dummy').focus();
-
-            // 加上淡出動畫
-            box.classList.add('removing');
-
-            setTimeout(()=>{
-              filesState.splice(idx,1);
-              render();
-              syncBackToInput();
-            },200);
+            filesState.splice(idx,1);
+            render();
+            syncBackToInput();
           });
 
           box.appendChild(img);
@@ -453,7 +439,5 @@
     }
   })();
   </script>
-  
-  <div id="focus-dummy" tabindex="-1" style="outline:none;position:fixed;opacity:0;"></div>
 </body>
 </html>
