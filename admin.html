@@ -385,7 +385,8 @@
     const pickBtn = document.getElementById('pickBtn');
     const status = document.getElementById('photoStatus');
     const preview = document.getElementById('preview');
-    let filesState = [];
+    window.filesState = [];  // ✅ 改成全域變數
+    let filesState = window.filesState;
 
     pickBtn.addEventListener('click', ()=> input.click());
 
@@ -433,9 +434,7 @@
     }
 
     function syncBackToInput(){
-      const dt = new DataTransfer();
-      filesState.forEach(f=>dt.items.add(f));
-      input.files = dt.files;
+      
     }
   })();
   </script>
