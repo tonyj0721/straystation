@@ -330,6 +330,7 @@
 </head>
 
 <body>
+  <div class="admin-container">
   <div class="form-card">
     <h1>🐾 新增浪浪資料</h1>
     <form id="addPetForm">
@@ -379,6 +380,19 @@
 
       <button>新增浪浪</button>
     </form>
+  </div>
+    <div class="registered-card">
+      <h2>已登錄動物</h2>
+      <table id="petTable">
+        <thead>
+          <tr>
+            <th>名字</th><th>類別</th><th>品種</th><th>年齡</th><th>性別</th><th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="petList"></tbody>
+      </table>
+    </div>
+
   </div>
   <script>
   (function(){
