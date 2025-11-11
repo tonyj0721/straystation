@@ -313,6 +313,10 @@
           await addDoc(collection(db, "pets"), data);
 
           alert(`🐾 已成功新增 ${data.name}！`);
+
+          // 🔁 自動更新表格
+          await loadPets();
+          
           form.reset();
           selectedFiles = [];
           preview.innerHTML = "";
