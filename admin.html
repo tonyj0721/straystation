@@ -161,6 +161,67 @@
       border-color: #f97316;
       box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2);
     }
+    /* 🌈 新增左右欄佈局 */
+.admin-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 24px;
+  padding: 20px;
+}
+
+.form-card, .registered-card {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+  padding: 32px;
+}
+
+.form-card {
+  flex: 1 1 360px;
+  max-width: 480px;
+}
+
+.registered-card {
+  flex: 1 1 600px;
+  max-width: 720px;
+}
+
+/* 表格樣式 */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th, td {
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+}
+th {
+  background-color: #fed7aa;
+  color: #c2410c;
+}
+td button {
+  background: #f97316;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* 📱 手機版上下排列 */
+@media (max-width: 768px) {
+  .admin-container {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .form-card, .registered-card {
+    width: 100%;
+    max-width: none;
+  }
+}
+
   </style>
 
   <script type="module">
