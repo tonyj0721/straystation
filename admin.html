@@ -378,6 +378,41 @@
 
       <button>新增浪浪</button>
     </form>
+
+    <h2 style="margin-top:2rem;color:#c2410c;">🐶 已登錄動物</h2>
+    <table id="petTable" border="1" style="width:100%;border-collapse:collapse;margin-top:10px;">
+      <thead style="background:#fed7aa;">
+        <tr>
+          <th>名字</th>
+          <th>品種/毛色</th>
+          <th>年齡</th>
+          <th>性別</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <!-- Modal 從 index.html 複製 -->
+    <dialog id="petDialog" class="w-full max-w-2xl rounded-2xl p-0 overflow-hidden">
+      <div class="bg-white">
+        <div class="relative aspect-video bg-gray-100">
+          <img id="dlgImg" alt="毛孩照片" class="w-full h-full object-cover"/>
+          <button id="dlgClose" class="absolute top-3 right-3 bg-black/60 text-white p-2 rounded-full" aria-label="關閉">✕</button>
+        </div>
+        <div class="p-5 space-y-4">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h3 id="dlgName" class="text-xl font-semibold">—</h3>
+              <p id="dlgMeta" class="text-gray-500">—</p>
+            </div>
+            <span id="dlgCity" class="inline-flex items-center px-2 py-1 text-xs bg-gray-100 rounded">—</span>
+          </div>
+          <p id="dlgDesc" class="text-gray-700">—</p>
+          <ul id="dlgBadges" class="flex flex-wrap gap-2 text-sm"></ul>
+        </div>
+      </div>
+    </dialog>
+
   </div>
   <script>
   (function(){
@@ -438,6 +473,72 @@
       input.files = dt.files;
     }
   })();
+  </script>
+
+  <script type="module">
+  import { getDocs, collection } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+  import { getFirestore } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyC4NT2KOm_Cw2OEdaaOimxI0ruoNv_u_9g",
+    authDomain: "straystation.firebaseapp.com",
+    projectId: "straystation",
+    storageBucket: "straystation.firebasestorage.app",
+    messagingSenderId: "611366379195",
+    appId: "1:611366379195:web:ef5a632e88d8bba1d6139e"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // === 顯示 Firestore pets 資料 ===
+  async function loadPets() {
+    const tbody = document.querySelector("#petTable tbody");
+    tbody.innerHTML = "<tr><td colspan='4' style='text-align:center'>讀取中...</td></tr>";
+
+    const querySnapshot = await getDocs(collection(db, "pets"));
+    tbody.innerHTML = "";
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      const tr = document.createElement("tr");
+      tr.style.cursor = "pointer";
+      tr.innerHTML = `
+        <td>${data.name || "—"}</td>
+        <td>${data.breed || "—"}</td>
+        <td>${data.age || "—"}</td>
+        <td>${data.gender || "—"}</td>
+      `;
+      tr.addEventListener("click", () => openModal(data));
+      tbody.appendChild(tr);
+    });
+  }
+
+  // === 使用 index.html 的 Modal ===
+  const dlg = document.getElementById("petDialog");
+  const dlgImg = document.getElementById("dlgImg");
+  const dlgName = document.getElementById("dlgName");
+  const dlgMeta = document.getElementById("dlgMeta");
+  const dlgCity = document.getElementById("dlgCity");
+  const dlgDesc = document.getElementById("dlgDesc");
+  const dlgBadges = document.getElementById("dlgBadges");
+  document.getElementById("dlgClose").addEventListener("click", ()=>dlg.close());
+
+  function openModal(data) {
+    dlgImg.src = data.images?.[0] || "";
+    dlgName.textContent = data.name || "—";
+    dlgMeta.textContent = `${data.species || "—"}・${data.gender || "—"}・${data.age || "—"}`;
+    dlgCity.textContent = data.city || "—";
+    dlgDesc.textContent = data.desc || "—";
+    dlgBadges.innerHTML = `
+      ${data.vaccinated ? "<li class='px-2 py-1 rounded bg-gray-100'>已施打疫苗</li>" : ""}
+      ${data.neutered ? "<li class='px-2 py-1 rounded bg-gray-100'>已節育</li>" : ""}
+    `;
+    dlg.showModal();
+  }
+
+  document.addEventListener("DOMContentLoaded", loadPets);
   </script>
 </body>
 </html>
