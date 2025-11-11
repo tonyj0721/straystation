@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>浪浪轉運站｜管理員新增浪浪資料</title>
-  <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body {
       font-family: "Noto Sans TC", sans-serif;
@@ -268,35 +267,10 @@
     dlgClose.addEventListener("click", () => dlg.close());
 
     function openDialog(p) {
-      const images = p.images || [];
-
-      // 顯示主圖
-      const mainImg = document.getElementById("dlgMainImg");
-      mainImg.src = images[0] || "https://placehold.co/600x400?text=No+Image";
-
-      // 清空縮圖區
-      const thumbContainer = document.getElementById("dlgThumbnails");
-      thumbContainer.innerHTML = "";
-
-      // 動態建立縮圖
-      images.forEach((url, index) => {
-        const thumb = document.createElement("img");
-        thumb.src = url;
-        thumb.className = "h-20 w-20 object-cover rounded-lg cursor-pointer border-2 border-transparent hover:border-rose-500 transition";
-        thumb.addEventListener("click", () => {
-          mainImg.src = url;
-          document.querySelectorAll("#dlgThumbnails img").forEach(img => img.classList.remove("border-rose-500"));
-          thumb.classList.add("border-rose-500");
-        });
-        if (index === 0) thumb.classList.add("border-rose-500");
-        thumbContainer.appendChild(thumb);
-      });
-
-      // 文字資訊
+      document.getElementById("dlgImg").src = (p.images && p.images[0]) || "https://placehold.co/600x400?text=No+Image";
       document.getElementById("dlgName").textContent = p.name || "—";
       document.getElementById("dlgMeta").textContent = `${p.species || "—"}・${p.gender || "—"}・${p.age || "—"}`;
       document.getElementById("dlgDesc").textContent = p.desc || "尚無介紹";
-
       dlg.showModal();
     }
 
@@ -515,31 +489,21 @@
       </table>
     </div>
   </div>
-  <!-- 🐾 Modal（主圖＋縮圖版） -->
-  <dialog id="petDialog" class="w-full max-w-2xl rounded-2xl p-0 overflow-hidden shadow-xl">
+  <!-- 🐾 Modal（照 index.html 樣式） -->
+  <dialog id="petDialog" class="w-full max-w-2xl rounded-2xl p-0 overflow-hidden">
     <div class="bg-white dark:bg-gray-900">
-      <!-- 主圖 -->
-      <div class="relative bg-gray-100 dark:bg-gray-800 aspect-video overflow-hidden">
-        <img id="dlgMainImg" class="w-full h-full object-cover transition-all duration-300" />
-        <button id="dlgClose"
-          class="absolute top-3 right-3 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full transition"
-          aria-label="關閉">✕</button>
+      <div class="relative aspect-video bg-gray-100 dark:bg-gray-800">
+        <img id="dlgImg" alt="毛孩照片" class="w-full h-full object-cover"/>
+        <button id="dlgClose" class="absolute top-3 right-3 bg-black/60 text-white p-2 rounded-full" aria-label="關閉">✕</button>
       </div>
-
-      <!-- 縮圖列 -->
-      <div id="dlgThumbnails" class="flex gap-2 p-3 overflow-x-auto bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <!-- JS 會自動插入縮圖 -->
-      </div>
-
-      <!-- 文字內容 -->
       <div class="p-5 space-y-4">
         <div class="flex items-start justify-between gap-3">
           <div>
-            <h3 id="dlgName" class="text-xl font-semibold text-gray-900 dark:text-white">—</h3>
-            <p id="dlgMeta" class="text-gray-500 dark:text-gray-400">—</p>
+            <h3 id="dlgName" class="text-xl font-semibold">—</h3>
+            <p id="dlgMeta" class="text-gray-500">—</p>
           </div>
         </div>
-        <p id="dlgDesc" class="text-gray-700 dark:text-gray-200 leading-relaxed">尚無介紹</p>
+        <p id="dlgDesc" class="text-gray-700 dark:text-gray-200">—</p>
       </div>
     </div>
   </dialog>
