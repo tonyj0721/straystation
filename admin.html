@@ -375,6 +375,53 @@
       word-break: break-word;
       margin-bottom: 16px; /* 🔹 與按鈕距離更小 */
     }
+
+    /* 🔸 整體視窗緊湊 */
+    .swal-compact {
+      border-radius: 14px !important;
+      font-family: "Noto Sans TC", sans-serif;
+    }
+
+    /* 🔸 標題縮小一點 */
+    .swal-title {
+      font-size: 1.2rem !important;
+      margin-bottom: 0.5em !important;
+    }
+
+    /* 🔸 按鈕左右並排樣式 */
+    .swal2-actions {
+      display: flex !important;
+      flex-direction: row !important;   /* ✅ 改成橫向 */
+      justify-content: center !important;
+      gap: 10px !important;             /* ✅ 控制間距 */
+      margin-top: 0.8em !important;
+    }
+
+    /* 🔸 按鈕造型 */
+    .swal-confirm, .swal-cancel {
+      flex: 1;
+      border: none !important;
+      border-radius: 8px !important;
+      font-size: 1rem !important;
+      font-weight: 600 !important;
+      padding: 8px 0 !important;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .swal-confirm {
+      background-color: #f97316 !important; /* 橘色 */
+      color: white !important;
+    }
+
+    .swal-cancel {
+      background-color: #6b7280 !important; /* 灰色 */
+      color: white !important;
+    }
+
+    .swal-confirm:hover, .swal-cancel:hover {
+      opacity: 0.85 !important;
+    }
   </style>
 
   <script type="module">
@@ -646,12 +693,19 @@
             title: `已存在名為「${data.name}」的浪浪`,
             text: "是否仍要繼續新增？",
             icon: "warning",
+            width: "340px",          // ✅ 縮小寬度
+            padding: "1.2em",        // ✅ 減少內距
             showCancelButton: true,
-            confirmButtonColor: "#f97316",
-            cancelButtonColor: "#6b7280",
             confirmButtonText: "是",
             cancelButtonText: "否",
-            reverseButtons: true
+            reverseButtons: true,    // ✅ 讓「否」在左、「是」在右（台灣常見習慣）
+            buttonsStyling: false,   // ✅ 關閉預設樣式，改用自訂 class
+            customClass: {
+              popup: "swal-compact",
+              title: "swal-title",
+              confirmButton: "swal-confirm",
+              cancelButton: "swal-cancel"
+            }
           });
 
           if (!result.isConfirmed) {
