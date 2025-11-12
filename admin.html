@@ -375,6 +375,20 @@
       word-break: break-word;
       margin-bottom: 16px; /* 🔹 與按鈕距離更小 */
     }
+
+    body.modal-open {
+      position: fixed;
+      overflow: hidden;
+      width: 100%;
+    }
+    
+    html, body {
+      overscroll-behavior: none;
+    }
+    
+    .modal {
+      overscroll-behavior: contain;
+    }
   </style>
 
   <script type="module">
@@ -437,7 +451,7 @@
     // 🐾 開啟 Modal（顯示圖片）
     function openModal(id, pet) {
       modal.style.display = "flex";
-      document.body.style.overflow = "hidden";
+      document.body.classList.add("modal-open");
 
       document.getElementById("modalName").textContent = pet.name || "未命名";
 
@@ -495,13 +509,13 @@
     // ❌ 關閉 Modal
     closeBtn.onclick = () => {
       modal.style.display = "none";
-      document.body.style.overflow = "";
+      document.body.classList.remove("modal-open");
     };
 
     window.onclick = (e) => {
       if (e.target === modal) {
         modal.style.display = "none";
-        document.body.style.overflow = "";
+        document.body.classList.remove("modal-open");
       }
     };
 
