@@ -646,12 +646,19 @@
             title: `已存在名為「${data.name}」的浪浪`,
             text: "是否仍要繼續新增？",
             icon: "warning",
+            width: "340px",          // ✅ 縮小寬度
+            padding: "1.2em",        // ✅ 減少內距
             showCancelButton: true,
-            confirmButtonColor: "#f97316",
-            cancelButtonColor: "#6b7280",
             confirmButtonText: "是",
             cancelButtonText: "否",
-            reverseButtons: true
+            reverseButtons: true,    // ✅ 讓「否」在左、「是」在右（台灣常見習慣）
+            buttonsStyling: true,   // ✅ 關閉預設樣式，改用自訂 class
+            customClass: {
+              popup: "swal-compact",
+              title: "swal-title",
+              confirmButton: "swal-confirm",
+              cancelButton: "swal-cancel"
+            }
           });
 
           if (!result.isConfirmed) {
