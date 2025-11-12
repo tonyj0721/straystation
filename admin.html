@@ -296,19 +296,48 @@
     }
 
     /* === Modal 圖片區 === */
+    .modal-main-photo {
+      width: 100%;
+      max-height: 320px;
+      border-radius: 12px;
+      object-fit: contain; /* ✅ 保持完整顯示，不裁切 */
+      background-color: #f9f9f9;
+    }
+    
     .modal-photos {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
-      margin: 12px 0;
+      gap: 8px;
+      margin: 10px 0 16px;
+      justify-content: center;
     }
     
     .modal-photos img {
-      width: 100px;
-      height: 100px;
+      width: 80px;
+      height: 80px;
       object-fit: cover;
       border-radius: 8px;
-      border: 2px solid #fed7aa;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    .modal-photos img:hover {
+      transform: scale(1.05);
+      border-color: #f97316;
+    }
+
+    .modal-photos img.active {
+      border-color: #f97316;
+    }
+
+    /* === Modal 內容調整 === */
+    .modal-info {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+      font-size: 1rem;
+      color: #333;
     }
   </style>
 
@@ -374,27 +403,43 @@
       modal.style.display = "flex";
       document.body.style.overflow = "hidden";
 
-      document.getElementById("modalName").textContent = pet.name;
-      document.getElementById("modalSpecies").textContent = pet.species;
-      document.getElementById("modalBreed").textContent = pet.breed;
-      document.getElementById("modalAge").textContent = pet.age || "-";
-      document.getElementById("modalGender").textContent = pet.gender || "-";
-      document.getElementById("modalDesc").textContent = pet.desc || "無詳細資料";
+      document.getElementById("modalName").textContent = pet.name || "未命名";
 
-      // 🖼️ 顯示照片（支援多張）
+      // 🧩 資料顯示（若無資料顯示不詳）
+      document.getElementById("modalSpecies").textContent = pet.species || "不詳";
+      document.getElementById("modalBreed").textContent = pet.breed || "不詳";
+      document.getElementById("modalAge").textContent = pet.age || "不詳";
+      document.getElementById("modalGender").textContent = pet.gender || "不詳";
+      document.getElementById("modalDesc").textContent = pet.desc || "";
+
+      // 🖼️ 圖片顯示
       const photoContainer = document.getElementById("modalPhotos");
+      const mainPhoto = document.getElementById("mainPhoto");
       photoContainer.innerHTML = "";
+
       if (pet.images && pet.images.length > 0) {
-        pet.images.forEach((url) => {
+        mainPhoto.src = pet.images[0]; // 預設第一張
+        pet.images.forEach((url, index) => {
           const img = document.createElement("img");
           img.src = url;
+          if (index === 0) img.classList.add("active");
+          img.addEventListener("click", () => {
+            // 點擊縮圖切換主圖
+            mainPhoto.src = url;
+            document
+              .querySelectorAll("#modalPhotos img")
+              .forEach((thumb) => thumb.classList.remove("active"));
+            img.classList.add("active");
+          });
           photoContainer.appendChild(img);
         });
       } else {
+        mainPhoto.src = "";
+        mainPhoto.alt = "無照片";
         photoContainer.innerHTML = "<p style='color:#999'>尚無照片</p>";
       }
 
-      // 刪除功能
+      // 🗑️ 刪除功能
       document.getElementById("deleteBtn").onclick = async () => {
         if (confirm(`確定要刪除 ${pet.name} 嗎？`)) {
           await deleteDoc(doc(db, "pets", id));
@@ -404,10 +449,12 @@
         }
       };
 
+      // ✏️ 編輯（預留）
       document.getElementById("editBtn").onclick = () => {
         alert(`尚未實作編輯功能：${pet.name}`);
       };
 
+      // 🏠 已領養
       document.getElementById("adoptBtn").onclick = () => {
         window.location.href = "home.html";
       };
@@ -669,15 +716,25 @@
     <div class="modal-content">
       <span class="close">&times;</span>
       <h3 id="modalName"></h3>
-      <!-- 🐾 照片區 -->
+
+      <!-- 🖼️ 主圖 -->
+      <img id="mainPhoto" class="modal-main-photo" src="" alt="主圖">
+
+      <!-- 🖼️ 縮圖 -->
       <div class="modal-photos" id="modalPhotos"></div>
-      <p><strong>類別：</strong><span id="modalSpecies"></span></p>
-      <p><strong>品種：</strong><span id="modalBreed"></span></p>
-      <p><strong>年齡：</strong><span id="modalAge"></span></p>
-      <p><strong>性別：</strong><span id="modalGender"></span></p>
-      <p><strong>簡介：</strong><span id="modalDesc"></span></p>
+
+      <!-- 📋 動物資訊 -->
+      <div class="modal-info">
+        <span id="modalSpecies"></span>
+        <span id="modalBreed"></span>
+        <span id="modalAge"></span>
+        <span id="modalGender"></span>
+      </div>
+
+      <p id="modalDesc" style="margin-top: 12px; white-space: pre-wrap; word-break: break-word;"></p>
+
       <div class="modal-actions">
-        <button id="editBtn">編輯</button>
+        <button id="editBtn" class="edit">編輯</button>
         <button id="deleteBtn" class="danger">刪除</button>
         <button id="adoptBtn" class="success">已領養</button>
       </div>
