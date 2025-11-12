@@ -281,95 +281,25 @@
     }
 
     /* === 搜尋框 === */
-    /* === 右側「已登錄動物」標題與搜尋框對齊 === */
-    .list-header {
+    .search-box {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 14px;
-      padding-right: 12px;
-      padding-left: 2px;
-      box-sizing: border-box;
+      justify-content: flex-end;
+      margin-bottom: 12px;
     }
 
-    /* === 左右卡片標題：字體大小與顏色統一 === */
-    .form-card h2,
-    .list-header h2 {
-      font-size: 1.6rem;
-      font-weight: 700;
-      color: #d97706; /* 橘色一致 */
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin: 0;
-      line-height: 1.2;
-    }
-
-    /* === 搜尋框樣式 === */
-    .list-header input {
-      padding: 6px 10px;
+    .search-box input {
+      padding: 8px 12px;
       border-radius: 8px;
       border: 1px solid #ccc;
-      font-size: 0.9rem;
-      width: 130px;         /* 手機也剛好一行 */
-      max-width: 35%;
+      font-size: 1rem;
+      width: 200px;
       transition: border-color 0.2s;
     }
 
-    .list-header input:focus {
+    .search-box input:focus {
       outline: none;
       border-color: #f97316;
       box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
-    }
-
-    /* === 手機優化 === */
-    @media (max-width: 600px) {
-      .container {
-        display: flex;
-        flex-wrap: nowrap;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 24px;
-        width: 100%;
-        max-width: 1280px;
-        margin: 0 auto;
-        box-sizing: border-box;
-      }
-
-      /* 左右欄卡片基礎設定 */
-      .form-card, .list-card {
-        background: #ffffff;
-        border-radius: 16px;
-        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
-        padding: 24px;
-        box-sizing: border-box;
-      }
-      
-      /* 左欄（新增浪浪） */
-      .form-card {
-        flex: 1 1 45%;
-        max-width: 540px;
-      }
-
-      /* 右欄（已登錄動物） */
-      .list-card {
-        flex: 1 1
-      }
-
-      .list-header {
-        flex-wrap: wrap;             /* ✅ 自動換行 */
-        justify-content: flex-start; /* ✅ 靠左對齊 */
-        gap: 8px;
-      }
-
-      .list-header h2 {
-        width: 100%;                 /* ✅ 標題單獨一行 */
-      }
-
-      .list-header input {
-        width: 100%;                 /* ✅ 滿版但不溢出 */
-        max-width: none;
-      }
     }
 
     /* === Modal 圖片區 === */
@@ -385,28 +315,25 @@
       box-shadow: 0 2px 6px rgba(0,0,0,0.05);
     }
     
-    /* === 縮圖列：剛好一列 5 張 === */
+    /* === 縮圖列（靠左、不置中）=== */
     .modal-photos {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(18%, 1fr));
-      /* 💡 每張約占 18%，含間距後剛好五張一排 */
-      gap: 6px;
-      margin-bottom: 12px;
-      justify-items: center;
-      align-items: center;
+      display: flex;
+      justify-content: flex-start; /* ✅ 左對齊 */
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px; /* 🔹 與文字間距更緊密 */
     }
-
-    /* 每張縮圖自適應寬高、固定比例 */
+    
     .modal-photos img {
-      width: 100%;
-      aspect-ratio: 1 / 1; /* ✅ 保持正方形 */
+      width: 65px;
+      height: 65px;
       object-fit: cover;
       border-radius: 8px;
       border: 2px solid transparent;
       cursor: pointer;
       transition: transform 0.2s, border-color 0.2s;
     }
-
+    
     .modal-photos img:hover {
       transform: scale(1.05);
     }
@@ -791,11 +718,12 @@
 
     <!-- 右邊：已登錄動物 -->
     <div class="list-card">
-      <div class="list-header">
-        <h2>📋 已登錄動物</h2>
+      <h2>📋 已登錄動物</h2>
+
+      <!-- 🔍 搜尋框 -->
+      <div class="search-box">
         <input type="text" id="searchInput" placeholder="搜尋名字..." />
       </div>
-
 
       <table>
         <thead>
