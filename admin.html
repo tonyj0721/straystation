@@ -281,40 +281,38 @@
     }
 
     /* === 搜尋框 === */
-    /* === 已登錄動物標題列（桌機 + 手機皆可對齊）=== */
+    /* === 右側「已登錄動物」標題與搜尋框對齊 === */
     .list-header {
       display: flex;
       align-items: center;
-      justify-content: space-between; /* ✅ 讓搜尋框固定靠右 */
-      gap: 12px;
-      margin-bottom: 12px;
-      flex-wrap: nowrap;
-      width: 100%;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      padding-right: 12px;
+      padding-left: 2px;
       box-sizing: border-box;
-      padding-right: 8px;             /* ✅ 加一點內距避免太靠邊 */
     }
 
-    /* === 左右卡片標題統一樣式 === */
+    /* === 左右卡片標題：字體大小與顏色統一 === */
     .form-card h2,
     .list-header h2 {
-      font-size: 1.6rem;              /* 與新增浪浪資料一致 */
+      font-size: 1.6rem;
       font-weight: 700;
+      color: #d97706; /* 橘色一致 */
       display: flex;
       align-items: center;
       gap: 6px;
       margin: 0;
-      color: #d97706;                 /* 橘色一致 */
+      line-height: 1.2;
     }
 
     /* === 搜尋框樣式 === */
     .list-header input {
-      flex-shrink: 0;
-      padding: 5px 10px;
+      padding: 6px 10px;
       border-radius: 8px;
       border: 1px solid #ccc;
       font-size: 0.9rem;
-      width: 140px;                   /* ✅ 手機不會太長也不會掉行 */
-      max-width: 40%;                 /* ✅ 防止在窄螢幕時溢出 */
+      width: 130px;         /* 手機也剛好一行 */
+      max-width: 35%;
       transition: border-color 0.2s;
     }
 
@@ -327,14 +325,35 @@
     /* === 手機優化 === */
     @media (max-width: 600px) {
       .container {
-        flex-direction: column;
-        align-items: stretch;
+        display: flex;
+        flex-wrap: nowrap;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 24px;
+        width: 100%;
+        max-width: 1280px;
+        margin: 0 auto;
+        box-sizing: border-box;
       }
 
+      /* 左右欄卡片基礎設定 */
       .form-card, .list-card {
-        width: 100%;
-        max-width: none;
+        background: #ffffff;
+        border-radius: 16px;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+        padding: 24px;
+        box-sizing: border-box;
       }
+      
+      /* 左欄（新增浪浪） */
+      .form-card {
+        flex: 1 1 45%;
+        max-width: 540px;
+      }
+
+      /* 右欄（已登錄動物） */
+      .list-card {
+        flex: 1 1
 
       .list-header {
         flex-wrap: wrap;             /* ✅ 自動換行 */
