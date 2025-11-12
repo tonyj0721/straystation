@@ -635,7 +635,7 @@
         e.preventDefault();
         const data = Object.fromEntries(new FormData(form).entries());
         const imageUrls = [];
-        const submitBtn = form.querySelector("button[type='submit']") || form.querySelector("button");
+        const submitBtn = form.querySelector("button[type='submit']");
         const status = document.getElementById("photoStatus");
 
         // 🔸 按下後暫時停用按鈕
@@ -735,7 +735,7 @@
         <span id="photoStatus" class="note">尚未選擇</span>
         <div id="preview"></div>
 
-        <button>新增浪浪</button>
+        <button type="submit">新增浪浪</button>
       </form>
     </div>
 
