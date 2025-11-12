@@ -161,11 +161,225 @@
       border-color: #f97316;
       box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2);
     }
+
+    .container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      width: 100%;
+      justify-content: center;
+    }
+
+    .form-card, .list-card {
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+      padding: 24px;
+    }
+
+    .form-card {
+      flex: 1 1 40%;
+      max-width: 480px;
+    }
+
+    .list-card {
+      flex: 1 1 50%;
+      max-width: 720px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 10px;
+      text-align: center;
+      border-bottom: 1px solid #eee;
+    }
+
+    tr:hover {
+      background-color: #fff7ed;
+      cursor: pointer;
+    }
+
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(2px);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      overflow: auto; /* 整個視窗可捲動 */
+    }
+
+    .modal-content {
+      background: #fff;
+      padding: 20px 24px 16px;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 540px;
+      margin: 40px auto;
+      max-height: 88vh;
+      overflow-y: auto;
+      position: relative;
+    }
+
+    /* === 標題 === */
+    #modalName {
+      text-align: left;
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin: 4px 0 10px 0; /* 🔹 縮小上方空白 */
+    }
+
+    .close {
+      position: absolute;
+      right: 20px;
+      top: 15px;
+      font-size: 28px;
+      color: #666;
+      cursor: pointer;
+    }
+
+    /* === 按鈕區 === */
+    .modal-actions {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 4px; /* 🔹 減少按鈕上方空白 */
+    }
+
+    .modal-actions button {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .modal-actions button:hover {
+      opacity: 0.85;
+    }
+
+    button.danger {
+      background-color: #dc2626;
+    }
+    
+    button.success {
+      background-color: #16a34a;
+    }
+    
+    button.edit {
+      background-color: #f97316;
+    }
+
+    /* === 搜尋框 === */
+    .search-box {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 12px;
+    }
+
+    .search-box input {
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 1rem;
+      width: 200px;
+      transition: border-color 0.2s;
+    }
+
+    .search-box input:focus {
+      outline: none;
+      border-color: #f97316;
+      box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+    }
+
+    /* === Modal 圖片區 === */
+    /* === 主圖 === */
+    .modal-main-photo {
+      width: 100%;
+      max-height: 300px;
+      border-radius: 10px;
+      object-fit: contain;
+      background-color: #f9f9f9;
+      display: block;
+      margin: 0 auto 8px auto; /* 🔹 縮小下方距離 */
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    }
+    
+    /* === 縮圖列：剛好一列 5 張 === */
+    .modal-photos {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(18%, 1fr));
+      /* 💡 每張約占 18%，含間距後剛好五張一排 */
+      gap: 6px;
+      margin-bottom: 12px;
+      justify-items: center;
+      align-items: center;
+    }
+
+    /* 每張縮圖自適應寬高、固定比例 */
+    .modal-photos img {
+      width: 100%;
+      aspect-ratio: 1 / 1; /* ✅ 保持正方形 */
+      object-fit: cover;
+      border-radius: 8px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .modal-photos img:hover {
+      transform: scale(1.05);
+    }
+
+    .modal-photos img.active {
+      border-color: #f97316;
+    }
+
+    /* === 動物資訊 === */
+    .modal-info {
+      display: flex;
+      justify-content: flex-start;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 10px; /* 🔹 縮小上下距離 */
+    }
+
+    .modal-info span {
+      background: #fff7ed;
+      padding: 5px 12px;
+      border-radius: 16px;
+      color: #92400e;
+      font-weight: 500;
+      font-size: 0.95rem;
+    }
+
+    /* === 敘述文字 === */
+    #modalDesc {
+      background: #fffaf4;
+      padding: 10px 14px;
+      border-radius: 8px;
+      color: #444;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin-bottom: 16px; /* 🔹 與按鈕距離更小 */
+    }
   </style>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-    import { getFirestore, addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+    import { getFirestore, addDoc, collection, serverTimestamp, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
     import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
 
     const firebaseConfig = {
@@ -180,6 +394,128 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const storage = getStorage(app);
+
+    const listEl = document.getElementById("petList");
+    const modal = document.getElementById("detailModal");
+    const closeBtn = modal.querySelector(".close");
+
+    // 🚀 載入 Firestore 資料
+    // 🧾 全域變數存全部資料以供搜尋
+    let allPets = [];
+
+    // 🚀 載入 Firestore 資料
+    async function loadPets() {
+      const querySnapshot = await getDocs(collection(db, "pets"));
+      listEl.innerHTML = "";
+      allPets = []; // 清空再載入
+
+      querySnapshot.forEach((docSnap) => {
+        const pet = { id: docSnap.id, ...docSnap.data() };
+        allPets.push(pet);
+      });
+
+      renderPetList(allPets);
+    }
+
+    // 🐾 產生表格內容（分開函式方便即時搜尋重繪）
+    function renderPetList(pets) {
+      listEl.innerHTML = "";
+      pets.forEach((pet) => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${pet.name}</td>
+          <td>${pet.species}</td>
+          <td>${pet.breed}</td>
+          <td>${pet.age || "-"}</td>
+          <td>${pet.gender || "-"}</td>
+        `;
+        row.addEventListener("click", () => openModal(pet.id, pet));
+        listEl.appendChild(row);
+      });
+    }
+
+    // 🐾 開啟 Modal（顯示圖片）
+    function openModal(id, pet) {
+      modal.style.display = "flex";
+      document.body.style.overflow = "hidden";
+
+      document.getElementById("modalName").textContent = pet.name || "未命名";
+
+      // 🧩 資料顯示（若無資料顯示不詳）
+      document.getElementById("modalSpecies").textContent = pet.species || "不詳";
+      document.getElementById("modalBreed").textContent = pet.breed || "不詳";
+      document.getElementById("modalAge").textContent = pet.age || "不詳";
+      document.getElementById("modalGender").textContent = pet.gender || "不詳";
+      document.getElementById("modalDesc").textContent = pet.desc || " ";
+
+      // 🖼️ 圖片顯示
+      const photoContainer = document.getElementById("modalPhotos");
+      const mainPhoto = document.getElementById("mainPhoto");
+      photoContainer.innerHTML = "";
+
+      if (pet.images && pet.images.length > 0) {
+        mainPhoto.src = pet.images[0]; // 預設第一張
+        pet.images.forEach((url, index) => {
+          const img = document.createElement("img");
+          img.src = url;
+          if (index === 0) img.classList.add("active");
+          img.addEventListener("click", () => {
+            mainPhoto.src = url;
+            document
+              .querySelectorAll("#modalPhotos img")
+              .forEach((thumb) => thumb.classList.remove("active"));
+            img.classList.add("active");
+          });
+          photoContainer.appendChild(img);
+        });
+      } else {
+        mainPhoto.src = "";
+        photoContainer.innerHTML = "<p style='color:#999'>尚無照片</p>";
+      }
+
+      // 按鈕功能
+      document.getElementById("deleteBtn").onclick = async () => {
+        if (confirm(`確定要刪除 ${pet.name} 嗎？`)) {
+          await deleteDoc(doc(db, "pets", id));
+          modal.style.display = "none";
+          document.body.style.overflow = "";
+          loadPets();
+        }
+      };
+
+      document.getElementById("editBtn").onclick = () => {
+        alert(`尚未實作編輯功能：${pet.name}`);
+      };
+
+      document.getElementById("adoptBtn").onclick = () => {
+        window.location.href = "home.html";
+      };
+    }
+
+    // ❌ 關閉 Modal
+    closeBtn.onclick = () => {
+      modal.style.display = "none";
+      document.body.style.overflow = "";
+    };
+
+    window.onclick = (e) => {
+      if (e.target === modal) {
+        modal.style.display = "none";
+        document.body.style.overflow = "";
+      }
+    };
+
+    // 🔍 即時搜尋功能
+    const searchInput = document.getElementById("searchInput");
+    searchInput.addEventListener("input", () => {
+      const keyword = searchInput.value.trim();
+      const filtered = allPets.filter(p =>
+        p.name && p.name.includes(keyword)
+      );
+      renderPetList(filtered);
+    });
+
+    loadPets();
 
     document.addEventListener("DOMContentLoaded", () => {
       const form = document.getElementById("addPetForm");
@@ -330,55 +666,108 @@
 </head>
 
 <body>
-  <div class="form-card">
-    <h1>🐾 新增浪浪資料</h1>
-    <form id="addPetForm">
-      <label>名字</label>
-      <input name="name" required />
+  <div class="container">
+    <!-- 左邊：新增動物 -->
+    <div class="form-card">
+      <h1>🐾 新增浪浪資料</h1>
+      <form id="addPetForm">
+        <label>名字</label>
+        <input name="name" required />
 
-      <label>類別</label>
-      <select name="species" id="species" required>
-        <option value="">請選擇</option>
-        <option value="貓">貓咪</option>
-        <option value="狗">狗狗</option>
-      </select>
-
-      <div id="breedTypeWrap" class="hidden">
-        <label>品種類別</label>
-        <select id="breedType" name="breedType" disabled>
+        <label>類別</label>
+        <select name="species" id="species" required>
           <option value="">請選擇</option>
-          <option value="品種貓">品種貓</option>
-          <option value="品種犬">品種犬</option>
-          <option value="米克斯">米克斯</option>
+          <option value="貓">貓咪</option>
+          <option value="狗">狗狗</option>
         </select>
+
+        <div id="breedTypeWrap" class="hidden">
+          <label>品種類別</label>
+          <select id="breedType" name="breedType" disabled>
+            <option value="">請選擇</option>
+            <option value="品種貓">品種貓</option>
+            <option value="品種犬">品種犬</option>
+            <option value="米克斯">米克斯</option>
+          </select>
+        </div>
+
+        <div id="breedWrap" class="hidden">
+          <label>品種</label>
+          <select id="breed" name="breed" disabled></select>
+        </div>
+
+        <label>年齡</label>
+        <input name="age" placeholder="例如：1歲 或 幼年" />
+
+        <label>性別</label>
+        <select name="gender">
+          <option value="">請選擇</option>
+          <option value="男生">男生</option>
+          <option value="女生">女生</option>
+        </select>
+
+        <label>簡介</label>
+        <textarea name="desc" rows="3" placeholder="輸入個性、故事、習慣等..."></textarea>
+
+        <label>上傳照片（最多 5 張，可分次上傳）</label>
+        <input type="file" id="photo" accept="image/*" multiple style="display:none;">
+        <button type="button" id="pickBtn" class="upload-btn">選擇照片</button>
+        <span id="photoStatus" class="note">尚未選擇</span>
+        <div id="preview"></div>
+
+        <button>新增浪浪</button>
+      </form>
+    </div>
+
+    <!-- 右邊：已登錄動物 -->
+    <div class="list-card">
+      <h2>📋 已登錄動物</h2>
+
+      <!-- 🔍 搜尋框 -->
+      <div class="search-box">
+        <input type="text" id="searchInput" placeholder="搜尋名字..." />
       </div>
 
-      <div id="breedWrap" class="hidden">
-        <label>品種</label>
-        <select id="breed" name="breed" disabled></select>
+      <table>
+        <thead>
+          <tr>
+            <th>名字</th>
+            <th>類別</th>
+            <th>品種</th>
+            <th>年齡</th>
+            <th>性別</th>
+          </tr>
+        </thead>
+        <tbody id="petList"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div id="detailModal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h3 id="modalName" style="text-align:center; margin-bottom:12px;"></h3>
+
+      <img id="mainPhoto" class="modal-main-photo" src="" alt="主圖">
+
+      <div class="modal-photos" id="modalPhotos"></div>
+
+      <div class="modal-info">
+        <span id="modalSpecies"></span>
+        <span id="modalBreed"></span>
+        <span id="modalAge"></span>
+        <span id="modalGender"></span>
       </div>
 
-      <label>年齡</label>
-      <input name="age" placeholder="例如：1歲 或 幼年" />
+      <p id="modalDesc"></p>
 
-      <label>性別</label>
-      <select name="gender">
-        <option value="">請選擇</option>
-        <option value="男生">男生</option>
-        <option value="女生">女生</option>
-      </select>
-
-      <label>簡介</label>
-      <textarea name="desc" rows="3" placeholder="輸入個性、故事、習慣等..."></textarea>
-
-      <label>上傳照片（最多 5 張，可分次上傳）</label>
-      <input type="file" id="photo" accept="image/*" multiple style="display:none;">
-      <button type="button" id="pickBtn" class="upload-btn">選擇照片</button>
-      <span id="photoStatus" class="note">尚未選擇</span>
-      <div id="preview"></div>
-
-      <button>新增浪浪</button>
-    </form>
+      <div class="modal-actions">
+        <button id="editBtn" class="edit">編輯</button>
+        <button id="deleteBtn" class="danger">刪除</button>
+        <button id="adoptBtn" class="success">已領養</button>
+      </div>
+    </div>
   </div>
   <script>
   (function(){

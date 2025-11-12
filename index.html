@@ -1,257 +1,489 @@
 <!doctype html>
-<html lang="zh-Hant">
+<html lang="zh-Hant" class="scroll-smooth">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>裝置 / 手機尺寸偵測範例</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>浪浪轉運站｜貓狗送養平台</title>
+  <meta name="description" content="浪浪轉運站：友善的貓狗送養平台。快速篩選、查看細節，手機與電腦版皆可用。" />
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png" sizes="16x16 32x32 64x64">
+  <link rel="apple-touch-icon" href="favicon.png">
+  <meta name="theme-color" content="#fcd34d">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Tailwind config
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#fff1f2', 100:'#ffe4e6', 200:'#fecdd3', 300:'#fda4af', 400:'#fb7185',
+              500:'#f43f5e', 600:'#e11d48', 700:'#be123c', 800:'#9f1239', 900:'#881337'
+            }
+          },
+          boxShadow: { soft: '0 10px 30px rgba(0,0,0,0.08)'}
+        }
+      },
+      darkMode: 'class'
+    }
+  </script>
   <style>
-    :root{
-      --gap: 12px;
-      --card-bg: #fff;
-      --bg: #f5f7fb;
-      --accent: #2563eb;
-      --muted: #6b7280;
-      --radius: 10px;
-    }
-    html,body{
-      height:100%;
-      margin:0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", "Microsoft JhengHei", Arial, sans-serif;
-      background: var(--bg);
-      color:#0f172a;
-      -webkit-font-smoothing:antialiased;
-    }
-    .wrap{
-      max-width:900px;
-      margin:28px auto;
-      padding:20px;
-    }
-    .header{
-      display:flex;
-      align-items:center;
-      gap:12px;
-      margin-bottom:18px;
-    }
-    .logo{
-      width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,var(--accent),#9b5cff);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:20px;
-    }
-    .title h1{margin:0;font-size:20px;}
-    .title p{margin:0;color:var(--muted);font-size:13px;}
-    .grid{
-      display:grid;
-      grid-template-columns: repeat(auto-fit,minmax(220px,1fr));
-      gap:var(--gap);
-    }
-    .card{
-      background:var(--card-bg);
-      padding:14px;
-      border-radius:var(--radius);
-      box-shadow: 0 6px 18px rgba(8,15,40,0.06);
-      min-height:80px;
-    }
-    .label{font-size:12px;color:var(--muted);margin-bottom:6px;}
-    .value{font-size:18px;font-weight:600;}
-    .big{
-      grid-column: 1 / -1;
-    }
-    .breakpoints{
-      display:flex;gap:8px;flex-wrap:wrap;
-      margin-top:12px;
-    }
-    .bp{padding:8px 10px;border-radius:8px;background:#f3f4f6;color:#374151;font-size:13px;}
-    .bp.active{background:linear-gradient(90deg,#e0f2fe,#bfdbfe);color:#0369a1;font-weight:700;}
-    /* 範例：依據 body class 做全頁提示（例如 mobile） */
-    body.mobile .header{box-shadow: inset 0 -6px 18px rgba(37,99,235,0.06);}
-    @media (max-width:600px){
-      .title h1{font-size:18px;}
-      .logo{width:48px;height:48px;font-size:18px;}
-    }
+    /* Hide number input arrows */
+    input[type=number]::-webkit-outer-spin-button,
+    input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; }
+    dialog::backdrop{ background: rgba(0,0,0,.5)}
   </style>
 </head>
-<body>
-  <div class="wrap" id="app">
-    <div class="header">
-      <div class="logo">D</div>
-      <div class="title">
-        <h1>裝置 & 視窗尺寸偵測</h1>
-        <p>即時顯示 viewport 與裝置資訊 — 使用 <code>matchMedia</code> 與 <code>resize</code>。</p>
+<body class="bg-white text-gray-800 dark:bg-gray-950 dark:text-gray-100">
+  <!-- Skip link -->
+  <a href="#pets" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 bg-brand-600 text-white px-3 py-2 rounded">跳到主要內容</a>
+
+  <!-- Navbar -->
+  <header class="sticky top-0 z-50 bg-white/80 backdrop-blur border-b border-gray-200 dark:bg-gray-950/70 dark:border-gray-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="h-16 flex items-center justify-between">
+        <a href="#" class="flex items-center gap-2 font-semibold text-lg">
+          <img src="浪浪轉運站Logo.png" alt="浪浪轉運站 Logo"
+               class="h-8 w-8 object-contain" />
+          <span>浪浪轉運站 X 台中簡媽媽狗園</span>
+        </a>
+        <nav class="hidden md:flex items-center gap-6">
+          <a href="cats.html" class="hover:text-brand-600">我想養貓咪</a>
+          <a href="dogs.html" class="hover:text-brand-600">我想養狗狗</a>
+          <a href="about.html" class="hover:text-brand-600">關於簡媽媽</a>
+          <a href="admin.html" class="hover:text-brand-600">管理員登入</a>
+        </nav>
+        <div class="flex items-center gap-2">
+          <button id="themeToggle" class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="切換深色模式">
+            <svg id="sun" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden dark:block" viewBox="0 0 24 24" fill="currentColor"><path d="M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.8 1.42-1.42zm10.48 0l1.79-1.8 1.41 1.41-1.8 1.79-1.4-1.4zM12 4V1h-0v3h0zm0 19v-3h0v3h0zM4 12H1v0h3v0zm19 0h-3v0h3v0zM6.76 19.16l-1.42 1.42-1.79-1.8 1.41-1.41 1.8 1.79zM19.16 17.24l1.8 1.79-1.41 1.41-1.79-1.8 1.4-1.4z"/><circle cx="12" cy="12" r="5"/></svg>
+            <svg id="moon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 dark:hidden" viewBox="0 0 24 24" fill="currentColor"><path d="M21.64 13a9 9 0 1 1-10.63-10.6 1 1 0 0 1 1.11 1.46A7 7 0 1 0 20.18 12a1 1 0 0 1 1.46 1.11z"/></svg>
+          </button>
+          <button class="md:hidden p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="開啟選單" id="navToggle">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+          </button>
+        </div>
+      </div>
+      <div id="mobileNav" class="md:hidden hidden pb-4">
+        <a href="cats.html" class="block py-2">我想養貓</a>
+        <a href="dogs.html" class="block py-2">我想養狗</a>
+        <a href="about.html" class="block py-2">關於簡媽媽</a>
+        <a href="admin.html" class="block py-2">管理員登入</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="relative overflow-hidden">
+    <div class="absolute -z-10 inset-0 bg-gradient-to-br from-brand-50 to-white dark:from-gray-900 dark:to-gray-950"></div>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 lg:py-20 grid lg:grid-cols-2 items-center gap-10">
+      <div>
+        <h1 class="text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight">讓牠們回家 🐾<br>找到命中注定的家人</h1>
+        <p class="mt-4 text-lg text-gray-600 dark:text-gray-300">在浪浪轉運站，我們與民間中途與收容所合作，為每一隻貓狗找到安全、穩定、充滿愛的家。</p>
+        <div class="mt-6 flex gap-3">
+          <a href="#pets" class="inline-flex items-center px-5 py-3 rounded-xl bg-brand-600 text-white font-medium shadow-soft hover:bg-brand-700">馬上找毛孩</a>
+          <a href="#apply" class="inline-flex items-center px-5 py-3 rounded-xl border border-gray-300 dark:border-gray-700 font-medium hover:bg-gray-50 dark:hover:bg-gray-800">我要送養</a>
+        </div>
+        <dl class="mt-8 grid grid-cols-3 gap-4 text-center">
+          <div class="p-4 rounded-xl bg-white/70 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800">
+            <dt class="text-sm text-gray-500">已成功送養</dt>
+            <dd class="text-xl font-semibold" id="statPlaced">0</dd>
+          </div>
+          <div class="p-4 rounded-xl bg-white/70 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800">
+            <dt class="text-sm text-gray-500">待領養名單</dt>
+            <dd class="text-xl font-semibold" id="statAvailable">0</dd>
+          </div>
+          <div class="p-4 rounded-xl bg-white/70 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800">
+            <dt class="text-sm text-gray-500">合作中途/機構</dt>
+            <dd class="text-xl font-semibold">24+</dd>
+          </div>
+        </dl>
+      </div>
+      <div class="relative">
+        <div class="aspect-[4/3] rounded-3xl overflow-hidden shadow-soft ring-1 ring-gray-200 dark:ring-gray-800">
+          <img src="https://images.unsplash.com/photo-1517849845537-4d257902454a?q=80&w=1600&auto=format&fit=crop" alt="一隻狗與一隻貓在陽光下相依" class="w-full h-full object-cover" loading="lazy">
+        </div>
+        <div class="absolute -bottom-6 -left-6 bg-white dark:bg-gray-900 rounded-2xl shadow-soft ring-1 ring-gray-200 dark:ring-gray-800 p-4 flex items-center gap-3">
+          <span class="text-2xl">🎉</span>
+          <div class="text-sm">
+            <p class="font-semibold">這週 8 位毛孩找到新家</p>
+            <p class="text-gray-500 dark:text-gray-400">感謝每位認養人與志工</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Filters + Pets -->
+  <main id="pets" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+      <div>
+        <h2 class="text-2xl font-bold">找毛孩</h2>
+        <p class="text-gray-600 dark:text-gray-300">依品種/年齡/地區快速篩選，點擊卡片可查看詳細資訊。</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <label class="inline-flex items-center gap-2 text-sm"><input id="onlyKids" type="checkbox" class="rounded border-gray-300 dark:border-gray-700"> 適合與小孩</label>
+        <label class="inline-flex items-center gap-2 text-sm"><input id="onlyVacc" type="checkbox" class="rounded border-gray-300 dark:border-gray-700"> 已施打疫苗</label>
+        <label class="inline-flex items-center gap-2 text-sm"><input id="onlyNeut" type="checkbox" class="rounded border-gray-300 dark:border-gray-700"> 已節育</label>
       </div>
     </div>
 
-    <div class="grid">
-      <div class="card">
-        <div class="label">Viewport（寬 × 高）</div>
-        <div class="value" id="viewport">--</div>
+    <div class="mt-6 grid grid-cols-2 md:grid-cols-6 gap-3">
+      <select id="fSpecies" class="col-span-1 md:col-span-1 rounded-xl border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-2"><option value="">全部</option><option value="貓">貓</option><option value="狗">狗</option></select>
+      <select id="fAge" class="col-span-1 md:col-span-1 rounded-xl border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-2"><option value="">年齡</option><option>幼年</option><option>成年</option><option>熟齡</option></select>
+      <select id="fSize" class="col-span-1 md:col-span-1 rounded-xl border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-2"><option value="">體型</option><option>小型</option><option>中型</option><option>大型</option></select>
+      <select id="fCity" class="col-span-1 md:col-span-1 rounded-xl border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-2"><option value="">地區</option><option>台北</option><option>新北</option><option>桃園</option><option>台中</option><option>台南</option><option>高雄</option></select>
+      <input id="fQuery" class="col-span-2 md:col-span-2 rounded-xl border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-2" placeholder="輸入關鍵字（如：虎斑、親人、活潑）" />
+      <div class="col-span-2 md:col-span-1 flex gap-2">
+        <button id="btnFilter" class="flex-1 px-4 py-2 rounded-xl bg-gray-900 text-white dark:bg-white dark:text-gray-900 font-medium">套用</button>
+        <button id="btnReset" class="px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-700">重置</button>
       </div>
+    </div>
 
-      <div class="card">
-        <div class="label">像素密度 (devicePixelRatio)</div>
-        <div class="value" id="dpr">--</div>
-      </div>
+    <div id="grid" class="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <!-- Cards injected here -->
+    </div>
 
-      <div class="card">
-        <div class="label">方向 (orientation)</div>
-        <div class="value" id="orientation">--</div>
-      </div>
+    <div id="emptyState" class="hidden mt-10 text-center text-gray-500 dark:text-gray-400">沒有符合條件的毛孩，試試看調整篩選條件。</div>
+  </main>
 
-      <div class="card">
-        <div class="label">是否支援觸控</div>
-        <div class="value" id="touch">--</div>
-      </div>
-
-      <div class="card">
-        <div class="label">裝置類型判定</div>
-        <div class="value" id="deviceType">--</div>
-      </div>
-
-      <div class="card">
-        <div class="label">使用者代理（簡短）</div>
-        <div class="value" id="ua">--</div>
-      </div>
-
-      <div class="card big">
-        <div class="label">當前斷點（CSS / JS 共用）</div>
-        <div class="breakpoints" id="bps">
-          <!-- 斷點標籤會由 JS 填入 -->
+  <!-- Apply Section -->
+  <section id="apply" class="bg-gray-50 dark:bg-gray-900/40 border-t border-gray-200 dark:border-gray-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <h2 class="text-2xl font-bold">送養申請</h2>
+      <p class="text-gray-600 dark:text-gray-300">想刊登待認養毛孩？填寫表單，我們會與你聯繫完成審核與上架。</p>
+      <form id="applyForm" class="mt-6 grid md:grid-cols-2 gap-4" novalidate>
+        <div class="md:col-span-2">
+          <label class="block text-sm mb-1" for="petName">毛孩名稱（若要認養，會自動帶入）</label>
+          <input id="petName" name="petName" class="w-full rounded-xl border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-2" placeholder="例：小虎、奶茶" />
         </div>
-        <div style="margin-top:10px;color:var(--muted);font-size:13px;">
-          斷點定義：xs ≤ 375, sm ≤ 600, md ≤ 900, lg ≤ 1200, xl > 1200
+        <div>
+          <label class="block text-sm mb-1" for="name">您的姓名*</label>
+          <input id="name" name="name" required class="w-full rounded-xl border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-2" />
+        </div>
+        <div>
+          <label class="block text-sm mb-1" for="phone">聯絡電話*</label>
+          <input id="phone" name="phone" type="tel" required pattern="[0-9\-\+ ]{8,}" class="w-full rounded-xl border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-2" />
+        </div>
+        <div>
+          <label class="block text-sm mb-1" for="email">Email*</label>
+          <input id="email" name="email" type="email" required class="w-full rounded-xl border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-2" />
+        </div>
+        <div>
+          <label class="block text-sm mb-1" for="city">所在城市*</label>
+          <select id="city" name="city" required class="w-full rounded-xl border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-2">
+            <option value="">請選擇</option>
+            <option>台北</option><option>新北</option><option>桃園</option><option>台中</option><option>台南</option><option>高雄</option>
+          </select>
+        </div>
+        <fieldset class="md:col-span-2 grid sm:grid-cols-2 gap-4">
+          <legend class="text-sm mb-2">居住環境*</legend>
+          <label class="inline-flex items-center gap-2"><input type="radio" name="home" value="公寓/大樓" required class="rounded"> 公寓/大樓</label>
+          <label class="inline-flex items-center gap-2"><input type="radio" name="home" value="透天/有庭院" class="rounded"> 透天/有庭院</label>
+        </fieldset>
+        <div class="md:col-span-2">
+          <label class="block text-sm mb-1" for="message">簡述經驗與動機*</label>
+          <textarea id="message" name="message" required rows="5" class="w-full rounded-xl border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-2" placeholder="請告訴我們您的飼養經驗、生活作息、以及為何想送養/認養"></textarea>
+        </div>
+        <div class="md:col-span-2 flex items-center justify-between gap-4">
+          <p class="text-sm text-gray-500">送出後，資料會僅用於審核與聯絡，不會公開。</p>
+          <button class="px-5 py-2 rounded-xl bg-brand-600 text-white font-medium hover:bg-brand-700">送出表單</button>
+        </div>
+      </form>
+      <div id="toast" class="hidden mt-4 p-4 rounded-xl bg-green-50 text-green-800 border border-green-200">已收到您的申請！我們將於 2-3 個工作日內聯繫您。</div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <h2 class="text-2xl font-bold">常見問題</h2>
+    <div class="mt-6 grid md:grid-cols-2 gap-6">
+      <details class="p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800" open>
+        <summary class="font-medium cursor-pointer">認養流程需要多久？</summary>
+        <p class="mt-2 text-gray-600 dark:text-gray-300">通常 1–2 週，包含基本面談、家訪與試養期。我們會確保雙方都準備好。</p>
+      </details>
+      <details class="p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
+        <summary class="font-medium cursor-pointer">可以跨縣市認養嗎？</summary>
+        <p class="mt-2 text-gray-600 dark:text-gray-300">可以，但需評估交通與後續回診等安排，並視中途/機構規定調整。</p>
+      </details>
+      <details class="p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
+        <summary class="font-medium cursor-pointer">送養上架需要費用嗎？</summary>
+        <p class="mt-2 text-gray-600 dark:text-gray-300">平台免費，僅需提供基本資料與健康文件，通過審核即可上架。</p>
+      </details>
+      <details class="p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
+        <summary class="font-medium cursor-pointer">是否提供晶片登記與結紮補助？</summary>
+        <p class="mt-2 text-gray-600 dark:text-gray-300">部分合作機構提供，依地區不同，請聯繫我們了解詳情。</p>
+      </details>
+    </div>
+  </section>
+
+  <!-- Contact -->
+  <section id="contact" class="bg-gray-50 dark:bg-gray-900/40 border-t border-gray-200 dark:border-gray-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <h2 class="text-2xl font-bold">聯絡我們</h2>
+      <p class="mt-2 text-gray-600 dark:text-gray-300">合作、中途申請或媒體聯繫：<a href="mailto:hello@warmhome.tw" class="text-brand-600 hover:underline">hello@warmhome.tw</a></p>
+      <div class="mt-4 text-sm text-gray-500">© <span id="year"></span> 浪浪轉運站 StrayStation. 保留所有權利。</div>
+    </div>
+  </section>
+
+  <!-- Pet Detail Modal -->
+  <dialog id="petDialog" class="w-full max-w-2xl rounded-2xl p-0 overflow-hidden">
+    <div class="bg-white dark:bg-gray-900">
+      <div class="relative aspect-video bg-gray-100 dark:bg-gray-800">
+        <img id="dlgImg" alt="毛孩照片" class="w-full h-full object-cover"/>
+        <button id="dlgClose" class="absolute top-3 right-3 bg-black/60 text-white p-2 rounded-full" aria-label="關閉">✕</button>
+      </div>
+      <div class="p-5 space-y-4">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <h3 id="dlgName" class="text-xl font-semibold">—</h3>
+            <p id="dlgMeta" class="text-gray-500">—</p>
+          </div>
+          <span id="dlgCity" class="inline-flex items-center px-2 py-1 text-xs bg-gray-100 dark:bg-gray-800 rounded">—</span>
+        </div>
+        <p id="dlgDesc" class="text-gray-700 dark:text-gray-200">—</p>
+        <ul id="dlgBadges" class="flex flex-wrap gap-2 text-sm"></ul>
+        <div class="flex justify-end gap-3 pt-2">
+          <button id="dlgAdopt" class="px-4 py-2 rounded-xl bg-brand-600 text-white">我要認養</button>
+          <button id="dlgShare" class="px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-700">分享</button>
         </div>
       </div>
     </div>
-  </div>
+  </dialog>
 
   <script>
-    // ---------- 斷點定義（可依需求調整） ----------
-    const BREAKPOINTS = [
-      { name: 'xs', max: 375 },
-      { name: 'sm', max: 600 },
-      { name: 'md', max: 900 },
-      { name: 'lg', max: 1200 },
-      { name: 'xl', max: Infinity }
+    // ======= Data =======
+    const pets = [
+      {id:1, name:'小虎', species:'貓', gender:'公', age:'幼年', size:'小型', color:'虎斑', vaccinated:true, neutered:false, goodWithKids:true, city:'台北', image:'https://images.unsplash.com/photo-1518791841217-8f162f1e1131?q=80&w=1600&auto=format&fit=crop', desc:'活潑親人，已基本驅蟲，適合第一次養貓的家庭。', createdAt:'2025-10-20'},
+      {id:2, name:'奶茶', species:'狗', gender:'母', age:'成年', size:'中型', color:'米白', vaccinated:true, neutered:true, goodWithKids:true, city:'新北', image:'https://images.unsplash.com/photo-1552053831-71594a27632d?q=80&w=1600&auto=format&fit=crop', desc:'穩定溫和，會基本口令，喜歡散步。', createdAt:'2025-10-28'},
+      {id:3, name:'黑豆', species:'貓', gender:'母', age:'成年', size:'小型', color:'黑', vaccinated:false, neutered:true, goodWithKids:false, city:'台中', image:'https://images.unsplash.com/photo-1495360010541-f48722b34f7d?q=80&w=1600&auto=format&fit=crop', desc:'剛結紮，需耐心互動，熟悉後很撒嬌。', createdAt:'2025-09-30'},
+      {id:4, name:'抱抱', species:'狗', gender:'公', age:'熟齡', size:'大型', color:'黃', vaccinated:true, neutered:true, goodWithKids:true, city:'高雄', image:'https://images.unsplash.com/photo-1558944351-c0e0952e0b48?q=80&w=1600&auto=format&fit=crop', desc:'過去有街頭生活，現在非常黏人，適合有庭院的家庭。', createdAt:'2025-08-15'},
+      {id:5, name:'雪球', species:'貓', gender:'母', age:'幼年', size:'小型', color:'白', vaccinated:true, neutered:false, goodWithKids:true, city:'台南', image:'https://images.unsplash.com/photo-1511044568932-338cba0ad803?q=80&w=1600&auto=format&fit=crop', desc:'活潑好動，喜歡逗貓棒，建議與另一隻貓作伴。', createdAt:'2025-10-31'},
+      {id:6, name:'阿財', species:'狗', gender:'公', age:'成年', size:'大型', color:'黑白', vaccinated:false, neutered:false, goodWithKids:false, city:'桃園', image:'https://images.unsplash.com/photo-1534361960057-19889db9621e?q=80&w=1600&auto=format&fit=crop', desc:'需要有經驗的飼主，正在學習牽繩禮儀。', createdAt:'2025-07-21'}
     ];
 
-    // ---------- DOM references ----------
-    const viewportEl = document.getElementById('viewport');
-    const dprEl = document.getElementById('dpr');
-    const orientationEl = document.getElementById('orientation');
-    const touchEl = document.getElementById('touch');
-    const deviceTypeEl = document.getElementById('deviceType');
-    const uaEl = document.getElementById('ua');
-    const bpsEl = document.getElementById('bps');
+    // ======= State & Utils =======
+    const $ = (q) => document.querySelector(q);
+    const $$ = (q) => document.querySelectorAll(q);
 
-    // 在 body 上顯示斷點 class，也方便 CSS 使用
-    function setBodyBreakpointClass(bpName){
-      document.body.classList.remove(...BREAKPOINTS.map(b=>b.name));
-      document.body.classList.add(bpName);
+    function fmtBadges(p){
+      const arr = [];
+      if(p.vaccinated) arr.push('已施打疫苗');
+      if(p.neutered) arr.push('已節育');
+      if(p.goodWithKids) arr.push('適合與小孩');
+      return arr;
     }
 
-    // 生成斷點標籤 UI
-    function renderBreakpointTags(activeName){
-      bpsEl.innerHTML = '';
-      for(const bp of BREAKPOINTS){
-        const span = document.createElement('div');
-        span.className = 'bp' + (bp.name === activeName ? ' active' : '');
-        span.textContent = bp.name + (bp.max !== Infinity ? ` ≤ ${bp.max}px` : ' > 1200px');
-        bpsEl.appendChild(span);
+    function applyStats(){
+      $('#statAvailable').textContent = pets.length;
+      // 簡單示意：假設 128 已送養
+      $('#statPlaced').textContent = 128;
+    }
+
+    // ======= Render Cards =======
+    function render(petList){
+      const grid = $('#grid');
+      grid.innerHTML = '';
+      if(!petList.length){
+        $('#emptyState').classList.remove('hidden');
+        return;
       }
+      $('#emptyState').classList.add('hidden');
+
+      petList.forEach(p => {
+        const card = document.createElement('article');
+        card.className = 'group rounded-2xl overflow-hidden ring-1 ring-gray-200 dark:ring-gray-800 bg-white dark:bg-gray-900 hover:shadow-soft transition-shadow';
+        card.innerHTML = `
+          <div class="relative aspect-[4/3] bg-gray-100 dark:bg-gray-800">
+            <img src="${p.image}" alt="${p.name} 的照片" class="w-full h-full object-cover" loading="lazy"/>
+            <span class="absolute top-3 left-3 text-xs px-2 py-1 rounded bg-white/90 dark:bg-gray-900/80">${p.city}</span>
+          </div>
+          <div class="p-4">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <h3 class="text-lg font-semibold">${p.name}</h3>
+                <p class="text-sm text-gray-500">${p.species}・${p.gender}・${p.age}・${p.size}</p>
+              </div>
+              <button class="like p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="加入收藏">♡</button>
+            </div>
+            <div class="mt-3 flex flex-wrap gap-2 text-xs">
+              ${fmtBadges(p).map(b => `<span class='px-2 py-1 rounded bg-gray-100 dark:bg-gray-800'>${b}</span>`).join('')}
+            </div>
+            <div class="mt-4 flex gap-2">
+              <button data-id="${p.id}" class="btn-detail flex-1 px-3 py-2 rounded-xl bg-gray-900 text-white dark:bg-white dark:text-gray-900">查看</button>
+              <button data-id="${p.id}" class="btn-adopt px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700">認養</button>
+            </div>
+          </div>`;
+        grid.appendChild(card);
+      });
+
+      // Like interaction (localStorage)
+      $$('.like').forEach(btn => {
+        btn.addEventListener('click', () => {
+          btn.textContent = btn.textContent === '♡' ? '♥' : '♡';
+        });
+      });
+
+      // Detail modal
+      $$('.btn-detail').forEach(btn => btn.addEventListener('click', (e) => openDialog(+e.target.dataset.id)));
+      // Adopt quick fill
+      $$('.btn-adopt').forEach(btn => btn.addEventListener('click', (e) => {
+        const p = pets.find(x => x.id === +e.target.dataset.id);
+        document.getElementById('petName').value = p.name;
+        location.hash = '#apply';
+        $('#name').focus();
+      }));
     }
 
-    // 節流/防抖
-    function debounce(fn, wait=80){
-      let t = null;
-      return (...args)=>{
-        clearTimeout(t);
-        t = setTimeout(()=>fn.apply(this,args), wait);
+    // ======= Filtering =======
+    function getFilters(){
+      return {
+        species: $('#fSpecies').value,
+        age: $('#fAge').value,
+        size: $('#fSize').value,
+        city: $('#fCity').value,
+        query: $('#fQuery').value.trim().toLowerCase(),
+        onlyKids: $('#onlyKids').checked,
+        onlyVacc: $('#onlyVacc').checked,
+        onlyNeut: $('#onlyNeut').checked,
       };
     }
 
-    // 判斷斷點
-    function getBreakpointName(width){
-      for(const bp of BREAKPOINTS){
-        if(width <= bp.max) return bp.name;
-      }
-      return 'xl';
+    function filterPets(){
+      const f = getFilters();
+      const list = pets.filter(p => {
+        if(f.species && p.species !== f.species) return false;
+        if(f.age && p.age !== f.age) return false;
+        if(f.size && p.size !== f.size) return false;
+        if(f.city && p.city !== f.city) return false;
+        if(f.onlyKids && !p.goodWithKids) return false;
+        if(f.onlyVacc && !p.vaccinated) return false;
+        if(f.onlyNeut && !p.neutered) return false;
+        if(f.query){
+          const hay = (p.name + p.color + p.desc + p.city).toLowerCase();
+          if(!hay.includes(f.query)) return false;
+        }
+        return true;
+      }).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+      render(list);
     }
 
-    // 是否支援觸控（feature detection）
-    function supportsTouch(){
-      // pointer media or maxTouchPoints
-      return ('ontouchstart' in window) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0) || window.matchMedia('(pointer: coarse)').matches;
-    }
-
-    // 判斷裝置類型（簡易）
-    function guessDeviceType(width){
-      // 以寬度為主，這是保守估計；若需要更精準可綁定 userAgent 或更複雜的邏輯
-      if(width <= 600) return 'mobile';
-      if(width <= 900) return 'tablet';
-      return 'desktop';
-    }
-
-    // 取得方向
-    function getOrientation(){
-      if(window.screen && window.screen.orientation && window.screen.orientation.type){
-        return window.screen.orientation.type; // ex: "landscape-primary"
-      }
-      return window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
-    }
-
-    // 更新所有顯示
-    function updateAll(){
-      const w = Math.round(window.innerWidth);
-      const h = Math.round(window.innerHeight);
-      viewportEl.textContent = `${w}px × ${h}px`;
-      dprEl.textContent = (window.devicePixelRatio || 1).toFixed(2);
-      orientationEl.textContent = getOrientation();
-      touchEl.textContent = supportsTouch() ? '支援' : '不支援';
-      deviceTypeEl.textContent = guessDeviceType(w);
-      // 簡短版 UA（避免太長）
-      uaEl.textContent = navigator.userAgent.slice(0,120) + (navigator.userAgent.length>120 ? '…' : '');
-
-      const bpName = getBreakpointName(w);
-      setBodyBreakpointClass(bpName);
-      renderBreakpointTags(bpName);
-    }
-
-    // 使用 matchMedia 監聽常用斷點（非必要，但可即時反應）
-    const mediaQueries = BREAKPOINTS.map(bp => {
-      if (bp.max === Infinity) {
-        return window.matchMedia(`(min-width: ${BREAKPOINTS[BREAKPOINTS.length-2].max + 1}px)`);
-      } else {
-        return window.matchMedia(`(max-width: ${bp.max}px)`);
-      }
+    // Buttons
+    $('#btnFilter').addEventListener('click', filterPets);
+    $('#btnReset').addEventListener('click', () => {
+      ['#fSpecies','#fAge','#fSize','#fCity','#fQuery','#onlyKids','#onlyVacc','#onlyNeut'].forEach(sel => {
+        const el = $(sel);
+        if(el.type === 'checkbox') el.checked = false; else el.value = '';
+      });
+      filterPets();
     });
 
-    // 綁定事件（resize 與 orientationchange）
-    const debouncedUpdate = debounce(updateAll, 80);
-    window.addEventListener('resize', debouncedUpdate);
-    window.addEventListener('orientationchange', debouncedUpdate);
-    // 若 matchMedia 支援 addEventListener
-    for(const mq of mediaQueries){
-      if(typeof mq.addEventListener === 'function'){
-        mq.addEventListener('change', debouncedUpdate);
-      }else if(typeof mq.addListener === 'function'){
-        mq.addListener(debouncedUpdate);
-      }
-    }
-
-    // 初始
-    updateAll();
-
-    // 額外：按下 's' 可以在 console.log 顯示更詳細資訊（方便 debug）
-    window.addEventListener('keydown', (e)=>{
-      if(e.key === 's'){
-        console.log({
-          innerWidth: window.innerWidth,
-          innerHeight: window.innerHeight,
-          devicePixelRatio: window.devicePixelRatio,
-          orientation: getOrientation(),
-          maxTouchPoints: navigator.maxTouchPoints,
-          userAgent: navigator.userAgent
-        });
-        alert('已在 console.print 詳細資訊 (按 F12 開啟 DevTools)。');
+    // ======= Modal =======
+    const dlg = document.getElementById('petDialog');
+    $('#dlgClose').addEventListener('click', () => dlg.close());
+    $('#dlgShare').addEventListener('click', async () => {
+      const name = $('#dlgName').textContent;
+      const url = location.href.split('#')[0];
+      const text = `一起幫 ${name} 找到家！`;
+      if(navigator.share){
+        try{ await navigator.share({ title: name, text, url }); }catch{}
+      }else{
+        navigator.clipboard.writeText(`${text} ${url}`);
+        alert('已複製分享連結');
       }
     });
+    $('#dlgAdopt').addEventListener('click', () => {
+      document.getElementById('petName').value = $('#dlgName').textContent;
+      dlg.close();
+      location.hash = '#apply';
+      $('#name').focus();
+    });
+
+    function openDialog(id){
+      const p = pets.find(x => x.id === id);
+      if(!p) return;
+      $('#dlgImg').src = p.image;
+      $('#dlgName').textContent = p.name;
+      $('#dlgMeta').textContent = `${p.species}・${p.gender}・${p.age}・${p.size}`;
+      $('#dlgCity').textContent = p.city;
+      $('#dlgDesc').textContent = p.desc;
+      const badges = fmtBadges(p).map(b => `<li class='px-2 py-1 rounded bg-gray-100 dark:bg-gray-800'>${b}</li>`).join('');
+      $('#dlgBadges').innerHTML = badges || '<li class="text-gray-500">—</li>';
+      if(typeof dlg.showModal === 'function') dlg.showModal(); else alert('您的瀏覽器不支援對話框');
+    }
+
+    // ======= Form Handling =======
+    $('#applyForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const form = e.target;
+      if(!form.checkValidity()){
+        form.reportValidity();
+        return;
+      }
+      const data = Object.fromEntries(new FormData(form).entries());
+      const applications = JSON.parse(localStorage.getItem('applications')||'[]');
+      applications.push({ ...data, ts: new Date().toISOString() });
+      localStorage.setItem('applications', JSON.stringify(applications));
+      form.reset();
+      $('#toast').classList.remove('hidden');
+      setTimeout(()=>$('#toast').classList.add('hidden'), 4000);
+    });
+
+    // ======= Theme & Nav =======
+    function setTheme(mode){
+      const root = document.documentElement;
+      if(mode === 'dark'){ root.classList.add('dark'); localStorage.setItem('theme','dark'); }
+      else { root.classList.remove('dark'); localStorage.setItem('theme','light'); }
+    }
+    $('#themeToggle').addEventListener('click', () => {
+      const isDark = document.documentElement.classList.contains('dark');
+      setTheme(isDark ? 'light' : 'dark');
+    });
+    // initial theme
+    const saved = localStorage.getItem('theme');
+    if(saved) setTheme(saved); else if(window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
+
+    $('#navToggle').addEventListener('click', ()=>{
+      const el = $('#mobileNav');
+      el.classList.toggle('hidden');
+    })
+
+    // ======= Init =======
+    applyStats();
+    filterPets();
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+
+  <!-- SEO: organization schema -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "NGO",
+    "name": "浪浪轉運站 StrayStation",
+    "url": "https://example.org",
+    "areaServed": "Taiwan",
+    "sameAs": ["https://www.facebook.com/", "https://www.instagram.com/"]
+  }
+  </script>
+  <!-- Firebase SDK -->
+  <script type="module">
+    // 匯入 Firebase 核心與 Firestore
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+    import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+
+    // 🔧 這裡貼上你的設定碼
+    const firebaseConfig = {
+      apiKey: "AIzaSyC4NT2KOm_Cw2OEdaaOimxI0ruoNv_u_9g",
+      authDomain: "straystation.firebaseapp.com",
+      projectId: "straystation",
+      storageBucket: "straystation.firebasestorage.app",
+      messagingSenderId: "611366379195",
+      appId: "1:611366379195:web:ef5a632e88d8bba1d6139e"
+    };
+
+    // 初始化
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
   </script>
 </body>
 </html>
