@@ -296,48 +296,79 @@
     }
 
     /* === Modal 圖片區 === */
+    /* === Modal 主圖 === */
     .modal-main-photo {
       width: 100%;
+      max-width: 420px;
+      height: auto;
       max-height: 320px;
       border-radius: 12px;
-      object-fit: contain; /* ✅ 保持完整顯示，不裁切 */
-      background-color: #f9f9f9;
+      object-fit: contain;
+      display: block;
+      margin: 0 auto;
+      background-color: #fefcfb;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     }
     
+    /* === 縮圖列 === */
     .modal-photos {
       display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin: 10px 0 16px;
       justify-content: center;
+      gap: 10px;
+      margin: 12px 0 20px;
+      flex-wrap: wrap;
     }
     
     .modal-photos img {
-      width: 80px;
-      height: 80px;
+      width: 70px;
+      height: 70px;
       object-fit: cover;
       border-radius: 8px;
       border: 2px solid transparent;
       cursor: pointer;
-      transition: border-color 0.2s, transform 0.2s;
+      transition: transform 0.2s, border-color 0.2s;
     }
-
+    
     .modal-photos img:hover {
-      transform: scale(1.05);
-      border-color: #f97316;
+      transform: scale(1.08);
     }
 
     .modal-photos img.active {
       border-color: #f97316;
     }
 
-    /* === Modal 內容調整 === */
+    /* === 資料列 === */
     .modal-info {
       display: flex;
-      justify-content: space-between;
-      margin-top: 10px;
+      justify-content: center;
+      gap: 16px;
+      margin: 10px 0 16px;
       font-size: 1rem;
       color: #333;
+      font-weight: 500;
+      flex-wrap: wrap;
+    }
+
+    .modal-info span {
+      background: #fff7ed;
+      padding: 6px 14px;
+      border-radius: 20px;
+      color: #92400e;
+      min-width: 60px;
+      text-align: center;
+    }
+
+    /* === 文字敘述 === */
+    #modalDesc {
+      text-align: left;
+      line-height: 1.6;
+      color: #444;
+      font-size: 0.95rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #fffaf4;
+      padding: 10px 14px;
+      border-radius: 10px;
     }
   </style>
 
@@ -410,7 +441,7 @@
       document.getElementById("modalBreed").textContent = pet.breed || "不詳";
       document.getElementById("modalAge").textContent = pet.age || "不詳";
       document.getElementById("modalGender").textContent = pet.gender || "不詳";
-      document.getElementById("modalDesc").textContent = pet.desc || "";
+      document.getElementById("modalDesc").textContent = pet.desc || " ";
 
       // 🖼️ 圖片顯示
       const photoContainer = document.getElementById("modalPhotos");
@@ -424,7 +455,6 @@
           img.src = url;
           if (index === 0) img.classList.add("active");
           img.addEventListener("click", () => {
-            // 點擊縮圖切換主圖
             mainPhoto.src = url;
             document
               .querySelectorAll("#modalPhotos img")
@@ -435,11 +465,10 @@
         });
       } else {
         mainPhoto.src = "";
-        mainPhoto.alt = "無照片";
         photoContainer.innerHTML = "<p style='color:#999'>尚無照片</p>";
       }
 
-      // 🗑️ 刪除功能
+      // 按鈕功能
       document.getElementById("deleteBtn").onclick = async () => {
         if (confirm(`確定要刪除 ${pet.name} 嗎？`)) {
           await deleteDoc(doc(db, "pets", id));
@@ -449,12 +478,10 @@
         }
       };
 
-      // ✏️ 編輯（預留）
       document.getElementById("editBtn").onclick = () => {
         alert(`尚未實作編輯功能：${pet.name}`);
       };
 
-      // 🏠 已領養
       document.getElementById("adoptBtn").onclick = () => {
         window.location.href = "home.html";
       };
@@ -715,15 +742,12 @@
   <div id="detailModal" class="modal">
     <div class="modal-content">
       <span class="close">&times;</span>
-      <h3 id="modalName"></h3>
+      <h3 id="modalName" style="text-align:center; margin-bottom:12px;"></h3>
 
-      <!-- 🖼️ 主圖 -->
       <img id="mainPhoto" class="modal-main-photo" src="" alt="主圖">
 
-      <!-- 🖼️ 縮圖 -->
       <div class="modal-photos" id="modalPhotos"></div>
 
-      <!-- 📋 動物資訊 -->
       <div class="modal-info">
         <span id="modalSpecies"></span>
         <span id="modalBreed"></span>
@@ -731,7 +755,7 @@
         <span id="modalGender"></span>
       </div>
 
-      <p id="modalDesc" style="margin-top: 12px; white-space: pre-wrap; word-break: break-word;"></p>
+      <p id="modalDesc"></p>
 
       <div class="modal-actions">
         <button id="editBtn" class="edit">編輯</button>
