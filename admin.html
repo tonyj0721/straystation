@@ -635,6 +635,13 @@
         e.preventDefault();
         const data = Object.fromEntries(new FormData(form).entries());
         const imageUrls = [];
+        const submitBtn = form.querySelector("button[type='submit']");
+        const status = document.getElementById("photoStatus");
+
+        // 🔸 按下後暫時停用按鈕
+        submitBtn.disabled = true;
+        const originalText = submitBtn.textContent;
+        submitBtn.textContent = "登錄中...";
 
         try {
           const files = window.filesState || [];
@@ -651,14 +658,27 @@
           data.createdAt = serverTimestamp();
           await addDoc(collection(db, "pets"), data);
 
-          alert(`🐾 已成功新增 ${data.name}！`);
+          // ✅ 顯示成功提示（不含網址）
+          alert(`🐾 ${data.name} 已成功登錄！`);
+
+          // ✅ 重置表單
           form.reset();
+          window.filesState = [];
           selectedFiles = [];
           preview.innerHTML = "";
+          status.textContent = "尚未選擇";
           resetBreed();
+
+          // ✅ 自動更新清單
+          await loadPets();
+
         } catch (err) {
           console.error("❌ 新增失敗：", err);
           alert("上傳或新增失敗，請檢查 Console。");
+        } finally {
+          // 🔸 恢復按鈕
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
         }
       });
     });
