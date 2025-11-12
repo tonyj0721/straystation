@@ -379,7 +379,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-    import { getFirestore, addDoc, collection, serverTimestamp, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+    import { getFirestore, addDoc, collection, serverTimestamp, getDocs, deleteDoc, doc, query, where } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
     import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
 
     const firebaseConfig = {
@@ -636,10 +636,38 @@
         const data = Object.fromEntries(new FormData(form).entries());
         const imageUrls = [];
 
-        try {
-          const files = window.filesState || [];
-          console.log("準備上傳：", files);
+        // 🔍 Firestore 查詢相同名字
+        const nameQuery = query(collection(db, "pets"), where("name", "==", data.name));
+        const querySnapshot = await getDocs(nameQuery);
 
+        if (!querySnapshot.empty) {
+          // 🚨 SweetAlert2 彈出確認視窗
+          const result = await Swal.fire({
+            title: `已存在名為「${data.name}」的浪浪`,
+            text: "是否仍要繼續新增？",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#f97316",
+            cancelButtonColor: "#6b7280",
+            confirmButtonText: "是",
+            cancelButtonText: "否",
+            reverseButtons: true
+          });
+
+          if (!result.isConfirmed) {
+            Swal.fire({
+              title: "已取消新增",
+              icon: "info",
+              timer: 1500,
+              showConfirmButton: false
+            });
+            return; // ⛔ 停止流程
+          }
+        }
+
+        try {
+          // 📸 上傳照片
+          const files = window.filesState || [];
           for (let file of files) {
             const fileRef = ref(storage, `pets/${Date.now()}_${file.name}`);
             const snapshot = await uploadBytes(fileRef, file);
@@ -649,20 +677,31 @@
 
           data.images = imageUrls;
           data.createdAt = serverTimestamp();
+
           await addDoc(collection(db, "pets"), data);
 
-          alert(`🐾 已成功新增 ${data.name}！`);
+          Swal.fire({
+            title: `🐾 已成功新增 ${data.name}！`,
+            icon: "success",
+            confirmButtonColor: "#f97316"
+          });
+
           form.reset();
           selectedFiles = [];
           preview.innerHTML = "";
-          resetBreed();
         } catch (err) {
           console.error("❌ 新增失敗：", err);
-          alert("上傳或新增失敗，請檢查 Console。");
+          Swal.fire({
+            title: "上傳或新增失敗",
+            text: "請檢查 Console。",
+            icon: "error",
+            confirmButtonColor: "#f97316"
+          });
         }
       });
     });
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 
 <body>
