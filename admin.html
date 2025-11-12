@@ -287,11 +287,11 @@
       align-items: center;
       justify-content: space-between;
       margin-bottom: 10px;
-      flex-wrap: wrap; /* 📱 手機時自動換行 */
+      flex-wrap: wrap; /* 📱 手機太窄時自動換行 */
     }
 
     .list-header h2 {
-      font-size: 1.2rem;
+      font-size: 1.5rem; /* ✅ 放大，與「新增浪浪資料」一致 */
       font-weight: 700;
       display: flex;
       align-items: center;
@@ -300,11 +300,11 @@
     }
 
     .list-header input {
-      padding: 6px 10px;
+      padding: 5px 8px;
       border-radius: 8px;
       border: 1px solid #ccc;
-      font-size: 0.95rem;
-      width: 180px;
+      font-size: 0.9rem;
+      width: 120px; /* ✅ 改小，手機不會換行 */
       transition: border-color 0.2s;
     }
 
