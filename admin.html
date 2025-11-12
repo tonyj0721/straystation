@@ -281,34 +281,40 @@
     }
 
     /* === 搜尋框 === */
-    /* === 讓右側標題與搜尋框同排且對齊 === */
+    /* === 已登錄動物標題列（桌機 + 手機皆可對齊）=== */
     .list-header {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      margin-bottom: 10px;
-      flex-wrap: nowrap; /* ✅ 儘量不換行 */
+      justify-content: space-between; /* ✅ 讓搜尋框固定靠右 */
       gap: 12px;
+      margin-bottom: 12px;
+      flex-wrap: nowrap;
+      width: 100%;
+      box-sizing: border-box;
+      padding-right: 8px;             /* ✅ 加一點內距避免太靠邊 */
     }
 
-    /* === 讓兩側卡片標題統一風格 === */
+    /* === 左右卡片標題統一樣式 === */
     .form-card h2,
     .list-header h2 {
-      font-size: 1.5rem; /* ✅ 相同字體大小 */
+      font-size: 1.6rem;              /* 與新增浪浪資料一致 */
       font-weight: 700;
       display: flex;
       align-items: center;
       gap: 6px;
-      margin-bottom: 16px;
-      color: #d97706; /* 🧡 顏色一致 */
+      margin: 0;
+      color: #d97706;                 /* 橘色一致 */
     }
 
+    /* === 搜尋框樣式 === */
     .list-header input {
-      padding: 5px 8px;
+      flex-shrink: 0;
+      padding: 5px 10px;
       border-radius: 8px;
       border: 1px solid #ccc;
       font-size: 0.9rem;
-      width: 120px; /* ✅ 手機不會掉行 */
+      width: 140px;                   /* ✅ 手機不會太長也不會掉行 */
+      max-width: 40%;                 /* ✅ 防止在窄螢幕時溢出 */
       transition: border-color 0.2s;
     }
 
@@ -318,7 +324,7 @@
       box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
     }
 
-    /* === 手機版優化 === */
+    /* === 手機優化 === */
     @media (max-width: 600px) {
       .container {
         flex-direction: column;
@@ -331,12 +337,18 @@
       }
 
       .list-header {
-        flex-wrap: wrap; /* 📱 手機太窄時允許換行 */
-        justify-content: flex-start;
+        flex-wrap: wrap;             /* ✅ 自動換行 */
+        justify-content: flex-start; /* ✅ 靠左對齊 */
+        gap: 8px;
       }
 
       .list-header h2 {
-        margin-bottom: 8px;
+        width: 100%;                 /* ✅ 標題單獨一行 */
+      }
+
+      .list-header input {
+        width: 100%;                 /* ✅ 滿版但不溢出 */
+        max-width: none;
       }
     }
 
