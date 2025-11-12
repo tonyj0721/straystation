@@ -315,25 +315,28 @@
       box-shadow: 0 2px 6px rgba(0,0,0,0.05);
     }
     
-    /* === 縮圖列（靠左、不置中）=== */
+    /* === 縮圖列：剛好一列 5 張 === */
     .modal-photos {
-      display: flex;
-      justify-content: flex-start; /* ✅ 左對齊 */
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 12px; /* 🔹 與文字間距更緊密 */
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(18%, 1fr));
+      /* 💡 每張約占 18%，含間距後剛好五張一排 */
+      gap: 6px;
+      margin-bottom: 12px;
+      justify-items: center;
+      align-items: center;
     }
-    
+
+    /* 每張縮圖自適應寬高、固定比例 */
     .modal-photos img {
-      width: 65px;
-      height: 65px;
+      width: 100%;
+      aspect-ratio: 1 / 1; /* ✅ 保持正方形 */
       object-fit: cover;
       border-radius: 8px;
       border: 2px solid transparent;
       cursor: pointer;
       transition: transform 0.2s, border-color 0.2s;
     }
-    
+
     .modal-photos img:hover {
       transform: scale(1.05);
     }
