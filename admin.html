@@ -218,16 +218,22 @@
 
     .modal-content {
       background: #fff;
-      padding: 24px;
+      padding: 20px 24px 16px;
       border-radius: 12px;
       width: 90%;
-      max-width: 520px;
-      margin: 60px auto;
-      max-height: 85vh;
-      overflow-y: auto; /* 內容過多時可內部捲動 */
-      white-space: pre-wrap; /* 保留換行 */
-      word-break: break-word; /* 自動換行 */
+      max-width: 540px;
+      margin: 40px auto;
+      max-height: 88vh;
+      overflow-y: auto;
       position: relative;
+    }
+
+    /* === 標題 === */
+    #modalName {
+      text-align: left;
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin: 4px 0 10px 0; /* 🔹 縮小上方空白 */
     }
 
     .close {
@@ -241,10 +247,10 @@
 
     /* === 按鈕區 === */
     .modal-actions {
-      margin-top: 16px;
       display: flex;
       justify-content: space-between;
       gap: 10px;
+      margin-top: 4px; /* 🔹 減少按鈕上方空白 */
     }
 
     .modal-actions button {
@@ -265,10 +271,11 @@
     button.danger {
       background-color: #dc2626;
     }
+    
     button.success {
       background-color: #16a34a;
     }
-
+    
     button.edit {
       background-color: #f97316;
     }
@@ -296,32 +303,30 @@
     }
 
     /* === Modal 圖片區 === */
-    /* === Modal 主圖 === */
+    /* === 主圖 === */
     .modal-main-photo {
       width: 100%;
-      max-width: 420px;
-      height: auto;
-      max-height: 320px;
-      border-radius: 12px;
+      max-height: 300px;
+      border-radius: 10px;
       object-fit: contain;
+      background-color: #f9f9f9;
       display: block;
-      margin: 0 auto;
-      background-color: #fefcfb;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      margin: 0 auto 8px auto; /* 🔹 縮小下方距離 */
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
     }
     
-    /* === 縮圖列 === */
+    /* === 縮圖列（靠左、不置中）=== */
     .modal-photos {
       display: flex;
-      justify-content: center;
-      gap: 10px;
-      margin: 12px 0 20px;
+      justify-content: flex-start; /* ✅ 左對齊 */
       flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px; /* 🔹 與文字間距更緊密 */
     }
     
     .modal-photos img {
-      width: 70px;
-      height: 70px;
+      width: 65px;
+      height: 65px;
       object-fit: cover;
       border-radius: 8px;
       border: 2px solid transparent;
@@ -330,45 +335,42 @@
     }
     
     .modal-photos img:hover {
-      transform: scale(1.08);
+      transform: scale(1.05);
     }
 
     .modal-photos img.active {
       border-color: #f97316;
     }
 
-    /* === 資料列 === */
+    /* === 動物資訊 === */
     .modal-info {
       display: flex;
-      justify-content: center;
-      gap: 16px;
-      margin: 10px 0 16px;
-      font-size: 1rem;
-      color: #333;
-      font-weight: 500;
+      justify-content: flex-start;
       flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 10px; /* 🔹 縮小上下距離 */
     }
 
     .modal-info span {
       background: #fff7ed;
-      padding: 6px 14px;
-      border-radius: 20px;
+      padding: 5px 12px;
+      border-radius: 16px;
       color: #92400e;
-      min-width: 60px;
-      text-align: center;
+      font-weight: 500;
+      font-size: 0.95rem;
     }
 
-    /* === 文字敘述 === */
+    /* === 敘述文字 === */
     #modalDesc {
-      text-align: left;
-      line-height: 1.6;
-      color: #444;
-      font-size: 0.95rem;
-      white-space: pre-wrap;
-      word-break: break-word;
       background: #fffaf4;
       padding: 10px 14px;
-      border-radius: 10px;
+      border-radius: 8px;
+      color: #444;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin-bottom: 16px; /* 🔹 與按鈕距離更小 */
     }
   </style>
 
