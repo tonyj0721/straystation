@@ -208,14 +208,16 @@
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.5);
+      background: rgba(0, 0, 0, 0.5);
       backdrop-filter: blur(2px);
       justify-content: center;
       align-items: center;
       z-index: 1000;
-      overflow: hidden;              /* ⬅️ 原本是 auto，改成 hidden */
-      touch-action: none;            /* ⬅️ 禁止在 backdrop 上的平移手勢 */
+      overflow: hidden;              /* 🔸 鎖住背景不讓滾 */
+      touch-action: none;            /* 🔸 禁止在 backdrop 上的滑動 */
+      overscroll-behavior: contain;  /* 🔸 防止滾動穿透背景 */
     }
+
 
     .modal-content {
       background: #fff;
@@ -389,9 +391,6 @@
       overscroll-behavior: none;
     }
     
-    .modal {
-      overscroll-behavior: contain;
-    }
   </style>
 
   <script type="module">
