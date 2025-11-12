@@ -272,6 +272,44 @@
     button.edit {
       background-color: #f97316;
     }
+
+    /* === 搜尋框 === */
+    .search-box {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 12px;
+    }
+
+    .search-box input {
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 1rem;
+      width: 200px;
+      transition: border-color 0.2s;
+    }
+
+    .search-box input:focus {
+      outline: none;
+      border-color: #f97316;
+      box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+    }
+
+    /* === Modal 圖片區 === */
+    .modal-photos {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 12px 0;
+    }
+    
+    .modal-photos img {
+      width: 100px;
+      height: 100px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 2px solid #fed7aa;
+    }
   </style>
 
   <script type="module">
@@ -297,11 +335,27 @@
     const closeBtn = modal.querySelector(".close");
 
     // 🚀 載入 Firestore 資料
+    // 🧾 全域變數存全部資料以供搜尋
+    let allPets = [];
+
+    // 🚀 載入 Firestore 資料
     async function loadPets() {
       const querySnapshot = await getDocs(collection(db, "pets"));
       listEl.innerHTML = "";
+      allPets = []; // 清空再載入
+
       querySnapshot.forEach((docSnap) => {
-        const pet = docSnap.data();
+        const pet = { id: docSnap.id, ...docSnap.data() };
+        allPets.push(pet);
+      });
+
+      renderPetList(allPets);
+    }
+
+    // 🐾 產生表格內容（分開函式方便即時搜尋重繪）
+    function renderPetList(pets) {
+      listEl.innerHTML = "";
+      pets.forEach((pet) => {
         const row = document.createElement("tr");
         row.innerHTML = `
           <td>${pet.name}</td>
@@ -310,15 +364,15 @@
           <td>${pet.age || "-"}</td>
           <td>${pet.gender || "-"}</td>
         `;
-        row.addEventListener("click", () => openModal(docSnap.id, pet));
+        row.addEventListener("click", () => openModal(pet.id, pet));
         listEl.appendChild(row);
       });
     }
 
-    // 🐾 開啟 Modal（可捲動、鎖背景）
+    // 🐾 開啟 Modal（顯示圖片）
     function openModal(id, pet) {
       modal.style.display = "flex";
-      document.body.style.overflow = "hidden"; // ✅ 鎖背景捲動
+      document.body.style.overflow = "hidden";
 
       document.getElementById("modalName").textContent = pet.name;
       document.getElementById("modalSpecies").textContent = pet.species;
@@ -327,31 +381,42 @@
       document.getElementById("modalGender").textContent = pet.gender || "-";
       document.getElementById("modalDesc").textContent = pet.desc || "無詳細資料";
 
-      // 🗑️ 刪除按鈕
+      // 🖼️ 顯示照片（支援多張）
+      const photoContainer = document.getElementById("modalPhotos");
+      photoContainer.innerHTML = "";
+      if (pet.images && pet.images.length > 0) {
+        pet.images.forEach((url) => {
+          const img = document.createElement("img");
+          img.src = url;
+          photoContainer.appendChild(img);
+        });
+      } else {
+        photoContainer.innerHTML = "<p style='color:#999'>尚無照片</p>";
+      }
+
+      // 刪除功能
       document.getElementById("deleteBtn").onclick = async () => {
         if (confirm(`確定要刪除 ${pet.name} 嗎？`)) {
           await deleteDoc(doc(db, "pets", id));
           modal.style.display = "none";
-          document.body.style.overflow = ""; // 恢復背景
+          document.body.style.overflow = "";
           loadPets();
         }
       };
 
-      // ✅ 編輯按鈕（之後可擴充）
       document.getElementById("editBtn").onclick = () => {
-        alert(`編輯功能尚未實作：${pet.name}`);
+        alert(`尚未實作編輯功能：${pet.name}`);
       };
 
-      // 🏠 已領養按鈕
       document.getElementById("adoptBtn").onclick = () => {
         window.location.href = "home.html";
       };
     }
 
-    // ❌ 關閉 Modal（包含點背景區域）
+    // ❌ 關閉 Modal
     closeBtn.onclick = () => {
       modal.style.display = "none";
-      document.body.style.overflow = ""; // ✅ 恢復背景捲動
+      document.body.style.overflow = "";
     };
 
     window.onclick = (e) => {
@@ -360,6 +425,16 @@
         document.body.style.overflow = "";
       }
     };
+
+    // 🔍 即時搜尋功能
+    const searchInput = document.getElementById("searchInput");
+    searchInput.addEventListener("input", () => {
+      const keyword = searchInput.value.trim();
+      const filtered = allPets.filter(p =>
+        p.name && p.name.includes(keyword)
+      );
+      renderPetList(filtered);
+    });
 
     loadPets();
 
@@ -568,6 +643,12 @@
     <!-- 右邊：已登錄動物 -->
     <div class="list-card">
       <h2>📋 已登錄動物</h2>
+
+      <!-- 🔍 搜尋框 -->
+      <div class="search-box">
+        <input type="text" id="searchInput" placeholder="搜尋名字..." />
+      </div>
+
       <table>
         <thead>
           <tr>
@@ -588,6 +669,8 @@
     <div class="modal-content">
       <span class="close">&times;</span>
       <h3 id="modalName"></h3>
+      <!-- 🐾 照片區 -->
+      <div class="modal-photos" id="modalPhotos"></div>
       <p><strong>類別：</strong><span id="modalSpecies"></span></p>
       <p><strong>品種：</strong><span id="modalBreed"></span></p>
       <p><strong>年齡：</strong><span id="modalAge"></span></p>
