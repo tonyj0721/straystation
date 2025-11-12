@@ -416,6 +416,13 @@
     const modal = document.getElementById("detailModal");
     const closeBtn = modal.querySelector(".close");
 
+    // 放在初始化的地方跑一次即可
+    modal.addEventListener('touchmove', (e) => {
+      if (e.target === modal) {
+        e.preventDefault();          // ⬅️ 阻擋在 backdrop 的捲動
+      }
+    }, { passive: false });
+
     // 🚀 載入 Firestore 資料
     // 🧾 全域變數存全部資料以供搜尋
     let allPets = [];
