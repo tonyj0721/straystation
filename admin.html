@@ -281,22 +281,34 @@
     }
 
     /* === 搜尋框 === */
-    .search-box {
+    /* === 已登錄動物標題與搜尋框排成一行 === */
+    .list-header {
       display: flex;
-      justify-content: flex-end;
-      margin-bottom: 12px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      flex-wrap: wrap; /* 📱 手機時自動換行 */
     }
 
-    .search-box input {
-      padding: 8px 12px;
+    .list-header h2 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin: 0;
+    }
+
+    .list-header input {
+      padding: 6px 10px;
       border-radius: 8px;
       border: 1px solid #ccc;
-      font-size: 1rem;
-      width: 200px;
+      font-size: 0.95rem;
+      width: 180px;
       transition: border-color 0.2s;
     }
 
-    .search-box input:focus {
+    .list-header input:focus {
       outline: none;
       border-color: #f97316;
       box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
@@ -721,12 +733,11 @@
 
     <!-- 右邊：已登錄動物 -->
     <div class="list-card">
-      <h2>📋 已登錄動物</h2>
-
-      <!-- 🔍 搜尋框 -->
-      <div class="search-box">
+      <div class="list-header">
+        <h2>📋 已登錄動物</h2>
         <input type="text" id="searchInput" placeholder="搜尋名字..." />
       </div>
+
 
       <table>
         <thead>
