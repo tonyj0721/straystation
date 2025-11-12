@@ -281,22 +281,26 @@
     }
 
     /* === 搜尋框 === */
-    /* === 已登錄動物標題與搜尋框排成一行 === */
+    /* === 讓右側標題與搜尋框同排且對齊 === */
     .list-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
       margin-bottom: 10px;
-      flex-wrap: wrap; /* 📱 手機太窄時自動換行 */
+      flex-wrap: nowrap; /* ✅ 儘量不換行 */
+      gap: 12px;
     }
 
+    /* === 讓兩側卡片標題統一風格 === */
+    .form-card h2,
     .list-header h2 {
-      font-size: 1.5rem; /* ✅ 放大，與「新增浪浪資料」一致 */
+      font-size: 1.5rem; /* ✅ 相同字體大小 */
       font-weight: 700;
       display: flex;
       align-items: center;
       gap: 6px;
-      margin: 0;
+      margin-bottom: 16px;
+      color: #d97706; /* 🧡 顏色一致 */
     }
 
     .list-header input {
@@ -304,7 +308,7 @@
       border-radius: 8px;
       border: 1px solid #ccc;
       font-size: 0.9rem;
-      width: 120px; /* ✅ 改小，手機不會換行 */
+      width: 120px; /* ✅ 手機不會掉行 */
       transition: border-color 0.2s;
     }
 
@@ -312,6 +316,28 @@
       outline: none;
       border-color: #f97316;
       box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+    }
+
+    /* === 手機版優化 === */
+    @media (max-width: 600px) {
+      .container {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .form-card, .list-card {
+        width: 100%;
+        max-width: none;
+      }
+
+      .list-header {
+        flex-wrap: wrap; /* 📱 手機太窄時允許換行 */
+        justify-content: flex-start;
+      }
+
+      .list-header h2 {
+        margin-bottom: 8px;
+      }
     }
 
     /* === Modal 圖片區 === */
