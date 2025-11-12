@@ -380,9 +380,9 @@
     }
 
     body.modal-open {
-      position: fixed;
       overflow: hidden;
-      width: 100%;
+      height: 100vh;      /* 防止整個頁面滾動 */
+      touch-action: none; /* 禁止滑動手勢 */
     }
     
     html, body {
