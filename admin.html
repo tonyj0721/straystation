@@ -635,7 +635,7 @@
         e.preventDefault();
         const data = Object.fromEntries(new FormData(form).entries());
         const imageUrls = [];
-        const submitBtn = form.querySelector("button[type='submit']");
+        const submitBtn = form.querySelector("button[type='submit']") || form.querySelector("button");
         const status = document.getElementById("photoStatus");
 
         // 🔸 按下後暫時停用按鈕
