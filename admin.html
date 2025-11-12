@@ -375,6 +375,29 @@
       word-break: break-word;
       margin-bottom: 16px; /* 🔹 與按鈕距離更小 */
     }
+
+    .my-actions {
+      display: flex !important;
+      justify-content: center !important;
+      gap: 10px !important; /* 按鈕間距 */
+      flex-direction: row !important; /* 左右排列 */
+    }
+
+    .swal2-confirm {
+      padding: 6px 14px !important; /* 按鈕大小 */
+      font-size: 14px !important;
+      border-radius: 6px !important;
+      background-color: #f97316 !important; /* 橘色 */
+      color: white !important;
+      
+    .swal2-cancel {
+      padding: 6px 14px !important; /* 按鈕大小 */
+      font-size: 14px !important;
+      border-radius: 6px !important;
+      background-color: #6b7280 !important; /* 灰色 */
+      color: white !important;
+    }
+
   </style>
 
   <script type="module">
@@ -651,13 +674,14 @@
             showCancelButton: true,
             confirmButtonText: "是",
             cancelButtonText: "否",
-            reverseButtons: true,    // ✅ 讓「否」在左、「是」在右（台灣常見習慣）
-            buttonsStyling: true,   // ✅ 關閉預設樣式，改用自訂 class
             customClass: {
-              popup: "swal-compact",
-              title: "swal-title",
-              confirmButton: "swal-confirm",
-              cancelButton: "swal-cancel"
+              actions: 'my-actions',
+              confirmButton: 'order-1 right-gap',
+              cancelButton: 'order-2',
+            },
+            didOpen: () => {
+              const actions = document.querySelector('.swal2-actions');
+              if (actions) actions.style.flexDirection = 'row'; // 左右排列
             }
           });
 
