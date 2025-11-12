@@ -213,7 +213,8 @@
       justify-content: center;
       align-items: center;
       z-index: 1000;
-      overflow: auto; /* 整個視窗可捲動 */
+      overflow: hidden;              /* ⬅️ 原本是 auto，改成 hidden */
+      touch-action: none;            /* ⬅️ 禁止在 backdrop 上的平移手勢 */
     }
 
     .modal-content {
@@ -224,8 +225,10 @@
       max-width: 540px;
       margin: 40px auto;
       max-height: 88vh;
-      overflow-y: auto;
+      overflow-y: auto;              /* ⬅️ 保留內容區垂直捲動 */
       position: relative;
+      overscroll-behavior: contain;  /* ⬅️ 避免邊界回彈傳到外層 */
+      -webkit-overflow-scrolling: touch; /* ⬅️ iOS 惰性捲動 */
     }
 
     /* === 標題 === */
