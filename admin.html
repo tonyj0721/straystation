@@ -651,7 +651,16 @@
               confirmButtonText: "是",
               cancelButtonText: "否",
               confirmButtonColor: "#f97316",
-              cancelButtonColor: "#6b7280"
+              cancelButtonColor: "#6b7280",
+              reverseButtons: true,         // ✅ 讓「是」「否」左右排列（是在右邊）
+              width: "320px",               // ✅ 視窗變窄
+              padding: "1.2em",             // ✅ 微調間距
+              customClass: {
+                popup: "rounded-lg shadow-md", // ✅ 稍微圓角陰影
+                title: "text-lg font-bold",
+                confirmButton: "px-5 py-2",
+                cancelButton: "px-5 py-2"
+              }
             });
 
             if (!result.isConfirmed) {
