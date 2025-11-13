@@ -641,11 +641,11 @@
           // ⚠️ SweetAlert2 提示是否繼續
           const result = await Swal.fire({
             title: "名稱重複",
-            text: `已存在名為「${data.name}」的動物，是否仍要新增？`,
+            text: `已存在名為「${data.name}」的動物，是否繼續新增？`,
             icon: "warning",
             showCancelButton: true,
-            confirmButtonText: "仍然新增",
-            cancelButtonText: "取消",
+            confirmButtonText: "是",
+            cancelButtonText: "否",
             confirmButtonColor: "#f97316",
             cancelButtonColor: "#6b7280"
           });
