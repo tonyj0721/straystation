@@ -375,6 +375,15 @@
       word-break: break-word;
       margin-bottom: 16px; /* 🔹 與按鈕距離更小 */
     }
+
+    /* 讓 SweetAlert2 的按鈕變成左右排列 */
+    .swal2-actions-row {
+      display: flex !important;
+      flex-direction: row !important;
+      justify-content: center !important;
+      gap: 20px !important; /* 按鈕間距 */
+      width: 100%;
+    }
   </style>
 
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -647,7 +656,12 @@
             confirmButtonText: "是",
             cancelButtonText: "否",
             confirmButtonColor: "#f97316",
-            cancelButtonColor: "#6b7280"
+            cancelButtonColor: "#6b7280",
+
+            / 🔥 加上這段
+            customClass: {
+              actions: 'swal2-actions-row'
+            }
           });
 
           if (!result.isConfirmed) {
