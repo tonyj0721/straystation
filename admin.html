@@ -375,27 +375,11 @@
       word-break: break-word;
       margin-bottom: 16px; /* 🔹 與按鈕距離更小 */
     }
-
-    .swal2-actions {
-      display: flex;
-      flex-direction: row;
-      justify-content: center;
-      align-items: center;
-      gap: 14px;
-      flex-wrap: nowrap ;
-    }
-
-    @media (max-width: 600px) {
-      .swal2-popup {
-        width: 75% !important;
-        padding: 1.5em !important;
-  }
-}
   </style>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-    import { getFirestore, addDoc, collection, serverTimestamp, getDocs, deleteDoc, doc, query, where } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+    import { getFirestore, addDoc, collection, serverTimestamp, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
     import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
 
     const firebaseConfig = {
@@ -649,33 +633,13 @@
       // 🚀 送出表單
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
-
         const data = Object.fromEntries(new FormData(form).entries());
         const imageUrls = [];
 
         try {
-          // 🟠 檢查是否有重複名稱（使用 Firestore query 篩選）
-          const q = query(collection(db, "pets"), where("name", "==", data.name));
-          const querySnapshot = await getDocs(q);
-
-          if (!querySnapshot.empty) {
-            const result = await SwalBase.fire({
-              title: "名字重複",
-              text: `已有名為「${data.name}」的浪浪，是否仍要新增？`,
-              icon: "warning",
-              showCancelButton: true,
-              confirmButtonText: "是",
-              cancelButtonText: "否",                           
-              reverseButtons: true,         // ✅ 讓「是」「否」左右排列（是在右邊）              
-            });
-
-            if (!result.isConfirmed) {              
-              return;
-            }
-          }
-
-          // 📸 上傳照片到 Firebase Storage
           const files = window.filesState || [];
+          console.log("準備上傳：", files);
+
           for (let file of files) {
             const fileRef = ref(storage, `pets/${Date.now()}_${file.name}`);
             const snapshot = await uploadBytes(fileRef, file);
@@ -683,41 +647,22 @@
             imageUrls.push(url);
           }
 
-          // 🐾 新增資料到 Firestore
           data.images = imageUrls;
           data.createdAt = serverTimestamp();
           await addDoc(collection(db, "pets"), data);
 
-          // ✅ 成功提示
-          await SwalBase.fire({
-            title: "新增成功！",
-            text: `🐾 已成功新增 ${data.name}`,
-            icon: "success",
-            showConfirmButton: false, // ❌ 不顯示「確定」按鈕
-            timer: 1000,              // ⏱️ 1秒（1000毫秒）後自動關閉
-            timerProgressBar: true    // 🔄 顯示關閉倒數進度條（可選）
-          });
-
-          // 🧹 清空表單與預覽
+          alert(`🐾 已成功新增 ${data.name}！`);
           form.reset();
           selectedFiles = [];
           preview.innerHTML = "";
           resetBreed();
-          loadPets(); // 重新載入清單
-
         } catch (err) {
-          console.error("❌ 新增失敗：", err);          
-          await SwalBase.fire({
-            title: "錯誤！",
-            text: "上傳或新增失敗，請檢查 Console。",
-            icon: "error",
-            confirmButtonColor: "#7066e0"
-          });
+          console.error("❌ 新增失敗：", err);
+          alert("上傳或新增失敗，請檢查 Console。");
         }
       });
     });
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 
 <body>
@@ -770,7 +715,7 @@
         <span id="photoStatus" class="note">尚未選擇</span>
         <div id="preview"></div>
 
-        <button type="submit">新增浪浪</button>
+        <button>新增浪浪</button>
       </form>
     </div>
 
@@ -882,13 +827,6 @@
       
     }
   })();
-
-    // 💡 SweetAlert2 全域預設設定
-    const SwalBase = Swal.mixin({
-      confirmButtonColor: "#f97316",
-      cancelButtonColor: "#6b7280",
-    });
-    
   </script>
 </body>
 </html>
