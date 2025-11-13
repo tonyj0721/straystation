@@ -385,6 +385,13 @@
       flex-wrap: nowrap;
       width: 100%;
     }
+
+    @media (max-width: 600px) {
+      .swal2-popup {
+        width: 75% !important;
+        padding: 1.5em !important;
+      }
+    }
   </style>
 
   <script type="module">
@@ -877,19 +884,12 @@
     }
   })();
 
-    // 💡 SweetAlert2 全域預設設定
     const SwalBase = Swal.mixin({
+      width: window.innerWidth <= 600 ? "75%" : "320px",
+      padding: window.innerWidth <= 600 ? "1.5em" : "1.25em",
       confirmButtonColor: "#f97316",
-      cancelButtonColor: "#6b7280",
+      cancelButtonColor: "#6b7280"
     });
-
-    // 📱 手機自適應（螢幕寬度小於 600px 時）
-    if (window.innerWidth <= 600) {
-      SwalBase.update({
-        width: "75%",      // ✅ 手機版改為 75%
-        padding: "1.5em"   // ✅ 手機稍微多一點 padding（約 24px）
-      });
-    }
   </script>
 </body>
 </html>
