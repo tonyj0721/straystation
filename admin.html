@@ -376,34 +376,43 @@
       margin-bottom: 16px; /* 🔹 與按鈕距離更小 */
     }
 
-    /* ✅ 自訂 SweetAlert2 按鈕排列與樣式 */
-    .swal-actions-row {
-      display: flex !important;
-      flex-direction: row !important;
-      justify-content: center;
-      gap: 12px !important;
-    }
+    /* --- SweetAlert2 客製化 --- */
+.swal-actions-row {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 14px !important;
+  margin-top: 1rem !important;
+}
 
-    .swal-confirm, .swal-cancel {
-      border: none;
-      border-radius: 6px;
-      padding: 8px 24px;
-      font-weight: 600;
-      color: #fff;
-      cursor: pointer;
-    }
+/* 橘色「是」按鈕 */
+.swal-confirm {
+  background-color: #f97316 !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 6px !important;
+  padding: 8px 26px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+}
 
-    .swal-confirm {
-      background-color: #f97316; /* 橘色「是」 */
-    }
+/* 灰色「否」按鈕 */
+.swal-cancel {
+  background-color: #6b7280 !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 6px !important;
+  padding: 8px 26px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+}
 
-    .swal-cancel {
-      background-color: #6b7280; /* 灰色「否」 */
-    }
+/* 視窗窄版 */
+.narrow-swal {
+  max-width: 320px !important;
+}
 
-    .narrow-swal {
-      max-width: 320px !important; /* 視窗窄版 */
-    }
   </style>
 
   <script type="module">
@@ -673,24 +682,24 @@
 
           if (!querySnapshot.empty) {
             const result = await Swal.fire({
-              title: "名字重複",
-                text: `已有名為「${data.name}」的浪浪，是否仍要新增？`,
-                icon: "warning",
-                showCancelButton: true,
-                confirmButtonText: "是",
-                cancelButtonText: "否",
-                confirmButtonColor: "#f97316",
-                cancelButtonColor: "#6b7280",
-                width: "320px",
-                padding: "1.2em",
-                customClass: {
-                  popup: "rounded-lg shadow-md narrow-swal",
-                  actions: "swal-actions-row",
-                  confirmButton: "swal-confirm",
-                  cancelButton: "swal-cancel"
-                },
-                buttonsStyling: false   // ✅ 關掉預設樣式，改用自訂 class
-              });
+  title: "名字重複",
+  text: `已有名為「${data.name}」的浪浪，是否仍要新增？`,
+  icon: "warning",
+  showCancelButton: true,
+  confirmButtonText: "是",
+  cancelButtonText: "否",
+  confirmButtonColor: "#f97316",
+  cancelButtonColor: "#6b7280",
+  width: "300px",
+  padding: "1.2em",
+  buttonsStyling: false, // ❌ 關掉預設樣式
+  customClass: {
+    popup: "rounded-lg shadow-md narrow-swal",
+    actions: "swal-actions-row",  // ✅ 客製按鈕區
+    confirmButton: "swal-confirm",
+    cancelButton: "swal-cancel"
+  }
+});
 
             if (!result.isConfirmed) {
               await Swal.fire("已取消", "未新增資料。", "info");
