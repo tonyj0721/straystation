@@ -655,12 +655,7 @@
               reverseButtons: true,         // ✅ 讓「是」「否」左右排列（是在右邊）
               width: "320px",               // ✅ 視窗變窄
               padding: "1.2em",             // ✅ 微調間距
-              customClass: {
-                popup: "rounded-lg shadow-md", // ✅ 稍微圓角陰影
-                title: "text-lg font-bold",
-                confirmButton: "px-5 py-2",
-                cancelButton: "px-5 py-2"
-              }
+              buttonsStyling: false // ❌ 關掉預設樣式
             });
 
             if (!result.isConfirmed) {
