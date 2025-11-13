@@ -385,13 +385,6 @@
       flex-wrap: nowrap;
       width: 100%;
     }
-
-    @media (max-width: 600px) {
-      .swal2-popup {
-        width: 75% !important;
-        padding: 1.5em !important;
-      }
-    }
   </style>
 
   <script type="module">
@@ -492,43 +485,11 @@
 
       // 按鈕功能
       document.getElementById("deleteBtn").onclick = async () => {
-        const result = await SwalBase.fire({
-          title: "確定要刪除嗎？",
-          text: `將刪除「${pet.name}」的資料，此操作無法復原。`,
-          icon: "warning",
-          showCancelButton: true,
-          confirmButtonText: "刪除",
-          cancelButtonText: "取消",
-          confirmButtonColor: "#ef4444", // 紅色刪除按鈕
-          cancelButtonColor: "#6b7280",  // 灰色取消
-          reverseButtons: true,          // 「刪除」在右邊
-          allowOutsideClick: false,
-        });
-
-        if (!result.isConfirmed) return; // ❌ 使用者取消
-
-        try {
+        if (confirm(`確定要刪除 ${pet.name} 嗎？`)) {
           await deleteDoc(doc(db, "pets", id));
           modal.style.display = "none";
           document.body.style.overflow = "";
           loadPets();
-
-          await SwalBase.fire({
-            title: "刪除成功！",
-            text: `🐾 已刪除 ${pet.name} 的資料。`,
-            icon: "success",
-            showConfirmButton: false,
-            timer: 1000,
-            timerProgressBar: true
-          });
-        } catch (error) {
-          console.error("刪除失敗：", error);
-          await SwalBase.fire({
-            title: "刪除失敗",
-            text: "請檢查 Console 或稍後再試。",
-            icon: "error",
-            confirmButtonColor: "#7066e0"
-          });
         }
       };
 
@@ -692,7 +653,7 @@
           const querySnapshot = await getDocs(q);
 
           if (!querySnapshot.empty) {
-            const result = await SwalBase.fire({
+            const result = await Swalbase.fire({
               title: "名字重複",
               text: `已有名為「${data.name}」的浪浪，是否仍要新增？`,
               icon: "warning",
@@ -740,7 +701,7 @@
 
         } catch (err) {
           console.error("❌ 新增失敗：", err);          
-          await SwalBase.fire({
+          await Swalbase.fire({
             title: "錯誤！",
             text: "上傳或新增失敗，請檢查 Console。",
             icon: "error",
@@ -916,12 +877,19 @@
     }
   })();
 
+    // 💡 SweetAlert2 全域預設設定
     const SwalBase = Swal.mixin({
-      width: window.innerWidth <= 600 ? "75%" : "320px",
-      padding: window.innerWidth <= 600 ? "1.5em" : "1.25em",
       confirmButtonColor: "#f97316",
-      cancelButtonColor: "#6b7280"
+      cancelButtonColor: "#6b7280",
     });
+
+    // 📱 手機自適應（螢幕寬度小於 600px 時）
+    if (window.innerWidth <= 600) {
+      SwalBase.update({
+        width: "75%",      // ✅ 手機版改為 75%
+        padding: "1.5em"   // ✅ 手機稍微多一點 padding（約 24px）
+      });
+    }
   </script>
 </body>
 </html>
