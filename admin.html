@@ -376,18 +376,20 @@
       margin-bottom: 16px; /* 🔹 與按鈕距離更小 */
     }
 
-    /* --- SweetAlert2 客製化 --- */
+    /* 🚀 強制 SweetAlert2 按鈕橫向排列 */
+.swal2-actions,
 .swal-actions-row {
   display: flex !important;
   flex-direction: row !important;
   justify-content: center !important;
   align-items: center !important;
   gap: 14px !important;
-  margin-top: 1rem !important;
+  flex-wrap: nowrap !important;
+  width: 100% !important;
 }
 
-/* 橘色「是」按鈕 */
-.swal-confirm {
+/* 🟠 是按鈕 */
+.swal2-confirm, .swal-confirm {
   background-color: #f97316 !important;
   color: #fff !important;
   border: none !important;
@@ -397,8 +399,8 @@
   cursor: pointer !important;
 }
 
-/* 灰色「否」按鈕 */
-.swal-cancel {
+/* ⚫ 否按鈕 */
+.swal2-cancel, .swal-cancel {
   background-color: #6b7280 !important;
   color: #fff !important;
   border: none !important;
