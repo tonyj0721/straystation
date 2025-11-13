@@ -663,15 +663,7 @@
               reverseButtons: true,         // ✅ 讓「是」「否」左右排列（是在右邊）              
             });
 
-            if (!result.isConfirmed) {
-              await SwalBase.fire({
-                title: "已取消",
-                text: "未新增資料",
-                icon: "info",
-                showConfirmButton: false, // ❌ 不顯示「確定」按鈕
-                timer: 1000,              // ⏱️ 1秒（1000毫秒）後自動關閉
-                timerProgressBar: true    // 🔄 顯示關閉倒數進度條（可選）
-              });
+            if (!result.isConfirmed) {              
               return;
             }
           }
