@@ -377,6 +377,8 @@
     }
   </style>
 
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
     import { getFirestore, addDoc, collection, serverTimestamp, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
@@ -627,12 +629,38 @@
       // 🚀 送出表單
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
-        const data = Object.fromEntries(new FormData(form).entries());
+
+        const formData = Object.fromEntries(new FormData(form).entries());
+        const name = formData.name.trim();
+
+        if (!name) return Swal.fire("錯誤", "請輸入名字", "error");
+
+        // 🔍 先檢查 Firestore 是否已存在同名
+        const petsRef = collection(db, "pets");
+        const snapshot = await getDocs(petsRef);
+        const exists = snapshot.docs.some(doc => doc.data().name === name);
+
+        if (exists) {
+          // ⚠️ SweetAlert2 詢問是否繼續新增
+          const result = await Swal.fire({
+            title: "名字重複！",
+            text: `已存在名為「${name}」的動物，是否繼續新增嗎？`,
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonText: "是",
+            cancelButtonText: "否",
+          });
+
+          if (!result.isConfirmed) return; // ❌ 使用者按取消就停止
+        }
+
+        // -----------------------------
+        // 🟢 使用者要繼續 → 開始上傳與新增資料
+        // -----------------------------
         const imageUrls = [];
 
         try {
           const files = window.filesState || [];
-          console.log("準備上傳：", files);
 
           for (let file of files) {
             const fileRef = ref(storage, `pets/${Date.now()}_${file.name}`);
@@ -641,18 +669,23 @@
             imageUrls.push(url);
           }
 
-          data.images = imageUrls;
-          data.createdAt = serverTimestamp();
-          await addDoc(collection(db, "pets"), data);
+          formData.images = imageUrls;
+          formData.createdAt = serverTimestamp();
 
-          alert(`🐾 已成功新增 ${data.name}！`);
+          await addDoc(collection(db, "pets"), formData);
+
+          Swal.fire({
+            title: "新增成功！",
+            text: `已成功新增「${formData.name}」！`,
+            icon: "success",
+          });
+
           form.reset();
           selectedFiles = [];
           preview.innerHTML = "";
-          resetBreed();
         } catch (err) {
           console.error("❌ 新增失敗：", err);
-          alert("上傳或新增失敗，請檢查 Console。");
+          Swal.fire("錯誤", "新增失敗，請稍後再試。", "error");
         }
       });
     });
