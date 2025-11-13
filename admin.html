@@ -653,7 +653,7 @@
           const querySnapshot = await getDocs(q);
 
           if (!querySnapshot.empty) {
-            const result = await Swalbase.fire({
+            const result = await SwalBase.fire({
               title: "名字重複",
               text: `已有名為「${data.name}」的浪浪，是否仍要新增？`,
               icon: "warning",
@@ -701,7 +701,7 @@
 
         } catch (err) {
           console.error("❌ 新增失敗：", err);          
-          await Swalbase.fire({
+          await SwalBase.fire({
             title: "錯誤！",
             text: "上傳或新增失敗，請檢查 Console。",
             icon: "error",
