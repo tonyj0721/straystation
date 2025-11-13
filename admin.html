@@ -414,6 +414,24 @@
       flex: 1;
       margin-left: 10px;
     }
+
+    /* 手機版（小視窗） */
+    @media (max-width: 600px) {
+      .swal2-popup {
+        width: 320px !important;
+        border-radius: 16px !important;
+        padding-top: 18px !important;
+      }
+    }
+
+    /* 桌機版（維持原本大小） */
+    @media (min-width: 601px) {
+      .swal2-popup {
+        width: 400px !important; /* SweetAlert2 預設約 400 */
+        border-radius: 16px !important;
+        padding-top: 18px !important;
+      }
+    }
   </style>
 
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
