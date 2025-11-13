@@ -375,6 +375,15 @@
       word-break: break-word;
       margin-bottom: 16px; /* 🔹 與按鈕距離更小 */
     }
+
+    /* 讓 SweetAlert2 的按鈕左右排列 */
+    .swal-actions-flex {
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+      width: 100%;
+      padding: 0 15px;
+    }
   </style>
 
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -641,11 +650,15 @@
         if (!querySnapshot.empty) {
           const result = await Swal.fire({
             title: "名字已存在",
-            text: `${name} 已經在資料庫中，是否仍要新增？`,
+            text: `${name} 已經在資料庫中，是否繼續新增？`,
             icon: "warning",
             showCancelButton: true,
-            confirmButtonText: "仍要新增",
-            cancelButtonText: "取消"
+            confirmButtonText: "是",
+            cancelButtonText: "否",
+            buttonsStyling: false
+            customClass: {
+              actions: "swal-actions-flex",   // ⭐ 重設 actions 容器
+            }
           });
 
           if (!result.isConfirmed) {
