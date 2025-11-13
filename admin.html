@@ -708,8 +708,13 @@
           loadPets(); // 重新載入清單
 
         } catch (err) {
-          console.error("❌ 新增失敗：", err);
-          Swal.fire("錯誤", "上傳或新增失敗，請檢查 Console。", "error");
+          console.error("❌ 新增失敗：", err);          
+          await Swal.fire({
+            title: "錯誤！",
+            text: "上傳或新增失敗，請檢查 Console。",
+            icon: "error",
+            confirmButtonColor: "#7066e0"
+          });
         }
       });
     });
