@@ -403,6 +403,25 @@
       border-radius: 6px !important;
       font-weight: 600 !important;
     }
+
+    /* ⭐ SweetAlert2 按鈕：強制水平排列 */
+    .swal2-actions {
+      display: flex !important;
+      flex-direction: row !important;
+      justify-content: center !important;
+      align-items: center !important;
+      gap: 16px !important;
+      width: 100% !important;
+      margin-top: 20px !important;
+    }
+
+    /* ⭐ 讓 SweetAlert2 按鈕不撐滿一整行 */
+    .swal2-actions button {
+      width: auto !important;
+      flex: 0 0 auto !important;
+      padding: 10px 24px !important;
+      border-radius: 6px !important;
+    }
   </style>
 
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
