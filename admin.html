@@ -672,10 +672,10 @@
       <h1>🐾 新增浪浪資料</h1>
       <form id="addPetForm">
         <label>名字</label>
-        <input name="name" required />
+        <input name="name" required>
 
         <label>類別</label>
-        <select name="species" id="species" required>
+        <select name="species" id="species">
           <option value="">請選擇</option>
           <option value="貓">貓咪</option>
           <option value="狗">狗狗</option>
@@ -697,7 +697,7 @@
         </div>
 
         <label>年齡</label>
-        <input name="age" placeholder="例如：1歲 或 幼年" />
+        <input name="age" placeholder="幾個月或幾歲">
 
         <label>性別</label>
         <select name="gender">
@@ -707,7 +707,7 @@
         </select>
 
         <label>簡介</label>
-        <textarea name="desc" rows="3" placeholder="輸入個性、故事、習慣等..."></textarea>
+        <textarea name="desc" rows="3" placeholder="個性、習慣、故事等"></textarea>
 
         <label>上傳照片（最多 5 張，可分次上傳）</label>
         <input type="file" id="photo" accept="image/*" multiple style="display:none;">
