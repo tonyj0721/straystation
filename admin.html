@@ -377,6 +377,8 @@
     }
   </style>
 
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
     import { getFirestore, addDoc, collection, serverTimestamp, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
@@ -627,13 +629,34 @@
       // 🚀 送出表單
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
+
         const data = Object.fromEntries(new FormData(form).entries());
         const imageUrls = [];
 
+        // 🚨 先檢查名字是否重複
+        const name = data.name.trim();
+        const q = query(collection(db, "pets"), where("name", "==", name));
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+          const result = await Swal.fire({
+            title: "名字已存在",
+            text: `${name} 已經在資料庫中，是否仍要新增？`,
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonText: "仍要新增",
+            cancelButtonText: "取消"
+          });
+
+          if (!result.isConfirmed) {
+            Swal.fire("已取消新增", "", "info");
+            return; 
+          }
+        }
+
+        // 🚀 以下為原本的新增流程（不變）
         try {
           const files = window.filesState || [];
-          console.log("準備上傳：", files);
-
           for (let file of files) {
             const fileRef = ref(storage, `pets/${Date.now()}_${file.name}`);
             const snapshot = await uploadBytes(fileRef, file);
@@ -643,16 +666,18 @@
 
           data.images = imageUrls;
           data.createdAt = serverTimestamp();
+
           await addDoc(collection(db, "pets"), data);
 
-          alert(`🐾 已成功新增 ${data.name}！`);
+          Swal.fire("新增成功！", `${data.name} 已成功新增！`, "success");
+
           form.reset();
-          selectedFiles = [];
+          window.filesState = [];
           preview.innerHTML = "";
           resetBreed();
         } catch (err) {
-          console.error("❌ 新增失敗：", err);
-          alert("上傳或新增失敗，請檢查 Console。");
+          console.error("新增失敗：", err);
+          Swal.fire("失敗", "上傳或新增失敗，請查看 Console", "error");
         }
       });
     });
