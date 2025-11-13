@@ -653,7 +653,7 @@
           const querySnapshot = await getDocs(q);
 
           if (!querySnapshot.empty) {
-            await SwalBase.fire({
+            const result = await Swal.fire({
               title: "名字重複",
               text: `已有名為「${data.name}」的浪浪，是否仍要新增？`,
               icon: "warning",
