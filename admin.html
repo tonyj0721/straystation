@@ -378,42 +378,42 @@
 
     /* SweetAlert2 按鈕美化 */
     /* SweetAlert2 – 彈窗縮小 */
-.swal2-popup {
-  border-radius: 16px !important;
-  padding-top: 18px !important;
-  width: 320px !important;
-}
+    .swal2-popup {
+      border-radius: 16px !important;
+      padding-top: 18px !important;
+      width: 320px !important;
+    }
 
-/* 讓 SweetAlert2 按鈕左右排列 */
-.swal-actions-flex {
-  display: flex !important;
-  flex-direction: row !important;
-  justify-content: space-between !important;
-  width: 100%;
-  padding: 0 15px;
-}
+    /* 讓 SweetAlert2 按鈕左右排列 */
+    .swal-actions-flex {
+      display: flex !important;
+      flex-direction: row !important;
+      justify-content: space-between !important;
+      width: 100%;
+      padding: 0 15px;
+    }
 
-/* 左邊 - 取消 */
-.swal-cancel-btn {
-  background-color: #6b7280;
-  color: white;
-  padding: 10px 16px;
-  border-radius: 6px;
-  font-weight: bold;
-  flex: 1;
-  margin-right: 10px;
-}
+    /* 左邊 - 取消 */
+    .swal-cancel-btn {
+      background-color: #6b7280;
+      color: white;
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-weight: bold;
+      flex: 1;
+      margin-right: 10px;
+    }
 
-/* 右邊 - 仍要新增 */
-.swal-confirm-btn {
-  background-color: #6d28d9;
-  color: white;
-  padding: 10px 16px;
-  border-radius: 6px;
-  font-weight: bold;
-  flex: 1;
-  margin-left: 10px;
-}
+    /* 右邊 - 仍要新增 */
+    .swal-confirm-btn {
+      background-color: #6d28d9;
+      color: white;
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-weight: bold;
+      flex: 1;
+      margin-left: 10px;
+    }
   </style>
 
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -679,29 +679,28 @@
 
         if (!querySnapshot.empty) {
           const result = await Swal.fire({
-  title: "名字已存在",
-  text: `${name} 已經在資料庫中，是否仍要新增？`,
-  icon: "warning",
+            title: "名字已存在",
+            text: `${name} 已經在資料庫中，是否仍要新增？`,
+            icon: "warning",
 
-  width: "320px",
+            width: "320px",
 
-  showCancelButton: true,
-  confirmButtonText: "仍要新增",
-  cancelButtonText: "取消",
+            showCancelButton: true,
+            confirmButtonText: "仍要新增",
+            cancelButtonText: "取消",
 
-  // ⭐ 重要！讓按鈕左右排列
-  reverseButtons: true,
+            // ⭐ 重要！讓按鈕左右排列
+            reverseButtons: true,
 
-  // ⭐ 一定要關掉內建樣式，才不會強制上下排列
-  buttonsStyling: false,
+            // ⭐ 一定要關掉內建樣式，才不會強制上下排列
+            buttonsStyling: false,
 
-  customClass: {
-    actions: "swal-actions-flex",   // ⭐ 重設 actions 容器
-    confirmButton: "swal-confirm-btn",
-    cancelButton: "swal-cancel-btn"
-  }
-});
-
+            customClass: {
+              actions: "swal-actions-flex",   // ⭐ 重設 actions 容器
+              confirmButton: "swal-confirm-btn",
+              cancelButton: "swal-cancel-btn"
+            }
+          });
 
           if (!result.isConfirmed) {
             Swal.fire("已取消新增", "", "info");
