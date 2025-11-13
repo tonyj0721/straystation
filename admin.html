@@ -492,11 +492,43 @@
 
       // 按鈕功能
       document.getElementById("deleteBtn").onclick = async () => {
-        if (confirm(`確定要刪除 ${pet.name} 嗎？`)) {
+        const result = await Swal.fire({
+          title: "確定要刪除嗎？",
+          text: `將刪除「${pet.name}」的資料，此操作無法復原。`,
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonText: "刪除",
+          cancelButtonText: "取消",
+          confirmButtonColor: "#ef4444", // 紅色刪除按鈕
+          cancelButtonColor: "#6b7280",  // 灰色取消
+          reverseButtons: true,          // 「刪除」在右邊
+          allowOutsideClick: false,
+        });
+
+        if (!result.isConfirmed) return; // ❌ 使用者取消
+
+        try {
           await deleteDoc(doc(db, "pets", id));
           modal.style.display = "none";
           document.body.style.overflow = "";
           loadPets();
+
+          await Swal.fire({
+            title: "刪除成功！",
+            text: `🐾 已刪除 ${pet.name} 的資料。`,
+            icon: "success",
+            showConfirmButton: false,
+            timer: 1000,
+            timerProgressBar: true
+          });
+        } catch (error) {
+          console.error("刪除失敗：", error);
+          await Swal.fire({
+            title: "刪除失敗",
+            text: "請檢查 Console 或稍後再試。",
+            icon: "error",
+            confirmButtonColor: "#7066e0"
+          });
         }
       };
 
