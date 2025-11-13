@@ -375,6 +375,31 @@
       word-break: break-word;
       margin-bottom: 16px; /* 🔹 與按鈕距離更小 */
     }
+
+    /* 讓 SweetAlert2 的按鈕左右排列 */
+    .swal-actions-row {
+      display: flex !important;
+      justify-content: center !important;
+      gap: 15px !important;
+    }
+
+    /* 是（確認）按鈕 */
+    .swal-confirm-btn {
+      padding: 8px 24px;
+      background-color: #6366f1; /* 紫色或你要的橘色 */
+      color: #fff !important;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+
+    /* 否（取消）按鈕 */
+    .swal-cancel-btn {
+      padding: 8px 24px;
+      background-color: #6b7280; /* 灰色 */
+      color: #fff !important;
+      border-radius: 6px;
+      font-weight: 600;
+    }
   </style>
 
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -644,12 +669,19 @@
           // ⚠️ SweetAlert2 詢問是否繼續新增
           const result = await Swal.fire({
             title: "名字重複！",
-            text: `已存在名為「${name}」的動物，是否繼續新增嗎？`,
+            text: `已存在名為「${name}」的動物，是否繼續新增？`,
             icon: "warning",
             showCancelButton: true,
             confirmButtonText: "是",
             cancelButtonText: "否",
-            reverseButtons: true, // ← 讓按鈕左右交換位置
+
+            // ⭐ 讓按鈕橫向排列
+            buttonsStyling: false,
+            customClass: {
+              actions: 'swal-actions-row',
+              confirmButton: 'swal-confirm-btn',
+              cancelButton: 'swal-cancel-btn',
+            }
           });
 
           if (!result.isConfirmed) return; // ❌ 使用者按取消就停止
