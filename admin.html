@@ -375,6 +375,35 @@
       word-break: break-word;
       margin-bottom: 16px; /* 🔹 與按鈕距離更小 */
     }
+
+    /* ✅ 自訂 SweetAlert2 按鈕排列與樣式 */
+    .swal-actions-row {
+      display: flex !important;
+      flex-direction: row !important;
+      justify-content: center;
+      gap: 12px !important;
+    }
+
+    .swal-confirm, .swal-cancel {
+      border: none;
+      border-radius: 6px;
+      padding: 8px 24px;
+      font-weight: 600;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    .swal-confirm {
+      background-color: #f97316; /* 橘色「是」 */
+    }
+
+    .swal-cancel {
+      background-color: #6b7280; /* 灰色「否」 */
+    }
+
+    .narrow-swal {
+      max-width: 320px !important; /* 視窗窄版 */
+    }
   </style>
 
   <script type="module">
@@ -645,23 +674,23 @@
           if (!querySnapshot.empty) {
             const result = await Swal.fire({
               title: "名字重複",
-              text: `已有名為「${data.name}」的浪浪，是否仍要新增？`,
-              icon: "warning",
-              showCancelButton: true,
-              confirmButtonText: "是",
-              cancelButtonText: "否",
-              confirmButtonColor: "#f97316",
-              cancelButtonColor: "#6b7280",
-              reverseButtons: true,         // ✅ 讓「是」「否」左右排列（是在右邊）
-              width: "320px",               // ✅ 視窗變窄
-              padding: "1.2em",             // ✅ 微調間距
-              customClass: {
-                popup: "rounded-lg shadow-md", // ✅ 稍微圓角陰影
-                title: "text-lg font-bold",
-                confirmButton: "px-5 py-2",
-                cancelButton: "px-5 py-2"
-              }
-            });
+                text: `已有名為「${data.name}」的浪浪，是否仍要新增？`,
+                icon: "warning",
+                showCancelButton: true,
+                confirmButtonText: "是",
+                cancelButtonText: "否",
+                confirmButtonColor: "#f97316",
+                cancelButtonColor: "#6b7280",
+                width: "320px",
+                padding: "1.2em",
+                customClass: {
+                  popup: "rounded-lg shadow-md narrow-swal",
+                  actions: "swal-actions-row",
+                  confirmButton: "swal-confirm",
+                  cancelButton: "swal-cancel"
+                },
+                buttonsStyling: false   // ✅ 關掉預設樣式，改用自訂 class
+              });
 
             if (!result.isConfirmed) {
               await Swal.fire("已取消", "未新增資料。", "info");
