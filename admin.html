@@ -375,14 +375,6 @@
       word-break: break-word;
       margin-bottom: 16px; /* 🔹 與按鈕距離更小 */
     }
-
-    .swal2-actions {
-      /*display: flex;*/
-      /*flex-direction: row;*/
-      flex-wrap: nowrap;    
-      /*gap: 50px;*/
-      /*width: 75%;*/
-    }
   </style>
 
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -657,7 +649,7 @@
             confirmButtonColor: "#f97316",
             cancelButtonColor: "#6b7280",
             reverseButtons: true,
-            buttonsStyling: false
+            flex-wrap: nowrap
           });
 
           if (!result.isConfirmed) {
