@@ -376,33 +376,13 @@
       margin-bottom: 16px; /* 🔹 與按鈕距離更小 */
     }
 
-    /* 強制 SweetAlert2 按鈕左右排列 */
     .swal2-actions {
-      flex-direction: row !important;
-      width: 100% !important;
-      justify-content: center !important;
-      gap: 16px !important;
+      display: flex;
+      flex-direction: row;
+      flex-wrap: nowrap;
+      justify-content: center;
+      align-items: center;
     }
-
-    .swal2-confirm, .swal2-cancel {
-      margin: 0 !important;  /* 避免 SweetAlert2 加上上下 margin */
-      width: 120px;          /* 你可以調整 */
-    }
-
-    /* 🔥 SweetAlert2 彈窗寬度（桌機保持不變） */
-    .swal2-popup {
-      width: 500px !important;       /* 你現在桌機的寬度 */
-      max-width: 90% !important;     /* 防止桌機視窗變太窄時溢出 */
-    }
-
-    /* 🔥 手機版（小於 480px）縮窄彈窗 */
-    @media (max-width: 480px) {
-      .swal2-popup {
-        width: 320px !important;     /* 手機專用寬度，可調整 280～360 */
-        max-width: 85% !important;
-      }
-    }
-
   </style>
 
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -676,7 +656,8 @@
             cancelButtonText: "否",
             confirmButtonColor: "#f97316",
             cancelButtonColor: "#6b7280",
-            reverseButtons: true   // ← 讓「是」在右邊，「否」在左邊
+            reverseButtons: true,
+            buttonsStyling: false
           });
 
           if (!result.isConfirmed) {
