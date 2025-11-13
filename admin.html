@@ -375,7 +375,35 @@
       word-break: break-word;
       margin-bottom: 16px; /* 🔹 與按鈕距離更小 */
     }
+
+    /* 👉 SweetAlert2：按鈕水平排列（固定版） */
+    .my-swal-actions {
+      display: flex !important;
+      flex-direction: row !important;
+      justify-content: center !important;
+      gap: 16px !important;
+    }
+
+    /* 👉 SweetAlert2：確認按鈕 */
+    .my-swal-confirm {
+      padding: 10px 24px !important;
+      background-color: #f97316 !important; /* 橘色主題 */
+      color: white !important;
+      border-radius: 6px !important;
+      flex: 0 0 auto !important;
+    }
+
+    /* 👉 SweetAlert2：取消按鈕 */
+    .my-swal-cancel {
+      padding: 10px 24px !important;
+      background-color: #6b7280 !important; /* 灰色 */
+      color: white !important;
+      border-radius: 6px !important;
+      flex: 0 0 auto !important;
+    }
   </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
@@ -627,12 +655,41 @@
       // 🚀 送出表單
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
-        const data = Object.fromEntries(new FormData(form).entries());
+        const formData = Object.fromEntries(new FormData(form).entries());
+        const name = formData.name.trim();
+
+        if (!name)
+          return Swal.fire("錯誤", "請輸入名字", "error");
+
+        // 🔍 先檢查重複名字
+        const petRef = collection(db, "pets");
+        const snap = await getDocs(petRef);
+        const exists = snap.docs.some(d => d.data().name === name);
+
+        if (exists) {
+          const result = await Swal.fire({
+            title: "名字重複！",
+            text: `已存在名為「${name}」的動物，是否仍要新增？`,
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonText: "是",
+            cancelButtonText: "否",
+            buttonsStyling: false,
+            customClass: {
+              actions: "my-swal-actions",
+              confirmButton: "my-swal-confirm",
+              cancelButton: "my-swal-cancel",
+            }
+          });
+
+          if (!result.isConfirmed) return;
+        }
+
+        // 🟠 開始上傳與新增
         const imageUrls = [];
 
         try {
           const files = window.filesState || [];
-          console.log("準備上傳：", files);
 
           for (let file of files) {
             const fileRef = ref(storage, `pets/${Date.now()}_${file.name}`);
@@ -641,18 +698,28 @@
             imageUrls.push(url);
           }
 
-          data.images = imageUrls;
-          data.createdAt = serverTimestamp();
-          await addDoc(collection(db, "pets"), data);
+          formData.images = imageUrls;
+          formData.createdAt = serverTimestamp();
 
-          alert(`🐾 已成功新增 ${data.name}！`);
+          await addDoc(collection(db, "pets"), formData);
+
+          Swal.fire({
+            title: "新增成功！",
+            text: `已成功新增「${formData.name}」！`,
+            icon: "success",
+            confirmButtonText: "確定",
+            buttonsStyling: false,
+            customClass: {
+              confirmButton: "my-swal-confirm"
+            }
+          });
+
           form.reset();
           selectedFiles = [];
           preview.innerHTML = "";
-          resetBreed();
         } catch (err) {
           console.error("❌ 新增失敗：", err);
-          alert("上傳或新增失敗，請檢查 Console。");
+          Swal.fire("錯誤", "新增失敗，請稍後再試。", "error");
         }
       });
     });
