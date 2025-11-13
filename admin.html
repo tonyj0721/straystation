@@ -377,6 +377,8 @@
     }
   </style>
 
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
     import { getFirestore, addDoc, collection, serverTimestamp, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
@@ -627,13 +629,42 @@
       // 🚀 送出表單
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
+
         const data = Object.fromEntries(new FormData(form).entries());
+        const newName = data.name;
+
+        // 🔍 先查詢是否已有同名浪浪
+        const petRef = collection(db, "pets");
+        const snapshot = await getDocs(petRef);
+        const exists = snapshot.docs.some(doc => doc.data().name === newName);
+
+        if (exists) {
+          // ⚠️ SweetAlert2 提醒使用者
+          const result = await Swal.fire({
+            title: "名字重複！",
+            text: `已有名為「${newName}」的浪浪，是否繼續登錄？`,
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonText: "是",
+            cancelButtonText: "否",
+            confirmButtonColor: "#f97316",
+            cancelButtonColor: "#6b7280"
+          });
+
+          if (!result.isConfirmed) {
+            return; // ❌ 使用者取消，不送出
+          }
+        }
+
+        // ================================
+        //  ⭐ 名字不重複或使用者決定繼續
+        //      → 進入原本的上傳流程
+        // ================================
+
         const imageUrls = [];
 
         try {
           const files = window.filesState || [];
-          console.log("準備上傳：", files);
-
           for (let file of files) {
             const fileRef = ref(storage, `pets/${Date.now()}_${file.name}`);
             const snapshot = await uploadBytes(fileRef, file);
@@ -643,16 +674,26 @@
 
           data.images = imageUrls;
           data.createdAt = serverTimestamp();
+
           await addDoc(collection(db, "pets"), data);
 
-          alert(`🐾 已成功新增 ${data.name}！`);
+          Swal.fire({
+            icon: "success",
+            title: "新增成功！",
+            text: `🐾 已成功新增 ${data.name}！`,
+            confirmButtonColor: "#f97316"
+          });
+
           form.reset();
-          selectedFiles = [];
           preview.innerHTML = "";
-          resetBreed();
+          window.filesState = [];
         } catch (err) {
           console.error("❌ 新增失敗：", err);
-          alert("上傳或新增失敗，請檢查 Console。");
+          Swal.fire({
+            icon: "error",
+            title: "新增失敗",
+            text: "請稍後再試或查看 Console。",
+          });
         }
       });
     });
