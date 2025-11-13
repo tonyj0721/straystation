@@ -375,6 +375,30 @@
       word-break: break-word;
       margin-bottom: 16px; /* 🔹 與按鈕距離更小 */
     }
+
+    /* SweetAlert2 按鈕美化 */
+    .swal-confirm-btn {
+      background-color: #6d28d9;   /* 紫色，與你截圖一致 */
+      color: white;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: bold;
+      margin-left: 8px;
+    }
+
+    .swal-cancel-btn {
+      background-color: #6b7280;   /* 灰色 */
+      color: white;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: bold;
+      margin-right: 8px;
+    }
+
+    .swal2-popup {
+      border-radius: 16px !important; /* 更可愛的圓角 */
+      padding-top: 18px !important;
+    }
   </style>
 
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -643,9 +667,22 @@
             title: "名字已存在",
             text: `${name} 已經在資料庫中，是否仍要新增？`,
             icon: "warning",
+
+            // ⭐ 視窗縮小
+            width: "320px",
+
+            // ⭐ 按鈕左右排列
             showCancelButton: true,
             confirmButtonText: "仍要新增",
-            cancelButtonText: "取消"
+            cancelButtonText: "取消",
+            reverseButtons: true,   // ← 讓「取消」在左、「仍要新增」在右
+
+            // ⭐ 按鈕樣式（跟你網站風格一致）
+            customClass: {
+              confirmButton: "swal-confirm-btn",
+              cancelButton: "swal-cancel-btn"
+            },
+            buttonsStyling: false
           });
 
           if (!result.isConfirmed) {
