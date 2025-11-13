@@ -653,23 +653,26 @@
           const querySnapshot = await getDocs(q);
 
           if (!querySnapshot.empty) {
-            const result = await Swal.fire({
+            await SwalBase.fire({
               title: "名字重複",
               text: `已有名為「${data.name}」的浪浪，是否仍要新增？`,
               icon: "warning",
               showCancelButton: true,
               confirmButtonText: "是",
-              cancelButtonText: "否",
-              confirmButtonColor: "#f97316",
-              cancelButtonColor: "#6b7280",
-              reverseButtons: true,         // ✅ 讓「是」「否」左右排列（是在右邊）
-              width: "75%",               // ✅ 視窗變窄
-              padding: "1em"             // ✅ 微調間距
+              cancelButtonText: "否",                           
+              reverseButtons: true,         // ✅ 讓「是」「否」左右排列（是在右邊）              
             });
 
             if (!result.isConfirmed) {
-              await Swal.fire("已取消", "未新增資料。", "info");
-              return; // ❌ 使用者取消新增
+              await SwalBase.fire({
+                title: "已取消",
+                text: "未新增資料",
+                icon: "info",
+                showConfirmButton: false, // ❌ 不顯示「確定」按鈕
+                timer: 1000,              // ⏱️ 1秒（1000毫秒）後自動關閉
+                timerProgressBar: true    // 🔄 顯示關閉倒數進度條（可選）
+              });
+              return;
             }
           }
 
@@ -688,11 +691,13 @@
           await addDoc(collection(db, "pets"), data);
 
           // ✅ 成功提示
-          await Swal.fire({
+          await SwalBase.fire({
             title: "新增成功！",
             text: `🐾 已成功新增 ${data.name}`,
             icon: "success",
-            confirmButtonColor: "#f97316"
+            showConfirmButton: false, // ❌ 不顯示「確定」按鈕
+            timer: 1000,              // ⏱️ 1秒（1000毫秒）後自動關閉
+            timerProgressBar: true    // 🔄 顯示關閉倒數進度條（可選）
           });
 
           // 🧹 清空表單與預覽
@@ -874,6 +879,20 @@
       
     }
   })();
+
+    // 💡 SweetAlert2 全域預設設定
+    const SwalBase = Swal.mixin({
+      confirmButtonColor: "#f97316",
+      cancelButtonColor: "#6b7280",
+    });
+
+    // 📱 手機自適應（螢幕寬度小於 600px 時）
+    if (window.innerWidth <= 600) {
+      SwalBase.update({
+        width: "75%",      // ✅ 手機版改為 75%
+        padding: "1.5em"   // ✅ 手機稍微多一點 padding（約 24px）
+      });
+    }
   </script>
 </body>
 </html>
