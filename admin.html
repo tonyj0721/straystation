@@ -375,6 +375,68 @@
       word-break: break-word;
       margin-bottom: 16px; /* 🔹 與按鈕距離更小 */
     }
+
+    /* SweetAlert2 按鈕美化 */
+    /* SweetAlert2 – 彈窗縮小 */
+    .swal2-popup {
+      border-radius: 16px !important;
+      padding-top: 18px !important;
+      width: 320px !important;
+    }
+
+    /* 讓 SweetAlert2 按鈕左右排列 */
+    .swal-actions-flex {
+      display: flex !important;
+      flex-direction: row !important;
+      justify-content: space-between !important;
+      width: 100%;
+      padding: 0 15px;
+    }
+
+    /* 左邊 - 取消 */
+    .swal-cancel-btn {
+      background-color: #6b7280;
+      color: white;
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-weight: bold;
+      flex: 1;
+      margin-right: 10px;
+    }
+
+    /* 右邊 - 仍要新增 */
+    .swal-confirm-btn {
+      background-color: #6d28d9;
+      color: white;
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-weight: bold;
+      flex: 1;
+      margin-left: 10px;
+    }
+
+    /* 手機版：彈窗固定為 320px，不讓內容撐寬 */
+@media (max-width: 600px) {
+  .swal2-popup {
+    width: 320px !important;
+    max-width: 320px !important;
+    min-width: 320px !important;
+    border-radius: 16px !important;
+    padding-top: 18px !important;
+  }
+}
+
+/* 桌機版：保持 SweetAlert2 原本大小（由內容決定） */
+@media (min-width: 601px) {
+  .swal2-popup {
+    width: auto !important;        /* 🌟 保持 SweetAlert2 原本寬度 */
+    max-width: 500px !important;   /* 🌟 防止過度變大（預設內容不會超過） */
+    min-width: 300px !important;   /* 🌟 跟原本預設一樣 */
+    border-radius: 16px !important;
+    padding-top: 18px !important;
+  }
+}
+
   </style>
 
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -643,9 +705,24 @@
             title: "名字已存在",
             text: `${name} 已經在資料庫中，是否仍要新增？`,
             icon: "warning",
+
+            width: "320px",
+
             showCancelButton: true,
             confirmButtonText: "仍要新增",
-            cancelButtonText: "取消"
+            cancelButtonText: "取消",
+
+            // ⭐ 重要！讓按鈕左右排列
+            reverseButtons: true,
+
+            // ⭐ 一定要關掉內建樣式，才不會強制上下排列
+            buttonsStyling: false,
+
+            customClass: {
+              actions: "swal-actions-flex",   // ⭐ 重設 actions 容器
+              confirmButton: "swal-confirm-btn",
+              cancelButton: "swal-cancel-btn"
+            }
           });
 
           if (!result.isConfirmed) {
