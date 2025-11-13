@@ -376,13 +376,17 @@
       margin-bottom: 16px; /* 🔹 與按鈕距離更小 */
     }
 
-    /* 讓 SweetAlert2 的按鈕變成左右排列 */
-    .swal2-actions-row {
-      display: flex !important;
+    /* 強制 SweetAlert2 按鈕左右排列 */
+    .swal2-actions {
       flex-direction: row !important;
+      width: 100% !important;
       justify-content: center !important;
-      gap: 20px !important; /* 按鈕間距 */
-      width: 100%;
+      gap: 16px !important;
+    }
+
+    .swal2-confirm, .swal2-cancel {
+      margin: 0 !important;  /* 避免 SweetAlert2 加上上下 margin */
+      width: 120px;          /* 你可以調整 */
     }
   </style>
 
@@ -657,11 +661,7 @@
             cancelButtonText: "否",
             confirmButtonColor: "#f97316",
             cancelButtonColor: "#6b7280",
-
-            // 🔥 加上這段
-            customClass: {
-              actions: 'swal2-actions-row'
-            }
+            reverseButtons: true   // ← 讓「是」在右邊，「否」在左邊
           });
 
           if (!result.isConfirmed) {
