@@ -376,34 +376,6 @@
       margin-bottom: 16px; /* 🔹 與按鈕距離更小 */
     }
 
-    /* ⬅️ 強制把按鈕橫向排列 */
-    .my-swal-actions {
-      display: flex !important;
-      flex-direction: row !important;
-      justify-content: center !important;
-      gap: 16px !important;
-      width: 100% !important;
-      margin-top: 20px !important;
-    }
-
-    /* 是按鈕 */
-    .my-swal-confirm {
-      padding: 10px 28px !important;
-      background-color: #6366f1 !important; /* 或改橘色 */
-      color: white !important;
-      border-radius: 6px !important;
-      font-weight: 600 !important;
-    }
-
-    /* 否按鈕 */
-    .my-swal-cancel {
-      padding: 10px 28px !important;
-      background-color: #6b7280 !important;
-      color: white !important;
-      border-radius: 6px !important;
-      font-weight: 600 !important;
-    }
-
     /* ⭐ SweetAlert2 按鈕：強制水平排列 */
     .swal2-actions {
       display: flex !important;
@@ -413,14 +385,6 @@
       gap: 16px !important;
       width: 100% !important;
       margin-top: 20px !important;
-    }
-
-    /* ⭐ 讓 SweetAlert2 按鈕不撐滿一整行 */
-    .swal2-actions button {
-      width: auto !important;
-      flex: 0 0 auto !important;
-      padding: 10px 24px !important;
-      border-radius: 6px !important;
     }
   </style>
 
@@ -696,13 +660,8 @@
             showCancelButton: true,
             confirmButtonText: "是",
             cancelButtonText: "否",
-
+            reverseButtons: true,
             buttonsStyling: false,
-            customClass: {
-              actions: 'my-swal-actions',
-              confirmButton: 'my-swal-confirm',
-              cancelButton: 'my-swal-cancel'
-            }
           });
 
           if (!result.isConfirmed) return; // ❌ 使用者按取消就停止
