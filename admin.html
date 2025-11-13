@@ -641,16 +641,18 @@
         if (exists) {
           // ⚠️ SweetAlert2 提醒使用者
           const result = await Swal.fire({
-            title: "測試彈窗大小",
+            title: "按鈕大小",
+  showCancelButton: true,
   didOpen: () => {
-    const popup = document.querySelector('.swal2-popup');
+    const confirmBtn = document.querySelector('.swal2-confirm');
+    const cancelBtn = document.querySelector('.swal2-cancel');
+
     Swal.update({
       html: `
-        <p>寬度：${popup.offsetWidth}px</p>
-        <p>高度：${popup.offsetHeight}px</p>
+        <p>確認按鈕：${confirmBtn.offsetWidth} × ${confirmBtn.offsetHeight}</p>
+        <p>取消按鈕：${cancelBtn.offsetWidth} × ${cancelBtn.offsetHeight}</p>
       `
     });
-  }
           });
 
           if (!result.isConfirmed) {
