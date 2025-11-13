@@ -649,7 +649,11 @@
             cancelButtonText: "否",
             confirmButtonColor: "#f97316",
             cancelButtonColor: "#6b7280",
-            width: "700px"
+            didOpen: () => {
+              const popup = document.querySelector('.swal2-popup');
+              console.log("彈窗寬度：", popup.offsetWidth);
+              console.log("彈窗高度：", popup.offsetHeight);
+            }
           });
 
           if (!result.isConfirmed) {
