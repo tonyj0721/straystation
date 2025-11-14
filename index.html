@@ -360,15 +360,10 @@
       $('#statPlaced').textContent = 128;
     }
 
-    function formatBreed(p){
-      if (!p.breedCategory && !p.breed) return "品種不詳";
-
-      // 品種犬 → p.breed = "貴賓"
-      // 米克斯 → p.breedCategory = "米克斯", p.breed = "棕色"
-      if (p.breedCategory === "米克斯") {
-        return `米克斯/${p.breed || "不明"}`;
-      }
-      return p.breed || "品種不詳";
+    function formatBreed(p) {
+      return p.breedType === "米克斯"
+        ? `米克斯/${p.breed}`   // 米克斯 → 米克斯/棕色
+        : p.breed;               // 品種犬、品種貓 → 直接顯示品種
     }
 
     function formatAge(p){
