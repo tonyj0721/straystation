@@ -381,7 +381,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-    import { getFirestore, addDoc, collection, serverTimestamp, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+    import { getFirestore, addDoc, collection, serverTimestamp, getDocs, deleteDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
     import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
 
     const firebaseConfig = {
@@ -410,7 +410,13 @@
 
     // 🚀 載入 Firestore 資料
     async function loadPets() {
-      const querySnapshot = await getDocs(collection(db, "pets"));
+      // 🔥 依 createdAt（建立時間）由新到舊排序
+      const petsQuery = query(
+        collection(db, "pets"),
+        orderBy("createdAt", "desc")
+      );
+      
+      const querySnapshot = await getDocs(petsQuery);
       listEl.innerHTML = "";
       allPets = []; // 清空再載入
 
