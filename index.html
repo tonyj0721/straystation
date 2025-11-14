@@ -33,6 +33,21 @@
     input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     input[type=number] { -moz-appearance: textfield; }
     dialog::backdrop{ background: rgba(0,0,0,.5)}
+
+    /* 🔥 Modal 縮圖 */
+    .dlg-thumb {
+      width: 70px;
+      height: 70px;
+      object-fit: cover;
+      border-radius: 8px;
+      cursor: pointer;
+      opacity: 0.7;
+      transition: 0.2s;
+    }
+    .dlg-thumb.active {
+      border: 2px solid #000;
+      opacity: 1;
+    }
   </style>
 </head>
 <body class="bg-white text-gray-800 dark:bg-gray-950 dark:text-gray-100">
@@ -231,6 +246,8 @@
     <div class="bg-white dark:bg-gray-900">
       <div class="relative aspect-video bg-gray-100 dark:bg-gray-800">
         <img id="dlgImg" alt="毛孩照片" class="w-full h-full object-cover"/>
+        <!-- 🔥 多張縮圖列 -->
+        <div id="dlgThumbs" class="flex gap-2 overflow-x-auto p-3"></div>
         <button id="dlgClose" class="absolute top-3 right-3 bg-black/60 text-white p-2 rounded-full" aria-label="關閉">✕</button>
       </div>
       <div class="p-5 space-y-4">
@@ -447,16 +464,46 @@
     function openDialog(id){
       const p = pets.find(x => x.id === id);
       if(!p) return;
-      const cover = (p.images && p.images.length ? p.images[0] : p.image) || '';
 
-      $('#dlgImg').src = cover;
+      const dlgImg = $('#dlgImg');
+      const dlgThumbs = $('#dlgThumbs');
+
+      // 取所有圖片
+      const imgs = p.images?.length ? p.images : [p.image];
+
+      // 主圖
+      dlgImg.src = imgs[0];
+
+      // 生成縮圖
+      dlgThumbs.innerHTML = "";
+      imgs.forEach((url, i) => {
+        const img = document.createElement("img");
+        img.src = url;
+        img.className = "dlg-thumb" + (i === 0 ? " active" : "");
+        img.dataset.index = i;
+
+        img.addEventListener("click", () => {
+          // 更新主圖
+          dlgImg.src = url;
+
+          // 更新 active 樣式
+          document.querySelectorAll(".dlg-thumb").forEach(t=>t.classList.remove("active"));
+          img.classList.add("active");
+        });
+
+        dlgThumbs.appendChild(img);
+      });
+
+      // 其它基本資料
       $('#dlgName').textContent = p.name || '未命名';
       $('#dlgMeta').textContent = `${p.species || '—'}・${p.gender || '—'}・${p.age || '—'}・${p.size || '—'}`;
       $('#dlgCity').textContent = p.city || '—';
       $('#dlgDesc').textContent = p.desc || '';
+
       const badges = fmtBadges(p).map(b => `<li class='px-2 py-1 rounded bg-gray-100 dark:bg-gray-800'>${b}</li>`).join('');
       $('#dlgBadges').innerHTML = badges || '<li class="text-gray-500">—</li>';
-      if(typeof dlg.showModal === 'function') dlg.showModal(); else alert('您的瀏覽器不支援對話框');
+
+      dlg.showModal();
     }
 
     // ======= Form Handling（原本的 localStorage 版本） =======
