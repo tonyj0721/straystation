@@ -397,6 +397,9 @@
     const db = getFirestore(app);
     const storage = getStorage(app);
 
+    const nameInput = document.getElementById("petNameInput");
+    const nameWarn = document.getElementById("nameWarn");
+
     const listEl = document.getElementById("petList");
     const modal = document.getElementById("detailModal");
     const closeBtn = modal.querySelector(".close");
@@ -707,9 +710,6 @@
     
     // === 即時檢查名字是否重複（Highlight 版本） ===
     document.addEventListener("DOMContentLoaded", () => {
-      const nameInput = document.getElementById("petNameInput");
-      const nameWarn = document.getElementById("nameWarn");
-
       nameInput.addEventListener("input", async () => {
         const name = nameInput.value.trim();
 
