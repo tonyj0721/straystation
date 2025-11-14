@@ -732,14 +732,9 @@
           form.reset();
           nameInput.style.border = "";
           nameWarn.style.display = "none";
-          // ⭐ 重置照片暫存
-          window.filesState = [];
           selectedFiles = [];
-          // ⭐ 清除預覽顯示
           preview.innerHTML = "";
-          // ⭐ 重置文字
-          document.getElementById("photoStatus").textContent = "尚未選擇";
-
+          
         } catch (err) {
           console.error("❌ 新增失敗：", err);
           Swal.fire({
