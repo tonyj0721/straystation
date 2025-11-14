@@ -688,14 +688,14 @@
             title: "新增成功！",
             text: `已成功新增「${data.name}」`,
             timer: 1000,
-            showConfirmButton: false
+            showConfirmButton: false,
+            didClose: () => {
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }
           });
 
           // ⭐ 自動更新已登錄動物列表
           loadPets();
-
-          // ⭐ 自動滾到最上層
-          window.scrollTo({ top: 0, behavior: "smooth" });
 
           form.reset();
           nameInput.style.border = "";
