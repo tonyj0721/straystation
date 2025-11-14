@@ -252,11 +252,10 @@
   </dialog>
 
   <script type="module">
-    // ======= Firestore Data =======
+    // ======= Firebase Import & Init =======
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-    import { getFirestore, collection, query, where, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+    import { getFirestore, collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 
-    // ======= Firebase 初始化（請用你 admin 的設定） =======
     const firebaseConfig = {
       apiKey: "AIzaSyC4NT2KOm_Cw2OEdaaOimxI0ruoNv_u_9g",
       authDomain: "straystation.firebaseapp.com",
@@ -269,44 +268,37 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // 取得最新 5 隻貓
-    async function getLatestCats() {
-      const q = query(
-        collection(db, "pets"),
-        where("species", "==", "貓"),
-        orderBy("createdAt", "desc"),
-        limit(5)
-      );
-      const snap = await getDocs(q);
-      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // ======= Data（從 Firestore 載入） =======
+    let pets = [];
+
+    // 方便排序：createdAt 可能是 Timestamp 或字串
+    function getCreatedAtMs(p) {
+      if (!p.createdAt) return 0;
+      if (typeof p.createdAt.toDate === "function") {
+        return p.createdAt.toDate().getTime();
+      }
+      return new Date(p.createdAt).getTime() || 0;
     }
 
-    // 取得最新 5 隻狗
-    async function getLatestDogs() {
-      const q = query(
-        collection(db, "pets"),
-        where("species", "==", "狗"),
-        orderBy("createdAt", "desc"),
-        limit(5)
-      );
-      const snap = await getDocs(q);
-      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    }
-
-    // 合併資料
     async function loadIndexPets() {
-      const [cats, dogs] = await Promise.all([
-        getLatestCats(),
-        getLatestDogs()
-      ]);
+      // 只用 createdAt 排序，避免複合索引
+      const qRef = query(
+        collection(db, "pets"),
+        orderBy("createdAt", "desc")
+      );
 
-      const pets = [...cats, ...dogs]; // 合併 10 隻
-      applyStats(pets.length);
-      render(pets);
-      window._pets = pets; // 方便 openDialog 使用
+      const snap = await getDocs(qRef);
+      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      // 取最新的貓 5 隻 + 狗 5 隻
+      const cats = all.filter(p => p.species === "貓").slice(0, 5);
+      const dogs = all.filter(p => p.species === "狗").slice(0, 5);
+
+      pets = [...cats, ...dogs];
+
+      applyStats();
+      filterPets(); // 用最新資料重新套用篩選 & 渲染
     }
-
-    loadIndexPets();
 
     // ======= State & Utils =======
     const $ = (q) => document.querySelector(q);
@@ -339,16 +331,19 @@
       petList.forEach(p => {
         const card = document.createElement('article');
         card.className = 'group rounded-2xl overflow-hidden ring-1 ring-gray-200 dark:ring-gray-800 bg-white dark:bg-gray-900 hover:shadow-soft transition-shadow';
+
+        const cover = (p.images && p.images.length ? p.images[0] : p.image) || '';
+
         card.innerHTML = `
           <div class="relative aspect-[4/3] bg-gray-100 dark:bg-gray-800">
-            <img src="${p.image}" alt="${p.name} 的照片" class="w-full h-full object-cover" loading="lazy"/>
-            <span class="absolute top-3 left-3 text-xs px-2 py-1 rounded bg-white/90 dark:bg-gray-900/80">${p.city}</span>
+            <img src="${cover}" alt="${p.name || '毛孩'} 的照片" class="w-full h-full object-cover" loading="lazy"/>
+            <span class="absolute top-3 left-3 text-xs px-2 py-1 rounded bg-white/90 dark:bg-gray-900/80">${p.city || ''}</span>
           </div>
           <div class="p-4">
             <div class="flex items-start justify-between gap-3">
               <div>
-                <h3 class="text-lg font-semibold">${p.name}</h3>
-                <p class="text-sm text-gray-500">${p.species}・${p.gender}・${p.age}・${p.size}</p>
+                <h3 class="text-lg font-semibold">${p.name || '未命名'}</h3>
+                <p class="text-sm text-gray-500">${p.species || '—'}・${p.gender || '—'}・${p.age || '—'}・${p.size || '—'}</p>
               </div>
               <button class="like p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="加入收藏">♡</button>
             </div>
@@ -356,10 +351,11 @@
               ${fmtBadges(p).map(b => `<span class='px-2 py-1 rounded bg-gray-100 dark:bg-gray-800'>${b}</span>`).join('')}
             </div>
             <div class="mt-4 flex gap-2">
-              <button data-id="${p.id}" class="btn-detail flex-1 px-3 py-2 rounded-xl bg-gray-900 text-white dark:bg-white dark:text-gray-900">查看</button>
+              <button data-id="${p.id}" class="btn-detail flex-1 px-3 py-2 rounded-xl bg-gray-900 text-white dark:bg白 dark:text-gray-900">查看</button>
               <button data-id="${p.id}" class="btn-adopt px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700">認養</button>
             </div>
           </div>`;
+
         grid.appendChild(card);
       });
 
@@ -371,11 +367,12 @@
       });
 
       // Detail modal
-      $$('.btn-detail').forEach(btn => btn.addEventListener('click', (e) => openDialog(+e.target.dataset.id)));
+      $$('.btn-detail').forEach(btn => btn.addEventListener('click', (e) => openDialog(e.target.dataset.id)));
       // Adopt quick fill
       $$('.btn-adopt').forEach(btn => btn.addEventListener('click', (e) => {
-        const p = pets.find(x => x.id === +e.target.dataset.id);
-        document.getElementById('petName').value = p.name;
+        const p = pets.find(x => x.id === e.target.dataset.id);
+        if(!p) return;
+        document.getElementById('petName').value = p.name || '';
         location.hash = '#apply';
         $('#name').focus();
       }));
@@ -406,11 +403,12 @@
         if(f.onlyVacc && !p.vaccinated) return false;
         if(f.onlyNeut && !p.neutered) return false;
         if(f.query){
-          const hay = (p.name + p.color + p.desc + p.city).toLowerCase();
+          const hay = ((p.name || '') + (p.color || '') + (p.desc || '') + (p.city || '')).toLowerCase();
           if(!hay.includes(f.query)) return false;
         }
         return true;
-      }).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+      }).sort((a,b) => getCreatedAtMs(b) - getCreatedAtMs(a));
+
       render(list);
     }
 
@@ -419,6 +417,7 @@
     $('#btnReset').addEventListener('click', () => {
       ['#fSpecies','#fAge','#fSize','#fCity','#fQuery','#onlyKids','#onlyVacc','#onlyNeut'].forEach(sel => {
         const el = $(sel);
+        if(!el) return;
         if(el.type === 'checkbox') el.checked = false; else el.value = '';
       });
       filterPets();
@@ -448,17 +447,19 @@
     function openDialog(id){
       const p = pets.find(x => x.id === id);
       if(!p) return;
-      $('#dlgImg').src = p.image;
-      $('#dlgName').textContent = p.name;
-      $('#dlgMeta').textContent = `${p.species}・${p.gender}・${p.age}・${p.size}`;
-      $('#dlgCity').textContent = p.city;
-      $('#dlgDesc').textContent = p.desc;
+      const cover = (p.images && p.images.length ? p.images[0] : p.image) || '';
+
+      $('#dlgImg').src = cover;
+      $('#dlgName').textContent = p.name || '未命名';
+      $('#dlgMeta').textContent = `${p.species || '—'}・${p.gender || '—'}・${p.age || '—'}・${p.size || '—'}`;
+      $('#dlgCity').textContent = p.city || '—';
+      $('#dlgDesc').textContent = p.desc || '';
       const badges = fmtBadges(p).map(b => `<li class='px-2 py-1 rounded bg-gray-100 dark:bg-gray-800'>${b}</li>`).join('');
       $('#dlgBadges').innerHTML = badges || '<li class="text-gray-500">—</li>';
       if(typeof dlg.showModal === 'function') dlg.showModal(); else alert('您的瀏覽器不支援對話框');
     }
 
-    // ======= Form Handling =======
+    // ======= Form Handling（原本的 localStorage 版本） =======
     $('#applyForm').addEventListener('submit', (e) => {
       e.preventDefault();
       const form = e.target;
@@ -475,7 +476,7 @@
       setTimeout(()=>$('#toast').classList.add('hidden'), 4000);
     });
 
-    // ======= Theme & Nav =======
+    // ======= Theme & Nav（原樣保留） =======
     function setTheme(mode){
       const root = document.documentElement;
       if(mode === 'dark'){ root.classList.add('dark'); localStorage.setItem('theme','dark'); }
@@ -485,19 +486,17 @@
       const isDark = document.documentElement.classList.contains('dark');
       setTheme(isDark ? 'light' : 'dark');
     });
-    // initial theme
     const saved = localStorage.getItem('theme');
     if(saved) setTheme(saved); else if(window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
 
     $('#navToggle').addEventListener('click', ()=>{
       const el = $('#mobileNav');
       el.classList.toggle('hidden');
-    })
+    });
 
     // ======= Init =======
-    applyStats();
-    filterPets();
     document.getElementById('year').textContent = new Date().getFullYear();
+    loadIndexPets();   // 🚀 這裡去 Firestore 抓資料
   </script>
 
   <!-- SEO: organization schema -->
@@ -510,26 +509,6 @@
     "areaServed": "Taiwan",
     "sameAs": ["https://www.facebook.com/", "https://www.instagram.com/"]
   }
-  </script>
-  <!-- Firebase SDK -->
-  <script type="module">
-    // 匯入 Firebase 核心與 Firestore
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-    import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
-
-    // 🔧 這裡貼上你的設定碼
-    const firebaseConfig = {
-      apiKey: "AIzaSyC4NT2KOm_Cw2OEdaaOimxI0ruoNv_u_9g",
-      authDomain: "straystation.firebaseapp.com",
-      projectId: "straystation",
-      storageBucket: "straystation.firebasestorage.app",
-      messagingSenderId: "611366379195",
-      appId: "1:611366379195:web:ef5a632e88d8bba1d6139e"
-    };
-
-    // 初始化
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
   </script>
 </body>
 </html>
