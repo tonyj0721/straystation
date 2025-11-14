@@ -684,11 +684,13 @@
             icon: "success",
             title: "新增成功！",
             text: `已成功新增「${data.name}」`,
-            showconfirmButton: false,
-            timer: 1000
+            timer: 1000,
+            showConfirmButton: false
           });
 
           form.reset();
+          nameInput.style.border = "";
+          nameWarn.style.display = "none";
           selectedFiles = [];
           preview.innerHTML = "";
 
@@ -697,7 +699,7 @@
           Swal.fire({
             icon: "error",
             title: "新增失敗",
-            text: "請檢查 console 日誌。",
+            text: "請檢查 console 日誌",
           });
         }
       });
