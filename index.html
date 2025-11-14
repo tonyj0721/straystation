@@ -465,6 +465,7 @@
     });
 
     // ======= Modal =======
+    const dlg = document.getElementById('petDialog');
     $('#dlgClose').addEventListener('click', () => dlg.close());
     $('#dlgShare').addEventListener('click', async () => {
       const name = $('#dlgName').textContent;
@@ -583,7 +584,6 @@
     const lbImg = document.getElementById("lbImg");
     const lbPrev = document.getElementById("lbPrev");
     const lbNext = document.getElementById("lbNext");
-    const dlg = document.getElementById("petDialog");
 
     let lbImages = [];
     let lbIndex = 0;
