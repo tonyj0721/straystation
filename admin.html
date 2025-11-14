@@ -691,6 +691,9 @@
             showConfirmButton: false
           });
 
+          // ⭐ 自動更新已登錄動物列表
+          loadPets();
+
           form.reset();
           nameInput.style.border = "";
           nameWarn.style.display = "none";
