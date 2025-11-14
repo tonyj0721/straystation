@@ -711,7 +711,8 @@
       <h1>🐾 新增浪浪資料</h1>
       <form id="addPetForm">
         <label>名字</label>
-        <input name="name" required>
+        <input name="name" id="petNameInput" required>
+        <small id="nameWarn" style="color:red; display:none;">此名字已存在</small>
 
         <label>類別</label>
         <select name="species" id="species">
@@ -866,6 +867,40 @@
       
     }
   })();
+    // === 即時檢查名字是否重複（Highlight 版本） ===
+    document.addEventListener("DOMContentLoaded", () => {
+      const nameInput = document.getElementById("petNameInput");
+      const nameWarn = document.getElementById("nameWarn");
+
+      nameInput.addEventListener("input", async () => {
+        const name = nameInput.value.trim();
+
+        // 若空白 → 清除 highlight
+        if (!name) {
+          nameInput.style.border = "";
+          nameWarn.style.display = "none";
+          return;
+        }
+
+        // 取得所有寵物資料
+        const snaps = await getDocs(collection(db, "pets"));
+        let duplicated = false;
+
+        snaps.forEach(s => {
+          if (s.data().name === name) duplicated = true;
+        });
+
+        if (duplicated) {
+          // 🔥 Highlight：加紅框
+          nameInput.style.border = "2px solid red";
+          nameWarn.style.display = "block";
+        } else {
+          // 恢復正常外觀
+          nameInput.style.border = "";
+          nameWarn.style.display = "none";
+        }
+      });
+    });
   </script>
 </body>
 </html>
