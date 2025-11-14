@@ -48,6 +48,15 @@
       border: 2px solid #000;
       opacity: 1;
     }
+
+    #lightbox {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      -webkit-backdrop-filter: none;
+    }
   </style>
 </head>
 <body class="bg-white text-gray-800 dark:bg-gray-950 dark:text-gray-100">
@@ -554,60 +563,67 @@
     document.getElementById('year').textContent = new Date().getFullYear();
     loadIndexPets();   // 🚀 這裡去 Firestore 抓資料
 
-    // ======= Lightbox =======
+        // ======= Lightbox =======
     const lb = document.getElementById("lightbox");
     const lbImg = document.getElementById("lbImg");
     const lbPrev = document.getElementById("lbPrev");
     const lbNext = document.getElementById("lbNext");
+    const petDialog = document.getElementById("petDialog");
 
-    let lbImages = [];   // 所有圖片來源
-    let lbIndex = 0;     // 目前圖片位置
+    let lbImages = [];
+    let lbIndex = 0;
 
-    // 開啟 lightbox
-    function openLightbox(images, index=0){
+    // 🔥 開啟 Lightbox
+    function openLightbox(images, index = 0) {
       lbImages = images;
       lbIndex = index;
+
       lbImg.src = lbImages[lbIndex];
+
+      // ⭐ iOS 修正：隱藏 modal，避免遮住 lightbox
+      petDialog.style.visibility = "hidden";
 
       lb.classList.remove("hidden");
       lb.classList.add("flex");
     }
 
-    // 關閉
-    function closeLightbox(){
+    // 🔥 關閉 Lightbox
+    function closeLightbox() {
       lb.classList.add("hidden");
       lb.classList.remove("flex");
+
+      // ⭐ 恢復 modal
+      petDialog.style.visibility = "visible";
     }
 
-    // 左右切換
-    function lbShow(delta){
+    // 🔥 左右切換
+    function lbShow(delta) {
       lbIndex = (lbIndex + delta + lbImages.length) % lbImages.length;
       lbImg.src = lbImages[lbIndex];
     }
 
-    lbPrev.addEventListener("click", ()=> lbShow(-1));
-    lbNext.addEventListener("click", ()=> lbShow(1));
+    lbPrev.onclick = () => lbShow(-1);
+    lbNext.onclick = () => lbShow(1);
 
-    // 點背景關閉
-    lb.addEventListener("click", e => {
-      if(e.target === lb) closeLightbox();
-    });
+    // 🔥 點黑幕關閉
+    lb.onclick = e => {
+      if (e.target === lb) closeLightbox();
+    };
 
-    // ESC 關閉
+    // 🔥 按 ESC 關閉
     document.addEventListener("keydown", e => {
-      if(e.key === "Escape") closeLightbox();
+      if (e.key === "Escape") closeLightbox();
     });
 
-    // 手機滑動支援
+    // 🔥 手機滑動（左滑/右滑）
     let touchStartX = 0;
     lb.addEventListener("touchstart", e => {
       touchStartX = e.touches[0].clientX;
     });
-
     lb.addEventListener("touchend", e => {
-      let diff = e.changedTouches[0].clientX - touchStartX;
-      if(diff > 50) lbShow(-1);   // 向右滑 → 前一張
-      if(diff < -50) lbShow(1);   // 向左滑 → 下一張
+      const diff = e.changedTouches[0].clientX - touchStartX;
+      if (diff > 50) lbShow(-1);
+      if (diff < -50) lbShow(1);
     });
   </script>
 
