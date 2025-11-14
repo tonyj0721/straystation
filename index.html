@@ -252,15 +252,52 @@
   </dialog>
 
   <script>
-    // ======= Data =======
-    const pets = [
-      {id:1, name:'小虎', species:'貓', gender:'公', age:'幼年', size:'小型', color:'虎斑', vaccinated:true, neutered:false, goodWithKids:true, city:'台北', image:'https://images.unsplash.com/photo-1518791841217-8f162f1e1131?q=80&w=1600&auto=format&fit=crop', desc:'活潑親人，已基本驅蟲，適合第一次養貓的家庭。', createdAt:'2025-10-20'},
-      {id:2, name:'奶茶', species:'狗', gender:'母', age:'成年', size:'中型', color:'米白', vaccinated:true, neutered:true, goodWithKids:true, city:'新北', image:'https://images.unsplash.com/photo-1552053831-71594a27632d?q=80&w=1600&auto=format&fit=crop', desc:'穩定溫和，會基本口令，喜歡散步。', createdAt:'2025-10-28'},
-      {id:3, name:'黑豆', species:'貓', gender:'母', age:'成年', size:'小型', color:'黑', vaccinated:false, neutered:true, goodWithKids:false, city:'台中', image:'https://images.unsplash.com/photo-1495360010541-f48722b34f7d?q=80&w=1600&auto=format&fit=crop', desc:'剛結紮，需耐心互動，熟悉後很撒嬌。', createdAt:'2025-09-30'},
-      {id:4, name:'抱抱', species:'狗', gender:'公', age:'熟齡', size:'大型', color:'黃', vaccinated:true, neutered:true, goodWithKids:true, city:'高雄', image:'https://images.unsplash.com/photo-1558944351-c0e0952e0b48?q=80&w=1600&auto=format&fit=crop', desc:'過去有街頭生活，現在非常黏人，適合有庭院的家庭。', createdAt:'2025-08-15'},
-      {id:5, name:'雪球', species:'貓', gender:'母', age:'幼年', size:'小型', color:'白', vaccinated:true, neutered:false, goodWithKids:true, city:'台南', image:'https://images.unsplash.com/photo-1511044568932-338cba0ad803?q=80&w=1600&auto=format&fit=crop', desc:'活潑好動，喜歡逗貓棒，建議與另一隻貓作伴。', createdAt:'2025-10-31'},
-      {id:6, name:'阿財', species:'狗', gender:'公', age:'成年', size:'大型', color:'黑白', vaccinated:false, neutered:false, goodWithKids:false, city:'桃園', image:'https://images.unsplash.com/photo-1534361960057-19889db9621e?q=80&w=1600&auto=format&fit=crop', desc:'需要有經驗的飼主，正在學習牽繩禮儀。', createdAt:'2025-07-21'}
-    ];
+    // ======= Firestore Data =======
+    import {
+      getFirestore, collection, query, where,
+      orderBy, limit, getDocs
+    } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+
+    const db = getFirestore();
+
+    // 取得最新 5 隻貓
+    async function getLatestCats() {
+      const q = query(
+        collection(db, "pets"),
+        where("species", "==", "貓"),
+        orderBy("createdAt", "desc"),
+        limit(5)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    }
+
+    // 取得最新 5 隻狗
+    async function getLatestDogs() {
+      const q = query(
+        collection(db, "pets"),
+        where("species", "==", "狗"),
+        orderBy("createdAt", "desc"),
+        limit(5)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    }
+
+    // 合併資料
+    async function loadIndexPets() {
+      const [cats, dogs] = await Promise.all([
+        getLatestCats(),
+        getLatestDogs()
+      ]);
+
+      const pets = [...cats, ...dogs]; // 合併 10 隻
+      applyStats(pets.length);
+      render(pets);
+      window._pets = pets; // 方便 openDialog 使用
+    }
+
+    loadIndexPets();
 
     // ======= State & Utils =======
     const $ = (q) => document.querySelector(q);
