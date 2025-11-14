@@ -276,6 +276,23 @@
     </div>
   </dialog>
 
+  <!-- 🔥 Lightbox 全螢幕顯示 -->
+  <div id="lightbox"
+    class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[999999]">
+  
+    <!-- 左箭頭 -->
+    <button id="lbPrev"
+      class="absolute left-3 md:left-10 text-white text-4xl select-none">❮</button>
+
+    <!-- 主圖片 -->
+    <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg"/>
+
+    <!-- 右箭頭 -->
+    <button id="lbNext"
+      class="absolute right-3 md:right-10 text-white text-4xl select-none">❯</button>
+
+  </div>
+  
   <script type="module">
     // ======= Firebase Import & Init =======
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
@@ -638,21 +655,5 @@
     "sameAs": ["https://www.facebook.com/", "https://www.instagram.com/"]
   }
   </script>
-  <!-- 🔥 Lightbox 全螢幕顯示 -->
-  <div id="lightbox"
-    class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[999999]">
-  
-    <!-- 左箭頭 -->
-    <button id="lbPrev"
-      class="absolute left-3 md:left-10 text-white text-4xl select-none">❮</button>
-
-    <!-- 主圖片 -->
-    <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg"/>
-
-    <!-- 右箭頭 -->
-    <button id="lbNext"
-      class="absolute right-3 md:right-10 text-white text-4xl select-none">❯</button>
-
-  </div>
 </body>
 </html>
