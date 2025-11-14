@@ -903,43 +903,41 @@
     const pickBtn = document.getElementById('pickBtn');
     const status = document.getElementById('photoStatus');
     const preview = document.getElementById('preview');
-    window.filesState = [];  // ✅ 改成全域變數
-    let filesState = window.filesState;
 
-    pickBtn.addEventListener('click', ()=> input.click());
+    // ⭐ 統一：所有圖片只存這裡
+    window.filesState = [];
 
-    input.addEventListener('change', (e)=>{
+    pickBtn.addEventListener("click", () => input.click());
+
+    input.addEventListener("change", (e) => {
+      // ⭐ 每次重新選照片，都重置 filesState（避免累加）
       const incoming = Array.from(e.target.files);
-      for(const f of incoming){
-        if(filesState.length>=5) break;
-        filesState.push(f);
-      }
-      render();
-      syncBackToInput();
-      input.value = "";
+      window.filesState = incoming.slice(0, 5);
+
+      renderPreview();
+      input.value = ""; // 清空，避免第二次選同檔案不觸發 change
     });
 
-    function render(){
+    function renderPreview() {
       preview.innerHTML = "";
-      filesState.forEach((file, idx)=>{
-        const reader = new FileReader();
-        reader.onload = ev=>{
-          const box = document.createElement('div');
-          box.className = 'preview-item';
 
-          const img = document.createElement('img');
+      window.filesState.forEach((file, idx) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const box = document.createElement("div");
+          box.className = "preview-item";
+
+          const img = document.createElement("img");
           img.src = ev.target.result;
 
-          const btn = document.createElement('button');
-          btn.className = 'remove-btn';
-          btn.textContent = '✕';
-          Object.assign(btn.style,{position:'absolute',top:'6px',right:'6px',left:'auto',bottom:'auto',transform:'none'});
+          const btn = document.createElement("button");
+          btn.className = "remove-btn";
+          btn.textContent = "✕";
 
-          btn.addEventListener('click', ()=>{
-            filesState.splice(idx,1);
-            render();
-            syncBackToInput();
-          });
+          btn.onclick = () => {
+            window.filesState.splice(idx, 1);
+            renderPreview();
+          };
 
           box.appendChild(img);
           box.appendChild(btn);
@@ -948,12 +946,12 @@
         reader.readAsDataURL(file);
       });
 
-      status.textContent = filesState.length ? `已選擇 ${filesState.length} 張照片` : '尚未選擇';
+      status.textContent =
+        window.filesState.length
+          ? `已選擇 ${window.filesState.length} 張照片`
+          : "尚未選擇";
     }
 
-    function syncBackToInput(){
-      
-    }
   })();
   </script>
 </body>
