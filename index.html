@@ -38,7 +38,8 @@
     .dlg-thumb {
       width: 70px;
       height: 70px;
-      object-fit: cover;
+      object-fit: contain;
+      background-color: #f3f4f6;
       border-radius: 8px;
       cursor: pointer;
       opacity: 0.7;
@@ -253,7 +254,7 @@
   <dialog id="petDialog" class="w-full max-w-2xl max-h-[90vh] rounded-2xl p-0 overflow-y-auto">
     <div class="bg-white dark:bg-gray-900">
       <div class="relative aspect-video bg-gray-100 dark:bg-gray-800">
-        <img id="dlgImg" alt="毛孩照片" class="w-full h-full object-cover cursor-pointer"/>
+        <img id="dlgImg" alt="毛孩照片" class="w-full h-full object-contain cursor-pointer"/>
         <button id="dlgClose" class="absolute top-3 right-3 bg-black/60 text-white p-2 rounded-full" aria-label="關閉">✕</button>
       </div>
       <div id="dlgThumbs" class="flex gap-2 overflow-x-auto p-3"></div>
@@ -377,7 +378,7 @@
 
         card.innerHTML = `
           <div class="relative aspect-[4/3] bg-gray-100 dark:bg-gray-800">
-            <img src="${cover}" alt="${p.name || '毛孩'} 的照片" class="w-full h-full object-cover" loading="lazy"/>
+            <img src="${cover}" alt="${p.name || '毛孩'} 的照片" class="w-full h-full object-contain" loading="lazy"/>
             <span class="absolute top-3 left-3 text-xs px-2 py-1 rounded bg-white/90 dark:bg-gray-900/80">${p.city || ''}</span>
           </div>
           <div class="p-4">
