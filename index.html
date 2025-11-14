@@ -140,35 +140,9 @@
 
   <!-- Filters + Pets -->
   <main id="pets" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-      <div>
-        <h2 class="text-2xl font-bold">找毛孩</h2>
-        <p class="text-gray-600 dark:text-gray-300">依品種/年齡/地區快速篩選，點擊卡片可查看詳細資訊。</p>
-      </div>
-      <div class="flex items-center gap-3">
-        <label class="inline-flex items-center gap-2 text-sm"><input id="onlyKids" type="checkbox" class="rounded border-gray-300 dark:border-gray-700"> 適合與小孩</label>
-        <label class="inline-flex items-center gap-2 text-sm"><input id="onlyVacc" type="checkbox" class="rounded border-gray-300 dark:border-gray-700"> 已施打疫苗</label>
-        <label class="inline-flex items-center gap-2 text-sm"><input id="onlyNeut" type="checkbox" class="rounded border-gray-300 dark:border-gray-700"> 已節育</label>
-      </div>
-    </div>
-
-    <div class="mt-6 grid grid-cols-2 md:grid-cols-6 gap-3">
-      <select id="fSpecies" class="col-span-1 md:col-span-1 rounded-xl border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-2"><option value="">全部</option><option value="貓">貓</option><option value="狗">狗</option></select>
-      <select id="fAge" class="col-span-1 md:col-span-1 rounded-xl border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-2"><option value="">年齡</option><option>幼年</option><option>成年</option><option>熟齡</option></select>
-      <select id="fSize" class="col-span-1 md:col-span-1 rounded-xl border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-2"><option value="">體型</option><option>小型</option><option>中型</option><option>大型</option></select>
-      <select id="fCity" class="col-span-1 md:col-span-1 rounded-xl border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-2"><option value="">地區</option><option>台北</option><option>新北</option><option>桃園</option><option>台中</option><option>台南</option><option>高雄</option></select>
-      <input id="fQuery" class="col-span-2 md:col-span-2 rounded-xl border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-2" placeholder="輸入關鍵字（如：虎斑、親人、活潑）" />
-      <div class="col-span-2 md:col-span-1 flex gap-2">
-        <button id="btnFilter" class="flex-1 px-4 py-2 rounded-xl bg-gray-900 text-white dark:bg-white dark:text-gray-900 font-medium">套用</button>
-        <button id="btnReset" class="px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-700">重置</button>
-      </div>
-    </div>
-
     <div id="grid" class="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
       <!-- Cards injected here -->
     </div>
-
-    <div id="emptyState" class="hidden mt-10 text-center text-gray-500 dark:text-gray-400">沒有符合條件的毛孩，試試看調整篩選條件。</div>
   </main>
 
   <!-- Apply Section -->
@@ -339,7 +313,7 @@
       pets = [...cats, ...dogs];
 
       applyStats();
-      filterPets(); // 用最新資料重新套用篩選 & 渲染
+      render(pets);  // 直接渲染全部，不要篩選
     }
 
     // ======= State & Utils =======
@@ -419,51 +393,6 @@
         $('#name').focus();
       }));
     }
-
-    // ======= Filtering =======
-    function getFilters(){
-      return {
-        species: $('#fSpecies').value,
-        age: $('#fAge').value,
-        size: $('#fSize').value,
-        city: $('#fCity').value,
-        query: $('#fQuery').value.trim().toLowerCase(),
-        onlyKids: $('#onlyKids').checked,
-        onlyVacc: $('#onlyVacc').checked,
-        onlyNeut: $('#onlyNeut').checked,
-      };
-    }
-
-    function filterPets(){
-      const f = getFilters();
-      const list = pets.filter(p => {
-        if(f.species && p.species !== f.species) return false;
-        if(f.age && p.age !== f.age) return false;
-        if(f.size && p.size !== f.size) return false;
-        if(f.city && p.city !== f.city) return false;
-        if(f.onlyKids && !p.goodWithKids) return false;
-        if(f.onlyVacc && !p.vaccinated) return false;
-        if(f.onlyNeut && !p.neutered) return false;
-        if(f.query){
-          const hay = ((p.name || '') + (p.color || '') + (p.desc || '') + (p.city || '')).toLowerCase();
-          if(!hay.includes(f.query)) return false;
-        }
-        return true;
-      }).sort((a,b) => getCreatedAtMs(b) - getCreatedAtMs(a));
-
-      render(list);
-    }
-
-    // Buttons
-    $('#btnFilter').addEventListener('click', filterPets);
-    $('#btnReset').addEventListener('click', () => {
-      ['#fSpecies','#fAge','#fSize','#fCity','#fQuery','#onlyKids','#onlyVacc','#onlyNeut'].forEach(sel => {
-        const el = $(sel);
-        if(!el) return;
-        if(el.type === 'checkbox') el.checked = false; else el.value = '';
-      });
-      filterPets();
-    });
 
     // ======= Modal =======
     const dlg = document.getElementById('petDialog');
