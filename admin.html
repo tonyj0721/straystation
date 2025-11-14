@@ -375,10 +375,6 @@
       word-break: break-word;
       margin-bottom: 16px; /* 🔹 與按鈕距離更小 */
     }
-
-    .hidden {
-      display: none;
-    }
   </style>
 
   <script type="module">
@@ -444,7 +440,12 @@
       document.body.style.overflow = "hidden";
 
       // 🧩 資料顯示（若無資料顯示不詳）
+      document.getElementById("modalName").textContent   = pet.name;
+      document.getElementById("modalSpecies").textContent = pet.species;
+      document.getElementById("modalBreed").textContent   = pet.breed;
       document.getElementById("modalAge").textContent = pet.age || "年齡不詳";
+      document.getElementById("modalGender").textContent  = pet.gender;
+      document.getElementById("modalDesc").textContent    = pet.desc;
 
       // 🖼️ 圖片顯示
       const photoContainer = document.getElementById("modalPhotos");
