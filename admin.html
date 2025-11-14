@@ -575,13 +575,13 @@
         breed.disabled = true;
       }
 
-      // 🐾 類別切換
+      // 🐾 切換
       speciesSelect.addEventListener("change", () => {
         resetBreed();
         if (speciesSelect.value === "貓" || speciesSelect.value === "狗") {
           breedTypeWrap.classList.remove("hidden");
           breedType.disabled = false;
-          // 根據選擇的類別更新選項文字
+          // 根據選擇的更新選項文字
           breedType.innerHTML = `
             <option value="">請選擇</option>
             ${speciesSelect.value === "貓" 
@@ -591,7 +591,7 @@
         }
       });
 
-      // 🐱🐶 第二層：品種類別
+      // 🐱🐶 第二層：品種
       breedType.addEventListener("change", () => {
         breed.innerHTML = `<option value="">請選擇</option>`;
         const breedLabel = document.querySelector('#breedWrap label');
@@ -735,7 +735,7 @@
           window.filesState = [];
           selectedFiles = [];
           preview.innerHTML = "";
-          document.getElementById("selectedCount").textContent = "尚未選擇";
+          document.getElementById("photoStatus").textContent = "尚未選擇";
 
         } catch (err) {
           console.error("❌ 新增失敗：", err);
@@ -804,7 +804,7 @@
         <input name="name" id="petNameInput" required>
         <small id="nameWarn" style="color:red; display:none;">此名字已存在</small>
 
-        <label>類別</label>
+        <label></label>
         <select name="species" id="species">
           <option value="">請選擇</option>
           <option value="貓">貓咪</option>
@@ -812,7 +812,7 @@
         </select>
 
         <div id="breedTypeWrap" class="hidden">
-          <label>品種類別</label>
+          <label>品種</label>
           <select id="breedType" name="breedType" disabled>
             <option value="">請選擇</option>
             <option value="品種貓">品種貓</option>
@@ -862,7 +862,7 @@
         <thead>
           <tr>
             <th>名字</th>
-            <th>類別</th>
+            <th></th>
             <th>品種</th>
             <th>年齡</th>
             <th>性別</th>
