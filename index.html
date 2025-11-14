@@ -468,15 +468,7 @@
     // ======= Modal =======
     const dlg = document.getElementById('petDialog');
     // 鎖住 / 恢復背景捲動
-    function lockScroll() {
-      document.documentElement.style.overflow = 'hidden';
-      document.body.style.overflow = 'hidden';
-    }
-
-    function unlockScroll() {
-      document.documentElement.style.overflow = '';
-      document.body.style.overflow = '';
-    }
+    
     $('#dlgClose').addEventListener('click', () => {
       dlg.close();
       unlockScroll();
