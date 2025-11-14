@@ -694,6 +694,9 @@
           // ⭐ 自動更新已登錄動物列表
           loadPets();
 
+          // ⭐ 自動滾到最上層
+          window.scrollTo({ top: 0, behavior: "smooth" });
+
           form.reset();
           nameInput.style.border = "";
           nameWarn.style.display = "none";
