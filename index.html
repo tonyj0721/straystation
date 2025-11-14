@@ -360,6 +360,22 @@
       $('#statPlaced').textContent = 128;
     }
 
+    function formatBreed(p){
+      if (!p.breedCategory && !p.breed) return "品種不詳";
+
+      // 品種犬 → p.breed = "貴賓"
+      // 米克斯 → p.breedCategory = "米克斯", p.breed = "棕色"
+      if (p.breedCategory === "米克斯") {
+        return `米克斯/${p.breed || "不明"}`;
+      }
+      return p.breed || "品種不詳";
+    }
+
+    function formatAge(p){
+      if (!p.age || p.age.trim() === "" || p.age === "—") return "年齡不詳";
+      return p.age;
+    }
+
     // ======= Render Cards =======
     function render(petList){
       const grid = $('#grid');
@@ -379,33 +395,28 @@
         card.innerHTML = `
           <div class="relative aspect-[4/3] bg-gray-100 dark:bg-gray-800">
             <img src="${cover}" alt="${p.name || '毛孩'} 的照片" class="w-full h-full object-contain" loading="lazy"/>
-            <span class="absolute top-3 left-3 text-xs px-2 py-1 rounded bg-white/90 dark:bg-gray-900/80">${p.city || ''}</span>
           </div>
           <div class="p-4">
             <div class="flex items-start justify-between gap-3">
               <div>
                 <h3 class="text-lg font-semibold">${p.name || '未命名'}</h3>
-                <p class="text-sm text-gray-500">${p.species || '—'}・${p.gender || '—'}・${p.age || '—'}・${p.size || '—'}</p>
+                <p class="text-sm text-gray-500">
+                  ${p.species || '—'}・
+                  ${formatBreed(p)}・
+                  ${formatAge(p)}・
+                  ${p.gender || '—'}
+                </p>
               </div>
-              <button class="like p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="加入收藏">♡</button>
             </div>
             <div class="mt-3 flex flex-wrap gap-2 text-xs">
               ${fmtBadges(p).map(b => `<span class='px-2 py-1 rounded bg-gray-100 dark:bg-gray-800'>${b}</span>`).join('')}
             </div>
-            <div class="mt-4 flex gap-2">
-              <button data-id="${p.id}" class="btn-detail flex-1 px-3 py-2 rounded-xl bg-gray-900 text-white dark:bg白 dark:text-gray-900">查看</button>
-              <button data-id="${p.id}" class="btn-adopt px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700">認養</button>
+            <div class="mt-4">
+              <button data-id="${p.id}" class="btn-detail w-full px-3 py-2 rounded-xl bg-gray-900 text-white dark:bg-white dark:text-gray-900">查看</button>
             </div>
           </div>`;
 
         grid.appendChild(card);
-      });
-
-      // Like interaction (localStorage)
-      $$('.like').forEach(btn => {
-        btn.addEventListener('click', () => {
-          btn.textContent = btn.textContent === '♡' ? '♥' : '♡';
-        });
       });
 
       // Detail modal
