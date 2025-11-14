@@ -51,8 +51,7 @@
 
     #lightbox {
       position: fixed;
-      top: 0;
-      left: 0;
+      inset: 0;
       width: 100vw;
       height: 100vh;
       -webkit-backdrop-filter: none;
@@ -585,32 +584,48 @@
     const lbImg = document.getElementById("lbImg");
     const lbPrev = document.getElementById("lbPrev");
     const lbNext = document.getElementById("lbNext");
-    const petDialog = document.getElementById("petDialog");
+    const dlg = document.getElementById("petDialog");
 
     let lbImages = [];
     let lbIndex = 0;
 
-    // 🔥 開啟 Lightbox
+    // 用來記住原本 scroll 狀態
+    let oldHtmlOverflow = "";
+    let oldBodyOverflow = "";
+
+    // 🔥 開啟 Lightbox：完全關掉 dialog + 鎖定背景
     function openLightbox(images, index = 0) {
       lbImages = images;
       lbIndex = index;
 
       lbImg.src = lbImages[lbIndex];
 
-      // ⭐ iOS 修正：隱藏 modal，避免遮住 lightbox
-      petDialog.style.visibility = "hidden";
+      // ❗ 1. 關閉 dialog（避免 backdrop 蓋住）
+      if (typeof dlg.close === "function") dlg.close();
 
+      // ❗ 2. 鎖定背景（桌機 + 手機）
+      oldHtmlOverflow = document.documentElement.style.overflow;
+      oldBodyOverflow = document.body.style.overflow;
+
+      document.documentElement.style.overflow = "hidden";
+      document.body.style.overflow = "hidden";
+
+      // ❗ 3. 顯示 Lightbox
       lb.classList.remove("hidden");
       lb.classList.add("flex");
     }
 
-    // 🔥 關閉 Lightbox
+    // 🔥 關閉 Lightbox：恢復背景 + 回到 dialog
     function closeLightbox() {
       lb.classList.add("hidden");
       lb.classList.remove("flex");
 
-      // ⭐ 恢復 modal
-      petDialog.style.visibility = "visible";
+      // ❗ 恢復背景可滾動
+      document.documentElement.style.overflow = oldHtmlOverflow;
+      document.body.style.overflow = oldBodyOverflow;
+
+      // ❗ 恢復 dialog
+      if (typeof dlg.showModal === "function") dlg.showModal();
     }
 
     // 🔥 左右切換
@@ -623,25 +638,37 @@
     lbNext.onclick = () => lbShow(1);
 
     // 🔥 點黑幕關閉
-    lb.onclick = e => {
+    lb.addEventListener("click", (e) => {
       if (e.target === lb) closeLightbox();
-    };
+    });
 
-    // 🔥 按 ESC 關閉
-    document.addEventListener("keydown", e => {
+    // 🔥 ESC 關閉
+    document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") closeLightbox();
     });
 
-    // 🔥 手機滑動（左滑/右滑）
+    // 🔥 手機滑動切換
     let touchStartX = 0;
-    lb.addEventListener("touchstart", e => {
+    lb.addEventListener("touchstart", (e) => {
       touchStartX = e.touches[0].clientX;
-    });
-    lb.addEventListener("touchend", e => {
+    }, { passive: true });
+
+    lb.addEventListener("touchend", (e) => {
       const diff = e.changedTouches[0].clientX - touchStartX;
       if (diff > 50) lbShow(-1);
       if (diff < -50) lbShow(1);
-    });
+    }, { passive: true });
+
+    // 🔥 完全阻止背景滑動（桌機 + 手機都有效）
+    lb.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    }, { passive: false });
+
+    lb.addEventListener("touchmove", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    }, { passive: false });
   </script>
 
   <!-- SEO: organization schema -->
