@@ -250,7 +250,7 @@
   </section>
 
   <!-- Pet Detail Modal -->
-  <dialog id="petDialog" class="w-full max-w-2xl rounded-2xl p-0 overflow-hidden">
+  <dialog id="petDialog" class="w-full max-w-2xl max-h-[90vh] rounded-2xl p-0 overflow-y-auto">
     <div class="bg-white dark:bg-gray-900">
       <div class="relative aspect-video bg-gray-100 dark:bg-gray-800">
         <img id="dlgImg" alt="毛孩照片" class="w-full h-full object-cover cursor-pointer"/>
@@ -466,7 +466,20 @@
 
     // ======= Modal =======
     const dlg = document.getElementById('petDialog');
-    $('#dlgClose').addEventListener('click', () => dlg.close());
+    // 鎖住 / 恢復背景捲動
+    function lockScroll() {
+      document.documentElement.style.overflow = 'hidden';
+      document.body.style.overflow = 'hidden';
+    }
+
+    function unlockScroll() {
+      document.documentElement.style.overflow = '';
+      document.body.style.overflow = '';
+    }
+    $('#dlgClose').addEventListener('click', () => {
+      dlg.close();
+      unlockScroll();
+    });
     $('#dlgShare').addEventListener('click', async () => {
       const name = $('#dlgName').textContent;
       const url = location.href.split('#')[0];
@@ -481,8 +494,14 @@
     $('#dlgAdopt').addEventListener('click', () => {
       document.getElementById('petName').value = $('#dlgName').textContent;
       dlg.close();
+      unlockScroll();
       location.hash = '#apply';
       $('#name').focus();
+    });
+    // 防止使用者按 ESC 或點 backdrop 關掉時，背景卡死
+    dlg.addEventListener('close', () => {
+      // 保險：確保有恢復
+      unlockScroll();
     });
 
     function openDialog(id){
@@ -537,6 +556,8 @@
       document.getElementById('dlgBadges').innerHTML =
         badges || '<li class="text-gray-500">—</li>';
 
+      // 開啟前鎖住背景捲動
+      lockScroll();
       dlg.showModal();
     }
 
