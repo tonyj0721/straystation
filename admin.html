@@ -562,8 +562,6 @@
       const breed = document.getElementById("breed");
       const photoInput = document.getElementById("photo");
       const preview = document.getElementById("preview");
-      window.scrollTo(0, 0);
-      document.querySelector(".list-card").scrollTo(0, 0);
 
       let selectedFiles = [];
 
@@ -780,9 +778,15 @@
       });
     });
 
+    // 🔥 重新整理前強制捲到最上方
+    window.addEventListener("beforeunload", () => {
+      window.scrollTo(0, 0);
+    });
+
+    // 🔥 重新整理後強制捲到最上方
     window.addEventListener("load", () => {
       setTimeout(() => {
-        window.scrollTo({ top: 0, behavior: "instant" });
+        window.scrollTo(0, 0);
       }, 10);
     });
   </script>
