@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width"/>
+  <title>貓咪列表｜浪浪轉運站</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-white text-gray-800">
+
+  <header class="p-4 border-b bg-white sticky top-0">
+    <a href="index.html" class="text-lg font-bold">← 回首頁</a>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-10">
+    <h1 class="text-3xl font-bold mb-6">貓咪列表</h1>
+
+    <div id="grid" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"></div>
+    <p id="emptyState" class="hidden text-center text-gray-500 mt-10">沒有貓咪資料。</p>
+  </main>
+
+  <!-- Modal（與 index.html 共用） -->
+  <dialog id="petDialog" class="w-full max-w-xl rounded-xl bg-white p-0 overflow-hidden shadow-xl">
+    <div>
+      <div class="relative aspect-video bg-gray-100">
+        <img id="dlgImg" class="w-full h-full object-cover"/>
+        <button id="dlgClose" class="absolute top-3 right-3 bg-black/60 text-white p-2 rounded-full">✕</button>
+      </div>
+      <div class="p-5">
+        <h3 id="dlgName" class="text-xl font-semibold"></h3>
+        <p id="dlgMeta" class="text-gray-500"></p>
+        <p id="dlgDesc" class="mt-3"></p>
+        <ul id="dlgBadges" class="mt-3 flex flex-wrap gap-2 text-sm"></ul>
+
+        <div class="text-right mt-4">
+          <a id="dlgAdopt" class="px-4 py-2 bg-brand-600 text-white rounded-xl inline-block">我要認養</a>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+<script type="module">
+
+import {
+  getFirestore, collection, query, where,
+  orderBy, getDocs
+} from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+
+const db = getFirestore();
+
+// 取得所有貓
+async function loadCats() {
+  const q = query(
+    collection(db, "pets"),
+    where("species", "==", "貓"),
+    orderBy("createdAt", "desc")
+  );
+  const snap = await getDocs(q);
+  const pets = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  render(pets);
+  window._pets = pets;
+}
+
+loadCats();
+
+// ========= 卡片渲染 =========
+function render(list) {
+  const grid = document.getElementById("grid");
+  grid.innerHTML = "";
+
+  if (!list.length) {
+    document.getElementById("emptyState").classList.remove("hidden");
+    return;
+  }
+
+  list.forEach(p => {
+    const card = document.createElement("article");
+    card.className = "rounded-xl ring-1 ring-gray-200 bg-white hover:shadow-lg overflow-hidden";
+    card.innerHTML = `
+      <div class="aspect-[4/3] bg-gray-100">
+        <img src="${p.images?.[0] ?? ''}" class="w-full h-full object-cover"/>
+      </div>
+      <div class="p-4">
+        <h3 class="font-bold text-lg">${p.name}</h3>
+        <p class="text-gray-500">${p.gender}・${p.age}</p>
+        <button data-id="${p.id}" class="btn-detail mt-3 px-3 py-2 bg-gray-900 text-white rounded-lg w-full">查看</button>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+
+  document.querySelectorAll(".btn-detail").forEach(btn =>
+    btn.addEventListener("click", () => openDialog(btn.dataset.id))
+  );
+}
+
+// ========= Modal =========
+const dlg = document.getElementById("petDialog");
+document.getElementById("dlgClose").onclick = () => dlg.close();
+
+function openDialog(id) {
+  const p = window._pets.find(x => x.id === id);
+  if (!p) return;
+
+  document.getElementById("dlgImg").src = p.images[0] ?? "";
+  document.getElementById("dlgName").textContent = p.name;
+  document.getElementById("dlgMeta").textContent = `${p.gender}・${p.age}`;
+  document.getElementById("dlgDesc").textContent = p.description ?? "";
+  document.getElementById("dlgAdopt").href = `index.html#apply`;
+
+  dlg.showModal();
+}
+
+</script>
+</body>
+</html>
