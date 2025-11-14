@@ -560,7 +560,8 @@
 
       // 基本資料（原本的）
       document.getElementById('dlgName').textContent = p.name || '未命名';
-      document.getElementById('dlgMeta').textContent = `${p.species || '—'}・${p.gender || '—'}・${p.age || '—'}・${p.size || '—'}`;
+      document.getElementById('dlgMeta').textContent =
+        `${p.species || '—'}・${formatBreed(p)}・${formatAge(p)}・${p.gender || '—'}`;
       document.getElementById('dlgCity').textContent = p.city || '—';
       document.getElementById('dlgDesc').textContent = p.desc || '';
 
