@@ -505,6 +505,21 @@
       unlockScroll();
     });
 
+    let scrollTop = 0;
+
+    function lockScroll() {
+      scrollTop = window.scrollY; 
+      document.body.style.position = "fixed";
+      document.body.style.top = `-${scrollTop}px`;
+      document.body.style.width = "100%";
+    }
+
+    function unlockScroll() {
+      document.body.style.position = "";
+      document.body.style.top = "";
+      window.scrollTo(0, scrollTop);
+    }
+
     function openDialog(id){
       const p = pets.find(x => x.id === id);
       if(!p) return;
