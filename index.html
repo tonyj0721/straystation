@@ -346,14 +346,6 @@
     const $ = (q) => document.querySelector(q);
     const $$ = (q) => document.querySelectorAll(q);
 
-    function fmtBadges(p){
-      const arr = [];
-      if(p.vaccinated) arr.push('已施打疫苗');
-      if(p.neutered) arr.push('已節育');
-      if(p.goodWithKids) arr.push('適合與小孩');
-      return arr;
-    }
-
     function applyStats(){
       $('#statAvailable').textContent = pets.length;
       // 簡單示意：假設 128 已送養
@@ -562,14 +554,7 @@
       document.getElementById('dlgName').textContent = p.name || '未命名';
       document.getElementById('dlgMeta').textContent =
         `${p.species || '—'}・${formatBreed(p)}・${formatAge(p)}・${p.gender || '—'}`;
-      document.getElementById('dlgCity').textContent = p.city || '—';
       document.getElementById('dlgDesc').textContent = p.desc || '';
-
-      const badges = fmtBadges(p).map(b =>
-        `<li class='px-2 py-1 rounded bg-gray-100 dark:bg-gray-800'>${b}</li>`
-      ).join('');
-      document.getElementById('dlgBadges').innerHTML =
-        badges || '<li class="text-gray-500">—</li>';
 
       // 開啟前鎖住背景捲動
       lockScroll();
