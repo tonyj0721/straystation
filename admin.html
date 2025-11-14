@@ -732,8 +732,10 @@
           form.reset();
           nameInput.style.border = "";
           nameWarn.style.display = "none";
+          window.filesState = [];
           selectedFiles = [];
           preview.innerHTML = "";
+          document.getElementById("selectedCount").textContent = "尚未選擇";
 
         } catch (err) {
           console.error("❌ 新增失敗：", err);
