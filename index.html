@@ -57,6 +57,20 @@
       height: 100vh;
       -webkit-backdrop-filter: none;
     }
+    #lbThumbs img {
+      width: 60px;
+      height: 60px;
+      object-fit: contain;
+      border-radius: 6px;
+      opacity: 0.5;
+      cursor: pointer;
+      background: #444;
+    }
+
+    #lbThumbs img.active {
+      opacity: 1;
+      border: 2px solid white;
+    }
   </style>
 </head>
 <body class="bg-white text-gray-800 dark:bg-gray-950 dark:text-gray-100">
@@ -284,6 +298,11 @@
 
     <!-- 主圖片 -->
     <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg"/>
+
+    <!-- 🔥 Lightbox 縮圖列 -->
+    <div id="lbThumbs"
+      class="absolute bottom-5 left-1/2 -translate-x-1/2 flex gap-2 overflow-x-auto px-4 py-2">
+    </div>
 
     <!-- 右箭頭 -->
     <button id="lbNext"
@@ -615,6 +634,27 @@
 
       lbImg.src = lbImages[lbIndex];
 
+      // 建立縮圖列
+      const lbThumbs = document.getElementById("lbThumbs");
+      lbThumbs.innerHTML = "";
+
+      lbImages.forEach((url, i) => {
+        const t = document.createElement("img");
+        t.src = url;
+        t.className = i === lbIndex ? "active" : "";
+
+        t.addEventListener("click", () => {
+          lbIndex = i;
+          lbImg.src = lbImages[lbIndex];
+
+          // 更新 active 樣式
+          lbThumbs.querySelectorAll("img").forEach(el => el.classList.remove("active"));
+          t.classList.add("active");
+        });
+
+        lbThumbs.appendChild(t);
+      });
+
       // ❗ 1. 關閉 dialog（避免 backdrop 蓋住）
       if (typeof dlg.close === "function") dlg.close();
 
@@ -647,6 +687,12 @@
     function lbShow(delta) {
       lbIndex = (lbIndex + delta + lbImages.length) % lbImages.length;
       lbImg.src = lbImages[lbIndex];
+
+      // 同步更新縮圖 active 樣式
+      const lbThumbs = document.getElementById("lbThumbs");
+      lbThumbs.querySelectorAll("img").forEach((el, i) => {
+        el.classList.toggle("active", i === lbIndex);
+      });
     }
 
     lbPrev.onclick = () => lbShow(-1);
