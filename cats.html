@@ -460,8 +460,8 @@
       if (!currentPetId) return;
       const name = document.getElementById('dlgName').textContent.trim();
       const url = makePetUrl(currentPetId);
-      const text = `一起幫 ${name} 找到家！`;
-      window.open(`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+      const msg = `一起幫 ${name} 找到家！ ${url}`;
+      window.open(`https://line.me/R/msg/text/?${encodeURIComponent(msg)}`, '_blank', 'noopener');
     });
 
     $('#dlgAdopt').addEventListener('click', () => {
@@ -564,6 +564,7 @@
   </script>
 </body>
 </html>
+
 
 
 
