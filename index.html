@@ -509,23 +509,6 @@
       dlg.showModal();
     }
 
-    // ======= Form Handling（原本的 localStorage 版本） =======
-    $('#applyForm').addEventListener('submit', (e) => {
-      e.preventDefault();
-      const form = e.target;
-      if(!form.checkValidity()){
-        form.reportValidity();
-        return;
-      }
-      const data = Object.fromEntries(new FormData(form).entries());
-      const applications = JSON.parse(localStorage.getItem('applications')||'[]');
-      applications.push({ ...data, ts: new Date().toISOString() });
-      localStorage.setItem('applications', JSON.stringify(applications));
-      form.reset();
-      $('#toast').classList.remove('hidden');
-      setTimeout(()=>$('#toast').classList.add('hidden'), 4000);
-    });
-
     // ======= Theme & Nav（原樣保留） =======
     $('#navToggle').addEventListener('click', ()=>{
       const el = $('#mobileNav');
