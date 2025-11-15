@@ -183,6 +183,22 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
     import { getFirestore, collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 
+    // === Deep Link utilities (for sharable modal links) ===
+    let currentPetId = null;
+
+    function makePetUrl(id) {
+      // 產生：cats.html?pet=<id>
+      return `${location.origin}${location.pathname}?pet=${encodeURIComponent(id)}`;
+    }
+
+    function openFromDeepLink() {
+      const q = new URLSearchParams(location.search);
+      const id = q.get('pet');
+      if (!id || !Array.isArray(pets)) return;
+      const hit = pets.find(p => p.id === id);
+      if (hit) openDialog(hit.id);
+    }
+
     const firebaseConfig = {
       apiKey: "AIzaSyC4NT2KOm_Cw2OEdaaOimxI0ruoNv_u_9g",
       authDomain: "straystation.firebaseapp.com",
@@ -345,6 +361,7 @@
       pets = all.filter(p => p.species === SPECIES);
       buildBreedOptionsByType(); // ← 新的
       render(pets);
+      + openFromDeepLink();
 
       render(pets);
       // 即時篩選：任一選單變更就篩
@@ -419,6 +436,9 @@
         `${p.species || '—'}・${formatBreed(p)}・${formatAge(p)}・${p.gender || '—'}`;
       document.getElementById('dlgDesc').textContent = p.desc || '';
 
+      + currentPetId = id;
+      + history.replaceState(null, '', `?pet=${encodeURIComponent(id)}`);
+
       lockScroll();
       dlg.showModal();
     }
@@ -426,24 +446,23 @@
     $('#dlgClose').addEventListener('click', () => {
       dlg.close();
       unlockScroll();
+      + history.replaceState(null, '', location.pathname);
+      + currentPetId = null;
     });
 
     dlg.addEventListener('close', () => {
       unlockScroll();
+      + history.replaceState(null, '', location.pathname);
+      + currentPetId = null;
     });
 
     $('#dlgShare').addEventListener('click', () => {
-      const name = $('#dlgName').textContent.trim();
-      const baseUrl = location.origin + location.pathname;      // 乾淨頁面網址（不帶 #）
-      const url = `${baseUrl}#${encodeURIComponent(name)}`;     // 可用名字當錨點；有自己的 id 就改成 id
-      const text = `一起幫 ${name} 找到家！`;
-
-      // LINE 官方分享（會帶你到 LINE 的分享頁）
-      const shareUrl = `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
-
-      window.open(shareUrl, '_blank', 'noopener');
+      if (!currentPetId) return;
+      const name = document.getElementById('dlgName').textContent.trim();
+      const url = makePetUrl(currentPetId);
+      const msg = `一起幫 ${name} 找到家！ ${url}`;
+      window.open(`https://line.me/R/msg/text/?${encodeURIComponent(msg)}`, '_blank', 'noopener');
     });
-
 
     $('#dlgAdopt').addEventListener('click', () => {
       dlg.close();
@@ -547,6 +566,7 @@
   </script>
 </body>
 </html>
+
 
 
 
