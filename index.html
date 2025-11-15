@@ -2,7 +2,7 @@
 <html lang="zh-Hant" class="scroll-smooth">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>浪浪轉運站｜貓狗送養平台</title>
   <meta name="description" content="浪浪轉運站：友善的貓狗送養平台。快速篩選、查看細節，手機與電腦版皆可用。" />
   <!-- Favicon -->
@@ -54,23 +54,8 @@
       position: fixed;
       inset: 0;
       width: 100vw;
-      height: 100dvh;  /* 🔥 iOS 真實視窗高度 */
+      height: 100vh;
       -webkit-backdrop-filter: none;
-      padding-bottom: env(safe-area-inset-bottom); /* 🔥 iOS 補底部 */
-    }
-    #lbThumbs img {
-      width: 60px;
-      height: 60px;
-      object-fit: contain;
-      border-radius: 6px;
-      opacity: 0.5;
-      cursor: pointer;
-      background: #444;
-    }
-
-    #lbThumbs img.active {
-      opacity: 1;
-      border: 2px solid white;
     }
   </style>
 </head>
@@ -279,8 +264,10 @@
             <h3 id="dlgName" class="text-xl font-semibold">—</h3>
             <p id="dlgMeta" class="text-gray-500">—</p>
           </div>
+          <span id="dlgCity" class="inline-flex items-center px-2 py-1 text-xs bg-gray-100 dark:bg-gray-800 rounded">—</span>
         </div>
         <p id="dlgDesc" class="text-gray-700 dark:text-gray-200">—</p>
+        <ul id="dlgBadges" class="flex flex-wrap gap-2 text-sm"></ul>
         <div class="flex justify-end gap-3 pt-2">
           <button id="dlgAdopt" class="px-4 py-2 rounded-xl bg-brand-600 text-white">我要認養</button>
           <button id="dlgShare" class="px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-700">分享</button>
@@ -299,11 +286,6 @@
 
     <!-- 主圖片 -->
     <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg"/>
-
-    <!-- 🔥 Lightbox 縮圖列 -->
-    <div id="lbThumbs"
-      class="absolute bottom-20 left-0 w-full flex justify-center gap-3 px-4 py-2 pb-[env(safe-area-inset-bottom)]">
-    </div>
 
     <!-- 右箭頭 -->
     <button id="lbNext"
@@ -412,6 +394,9 @@
                   ${p.gender || '—'}
                 </p>
               </div>
+            </div>
+            <div class="mt-3 flex flex-wrap gap-2 text-xs">
+              ${fmtBadges(p).map(b => `<span class='px-2 py-1 rounded bg-gray-100 dark:bg-gray-800'>${b}</span>`).join('')}
             </div>
             <div class="mt-4">
               <button data-id="${p.id}" class="btn-detail w-full px-3 py-2 rounded-xl bg-gray-900 text-white dark:bg-white dark:text-gray-900">查看</button>
@@ -616,17 +601,6 @@
     loadIndexPets();   // 🚀 這裡去 Firestore 抓資料
 
         // ======= Lightbox =======
-    async function tryFullscreen() {
-      const el = document.documentElement;
-
-      if (document.fullscreenElement) return;
-
-      // Android + 桌機
-      if (el.requestFullscreen) {
-        try { await el.requestFullscreen(); } catch(e){}
-      }
-    }
-
     const lb = document.getElementById("lightbox");
     const lbImg = document.getElementById("lbImg");
     const lbPrev = document.getElementById("lbPrev");
@@ -641,34 +615,10 @@
 
     // 🔥 開啟 Lightbox：完全關掉 dialog + 鎖定背景
     function openLightbox(images, index = 0) {
-      // ❗ 自動嘗試全螢幕（iOS 不支援，不會報錯）
-      tryFullscreen();
-
       lbImages = images;
       lbIndex = index;
 
       lbImg.src = lbImages[lbIndex];
-
-      // 建立縮圖列
-      const lbThumbs = document.getElementById("lbThumbs");
-      lbThumbs.innerHTML = "";
-
-      lbImages.forEach((url, i) => {
-        const t = document.createElement("img");
-        t.src = url;
-        t.className = i === lbIndex ? "active" : "";
-
-        t.addEventListener("click", () => {
-          lbIndex = i;
-          lbImg.src = lbImages[lbIndex];
-
-          // 更新 active 樣式
-          lbThumbs.querySelectorAll("img").forEach(el => el.classList.remove("active"));
-          t.classList.add("active");
-        });
-
-        lbThumbs.appendChild(t);
-      });
 
       // ❗ 1. 關閉 dialog（避免 backdrop 蓋住）
       if (typeof dlg.close === "function") dlg.close();
@@ -702,12 +652,6 @@
     function lbShow(delta) {
       lbIndex = (lbIndex + delta + lbImages.length) % lbImages.length;
       lbImg.src = lbImages[lbIndex];
-
-      // 同步更新縮圖 active 樣式
-      const lbThumbs = document.getElementById("lbThumbs");
-      lbThumbs.querySelectorAll("img").forEach((el, i) => {
-        el.classList.toggle("active", i === lbIndex);
-      });
     }
 
     lbPrev.onclick = () => lbShow(-1);
