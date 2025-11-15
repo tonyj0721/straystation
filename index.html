@@ -368,14 +368,6 @@
 
       // Detail modal
       $$('.btn-detail').forEach(btn => btn.addEventListener('click', (e) => openDialog(e.target.dataset.id)));
-      // Adopt quick fill
-      $$('.btn-adopt').forEach(btn => btn.addEventListener('click', (e) => {
-        const p = pets.find(x => x.id === e.target.dataset.id);
-        if(!p) return;
-        document.getElementById('petName').value = p.name || '';
-        location.hash = '#apply';
-        $('#name').focus();
-      }));
     }
 
     // ======= Filtering =======
