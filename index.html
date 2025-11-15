@@ -628,61 +628,54 @@
 
     // 🔥 開啟 Lightbox：完全關掉 dialog + 鎖定背景
     function openLightbox(images, index = 0) {
-      lbImages = images;
-      lbIndex = index;
+  lbImages = images;
+  lbIndex = index;
 
+  lbImg.src = lbImages[lbIndex];
+
+  // 建立縮圖列
+  const lbThumbsInner = document.getElementById("lbThumbsInner");
+  lbThumbsInner.innerHTML = "";
+
+  lbImages.forEach((url, i) => {
+    const t = document.createElement("img");
+    t.src = url;
+    t.className = i === lbIndex ? "active" : "";
+
+    t.addEventListener("click", () => {
+      lbIndex = i;
       lbImg.src = lbImages[lbIndex];
 
-      // 建立縮圖列
-      const lbThumbsInner = document.getElementById("lbThumbsInner");
-      lbThumbsInner.innerHTML = "";
+      lbThumbsInner.querySelectorAll("img").forEach(el => el.classList.remove("active"));
+      t.classList.add("active");
+    });
 
-      lbImages.forEach((url, i) => {
-        const t = document.createElement("img");
-        t.src = url;
-        t.className = i === lbIndex ? "active" : "";
+    lbThumbsInner.appendChild(t);
+  });
 
-        t.addEventListener("click", () => {
-          lbIndex = i;
-          lbImg.src = lbImages[lbIndex];
+  // ❶ 正確：關掉 Modal（移除 backdrop）
+  if (dlg.open) dlg.close();
 
-          lbThumbsInner.querySelectorAll("img").forEach(el => el.classList.remove("active"));
-          t.classList.add("active");
-        });
+  // ❷ 正確：解除背景鎖定（避免 Lightbox 卡死）
+  unlockScroll();
 
-        lbThumbsInner.appendChild(t);
-      });
-
-      // ❗ 1. 關閉 dialog（避免 backdrop 蓋住）
-      dlg.style.display = "none";   // 🔥 暫時隱藏 Modal，不解除背景鎖定
-
-      // ❗ 2. 鎖定背景（桌機 + 手機）
-      oldHtmlOverflow = document.documentElement.style.overflow;
-      oldBodyOverflow = document.body.style.overflow;
-
-      document.documentElement.style.overflow = "hidden";
-      document.body.style.overflow = "hidden";
-
-      // ❗ 3. 顯示 Lightbox
-      lb.classList.remove("hidden");
-      lb.classList.add("flex");
-    }
+  // ❸ 顯示 Lightbox
+  lb.classList.remove("hidden");
+  lb.classList.add("flex");
+}
 
     // 🔥 關閉 Lightbox：恢復背景 + 回到 dialog
     function closeLightbox() {
-      // 隱藏 Lightbox
-      lb.classList.add("hidden");
-      lb.classList.remove("flex");
+  // 隱藏 Lightbox
+  lb.classList.add("hidden");
+  lb.classList.remove("flex");
 
-      // ❗ 恢復 Lightbox 開啟前的 overflow
-      document.documentElement.style.overflow = "";
+  // 回到 Modal
+  dlg.showModal();
 
-      // ❗ 顯示 Modal 回來（不要用 showModal，否則背景會跳動）
-      dlg.style.display = "";
-
-      // ❗ 回到 Modal → 重新鎖住背景
-      lockScroll();
-    }
+  // Modal 需要背景固定 → 再鎖一次
+  lockScroll();
+}
 
     // 🔥 左右切換
     function lbShow(delta) {
