@@ -236,6 +236,22 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
     import { getFirestore, collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 
+    // === Deep Link utilities (for sharable modal links) ===
+    let currentPetId = null;
+
+    function makePetUrl(id) {
+      // 產生：cats.html?pet=<id>
+      return `${location.origin}${location.pathname}?pet=${encodeURIComponent(id)}`;
+    }
+
+    function openFromDeepLink() {
+      const q = new URLSearchParams(location.search);
+      const id = q.get('pet');
+      if (!id || !Array.isArray(pets)) return;
+      const hit = pets.find(p => p.id === id);
+      if (hit) openDialog(hit.id);
+    }
+
     const firebaseConfig = {
       apiKey: "AIzaSyC4NT2KOm_Cw2OEdaaOimxI0ruoNv_u_9g",
       authDomain: "straystation.firebaseapp.com",
@@ -278,6 +294,7 @@
 
       applyStats();
       render(pets);
+      openFromDeepLink();
     }
 
     // ======= State & Utils =======
@@ -352,17 +369,15 @@
     $('#dlgClose').addEventListener('click', () => {
       dlg.close();
       unlockScroll();
+      history.replaceState(null, '', location.pathname);
+      currentPetId = null;
     });
-    $('#dlgShare').addEventListener('click', async () => {
-      const name = $('#dlgName').textContent;
-      const url = location.href.split('#')[0];
-      const text = `一起幫 ${name} 找到家！`;
-      if(navigator.share){
-        try{ await navigator.share({ title: name, text, url }); }catch{}
-      }else{
-        navigator.clipboard.writeText(`${text} ${url}`);
-        alert('已複製分享連結');
-      }
+    $('#dlgShare').addEventListener('click', () => {
+      if (!currentPetId) return;
+      const name = document.getElementById('dlgName').textContent.trim();
+      const url = makePetUrl(currentPetId);
+      const msg = `一起幫 ${name} 找到家！ ${url}`;
+      window.open(`https://line.me/R/msg/text/?${encodeURIComponent(msg)}`, '_blank', 'noopener');
     });
     $('#dlgAdopt').addEventListener('click', () => {
       document.getElementById('petName').value = $('#dlgName').textContent;
@@ -374,6 +389,8 @@
     dlg.addEventListener('close', () => {
       // 保險：確保有恢復
       unlockScroll();
+      history.replaceState(null, '', location.pathname);
+      currentPetId = null;
     });
 
     let scrollTop = 0;
@@ -433,6 +450,9 @@
       document.getElementById('dlgMeta').textContent =
         `${p.species || '—'}・${formatBreed(p)}・${formatAge(p)}・${p.gender || '—'}`;
       document.getElementById('dlgDesc').textContent = p.desc || '';
+
+      currentPetId = id;
+      history.replaceState(null, '', `?pet=${encodeURIComponent(id)}`);
 
       // 開啟前鎖住背景捲動
       lockScroll();
