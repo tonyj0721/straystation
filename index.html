@@ -570,8 +570,8 @@
       document.getElementById('dlgDesc').textContent = p.desc || '';
 
       // 開啟前鎖住背景捲動
-      dlg.style.display = "";
       lockScroll();
+      dlg.showModal();
     }
 
     // ======= Form Handling（原本的 localStorage 版本） =======
