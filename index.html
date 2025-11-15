@@ -116,25 +116,25 @@
             <dt class="text-sm text-gray-500">已成功送養</dt>
             <dd class="text-xl font-semibold" id="statPlaced">0</dd>
           </div>
-          <div class="p-4 rounded-xl bg-white/70 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800">
+          <div class="p-4 rounded-xl bg-white/70 dark:bg-gray-900/50 border border-gray-200">
             <dt class="text-sm text-gray-500">待領養名單</dt>
             <dd class="text-xl font-semibold" id="statAvailable">0</dd>
           </div>
-          <div class="p-4 rounded-xl bg-white/70 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800">
+          <div class="p-4 rounded-xl bg-white/70 dark:bg-gray-900/50 border border-gray-200">
             <dt class="text-sm text-gray-500">合作中途/機構</dt>
             <dd class="text-xl font-semibold">24+</dd>
           </div>
         </dl>
       </div>
       <div class="relative">
-        <div class="aspect-[4/3] rounded-3xl overflow-hidden shadow-soft ring-1 ring-gray-200 dark:ring-gray-800">
+        <div class="aspect-[4/3] rounded-3xl overflow-hidden shadow-soft ring-1 ring-gray-200">
           <img src="https://images.unsplash.com/photo-1517849845537-4d257902454a?q=80&w=1600&auto=format&fit=crop" alt="一隻狗與一隻貓在陽光下相依" class="w-full h-full object-cover" loading="lazy">
         </div>
-        <div class="absolute -bottom-6 -left-6 bg-white dark:bg-gray-900 rounded-2xl shadow-soft ring-1 ring-gray-200 dark:ring-gray-800 p-4 flex items-center gap-3">
+        <div class="absolute -bottom-6 -left-6 bg-white rounded-2xl shadow-soft ring-1 ring-gray-200 p-4 flex items-center gap-3">
           <span class="text-2xl">🎉</span>
           <div class="text-sm">
             <p class="font-semibold">這週 8 位毛孩找到新家</p>
-            <p class="text-gray-500 dark:text-gray-400">感謝每位認養人與志工</p>
+            <p class="text-gray-500">感謝每位認養人與志工</p>
           </div>
         </div>
       </div>
@@ -146,24 +146,24 @@
     <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
       <div>
         <h2 class="text-2xl font-bold">找毛孩</h2>
-        <p class="text-gray-600 dark:text-gray-300">依品種/年齡/地區快速篩選，點擊卡片可查看詳細資訊。</p>
+        <p class="text-gray-600">依品種/年齡/地區快速篩選，點擊卡片可查看詳細資訊。</p>
       </div>
       <div class="flex items-center gap-3">
-        <label class="inline-flex items-center gap-2 text-sm"><input id="onlyKids" type="checkbox" class="rounded border-gray-300 dark:border-gray-700"> 適合與小孩</label>
-        <label class="inline-flex items-center gap-2 text-sm"><input id="onlyVacc" type="checkbox" class="rounded border-gray-300 dark:border-gray-700"> 已施打疫苗</label>
-        <label class="inline-flex items-center gap-2 text-sm"><input id="onlyNeut" type="checkbox" class="rounded border-gray-300 dark:border-gray-700"> 已節育</label>
+        <label class="inline-flex items-center gap-2 text-sm"><input id="onlyKids" type="checkbox" class="rounded border-gray-300"> 適合與小孩</label>
+        <label class="inline-flex items-center gap-2 text-sm"><input id="onlyVacc" type="checkbox" class="rounded border-gray-300"> 已施打疫苗</label>
+        <label class="inline-flex items-center gap-2 text-sm"><input id="onlyNeut" type="checkbox" class="rounded border-gray-300"> 已節育</label>
       </div>
     </div>
 
     <div class="mt-6 grid grid-cols-2 md:grid-cols-6 gap-3">
-      <select id="fSpecies" class="col-span-1 md:col-span-1 rounded-xl border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-2"><option value="">全部</option><option value="貓">貓</option><option value="狗">狗</option></select>
-      <select id="fAge" class="col-span-1 md:col-span-1 rounded-xl border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-2"><option value="">年齡</option><option>幼年</option><option>成年</option><option>熟齡</option></select>
-      <select id="fSize" class="col-span-1 md:col-span-1 rounded-xl border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-2"><option value="">體型</option><option>小型</option><option>中型</option><option>大型</option></select>
-      <select id="fCity" class="col-span-1 md:col-span-1 rounded-xl border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-2"><option value="">地區</option><option>台北</option><option>新北</option><option>桃園</option><option>台中</option><option>台南</option><option>高雄</option></select>
-      <input id="fQuery" class="col-span-2 md:col-span-2 rounded-xl border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-2" placeholder="輸入關鍵字（如：虎斑、親人、活潑）" />
+      <select id="fSpecies" class="col-span-1 md:col-span-1 rounded-xl border-gray-300 bg-white p-2"><option value="">全部</option><option value="貓">貓</option><option value="狗">狗</option></select>
+      <select id="fAge" class="col-span-1 md:col-span-1 rounded-xl border-gray-300 bg-white p-2"><option value="">年齡</option><option>幼年</option><option>成年</option><option>熟齡</option></select>
+      <select id="fSize" class="col-span-1 md:col-span-1 rounded-xl border-gray-300 bg-white p-2"><option value="">體型</option><option>小型</option><option>中型</option><option>大型</option></select>
+      <select id="fCity" class="col-span-1 md:col-span-1 rounded-xl border-gray-300 bg-white p-2"><option value="">地區</option><option>台北</option><option>新北</option><option>桃園</option><option>台中</option><option>台南</option><option>高雄</option></select>
+      <input id="fQuery" class="col-span-2 md:col-span-2 rounded-xl border-gray-300 bg-white p-2" placeholder="輸入關鍵字（如：虎斑、親人、活潑）" />
       <div class="col-span-2 md:col-span-1 flex gap-2">
-        <button id="btnFilter" class="flex-1 px-4 py-2 rounded-xl bg-gray-900 text-white dark:bg-white dark:text-gray-900 font-medium">套用</button>
-        <button id="btnReset" class="px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-700">重置</button>
+        <button id="btnFilter" class="flex-1 px-4 py-2 rounded-xl bg-gray-900 text-white font-medium">套用</button>
+        <button id="btnReset" class="px-4 py-2 rounded-xl border border-gray-300">重置</button>
       </div>
     </div>
 
@@ -171,7 +171,7 @@
       <!-- Cards injected here -->
     </div>
 
-    <div id="emptyState" class="hidden mt-10 text-center text-gray-500 dark:text-gray-400">沒有符合條件的毛孩，試試看調整篩選條件。</div>
+    <div id="emptyState" class="hidden mt-10 text-center text-gray-500">沒有符合條件的毛孩，試試看調整篩選條件。</div>
   </main>
 
   <!-- FAQ -->
@@ -201,7 +201,7 @@
   <section id="contact" class="bg-gray-50 border-t border-gray-200">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <h2 class="text-2xl font-bold">聯絡我們</h2>
-      <p class="mt-2 text-gray-600 dark:text-gray-300">合作、中途申請或媒體聯繫：<a href="mailto:hello@warmhome.tw" class="text-brand-600 hover:underline">hello@warmhome.tw</a></p>
+      <p class="mt-2 text-gray-600">合作、中途申請或媒體聯繫：<a href="mailto:hello@warmhome.tw" class="text-brand-600 hover:underline">hello@warmhome.tw</a></p>
       <div class="mt-4 text-sm text-gray-500">© <span id="year"></span> 浪浪轉運站 StrayStation. 保留所有權利。</div>
     </div>
   </section>
@@ -209,7 +209,7 @@
   <!-- Pet Detail Modal -->
   <dialog id="petDialog" class="w-full max-w-2xl max-h-[90vh] rounded-2xl p-0 overflow-y-auto">
     <div class="bg-white">
-      <div class="relative aspect-video bg-gray-100 dark:bg-gray-800">
+      <div class="relative aspect-video bg-gray-100">
         <img id="dlgImg" alt="毛孩照片" class="w-full h-full object-contain cursor-pointer"/>
         <button id="dlgClose" class="absolute top-3 right-3 bg-black/60 text-white p-2 rounded-full" aria-label="關閉">✕</button>
       </div>
@@ -342,7 +342,7 @@
         const cover = (p.images && p.images.length ? p.images[0] : p.image) || '';
 
         card.innerHTML = `
-          <div class="relative aspect-[4/3] bg-gray-100 dark:bg-gray-800">
+          <div class="relative aspect-[4/3] bg-gray-100">
             <img src="${cover}" alt="${p.name || '毛孩'} 的照片" class="w-full h-full object-contain" loading="lazy"/>
           </div>
           <div class="p-4">
