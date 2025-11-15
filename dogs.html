@@ -102,12 +102,11 @@
     </header>
 
     <!-- Filters -->
-    <section class="mb-6 grid grid-cols-2 md:grid-cols-5 gap-3">
+    <section class="mb-6 grid grid-cols-2 md:grid-cols-4 gap-3">
       <select id="fBreedType" class="col-span-1 rounded-xl border border-gray-300 bg-white p-2 text-sm">
         <option value="">品種（全部）</option>
-        <option value="米克斯">米克斯</option>
         <option value="品種犬">品種犬</option>
-        <option value="品種貓">品種貓</option>
+        <option value="米克斯">米克斯</option>
       </select>
 
       <select id="fBreed" class="col-span-1 rounded-xl border border-gray-300 bg-white p-2 text-sm">
@@ -118,7 +117,7 @@
         <option value="">年齡（全部）</option>
         <option value="1以下">1 歲以下</option>
         <option value="1-5">1～5 歲</option>
-        <option value="5-10">5～10 歲</option>
+        <option value="6-10">6～10 歲</option>
         <option value="10以上">10 歲以上</option>
       </select>
 
@@ -127,16 +126,11 @@
         <option value="男生">男生</option>
         <option value="女生">女生</option>
       </select>
-
-      <div class="col-span-2 md:col-span-1 flex gap-2">
-        <button id="btnFilter" class="flex-1 px-4 py-2 rounded-xl bg-gray-900 text-white text-sm">套用</button>
-        <button id="btnReset" class="px-4 py-2 rounded-xl border border-gray-300 text-sm">重置</button>
-      </div>
     </section>
 
     <!-- Grid -->
     <section>
-      <div id="grid" class="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-3"></div>
+      <div id="grid" class="mt-4 grid grid-cols-2 gap-6 sm:grid-cols-2 lg:grid-cols-3"></div>
       <div id="emptyState" class="hidden mt-10 text-center text-gray-500">沒有符合條件的毛孩。</div>
     </section>
   </main>
@@ -207,6 +201,12 @@
     const $ = (q) => document.querySelector(q);
     const $$ = (q) => document.querySelectorAll(q);
 
+        // 固定下拉清單
+    const BREED_DICT = {
+      "品種犬": ["博美", "貴賓", "吉娃娃", "馬爾濟斯", "柯基", "柴犬", "哈士奇", "高山犬", "黃金獵犬"],
+      "米克斯": ["黑色", "黑白色", "白色", "白黃色", "黃色", "棕色", "虎斑", "花花"]
+    };
+
     function formatBreed(p) {
       return p.breedType === "米克斯"
         ? `米克斯/${p.breed || ""}`.replace(/\/$/, "")
@@ -228,18 +228,23 @@
     function ageBucket(ageStr) {
       if (!ageStr) return "";
       const s = ageStr.toString();
+
+      // 若寫「X月」或數值 < 1，皆歸「1以下」
       const numMatch = s.match(/(\d+(?:\.\d+)?)/);
       const years = numMatch ? parseFloat(numMatch[1]) : null;
 
       if (s.includes("月") || (years !== null && years < 1)) return "1以下";
+
       if (years !== null) {
-        if (years < 5) return "1-5";
-        if (years < 10) return "5-10";
+        if (years <= 5) return "1-5";   // 1~5 歲
+        if (years <= 10) return "6-10"; // 6~10 歲
         return "10以上";
       }
+
+      // 文字關鍵字後援
       if (s.includes("幼")) return "1以下";
-      if (s.includes("熟")) return "5-10";
       if (s.includes("成")) return "1-5";
+      if (s.includes("熟")) return "6-10";
       return "";
     }
 
@@ -291,11 +296,14 @@
       );
     }
 
-    function buildFilterOptions() {
+    function buildBreedOptionsByType() {
       const breedSel = $('#fBreed');
-      const breeds = Array.from(new Set(pets.map(p => p.breed).filter(Boolean)));
-      breedSel.innerHTML = '<option value="">品種／毛色（全部）</option>' +
-        breeds.map(b => `<option value="${b}">${b}</option>`).join('');
+      const type = $('#fBreedType').value;
+
+      const options = type && BREED_DICT[type] ? BREED_DICT[type] : [];
+      breedSel.innerHTML =
+        '<option value="">品種／毛色（全部）</option>' +
+        options.map(b => `<option value="${b}">${b}</option>`).join('');
     }
 
     function getFilters() {
@@ -334,8 +342,21 @@
       const snap = await getDocs(qRef);
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       pets = all.filter(p => p.species === SPECIES);
-      buildFilterOptions();
+      pets = all.filter(p => p.species === SPECIES);
+      buildBreedOptionsByType(); // ← 新的
       render(pets);
+
+      render(pets);
+      // 即時篩選：任一選單變更就篩
+      $('#fBreedType').addEventListener('change', () => {
+        buildBreedOptionsByType(); // 先重建子選項
+        $('#fBreed').value = '';   // 切換類型時清空子選擇
+        applyFilters();
+      });
+
+      $('#fBreed').addEventListener('change', applyFilters);
+      $('#fAge').addEventListener('change', applyFilters);
+      $('#fGender').addEventListener('change', applyFilters);
     }
 
     // ---- Modal + Lightbox 共用狀態 ----
@@ -512,16 +533,6 @@
       e.stopPropagation();
     }, { passive: false });
 
-    // Filters events
-    $('#btnFilter').addEventListener('click', applyFilters);
-    $('#btnReset').addEventListener('click', () => {
-      $('#fBreedType').value = '';
-      $('#fBreed').value = '';
-      $('#fAge').value = '';
-      $('#fGender').value = '';
-      render(pets);
-    });
-
     // Nav toggle
     $('#navToggle').addEventListener('click', () => {
       $('#mobileNav').classList.toggle('hidden');
@@ -533,3 +544,4 @@
   </script>
 </body>
 </html>
+
