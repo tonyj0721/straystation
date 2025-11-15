@@ -79,7 +79,7 @@
   <a href="#pets" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 bg-brand-600 text-white px-3 py-2 rounded">跳到主要內容</a>
 
   <!-- Navbar -->
-  <header class="sticky top-0 z-50 bg-white/80 backdrop-blur border-b border-gray-200 dark:bg-gray-950/70 dark:border-gray-800">
+  <header class="sticky z-50 bg-white/80 backdrop-blur border-b border-gray-200 dark:bg-gray-950/70 dark:border-gray-800">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="h-16 flex items-center justify-between">
         <a href="#" class="flex items-center gap-2 font-semibold text-lg">
@@ -94,10 +94,6 @@
           <a href="admin.html" class="hover:text-brand-600">管理員登入</a>
         </nav>
         <div class="flex items-center gap-2">
-          <button id="themeToggle" class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="切換深色模式">
-            <svg id="sun" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden dark:block" viewBox="0 0 24 24" fill="currentColor"><path d="M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.8 1.42-1.42zm10.48 0l1.79-1.8 1.41 1.41-1.8 1.79-1.4-1.4zM12 4V1h-0v3h0zm0 19v-3h0v3h0zM4 12H1v0h3v0zm19 0h-3v0h3v0zM6.76 19.16l-1.42 1.42-1.79-1.8 1.41-1.41 1.8 1.79zM19.16 17.24l1.8 1.79-1.41 1.41-1.79-1.8 1.4-1.4z"/><circle cx="12" cy="12" r="5"/></svg>
-            <svg id="moon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 dark:hidden" viewBox="0 0 24 24" fill="currentColor"><path d="M21.64 13a9 9 0 1 1-10.63-10.6 1 1 0 0 1 1.11 1.46A7 7 0 1 0 20.18 12a1 1 0 0 1 1.46 1.11z"/></svg>
-          </button>
           <button class="md:hidden p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="開啟選單" id="navToggle">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
           </button>
@@ -594,18 +590,6 @@
     });
 
     // ======= Theme & Nav（原樣保留） =======
-    function setTheme(mode){
-      const root = document.documentElement;
-      if(mode === 'dark'){ root.classList.add('dark'); localStorage.setItem('theme','dark'); }
-      else { root.classList.remove('dark'); localStorage.setItem('theme','light'); }
-    }
-    $('#themeToggle').addEventListener('click', () => {
-      const isDark = document.documentElement.classList.contains('dark');
-      setTheme(isDark ? 'light' : 'dark');
-    });
-    const saved = localStorage.getItem('theme');
-    if(saved) setTheme(saved); else if(window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
-
     $('#navToggle').addEventListener('click', ()=>{
       const el = $('#mobileNav');
       el.classList.toggle('hidden');
