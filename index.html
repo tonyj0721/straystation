@@ -516,17 +516,17 @@
     let scrollTop = 0;
 
     function lockScroll() {
-  oldHtmlOverflow = document.documentElement.style.overflow;
-  oldBodyOverflow = document.body.style.overflow;
+      oldHtmlOverflow = document.documentElement.style.overflow;
+      oldBodyOverflow = document.body.style.overflow;
 
-  document.documentElement.style.overflow = "hidden";
-  document.body.style.overflow = "hidden";
-}
+      document.documentElement.style.overflow = "hidden";
+      document.body.style.overflow = "hidden";
+    }
 
     function unlockScroll() {
-  document.documentElement.style.overflow = oldHtmlOverflow;
-  document.body.style.overflow = oldBodyOverflow;
-}
+      document.documentElement.style.overflow = oldHtmlOverflow;
+      document.body.style.overflow = oldBodyOverflow;
+    }
 
     function openDialog(id){
       const p = pets.find(x => x.id === id);
@@ -630,54 +630,54 @@
 
     // 🔥 開啟 Lightbox：完全關掉 dialog + 鎖定背景
     function openLightbox(images, index = 0) {
-  lbImages = images;
-  lbIndex = index;
+      lbImages = images;
+      lbIndex = index;
 
-  lbImg.src = lbImages[lbIndex];
-
-  // 建立縮圖列
-  const lbThumbsInner = document.getElementById("lbThumbsInner");
-  lbThumbsInner.innerHTML = "";
-
-  lbImages.forEach((url, i) => {
-    const t = document.createElement("img");
-    t.src = url;
-    t.className = i === lbIndex ? "active" : "";
-
-    t.addEventListener("click", () => {
-      lbIndex = i;
       lbImg.src = lbImages[lbIndex];
 
-      lbThumbsInner.querySelectorAll("img").forEach(el => el.classList.remove("active"));
-      t.classList.add("active");
-    });
+      // 建立縮圖列
+      const lbThumbsInner = document.getElementById("lbThumbsInner");
+      lbThumbsInner.innerHTML = "";
 
-    lbThumbsInner.appendChild(t);
-  });
+      lbImages.forEach((url, i) => {
+        const t = document.createElement("img");
+        t.src = url;
+        t.className = i === lbIndex ? "active" : "";
 
-  // ❶ 正確：關掉 Modal（移除 backdrop）
-  if (dlg.open) dlg.close();
+        t.addEventListener("click", () => {
+          lbIndex = i;
+          lbImg.src = lbImages[lbIndex];
 
-  // ❷ 正確：解除背景鎖定（避免 Lightbox 卡死）
-  unlockScroll();
+          lbThumbsInner.querySelectorAll("img").forEach(el => el.classList.remove("active"));
+          t.classList.add("active");
+        });
 
-  // ❸ 顯示 Lightbox
-  lb.classList.remove("hidden");
-  lb.classList.add("flex");
-}
+        lbThumbsInner.appendChild(t);
+      });
+
+      // ❶ 正確：關掉 Modal（移除 backdrop）
+      if (dlg.open) dlg.close();
+
+      // ❷ 正確：解除背景鎖定（避免 Lightbox 卡死）
+      unlockScroll();
+
+      // ❸ 顯示 Lightbox
+      lb.classList.remove("hidden");
+      lb.classList.add("flex");
+    }
 
     // 🔥 關閉 Lightbox：恢復背景 + 回到 dialog
     function closeLightbox() {
-  // 隱藏 Lightbox
-  lb.classList.add("hidden");
-  lb.classList.remove("flex");
+      // 隱藏 Lightbox
+      lb.classList.add("hidden");
+      lb.classList.remove("flex");
 
-  // 回到 Modal
-  dlg.showModal();
+      // 回到 Modal
+      dlg.showModal();
 
-  // Modal 需要背景固定 → 再鎖一次
-  lockScroll();
-}
+      // Modal 需要背景固定 → 再鎖一次
+      lockScroll();
+    }
 
     // 🔥 左右切換
     function lbShow(delta) {
