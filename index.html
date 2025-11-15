@@ -2,7 +2,7 @@
 <html lang="zh-Hant" class="scroll-smooth">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>浪浪轉運站｜貓狗送養平台</title>
   <meta name="description" content="浪浪轉運站：友善的貓狗送養平台。快速篩選、查看細節，手機與電腦版皆可用。" />
   <!-- Favicon -->
@@ -616,6 +616,17 @@
     loadIndexPets();   // 🚀 這裡去 Firestore 抓資料
 
         // ======= Lightbox =======
+    async function tryFullscreen() {
+      const el = document.documentElement;
+
+      if (document.fullscreenElement) return;
+
+      // Android + 桌機
+      if (el.requestFullscreen) {
+        try { await el.requestFullscreen(); } catch(e){}
+      }
+    }
+
     const lb = document.getElementById("lightbox");
     const lbImg = document.getElementById("lbImg");
     const lbPrev = document.getElementById("lbPrev");
@@ -630,6 +641,9 @@
 
     // 🔥 開啟 Lightbox：完全關掉 dialog + 鎖定背景
     function openLightbox(images, index = 0) {
+      // ❗ 自動嘗試全螢幕（iOS 不支援，不會報錯）
+      tryFullscreen();
+
       lbImages = images;
       lbIndex = index;
 
