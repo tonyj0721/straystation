@@ -338,6 +338,7 @@
       render(pets);
     }
 
+    // ---- Modal + Lightbox 共用狀態 ----
     const dlg = document.getElementById('petDialog');
     const lb = document.getElementById("lightbox");
     const lbImg = document.getElementById("lbImg");
@@ -511,6 +512,7 @@
       e.stopPropagation();
     }, { passive: false });
 
+    // Filters events
     $('#btnFilter').addEventListener('click', applyFilters);
     $('#btnReset').addEventListener('click', () => {
       $('#fBreedType').value = '';
@@ -520,6 +522,7 @@
       render(pets);
     });
 
+    // Nav toggle
     $('#navToggle').addEventListener('click', () => {
       $('#mobileNav').classList.toggle('hidden');
     });
@@ -530,3 +533,4 @@
   </script>
 </body>
 </html>
+
