@@ -207,6 +207,12 @@
     const $ = (q) => document.querySelector(q);
     const $$ = (q) => document.querySelectorAll(q);
 
+    // 固定下拉清單
+    const BREED_DICT = {
+      "品種貓": ["美短", "英短", "藍貓", "暹羅貓", "波斯貓", "布偶貓", "曼赤肯"],
+      "米克斯": ["橘貓", "黑貓", "虎斑貓", "白底虎斑貓", "三花貓", "賓士貓", "玳瑁貓", "白貓"]
+    };
+
     function formatBreed(p) {
       return p.breedType === "米克斯"
         ? `米克斯/${p.breed || ""}`.replace(/\/$/, "")
@@ -228,18 +234,23 @@
     function ageBucket(ageStr) {
       if (!ageStr) return "";
       const s = ageStr.toString();
+
+      // 若寫「X月」或數值 < 1，皆歸「1以下」
       const numMatch = s.match(/(\d+(?:\.\d+)?)/);
       const years = numMatch ? parseFloat(numMatch[1]) : null;
 
       if (s.includes("月") || (years !== null && years < 1)) return "1以下";
+
       if (years !== null) {
-        if (years < 5) return "1-5";
-        if (years < 10) return "5-10";
+        if (years <= 5) return "1-5";   // 1~5 歲
+        if (years <= 10) return "6-10"; // 6~10 歲
         return "10以上";
       }
+
+      // 文字關鍵字後援
       if (s.includes("幼")) return "1以下";
-      if (s.includes("熟")) return "5-10";
       if (s.includes("成")) return "1-5";
+      if (s.includes("熟")) return "6-10";
       return "";
     }
 
@@ -291,11 +302,14 @@
       );
     }
 
-    function buildFilterOptions() {
+    function buildBreedOptionsByType() {
       const breedSel = $('#fBreed');
-      const breeds = Array.from(new Set(pets.map(p => p.breed).filter(Boolean)));
-      breedSel.innerHTML = '<option value="">品種／毛色（全部）</option>' +
-        breeds.map(b => `<option value="${b}">${b}</option>`).join('');
+      const type = $('#fBreedType').value;
+
+      const options = type && BREED_DICT[type] ? BREED_DICT[type] : [];
+      breedSel.innerHTML =
+        '<option value="">品種／毛色（全部）</option>' +
+        options.map(b => `<option value="${b}">${b}</option>`).join('');
     }
 
     function getFilters() {
@@ -334,8 +348,21 @@
       const snap = await getDocs(qRef);
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       pets = all.filter(p => p.species === SPECIES);
-      buildFilterOptions();
+      pets = all.filter(p => p.species === SPECIES);
+      buildBreedOptionsByType(); // ← 新的
       render(pets);
+
+      render(pets);
+      // 即時篩選：任一選單變更就篩
+      $('#fBreedType').addEventListener('change', () => {
+        buildBreedOptionsByType(); // 先重建子選項
+        $('#fBreed').value = '';   // 切換類型時清空子選擇
+        applyFilters();
+      });
+
+      $('#fBreed').addEventListener('change', applyFilters);
+      $('#fAge').addEventListener('change', applyFilters);
+      $('#fGender').addEventListener('change', applyFilters);
     }
 
     // ---- Modal + Lightbox 共用狀態 ----
@@ -512,16 +539,6 @@
       e.stopPropagation();
     }, { passive: false });
 
-    // Filters events
-    $('#btnFilter').addEventListener('click', applyFilters);
-    $('#btnReset').addEventListener('click', () => {
-      $('#fBreedType').value = '';
-      $('#fBreed').value = '';
-      $('#fAge').value = '';
-      $('#fGender').value = '';
-      render(pets);
-    });
-
     // Nav toggle
     $('#navToggle').addEventListener('click', () => {
       $('#mobileNav').classList.toggle('hidden');
@@ -530,6 +547,9 @@
     document.getElementById('year').textContent = new Date().getFullYear();
 
     loadPets();
+
+    
   </script>
 </body>
 </html>
+
