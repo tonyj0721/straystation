@@ -432,17 +432,18 @@
       unlockScroll();
     });
 
-    $('#dlgShare').addEventListener('click', async () => {
-      const name = $('#dlgName').textContent;
-      const url = location.href.split('#')[0];
+    $('#dlgShare').addEventListener('click', () => {
+      const name = $('#dlgName').textContent.trim();
+      const baseUrl = location.origin + location.pathname;      // 乾淨頁面網址（不帶 #）
+      const url = `${baseUrl}#${encodeURIComponent(name)}`;     // 可用名字當錨點；有自己的 id 就改成 id
       const text = `一起幫 ${name} 找到家！`;
-      if (navigator.share) {
-        try { await navigator.share({ title: name, text, url }); } catch {}
-      } else {
-        navigator.clipboard.writeText(`${text} ${url}`);
-        alert('已複製分享連結');
-      }
+
+      // LINE 官方分享（會帶你到 LINE 的分享頁）
+      const shareUrl = `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
+
+      window.open(shareUrl, '_blank', 'noopener');
     });
+
 
     $('#dlgAdopt').addEventListener('click', () => {
       dlg.close();
@@ -546,6 +547,7 @@
   </script>
 </body>
 </html>
+
 
 
 
