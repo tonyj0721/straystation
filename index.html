@@ -661,7 +661,6 @@
       oldBodyOverflow = document.body.style.overflow;
 
       document.documentElement.style.overflow = "hidden";
-      document.body.style.overflow = "hidden";
 
       // ❗ 3. 顯示 Lightbox
       lb.classList.remove("hidden");
@@ -675,8 +674,7 @@
       lb.classList.remove("flex");
 
       // ❗ 恢復 Lightbox 開啟前的 overflow
-      document.documentElement.style.overflow = oldHtmlOverflow;
-      document.body.style.overflow = oldBodyOverflow;
+      document.documentElement.style.overflow = "";
 
       // ❗ 顯示 Modal 回來（不要用 showModal，否則背景會跳動）
       dlg.style.display = "";
