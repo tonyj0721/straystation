@@ -54,8 +54,9 @@
       position: fixed;
       inset: 0;
       width: 100vw;
-      height: 100vh;
+      height: 100dvh;  /* 🔥 iOS 真實視窗高度 */
       -webkit-backdrop-filter: none;
+      padding-bottom: env(safe-area-inset-bottom); /* 🔥 iOS 補底部 */
     }
     #lbThumbs img {
       width: 60px;
