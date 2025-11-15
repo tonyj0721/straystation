@@ -313,6 +313,8 @@
   </div>
   
   <script type="module">
+    history.scrollRestoration = "manual";  // 強制不還原位置
+    window.scrollTo(0, 0);                 // 每次載入回到最頂端
     // ======= Firebase Import & Init =======
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
     import { getFirestore, collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
