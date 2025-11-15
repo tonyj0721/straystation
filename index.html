@@ -301,7 +301,8 @@
     <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg"/>
 
     <!-- 🔥 Lightbox 縮圖列 -->
-    <div id="lbThumbs" class="absolute bottom-5 left-1/2 -translate-x-1/2 flex gap-2 overflow-x-auto px-4 py-2">
+    <div id="lbThumbs"
+      class="absolute bottom-20 left-0 w-full flex justify-center gap-3 px-4 py-2 pb-[env(safe-area-inset-bottom)]">
     </div>
 
     <!-- 右箭頭 -->
@@ -635,8 +636,8 @@
       lbImg.src = lbImages[lbIndex];
 
       // 建立縮圖列
-      const lbThumbs = document.getElementById("lbThumbs");
-      lbThumbs.innerHTML = "";
+      const lbThumbsInner = document.getElementById("lbThumbsInner");
+      lbThumbsInner.innerHTML = "";
 
       lbImages.forEach((url, i) => {
         const t = document.createElement("img");
@@ -647,12 +648,11 @@
           lbIndex = i;
           lbImg.src = lbImages[lbIndex];
 
-          // 更新 active 樣式
-          lbThumbs.querySelectorAll("img").forEach(el => el.classList.remove("active"));
+          lbThumbsInner.querySelectorAll("img").forEach(el => el.classList.remove("active"));
           t.classList.add("active");
         });
 
-        lbThumbs.appendChild(t);
+        lbThumbsInner.appendChild(t);
       });
 
       // ❗ 1. 關閉 dialog（避免 backdrop 蓋住）
