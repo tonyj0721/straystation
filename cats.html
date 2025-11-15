@@ -361,7 +361,7 @@
       pets = all.filter(p => p.species === SPECIES);
       buildBreedOptionsByType(); // ← 新的
       render(pets);
-      + openFromDeepLink();
+      openFromDeepLink();
 
       render(pets);
       // 即時篩選：任一選單變更就篩
@@ -436,8 +436,8 @@
         `${p.species || '—'}・${formatBreed(p)}・${formatAge(p)}・${p.gender || '—'}`;
       document.getElementById('dlgDesc').textContent = p.desc || '';
 
-      + currentPetId = id;
-      + history.replaceState(null, '', `?pet=${encodeURIComponent(id)}`);
+      currentPetId = id;
+      history.replaceState(null, '', `?pet=${encodeURIComponent(id)}`);
 
       lockScroll();
       dlg.showModal();
@@ -446,14 +446,14 @@
     $('#dlgClose').addEventListener('click', () => {
       dlg.close();
       unlockScroll();
-      + history.replaceState(null, '', location.pathname);
-      + currentPetId = null;
+      history.replaceState(null, '', location.pathname);
+      currentPetId = null;
     });
 
     dlg.addEventListener('close', () => {
       unlockScroll();
-      + history.replaceState(null, '', location.pathname);
-      + currentPetId = null;
+      history.replaceState(null, '', location.pathname);
+      currentPetId = null;
     });
 
     $('#dlgShare').addEventListener('click', () => {
@@ -561,11 +561,10 @@
     document.getElementById('year').textContent = new Date().getFullYear();
 
     loadPets();
-
-    
   </script>
 </body>
 </html>
+
 
 
 
