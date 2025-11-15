@@ -514,17 +514,17 @@
     let scrollTop = 0;
 
     function lockScroll() {
-      scrollTop = window.scrollY; 
-      document.body.style.position = "fixed";
-      document.body.style.top = `-${scrollTop}px`;
-      document.body.style.width = "100%";
-    }
+  oldHtmlOverflow = document.documentElement.style.overflow;
+  oldBodyOverflow = document.body.style.overflow;
+
+  document.documentElement.style.overflow = "hidden";
+  document.body.style.overflow = "hidden";
+}
 
     function unlockScroll() {
-      document.body.style.position = "";
-      document.body.style.top = "";
-      window.scrollTo(0, scrollTop);
-    }
+  document.documentElement.style.overflow = oldHtmlOverflow;
+  document.body.style.overflow = oldBodyOverflow;
+}
 
     function openDialog(id){
       const p = pets.find(x => x.id === id);
