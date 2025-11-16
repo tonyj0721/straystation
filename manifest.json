@@ -2,8 +2,11 @@
   "name": "浪浪轉運站",
   "short_name": "浪浪轉運站",
   "start_url": "/index.html",
-  "display": "standalone",    // 或 "fullscreen"
+  "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#ffffff",
-  "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
 }
