@@ -9,7 +9,7 @@
 ::backdrop{background:rgba(0,0,0,.4)}
 
 /* —— Lightbox（穩定版） —— */
-#lightbox{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9999}
+#lightbox { position: absolute; inset: 0; }
 #lightbox.hidden{display:none}
 #lightbox .wrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
 #lbImg{max-width:90vw;max-height:90vh;object-fit:contain;border-radius:12px}
@@ -29,5 +29,6 @@
   position:absolute; inset:0; width:100%; height:100%;
   object-fit: contain; z-index:1;  /* 上層放原圖，保持比例 */
 }
+
 
 
