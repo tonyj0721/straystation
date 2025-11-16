@@ -328,7 +328,7 @@
 
       const options = type && BREED_DICT[type] ? BREED_DICT[type] : [];
       breedSel.innerHTML =
-        '<option value="">品種／毛色（全部）</option>' +
+        '<option value="">請先選擇品種</option>' +
         options.map(b => `<option value="${b}">${b}</option>`).join('');
     }
 
