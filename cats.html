@@ -293,7 +293,9 @@
                   </span>
                 </div>
                 <p class="text-sm text-gray-500 mt-1">
-                  ${formatBreed(p)}・${formatAge(p)}・${p.gender || '—'}
+                  <span class="shrink-0 rounded-full bg-sky-50 text-sky-700 text-xs px-2 py-1">${formatBreed(p)}</span>
+                  <span class="shrink-0 rounded-full bg-sky-50 text-sky-700 text-xs px-2 py-1">・${formatAge(p)}</span>
+                  <span class="shrink-0 rounded-full bg-sky-50 text-sky-700 text-xs px-2 py-1">・${p.gender || '—'}</span>                  
                 </p>
               </div>
             </div>
