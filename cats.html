@@ -64,6 +64,18 @@
       opacity: 1;
       border: 2px solid white;
     }
+    /* 讓圖片容器用同張圖做模糊延伸背景 */
+    .blur-fit { position: relative; overflow: hidden; }
+    .blur-fit::before{
+      content:""; position:absolute; inset:0;
+      background: var(--bg) center/cover no-repeat; /* 這裡吃 inline style 的 --bg */
+      filter: blur(24px);
+      transform: scale(1.1); /* 放大避免邊緣露白 */
+    }
+    .blur-fit > img{
+      position:absolute; inset:0; width:100%; height:100%;
+      object-fit: contain; z-index:1; /* 上層放原圖，保持比例 */
+    }
   </style>
 </head>
 <body class="bg-white text-gray-800">
@@ -283,8 +295,8 @@
         const cover = (p.images && p.images.length ? p.images[0] : p.image) || '';
 
         card.innerHTML = `  
-          <div class="relative aspect-[4/3] bg-gray-100">
-            <img src="${cover}" alt="${p.name || '毛孩'} 的照片" class="w-full h-full object-contain" loading="lazy"/>
+          <div class="blur-fit rounded-t-2xl aspect-[4/3]" style="--bg: url('${img}')">
+            <img src="${img}" alt="${p.name || '動物照片'}">
           </div>
           <div class="p-4 flex-1 flex flex-col">
             <!-- 第一行：左邊名字、右上角圓角標籤 -->
