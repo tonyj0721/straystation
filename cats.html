@@ -337,12 +337,12 @@
       }
 
       // 已選：右側啟用；依左邊類型決定文案與清單
-      const label = (type === '米克斯') ? '毛色' : '品種';
+      const label = (type === '米克斯') ? '不限毛色' : '不限品種';
       const options = (BREED_DICT[type] || []);
 
       breedSel.disabled = false;
       breedSel.innerHTML =
-        `<option value="">${label}（全部）</option>` +
+        `<option value="">${label}</option>` +
         options.map(b => `<option value="${b}">${b}</option>`).join('');
     }
 
