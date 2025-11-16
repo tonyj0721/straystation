@@ -620,7 +620,6 @@
     }
 
     function closeLightbox() {
-      const lb = document.getElementById('lightbox');
       lb.classList.add('hidden');
       lb.classList.remove('flex');
       if (document.fullscreenElement) document.exitFullscreen(); // 退出全螢幕（若有）
@@ -640,7 +639,6 @@
     lbPrev.onclick = () => lbShow(-1);
     lbNext.onclick = () => lbShow(1);
 
-    const lb = document.getElementById('lightbox');
     lb.addEventListener('click', (e) => {
       if (e.target === lb) {
         e.preventDefault();
