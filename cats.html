@@ -294,19 +294,17 @@
             </div>
 
             <!-- 明細三行 -->
-            <div class="mt-2 mb-3 flex flex-wrap gap-2 text-xs">
-            <!-- 品種：手機時獨佔一列；大一點螢幕就跟其他標籤並排 -->
-            <span class="inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-2.5 py-1
-                         basis-full sm:basis-auto max-w-full truncate">
-              ${formatBreed(p)}
-            </span>
-            <span class="inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-2.5 py-1">
-              ${formatAge(p) || '—'}
-            </span>
-            <span class="inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-2.5 py-1">
-              ${p.gender || '—'}
-            </span>
-          </div>
+            <div class="mt-2 mb-3 flex flex-col gap-2 text-xs">
+              <span class="self-start inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-2.5 py-1 whitespace-nowrap max-w-full truncate">
+                ${formatBreed(p)}
+              </span>
+              <span class="self-start inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-2.5 py-1 whitespace-nowrap max-w-full truncate">
+                ${formatAge(p) || '—'}
+              </span>
+              <span class="self-start inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-2.5 py-1 whitespace-nowrap max-w-full truncate">
+                ${p.gender || '—'}
+              </span>
+            </div>
 
             <!-- 按鈕貼底 -->
             <button class="mt-auto w-full px-3 py-2 rounded-xl bg-gray-900 text-white hover:bg-black btn-detail"
