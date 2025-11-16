@@ -58,62 +58,8 @@
     .dlg-thumb.active {
       border: 2px solid #000;
       opacity: 1;
-    }
+    }    
 
-    /* 吃滿可視區，避開安全區 */
-    #lightbox{
-      position: fixed;
-      inset: 0;
-      width: 100vw;
-
-      /* 先用一般 vh，之後用 iOS 新的 svh/dvh 蓋過 */
-      height: 100vh;
-      height: 100svh;     /* 小視窗高（工具列展開時） */
-      height: 100dvh;     /* 動態視窗高（工具列收起時） */
-
-      /* iOS 後備，某些舊版會採用這個值 */
-      min-height: -webkit-fill-available;
-
-      padding:
-        env(safe-area-inset-top)
-        env(safe-area-inset-right)
-        env(safe-area-inset-bottom)
-        env(safe-area-inset-left);
-      
-      -webkit-backdrop-filter: none;
-      z-index: 9999;               /* 保險：確保在最上層 */
-    }
-    #lbThumbs img {
-      width: 60px;
-      height: 60px;
-      object-fit: contain;
-      border-radius: 6px;
-      opacity: 0.5;
-      cursor: pointer;
-      background: #444;
-    }
-    #lbThumbs img.active {
-      opacity: 1;
-      border: 2px solid white;
-    }
-    #lbImg{
-      max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-      max-height: calc(100svh - env(safe-area-inset-top) - env(safe-area-inset-bottom)); /* 覆蓋順序：svh/dvh */
-      max-width:  calc(100vw  - env(safe-area-inset-left) - env(safe-area-inset-right));
-      object-fit: contain;
-    }
-    /* 讓圖片容器用同張圖做模糊延伸背景 */
-    .blur-fit { position: relative; overflow: hidden; }
-    .blur-fit::before{
-      content:""; position:absolute; inset:0;
-      background: var(--bg) center/cover no-repeat; /* 這裡吃 inline style 的 --bg */
-      filter: blur(24px);
-      transform: scale(1.1); /* 放大避免邊緣露白 */
-    }
-    .blur-fit > img{
-      position:absolute; inset:0; width:100%; height:100%;
-      object-fit: contain; z-index:1; /* 上層放原圖，保持比例 */
-    }
     .swal2-confirm-btn{
       background:#22c55e;color:#fff;border-radius:9999px;
       padding:10px 20px;font-weight:600
@@ -203,7 +149,7 @@
   <!-- Pet Detail Modal -->
   <dialog id="petDialog" class="w-full max-w-2xl max-h-[90vh] rounded-2xl p-0 overflow-y-auto">
     <div class="bg-white">
-      <div class="relative aspect-video bg-gray-100">
+      <div class="relative aspect-video bg-gray-100 blur-fit">
         <img id="dlgImg" alt="毛孩照片" class="w-full h-full object-contain cursor-pointer"/>
         <button id="dlgClose" class="absolute top-3 right-3 bg-black/60 text-white p-2 rounded-full" aria-label="關閉">✕</button>
       </div>
@@ -266,7 +212,7 @@
       const id = q.get('pet');
       if (!id || !Array.isArray(pets)) return;
       const hit = pets.find(p => p.id === id);
-      if (hit) openDialog(hit.id);
+      if (hit) SiteModal.open(hit);
     }
 
     const firebaseConfig = {
@@ -392,7 +338,11 @@
       });
 
       $$('.btn-detail').forEach(btn =>
-        btn.addEventListener('click', (e) => openDialog(e.currentTarget.dataset.id))
+        btn.addEventListener('click', (e) => {
+          const id = e.currentTarget.dataset.id;
+          const p = pets.find(x => x.id === id);
+          if (p) SiteModal.open(p);
+        })
       );
     }
 
@@ -469,211 +419,6 @@
       $('#fGender').addEventListener('change', applyFilters);
     }
 
-    // ---- Modal + Lightbox 共用狀態 ----
-    const dlg = document.getElementById('petDialog');
-    const lb = document.getElementById("lightbox");
-    const lbImg = document.getElementById("lbImg");
-    const lbPrev = document.getElementById("lbPrev");
-    const lbNext = document.getElementById("lbNext");
-
-    let lbImages = [];
-    let lbIndex = 0;
-
-    let oldHtmlOverflow = "";
-    let oldBodyOverflow = "";
-
-    function lockScroll() {
-      oldHtmlOverflow = document.documentElement.style.overflow;
-      oldBodyOverflow = document.body.style.overflow;
-      document.documentElement.style.overflow = "hidden";
-      document.body.style.overflow = "hidden";
-    }
-
-    function unlockScroll() {
-      document.documentElement.style.overflow = oldHtmlOverflow;
-      document.body.style.overflow = oldBodyOverflow;
-    }
-
-    function openDialog(id) {
-      const p = pets.find(x => x.id === id);
-      if (!p) return;
-
-      const dlgImg = document.getElementById("dlgImg");
-      const dlgThumbs = document.getElementById("dlgThumbs");
-
-      const imgs = Array.isArray(p.images) && p.images.length > 0
-        ? p.images
-        : (p.image ? [p.image] : []);
-
-      dlgImg.src = imgs[0] || "";
-      dlgImg.onclick = () => openLightbox(imgs, 0);
-
-      dlgThumbs.innerHTML = "";
-      imgs.forEach((url, i) => {
-        const thumb = document.createElement("img");
-        thumb.src = url;
-        thumb.className = "dlg-thumb" + (i === 0 ? " active" : "");
-        thumb.dataset.index = i;
-
-        thumb.addEventListener("click", () => {
-          dlgImg.src = url;
-          document.querySelectorAll(".dlg-thumb").forEach(el => el.classList.remove("active"));
-          thumb.classList.add("active");
-        });
-
-        dlgThumbs.appendChild(thumb);
-      });
-
-      document.getElementById('dlgName').textContent = p.name || '未命名';
-      document.getElementById('dlgDesc').textContent = p.desc || '';
-
-      currentPetId = id;
-      history.replaceState(null, '', `?pet=${encodeURIComponent(id)}`);
-
-      // 右上角物種圓角標籤（貓咪/狗狗 + 顏色）
-      const speciesPill = document.getElementById('dlgSpeciesPill');
-      const isDog = /(狗|犬)/.test(String(p.species||''));
-      speciesPill.textContent = isDog ? '狗狗' : '貓咪';
-      speciesPill.className = `shrink-0 rounded-full text-xs px-2 py-1 ${
-        isDog ? 'bg-sky-50 text-sky-700' : 'bg-emerald-50 text-emerald-700'
-      }`;
-
-      // 三個圓角標籤（不換行，超出可橫向捲動）
-      document.getElementById('dlgTagBreed').textContent  = formatBreed(p) || '—';
-      document.getElementById('dlgTagAge').textContent    = formatAge(p)   || '—';
-      document.getElementById('dlgTagGender').textContent = p.gender       || '—';
-
-      lockScroll();
-      dlg.showModal();
-    }
-
-    $('#dlgClose').addEventListener('click', () => {
-      dlg.close();
-      unlockScroll();
-      history.replaceState(null, '', location.pathname);
-      currentPetId = null;
-    });
-
-    dlg.addEventListener('close', () => {
-      unlockScroll();
-      history.replaceState(null, '', location.pathname);
-      currentPetId = null;
-    });
-
-    $('#dlgShare').addEventListener('click', () => {
-      if (!currentPetId) return;
-      const name = document.getElementById('dlgName').textContent.trim();
-      const url = makePetUrl(currentPetId);
-      const text = `一起幫 ${name} 找到家！`;
-      window.open(`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`, '_blank', 'noopener');
-    });
-
-    document.getElementById('dlgAdopt').onclick = () => {
-      const dlg   = document.getElementById('petDialog');   // 目標 dialog
-      const name  = document.getElementById('dlgName').textContent.trim();
-      const petId = window.currentPetId || '';  // 沒有就給空字串
-      const goto  = `adopt.html?${petId ? `pet=${encodeURIComponent(petId)}&` : ''}name=${encodeURIComponent(name)}`;
-
-      Swal.fire({
-        target: dlg,          // 關鍵：把彈窗掛在 dialog 內
-        backdrop: false,      // 避免雙遮罩（dialog 已有 backdrop）
-        html: `
-          <div style="display:flex;flex-direction:column;align-items:center;gap:12px;padding:8px 0">
-            <div style="font-size:48px;line-height:1">💡</div>
-            <div style="text-align:center;color:#374151">
-              填寫完表單後，按下<br>
-              <strong>「📋 複製表單並聯絡小編」</strong><br><br>
-              系統會自動複製填寫訊息並開啟 Messenger。
-            </div>
-          </div>
-        `,
-        confirmButtonText: '繼續',
-        buttonsStyling: false,
-        customClass: { popup: 'rounded-2xl', confirmButton: 'swal2-confirm-btn' }
-      }).then(r => {
-        if (r.isConfirmed) window.location.href = goto;
-      });
-    };
-
-    function openLightbox(images, index = 0) {
-      const lb = document.getElementById('lightbox');
-      const lbImg = document.getElementById('lbImg');
-      const thumbs = document.getElementById('lbThumbs');
-
-      // 顯示
-      lb.classList.remove('hidden');
-      lb.classList.add('flex');
-
-      // iOS Safari 上不要 requestFullscreen（常有怪異行為）
-      const ua = navigator.userAgent;
-      const isIOS = /iP(hone|ad|od)/.test(ua);
-      const isSafari = /^((?!chrome|android).)*safari/i.test(ua);
-      if (!isIOS) {
-        try {
-          if (document.fullscreenEnabled && !document.fullscreenElement) {
-            lb.requestFullscreen();
-          }
-        } catch {}
-      }
-
-      // …你原本的載入圖片、縮圖、左右切換邏輯（照舊）…
-    }
-
-    function closeLightbox() {
-      lb.classList.add('hidden');
-      lb.classList.remove('flex');
-      if (document.fullscreenElement) document.exitFullscreen(); // 退出全螢幕（若有）
-    }
-
-    function lbShow(delta) {
-      if (!lbImages.length) return;
-      lbIndex = (lbIndex + delta + lbImages.length) % lbImages.length;
-      lbImg.src = lbImages[lbIndex];
-
-      const lbThumbsInner = document.getElementById("lbThumbsInner");
-      lbThumbsInner.querySelectorAll("img").forEach((el, i) => {
-        el.classList.toggle("active", i === lbIndex);
-      });
-    }
-
-    lbPrev.onclick = () => lbShow(-1);
-    lbNext.onclick = () => lbShow(1);
-
-    lb.addEventListener('click', (e) => {
-      if (e.target === lb) {
-        e.preventDefault();
-        e.stopPropagation();
-        closeLightbox();
-      }
-    });
-
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && !lb.classList.contains("hidden")) {
-        closeLightbox();
-      }
-    });
-
-    let touchStartX = 0;
-    lb.addEventListener("touchstart", (e) => {
-      touchStartX = e.touches[0].clientX;
-    }, { passive: true });
-
-    lb.addEventListener("touchend", (e) => {
-      const diff = e.changedTouches[0].clientX - touchStartX;
-      if (diff > 50) lbShow(-1);
-      if (diff < -50) lbShow(1);
-    }, { passive: true });
-
-    lb.addEventListener("wheel", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    }, { passive: false });
-
-    lb.addEventListener("touchmove", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    }, { passive: false });
-
     // Nav toggle
     $('#navToggle').addEventListener('click', () => {
       $('#mobileNav').classList.toggle('hidden');
@@ -703,6 +448,16 @@
         } else {
           location.href = goto;
         }
+      },
+
+      onShare: (pet) => {
+        const name = document.getElementById('dlgName').textContent.trim();
+        const url  = `${location.origin}${location.pathname}?pet=${encodeURIComponent(pet.id||'')}`;
+        const text = `一起幫 ${name} 找到家！`;
+        window.open(
+          `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`,
+          '_blank','noopener'
+        );
       }
     });
   </script>
