@@ -412,12 +412,10 @@
       const snap = await getDocs(qRef);
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       pets = all.filter(p => p.species === SPECIES);
-      pets = all.filter(p => p.species === SPECIES);
       buildBreedOptionsByType(); // ← 新的
       render(pets);
       openFromDeepLink();
 
-      render(pets);
       // 即時篩選：任一選單變更就篩
       $('#fBreedType').addEventListener('change', () => {
         buildBreedOptionsByType(); // 先重建子選項
