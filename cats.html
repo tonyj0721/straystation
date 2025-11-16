@@ -114,7 +114,7 @@
     </header>
 
     <!-- Filters -->
-    <section class="mb-6 grid grid-cols-2 md:grid-cols-5 gap-3">
+    <section class="mb-6 grid grid-cols-2 md:grid-cols-4 gap-3">
       <select id="fBreedType" class="col-span-1 rounded-xl border border-gray-300 bg-white p-2 text-sm">
         <option value="">不限品種</option>
         <option value="品種貓">品種貓</option>
@@ -519,16 +519,12 @@
       currentPetId = null;
     });
 
-    $('#dlgShare').addEventListener('click', async () => {
-      const name = $('#dlgName').textContent;
-      const url = location.href.split('#')[0];
+    $('#dlgShare').addEventListener('click', () => {
+      if (!currentPetId) return;
+      const name = document.getElementById('dlgName').textContent.trim();
+      const url = makePetUrl(currentPetId);
       const text = `一起幫 ${name} 找到家！`;
-      if (navigator.share) {
-        try { await navigator.share({ title: name, text, url }); } catch {}
-      } else {
-        navigator.clipboard.writeText(`${text} ${url}`);
-        alert('已複製分享連結');
-      }
+      window.open(`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`, '_blank', 'noopener');
     });
 
     $('#dlgAdopt').addEventListener('click', () => {
