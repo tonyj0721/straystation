@@ -1,0 +1,16 @@
+/* —— dialog thumbs —— */
+.dlg-thumb{width:56px;height:56px;object-fit:cover;border-radius:8px;opacity:.7;border:2px solid transparent;cursor:pointer}
+.dlg-thumb.active{opacity:1;border-color:#fff;box-shadow:0 0 0 2px rgba(0,0,0,.2)}
+/* —— pills —— */
+.pill{display:inline-flex;align-items:center;padding:4px 10px;border-radius:9999px;font-size:12px;line-height:1;background:#fff;color:#374151;border:1px solid #e5e7eb;white-space:nowrap}
+.pill--cat{background:#ecfdf5;color:#047857;border-color:transparent}
+.pill--dog{background:#eff6ff;color:#1d4ed8;border-color:transparent}
+/* dialog 背景 */
+::backdrop{background:rgba(0,0,0,.4)}
+
+/* —— Lightbox（穩定版） —— */
+#lightbox{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9999}
+#lightbox.hidden{display:none}
+#lightbox .wrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+#lbImg{max-width:90vw;max-height:90vh;object-fit:contain;border-radius:12px}
+#lbClose{position:absolute;top:12px;right:12px;height:40px;width:40px;border-radius:9999px;background:rgba(255,255,255,.15);color:#fff;font-size:22px;line-height:40px;text-align:center}
