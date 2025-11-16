@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>我想養貓咪｜浪浪轉運站</title>
   <meta name="description" content="查看所有待認養的貓咪，依品種、毛色、年齡與性別篩選。">
   <link rel="icon" type="image/png" href="favicon.png" sizes="16x16 32x32 64x64">
@@ -44,17 +44,29 @@
       opacity: 1;
     }
 
+    /* 吃滿可視區，避開安全區 */
     #lightbox{
       position: fixed;
       inset: 0;
       width: 100vw;
-      height: 100dvh; /* iOS 會隨工具列動態調整 */
+
+      /* 先用一般 vh，之後用 iOS 新的 svh/dvh 蓋過 */
+      height: 100vh;
+      height: 100svh;     /* 小視窗高（工具列展開時） */
+      height: 100dvh;     /* 動態視窗高（工具列收起時） */
+
+      /* iOS 後備，某些舊版會採用這個值 */
+      min-height: -webkit-fill-available;
+
       padding:
         env(safe-area-inset-top)
         env(safe-area-inset-right)
         env(safe-area-inset-bottom)
-        env(safe-area-inset-left);  /* 避開瀏海與底部 Home 條 */
+        env(safe-area-inset-left);
+
+      display: none;               /* 你開啟時會加上 .flex 類似的 */
       -webkit-backdrop-filter: none;
+      z-index: 9999;               /* 保險：確保在最上層 */
     }
     #lbThumbs img {
       width: 60px;
@@ -71,6 +83,7 @@
     }
     #lbImg{
       max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+      max-height: calc(100svh - env(safe-area-inset-top) - env(safe-area-inset-bottom)); /* 覆蓋順序：svh/dvh */
       max-width:  calc(100vw  - env(safe-area-inset-left) - env(safe-area-inset-right));
       object-fit: contain;
     }
