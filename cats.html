@@ -7,6 +7,8 @@
   <title>我想養貓咪｜浪浪轉運站</title>
   <meta name="description" content="查看所有待認養的貓咪，依品種、毛色、年齡與性別篩選。">
 
+  <link rel="stylesheet" href="/modal.css">
+
   <!-- Favicon（小尺寸瀏覽器分頁圖示） -->
   <link rel="icon" type="image/png" href="/favicon.png" sizes="16x16 32x32 64x64">
 
@@ -237,13 +239,11 @@
   </dialog>
 
   <!-- Lightbox -->
-  <div id="lightbox" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[9999]">
-    <button id="lbPrev" class="absolute left-3 md:left-10 text-white text-4xl select-none">❮</button>
-    <img id="lbImg" class="object-contain rounded-lg"/>
-    <div id="lbThumbs" class="absolute bottom-20 left-0 w-full flex justify-center px-4 py-2 pb-[env(safe-area-inset-bottom)]">
-      <div id="lbThumbsInner" class="flex gap-3"></div>
+  <div id="lightbox" class="hidden">
+    <div class="wrap">
+      <img id="lbImg" alt="">
+      <button id="lbClose">×</button>
     </div>
-    <button id="lbNext" class="absolute right-3 md:right-10 text-white text-4xl select-none">❯</button>
   </div>
 
   <script type="module">
@@ -685,5 +685,26 @@
   </script>
 
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="/modal.js"></script>
+  <script>
+    // 這裡放每頁客製（例如 SweetAlert2 B 方案）
+    SiteModal.init({
+      onAdopt: (pet) => {
+        const dlg  = document.getElementById('petDialog');
+        const name = document.getElementById('dlgName').textContent.trim();
+        const goto = `adopt.html?${pet.id ? `pet=${encodeURIComponent(pet.id)}&` : ''}name=${encodeURIComponent(name)}`;
+        if (window.Swal) {
+          Swal.fire({
+            target: dlg, backdrop:false, buttonsStyling:false,
+            confirmButtonText:'繼續',
+            customClass:{ confirmButton:'swal2-confirm-btn' },
+            html:`<div style="text-align:center;color:#374151"><div style="font-size:48px">💡</div>填完表單後按「📋 複製表單並聯絡小編」</div>`
+          }).then(r=>{ if(r.isConfirmed) location.href=goto; });
+        } else {
+          location.href = goto;
+        }
+      }
+    });
+  </script>
 </body>
 </html>
