@@ -147,7 +147,7 @@
   </footer>
 
   <!-- Pet Detail Modal -->
-  <dialog id="petDialog" class="w-full max-w-2xl max-h-[90vh] rounded-2xl p-0 overflow-y-auto">
+  <dialog id="petDialog" class="relative w-full max-w-2xl max-h-[90vh] rounded-2xl p-0 overflow-y-auto">
     <div class="bg-white">
       <div class="relative aspect-video bg-gray-100 blur-fit">
         <img id="dlgImg" alt="毛孩照片" class="w-full h-full object-contain cursor-pointer"/>
@@ -182,15 +182,14 @@
         </div>
       </div>
     </div>
-  </dialog>
-
-  <!-- Lightbox -->
-  <div id="lightbox" class="hidden">
-    <div class="wrap">
-      <img id="lbImg" alt="">
-      <button id="lbClose">×</button>
+    <!-- Lightbox -->
+    <div id="lightbox" class="hidden">
+      <div class="wrap">
+        <img id="lbImg" alt="">
+        <button id="lbClose">×</button>
+      </div>
     </div>
-  </div>
+  </dialog>
 
   <script type="module">
     history.scrollRestoration = "manual";
