@@ -104,17 +104,17 @@
     <!-- Filters -->
     <section class="mb-6 grid grid-cols-2 md:grid-cols-4 gap-3">
       <select id="fBreedType" class="col-span-1 rounded-xl border border-gray-300 bg-white p-2 text-sm">
-        <option value="">品種（全部）</option>
+        <option value="">不限品種</option>
         <option value="品種貓">品種貓</option>
         <option value="米克斯">米克斯</option>
       </select>
 
       <select id="fBreed" class="col-span-1 rounded-xl border border-gray-300 bg-white p-2 text-sm">
-        <option value="">品種／毛色（全部）</option>
+        <option value="">請先選擇類別</option>
       </select>
 
       <select id="fAge" class="col-span-1 rounded-xl border border-gray-300 bg-white p-2 text-sm">
-        <option value="">年齡（全部）</option>
+        <option value="">不限年齡</option>
         <option value="1以下">1 歲以下</option>
         <option value="1-5">1～5 歲</option>
         <option value="6-10">6～10 歲</option>
@@ -122,7 +122,7 @@
       </select>
 
       <select id="fGender" class="col-span-1 rounded-xl border border-gray-300 bg-white p-2 text-sm">
-        <option value="">性別（全部）</option>
+        <option value="">不限性別</option>
         <option value="男生">男生</option>
         <option value="女生">女生</option>
       </select>
@@ -279,7 +279,7 @@
 
         const cover = (p.images && p.images.length ? p.images[0] : p.image) || '';
 
-        card.innerHTML = `
+        card.innerHTML = `  
           <div class="relative aspect-[4/3] bg-gray-100">
             <img src="${cover}" alt="${p.name || '毛孩'} 的照片" class="w-full h-full object-contain" loading="lazy"/>
           </div>
