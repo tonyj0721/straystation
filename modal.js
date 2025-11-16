@@ -1,4 +1,3 @@
-<script>
 (()=> {
   const $ = s => document.querySelector(s);
 
@@ -40,6 +39,17 @@
 
     const dlgImg = $('#dlgImg');
     dlgImg.src = img0;
+
+    // ★ 把外層（含 .blur-fit）背景指向同張圖，做模糊延伸
+    const hero = dlgImg.parentElement;               // <div class="... blur-fit">
+    if (img0) {
+      hero?.classList.add('blur-fit');
+      hero?.style.setProperty('--bg', `url("${img0}")`);
+    } else {
+      hero?.style.removeProperty('--bg');
+      hero?.classList.remove('blur-fit');
+    }
+
     dlgImg.onclick = () => openLightbox(imgs, 0);
 
     const thumbs = $('#dlgThumbs');
@@ -87,5 +97,5 @@
   // 對外 API
   window.SiteModal = { init, open, openLightbox, closeLightbox };
 })();
-</script>
+
 
