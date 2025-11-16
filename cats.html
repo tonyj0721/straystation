@@ -113,7 +113,7 @@
         class="col-span-1 rounded-xl border border-gray-300 bg-white p-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
         disabled
       >
-        <option value="">請先選「品種」</option>
+        <option value="">請先選擇「品種」</option>
       </select>
 
       <select id="fAge" class="col-span-1 rounded-xl border border-gray-300 bg-white p-2 text-sm">
@@ -332,7 +332,7 @@
       if (!type) {
         // 未選：右側停用、顯示提示
         breedSel.disabled = true;
-        breedSel.innerHTML = '<option value="">請先選「品種」</option>';
+        breedSel.innerHTML = '<option value="">請先選擇「品種」</option>';
         return;
       }
 
