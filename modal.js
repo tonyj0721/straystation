@@ -10,25 +10,27 @@
 
   // —— Lightbox ——（穩定簡版）
   const lb = $('#lightbox'), lbImg = $('#lbImg'), lbClose = $('#lbClose');
-  function openLightbox(images, index=0){
-    const arr = Array.isArray(images) ? images : (images?[images]:[]);
+  // 開
+  function openLightbox(images, index = 0){
+    const lb = document.getElementById('lightbox');
+    const lbImg = document.getElementById('lbImg');
+    const arr = Array.isArray(images) ? images : (images ? [images] : []);
     const url = arr[index] || '';
     if (!url) return;
-    lbImg.src = url;                  // 先設 src 再顯示，避免黑畫面
+    lbImg.src = url;
     lb.classList.remove('hidden');
-
-    // 桌機才可選擇嘗試全螢幕
-    if (fullscreenOnDesktop && !/iP(hone|ad|od)/.test(navigator.userAgent)) {
-      try{ if(document.fullscreenEnabled && !document.fullscreenElement) lb.requestFullscreen(); }catch{}
-    }
   }
+  // 關
   function closeLightbox(){
+    const lb = document.getElementById('lightbox');
     lb.classList.add('hidden');
-    lbImg.src = '';
-    if (document.fullscreenElement) document.exitFullscreen();
+    document.getElementById('lbImg').src = '';
   }
-  lbClose?.addEventListener('click', closeLightbox);
-  lb?.addEventListener('click', (e)=>{ if(e.target===lb) closeLightbox(); });
+  // 背景點擊
+  document.getElementById('lightbox').addEventListener('click', (e)=>{
+    if (e.target.id === 'lightbox') closeLightbox();
+  });
+  document.getElementById('lbClose').addEventListener('click', closeLightbox);
 
   // —— Modal 主流程 ——（照 cats.html 結構）
   function open(p){
@@ -97,5 +99,6 @@
   // 對外 API
   window.SiteModal = { init, open, openLightbox, closeLightbox };
 })();
+
 
 
