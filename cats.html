@@ -75,7 +75,12 @@
     .blur-fit > img{
       position:absolute; inset:0; width:100%; height:100%;
       object-fit: contain; z-index:1; /* 上層放原圖，保持比例 */
-    }    
+    }
+    .swal2-confirm-btn{
+      background:#22c55e;color:#fff;border-radius:9999px;
+      padding:10px 20px;font-weight:600
+    }
+    .swal2-confirm-btn:hover{ background:#16a34a }
   </style>
 </head>
 <body class="bg-white text-gray-800">
@@ -527,11 +532,32 @@
       window.open(`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`, '_blank', 'noopener');
     });
 
-    $('#dlgAdopt').addEventListener('click', () => {
-      dlg.close();
-      unlockScroll();
-      alert('請私訊粉專或聯繫管理員進行認養流程');
-    });
+    document.getElementById('dlgAdopt').onclick = () => {
+      const dlg   = document.getElementById('petDialog');   // 目標 dialog
+      const name  = document.getElementById('dlgName').textContent.trim();
+      const petId = (window.currentPetId || (typeof p !== 'undefined' && p.id) || '');
+      const goto  = `adopt.html?pet=${encodeURIComponent(petId)}&name=${encodeURIComponent(name)}`;
+
+      Swal.fire({
+        target: dlg,          // 關鍵：把彈窗掛在 dialog 內
+        backdrop: false,      // 避免雙遮罩（dialog 已有 backdrop）
+        html: `
+          <div style="display:flex;flex-direction:column;align-items:center;gap:12px;padding:8px 0">
+            <div style="font-size:48px;line-height:1">💡</div>
+            <div style="text-align:center;color:#374151">
+              填寫完表單後，按下<br>
+              <strong>「📋 複製表單並聯絡小編」</strong><br><br>
+              系統會自動複製填寫訊息並開啟 Messenger。
+            </div>
+          </div>
+        `,
+        confirmButtonText: '繼續',
+        buttonsStyling: false,
+        customClass: { popup: 'rounded-2xl', confirmButton: 'swal2-confirm-btn' }
+      }).then(r => {
+        if (r.isConfirmed) window.location.href = goto;
+      });
+    };
 
     function openLightbox(images, index = 0) {
       lbImages = images;
@@ -625,5 +651,6 @@
 
     loadPets();
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </body>
 </html>
