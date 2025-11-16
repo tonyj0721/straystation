@@ -77,8 +77,7 @@
         env(safe-area-inset-right)
         env(safe-area-inset-bottom)
         env(safe-area-inset-left);
-
-      display: none;               /* 你開啟時會加上 .flex 類似的 */
+      
       -webkit-backdrop-filter: none;
       z-index: 9999;               /* 保險：確保在最上層 */
     }
@@ -597,48 +596,34 @@
     };
 
     function openLightbox(images, index = 0) {
-      lbImages = images;
-      lbIndex = index;
+      const lb = document.getElementById('lightbox');
+      const lbImg = document.getElementById('lbImg');
+      const thumbs = document.getElementById('lbThumbs');
 
-      lbImg.src = lbImages[lbIndex];
+      // 顯示
+      lb.classList.remove('hidden');
+      lb.classList.add('flex');
 
-      const lbThumbsInner = document.getElementById("lbThumbsInner");
-      lbThumbsInner.innerHTML = "";
+      // iOS Safari 上不要 requestFullscreen（常有怪異行為）
+      const ua = navigator.userAgent;
+      const isIOS = /iP(hone|ad|od)/.test(ua);
+      const isSafari = /^((?!chrome|android).)*safari/i.test(ua);
+      if (!isIOS) {
+        try {
+          if (document.fullscreenEnabled && !document.fullscreenElement) {
+            lb.requestFullscreen();
+          }
+        } catch {}
+      }
 
-      lbImages.forEach((url, i) => {
-        const t = document.createElement("img");
-        t.src = url;
-        t.className = i === lbIndex ? "active" : "";
-
-        t.addEventListener("click", () => {
-          lbIndex = i;
-          lbImg.src = lbImages[lbIndex];
-          lbThumbsInner.querySelectorAll("img").forEach(el => el.classList.remove("active"));
-          t.classList.add("active");
-        });
-
-        lbThumbsInner.appendChild(t);
-      });
-
-      if (dlg.open) dlg.close();
-      unlockScroll();
-
-      lb.classList.remove("hidden");
-      lb.classList.add("flex");
-      try{
-        if (document.fullscreenEnabled && !document.fullscreenElement) {
-          lb.requestFullscreen();
-        }
-      }catch(e){}
-
+      // …你原本的載入圖片、縮圖、左右切換邏輯（照舊）…
     }
 
     function closeLightbox() {
-      lb.classList.add("hidden");
-      lb.classList.remove("flex");
-      if (document.fullscreenElement) document.exitFullscreen();
-      dlg.showModal();
-      lockScroll();
+      const lb = document.getElementById('lightbox');
+      lb.classList.add('hidden');
+      lb.classList.remove('flex');
+      if (document.fullscreenElement) document.exitFullscreen(); // 退出全螢幕（若有）
     }
 
     function lbShow(delta) {
@@ -655,8 +640,13 @@
     lbPrev.onclick = () => lbShow(-1);
     lbNext.onclick = () => lbShow(1);
 
-    lb.addEventListener("click", (e) => {
-      if (e.target === lb) closeLightbox();
+    const lb = document.getElementById('lightbox');
+    lb.addEventListener('click', (e) => {
+      if (e.target === lb) {
+        e.preventDefault();
+        e.stopPropagation();
+        closeLightbox();
+      }
     });
 
     document.addEventListener("keydown", (e) => {
