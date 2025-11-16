@@ -109,8 +109,11 @@
         <option value="米克斯">米克斯</option>
       </select>
 
-      <select id="fBreed" class="col-span-1 rounded-xl border border-gray-300 bg-white p-2 text-sm">
-        <option value="">品種／毛色（全部）</option>
+      <select id="fBreed"
+        class="col-span-1 rounded-xl border border-gray-300 bg-white p-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled
+      >
+        <option value="">請先選擇「品種」</option>
       </select>
 
       <select id="fAge" class="col-span-1 rounded-xl border border-gray-300 bg-white p-2 text-sm">
@@ -323,12 +326,23 @@
     }
 
     function buildBreedOptionsByType() {
-      const breedSel = $('#fBreed');
-      const type = $('#fBreedType').value;
+      const breedSel = document.getElementById('fBreed');
+      const type = document.getElementById('fBreedType').value; // "", "品種犬", "米克斯"
 
-      const options = type && BREED_DICT[type] ? BREED_DICT[type] : [];
+      if (!type) {
+        // 未選：右側停用、顯示提示
+        breedSel.disabled = true;
+        breedSel.innerHTML = '<option value="">請先選擇「品種」</option>';
+        return;
+      }
+
+      // 已選：右側啟用；依左邊類型決定文案與清單
+      const label = (type === '米克斯') ? '不限毛色' : '不限品種';
+      const options = (BREED_DICT[type] || []);
+
+      breedSel.disabled = false;
       breedSel.innerHTML =
-        '<option value="">品種／毛色（全部）</option>' +
+        `<option value="">${label}</option>` +
         options.map(b => `<option value="${b}">${b}</option>`).join('');
     }
 
