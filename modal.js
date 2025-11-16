@@ -47,7 +47,12 @@
     imgs.forEach((url,i)=>{
       const t = document.createElement('img');
       t.src = url; t.className = 'dlg-thumb'+(i===0?' active':'');
-      t.onclick = ()=>{ dlgImg.src=url; thumbs.querySelectorAll('.dlg-thumb').forEach(x=>x.classList.remove('active')); t.classList.add('active'); };
+      t.onclick = ()=>{
+        dlgImg.src=url;
+        hero?.style.setProperty('--bg', `url("${url}")`);   // ★ 新增
+        thumbs.querySelectorAll('.dlg-thumb').forEach(x=>x.classList.remove('active'));
+        t.classList.add('active');
+      };
       thumbs.appendChild(t);
     });
 
@@ -83,3 +88,4 @@
   window.SiteModal = { init, open, openLightbox, closeLightbox };
 })();
 </script>
+
