@@ -1,0 +1,9 @@
+{
+  "name": "浪浪轉運站",
+  "short_name": "浪浪轉運站",
+  "start_url": "/index.html",
+  "display": "standalone",    // 或 "fullscreen"
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+}
