@@ -9,6 +9,10 @@
   <link rel="apple-touch-icon" href="favicon.png">
   <meta name="theme-color" content="#fcd34d">
 
+  <link rel="manifest" href="/manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -226,7 +230,7 @@
   <!-- Lightbox -->
   <div id="lightbox" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[9999]">
     <button id="lbPrev" class="absolute left-3 md:left-10 text-white text-4xl select-none">❮</button>
-    <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg"/>
+    <img id="lbImg" class="object-contain rounded-lg"/>
     <div id="lbThumbs" class="absolute bottom-20 left-0 w-full flex justify-center px-4 py-2 pb-[env(safe-area-inset-bottom)]">
       <div id="lbThumbsInner" class="flex gap-3"></div>
     </div>
@@ -440,12 +444,10 @@
       const snap = await getDocs(qRef);
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       pets = all.filter(p => p.species === SPECIES);
-      pets = all.filter(p => p.species === SPECIES);
       buildBreedOptionsByType(); // ← 新的
       render(pets);
       openFromDeepLink();
 
-      render(pets);
       // 即時篩選：任一選單變更就篩
       $('#fBreedType').addEventListener('change', () => {
         buildBreedOptionsByType(); // 先重建子選項
@@ -560,8 +562,8 @@
     document.getElementById('dlgAdopt').onclick = () => {
       const dlg   = document.getElementById('petDialog');   // 目標 dialog
       const name  = document.getElementById('dlgName').textContent.trim();
-      const petId = (window.currentPetId || (typeof p !== 'undefined' && p.id) || '');
-      const goto  = `adopt.html?pet=${encodeURIComponent(petId)}&name=${encodeURIComponent(name)}`;
+      const petId = window.currentPetId || '';  // 沒有就給空字串
+      const goto  = `adopt.html?${petId ? `pet=${encodeURIComponent(petId)}&` : ''}name=${encodeURIComponent(name)}`;
 
       Swal.fire({
         target: dlg,          // 關鍵：把彈窗掛在 dialog 內
@@ -624,6 +626,7 @@
     function closeLightbox() {
       lb.classList.add("hidden");
       lb.classList.remove("flex");
+      if (document.fullscreenElement) document.exitFullscreen();
       dlg.showModal();
       lockScroll();
     }
