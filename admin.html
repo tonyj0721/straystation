@@ -537,18 +537,22 @@
         const breedTypeWrap = document.getElementById("breedTypeWrap");
         const breedWrap = document.getElementById("breedWrap");
 
-        // 觸發類別切換
-        speciesSelect.dispatchEvent(new Event("change"));
+        if (speciesSelect) {
+          speciesSelect.value = pet.species || "";
+          speciesSelect.dispatchEvent(new Event("change"));
+        }
 
-        // 設定品種分類
-        breedType.value = pet.breedType || "";
-        breedType.dispatchEvent(new Event("change"));
+        if (breedType) {
+          breedType.value = pet.breedType || "";
+          breedType.dispatchEvent(new Event("change"));
+        }
 
-        // 設定品種
-        breed.value = pet.breed || "";
+        if (breed) {
+          breed.value = pet.breed || "";
+        }
 
         // 按鈕文字改成「儲存修改」
-        document.querySelector("button[type='submit']").textContent = "儲存修改";
+        document.getElementById("submitBtn").textContent = "儲存修改";
 
         // 關閉 modal
         modal.style.display = "none";
@@ -750,7 +754,7 @@
             window.filesState = [];
             preview.innerHTML = "";
 
-            document.querySelector("button[type='submit']").textContent = "登錄";
+            document.getElementById("submitBtn").textContent = "登錄";
 
             loadPets();
 
@@ -957,7 +961,7 @@
         <span id="photoStatus" class="note">尚未選擇</span>
         <div id="preview"></div>
 
-        <button>登錄</button>
+        <button type="submit" id="submitBtn">登錄</button>
       </form>
     </div>
 
