@@ -908,11 +908,11 @@
     const pickBtn = document.getElementById('pickBtn');
     const status = document.getElementById('photoStatus');
     const preview = document.getElementById('preview');
-    
+
     // ⭐ 統一：所有圖片只存這裡
     window.filesState = [];
 
-    pickBtn.addEventListener('click', ()=> input.click());
+    pickBtn.addEventListener('click', () => input.click());
 
     input.addEventListener("change", (e) => {
       // ⭐ 每次重新選照片，都重置 filesState（避免累加）
