@@ -81,6 +81,104 @@
       padding:10px 20px;font-weight:600
     }
     .swal2-confirm-btn:hover{ background:#16a34a }
+
+    /* --- 後台 Modal 風格搬到前台（cats / dogs 共用） --- */
+
+    /* 主圖：對應後台 .modal-main-photo */
+    #dlgImg {
+      width: 100%;
+      max-height: 300px;
+      border-radius: 10px;
+      object-fit: contain;
+      background-color: #f9f9f9;
+      display: block;
+      margin: 0 auto 8px auto;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    }
+
+    /* 縮圖容器：對應後台 .modal-photos */
+    #dlgThumbs {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(18%, 1fr));
+      gap: 6px;
+      padding: 12px 16px;
+      margin-bottom: 12px;
+      justify-items: center;
+      align-items: center;
+    }
+
+    /* 縮圖：對應後台 .modal-photos img */
+    #dlgThumbs img {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: transform 0.2s, border-color 0.2s, opacity 0.2s;
+      opacity: 0.8;
+      background: #f9f9f9;
+    }
+
+    #dlgThumbs img:hover {
+      transform: scale(1.05);
+    }
+
+    #dlgThumbs img.active {
+      border-color: #f97316; /* 用後台同一個橘色 */
+      opacity: 1;
+    }
+
+    /* 右上角「貓咪 / 狗狗」膠囊：對應後台 .modal-info 的風格 */
+    #dlgSpeciesPill {
+      background: #fff7ed;
+      color: #92400e;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    /* 三個資訊標籤列：對應後台 .modal-info */
+    #dlgTags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 6px;
+      margin-bottom: 6px;
+    }
+
+    /* 每個標籤：對應 .modal-info span */
+    #dlgTags span {
+      background: #fff7ed;
+      padding: 5px 12px;
+      border-radius: 999px;
+      color: #92400e;
+      font-weight: 500;
+      font-size: 0.9rem;
+    }
+
+    /* 主要敘述文字：對應後台 #modalDesc，手機友善版 */
+    #dlgDesc {
+      background: #fffaf4;
+      padding: 12px 16px;
+      border-radius: 10px;
+      color: #444;
+      font-size: 1rem;
+      line-height: 1.7;
+      white-space: pre-wrap;    /* 保留你原本用換行排版的方式 */
+      word-break: break-word;
+      margin-top: 8px;
+      margin-bottom: 16px;
+      font-weight: 400;
+    }
+
+    /* 手機再大一點字 */
+    @media (max-width: 640px) {
+      #dlgDesc {
+        font-size: 1.05rem;
+      }
+    }
   </style>
 </head>
 <body class="text-gray-800 bg-gradient-to-br from-brand-50 to-white">
