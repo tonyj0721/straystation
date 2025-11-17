@@ -573,7 +573,7 @@
         breedType.disabled = true;
 
         // ⭐ 改成保留 placeholder，不要清空
-        breed.innerHTML = `<option value="">請先選擇類別</option>`;
+        breed.innerHTML = `<option value="">請先選擇品種</option>`;
 
         // ⭐ 一樣隱藏
         breedWrap.classList.add("hidden");
@@ -589,7 +589,7 @@
           breed.disabled = true;
           // 根據選擇的更新選項文字
           breedType.innerHTML = `
-            <option value="">請先選擇品種</option>
+            <option value="">請選擇</option>
             ${speciesSelect.value === "貓" 
               ? '<option value="品種貓">品種貓</option><option value="米克斯">米克斯</option>'
               : '<option value="品種犬">品種犬</option><option value="米克斯">米克斯</option>'}
@@ -599,7 +599,7 @@
 
       // 🐱🐶 第二層：品種
       breedType.addEventListener("change", () => {
-        breed.innerHTML = `<option value="">請選擇1</option>`;
+        breed.innerHTML = `<option value="">請選擇</option>`;
         const breedLabel = document.querySelector('#breedWrap label');
         breedLabel.textContent = (breedType.value === "米克斯") ? "毛色" : "品種";
         let options = [];
@@ -815,7 +815,7 @@
 
         <label>類別</label>
         <select name="species" id="species">
-          <option value="">請選擇2</option>
+          <option value="">請選擇</option>
           <option value="貓">貓咪</option>
           <option value="狗">狗狗</option>
         </select>
@@ -823,7 +823,7 @@
         <div id="breedTypeWrap" class="hidden">
           <label>品種</label>
           <select id="breedType" name="breedType" disabled>
-            <option value="">請選擇3</option>
+            <option value="">請先選擇類別</option>
             <option value="品種貓">品種貓</option>
             <option value="品種犬">品種犬</option>
             <option value="米克斯">米克斯</option>
@@ -832,7 +832,7 @@
 
         <div id="breedWrap" class="hidden">
           <label>品種/毛色</label>
-          <select id="breed" name="breed" disabled><option value="">請選擇4</option></select>
+          <select id="breed" name="breed" disabled><option value="">請先選擇品種</option></select>
         </div>
 
         <label>年齡</label>
@@ -840,7 +840,7 @@
 
         <label>性別</label>
         <select name="gender">
-          <option value="">請選擇5</option>
+          <option value="">請選擇</option>
           <option value="男生">男生</option>
           <option value="女生">女生</option>
         </select>
