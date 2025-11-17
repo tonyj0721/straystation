@@ -157,22 +157,26 @@
   <main id="pets" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
     <!-- 手機：左右兩欄，左=貓、右=狗；直向捲動 -->
     <section class="sm:hidden">
-      <div class="grid grid-cols-2 gap-4">
-        <!-- 左欄：貓 -->
-        <div>
-          <h3 class="text-base font-semibold mb-2">貓咪</h3>
-          <div id="colCats" class="flex flex-col gap-4">
-            <!-- cats cards inject here -->
-          </div>
+      <!-- 左欄：貓 -->
+      <div>
+        <div class="mb-2 flex items-center justify-between">
+          <h3 class="text-base font-semibold">貓咪</h3>
+          <a href="cats.html" class="text-sm text-gray-500 hover:text-gray-900 inline-flex items-center gap-1">
+            看更多<span aria-hidden="true">→</span>
+          </a>
         </div>
+        <div id="colCats" class="flex flex-col gap-4"></div>
+      </div>
 
-        <!-- 右欄：狗 -->
-        <div>
-          <h3 class="text-base font-semibold mb-2">狗狗</h3>
-          <div id="colDogs" class="flex flex-col gap-4">
-            <!-- dogs cards inject here -->
-          </div>
+      <!-- 右欄：狗 -->
+      <div>
+        <div class="mb-2 flex items-center justify-between">
+          <h3 class="text-base font-semibold">狗狗</h3>
+          <a href="dogs.html" class="text-sm text-gray-500 hover:text-gray-900 inline-flex items-center gap-1">
+            看更多<span aria-hidden="true">→</span>
+          </a>
         </div>
+        <div id="colDogs" class="flex flex-col gap-4"></div>
       </div>
     </section>
 
