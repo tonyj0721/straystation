@@ -179,6 +179,59 @@
         font-size: 1.05rem;
       }
     }
+
+    /* ==============================
+   前台卡片粉嫩品牌風格（B）
+   ============================== */
+
+/* 卡片容器變柔和粉白 + 陰影 */
+.card {
+  background: #fff7f8; /* 淡淡粉白 */
+  border-radius: 16px; /* 更柔圓角 */
+  padding: 14px;
+  box-shadow: 0 4px 10px rgba(255, 160, 170, 0.25);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s;
+  border: 1px solid #ffe5e8;
+}
+
+/* hover 效果：輕微浮起 */
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 18px rgba(255, 140, 160, 0.35);
+  background: #fff0f3;
+}
+
+/* 卡片圖片：柔和圓角 + 輕陰影 */
+.card img {
+  border-radius: 14px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.07);
+  transition: transform 0.25s ease, opacity 0.25s;
+}
+
+/* hover 時圖片微微放大 */
+.card:hover img {
+  transform: scale(1.03);
+  opacity: 0.95;
+}
+
+/* 名稱字體更柔、品牌風 */
+.card-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #b03060; /* 粉系品牌色 */
+  margin-top: 10px;
+}
+
+/* 副資訊（性別/年齡）更淡柔 */
+.card-info {
+  font-size: 0.9rem;
+  color: #9b6b7a; /* 柔和粉灰 */
+}
+
+/* 內部間距統一柔和化 */
+.card-content {
+  padding: 6px 4px;
+}
   </style>
 </head>
 <body class="text-gray-800 bg-gradient-to-br from-brand-50 to-white">
