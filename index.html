@@ -155,30 +155,28 @@
 
   <!-- Filters + Pets -->
   <main id="pets" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-    <!-- ✅ 手機：兩列（貓/狗），每列橫向滑動、同時看到 2 張 -->
-    <section class="sm:hidden space-y-8">
-      <div>
-        <h3 class="text-lg font-semibold">最新貓咪</h3>
-        <div class="mt-3 overflow-x-auto">
-          <div id="catsTrack"
-               class="grid grid-flow-col auto-cols-[minmax(45%,_1fr)] gap-4 snap-x snap-mandatory">
+    <!-- 手機：左右兩欄，左=貓、右=狗；直向捲動 -->
+    <section class="sm:hidden">
+      <div class="grid grid-cols-2 gap-4">
+        <!-- 左欄：貓 -->
+        <div>
+          <h3 class="text-base font-semibold mb-2">貓咪</h3>
+          <div id="colCats" class="flex flex-col gap-4">
             <!-- cats cards inject here -->
           </div>
         </div>
-      </div>
 
-      <div>
-        <h3 class="text-lg font-semibold">最新狗狗</h3>
-        <div class="mt-3 overflow-x-auto">
-          <div id="dogsTrack"
-               class="grid grid-flow-col auto-cols-[minmax(45%,_1fr)] gap-4 snap-x snap-mandatory">
+        <!-- 右欄：狗 -->
+        <div>
+          <h3 class="text-base font-semibold mb-2">狗狗</h3>
+          <div id="colDogs" class="flex flex-col gap-4">
             <!-- dogs cards inject here -->
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ✅ sm↑：沿用原本的卡片格（2/3 欄） -->
+    <!-- sm 以上維持原本格狀 -->
     <div id="grid" class="mt-8 hidden sm:grid gap-6 sm:grid-cols-2 lg:grid-cols-3"></div>
 
     <div id="emptyState" class="hidden mt-10 text-center text-gray-500">
@@ -373,14 +371,14 @@
       }
       document.getElementById('emptyState').classList.add('hidden');
       grid.innerHTML = allPets.map(createCardHTML).join('');
-    }
+    }    
 
-    // 🚀 手機：一列一個物種、同時 2 張卡片（橫向滑動）
-    function renderMobileRows(cats, dogs){
-      const catsTrack = document.getElementById('catsTrack');
-      const dogsTrack = document.getElementById('dogsTrack');
-      catsTrack.innerHTML = cats.map(createCardHTML).join('');
-      dogsTrack.innerHTML = dogs.map(createCardHTML).join('');
+    // 手機：左右兩欄（左=貓、右=狗）
+    function renderMobileColumns(cats, dogs){
+      const colCats = document.getElementById('colCats');
+      const colDogs = document.getElementById('colDogs');
+      if (colCats) colCats.innerHTML = cats.map(createCardHTML).join('');
+      if (colDogs) colDogs.innerHTML = dogs.map(createCardHTML).join('');
     }
 
     // 重新掛 detail 事件（桌機與手機都適用）
@@ -402,7 +400,7 @@
       applyStats();
 
       renderDesktop(pets);                // sm 以上會顯示
-      renderMobileRows(cats, dogs);       // 手機顯示兩列
+      renderMobileColumns(cats, dogs);
       bindDetailButtons();
 
       openFromDeepLink();
