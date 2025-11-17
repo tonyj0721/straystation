@@ -381,7 +381,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-    import { getFirestore, addDoc, collection, serverTimestamp, getDocs, deleteDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+    import { getFirestore, addDoc, collection, serverTimestamp, getDocs, updateDoc, deleteDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
     import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
 
     const firebaseConfig = {
@@ -407,6 +407,7 @@
     // 🚀 載入 Firestore 資料
     // 🧾 全域變數存全部資料以供搜尋
     let allPets = [];
+    let editingId = null;
 
     // 🚀 載入 Firestore 資料
     async function loadPets() {
@@ -519,7 +520,39 @@
       };
 
       document.getElementById("editBtn").onclick = () => {
-        alert(`尚未實作編輯功能：${pet.name}`);
+        // 切換到編輯模式
+        editingId = id;
+
+        // 填入資料
+        document.querySelector("input[name='name']").value = pet.name;
+        document.querySelector("select[name='species']").value = pet.species;
+        document.querySelector("select[name='gender']").value = pet.gender;
+        document.querySelector("input[name='age']").value = pet.age || "";
+        document.querySelector("textarea[name='desc']").value = pet.desc || "";
+
+        // 品種/毛色階層處理
+        const speciesSelect = document.getElementById("species");
+        const breedType = document.getElementById("breedType");
+        const breed = document.getElementById("breed");
+        const breedTypeWrap = document.getElementById("breedTypeWrap");
+        const breedWrap = document.getElementById("breedWrap");
+
+        // 觸發類別切換
+        speciesSelect.dispatchEvent(new Event("change"));
+
+        // 設定品種分類
+        breedType.value = pet.breedType || "";
+        breedType.dispatchEvent(new Event("change"));
+
+        // 設定品種
+        breed.value = pet.breed || "";
+
+        // 按鈕文字改成「儲存修改」
+        document.querySelector("button[type='submit']").textContent = "儲存修改";
+
+        // 關閉 modal
+        modal.style.display = "none";
+        document.body.style.overflow = "";
       };
 
       document.getElementById("adoptBtn").onclick = () => {
@@ -675,6 +708,59 @@
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
         const data = Object.fromEntries(new FormData(form).entries());
+
+        // === 如果是編輯模式 → 不走新增流程 ===
+        if (editingId) {
+          try {
+            const petRef = doc(db, "pets", editingId);
+
+            // 如果沒有重新選照片 → 保留原本圖片
+            let imageUrls = [];
+
+            if (window.filesState.length === 0) {
+              const oldData = allPets.find(p => p.id === editingId);
+              imageUrls = oldData.images || [];
+            } else {
+              // 有重新選照片 → 重新上傳
+              for (let file of window.filesState) {
+                const fileRef = ref(storage, `pets/${Date.now()}_${file.name}`);
+                const snapshot = await uploadBytes(fileRef, file);
+                const url = await getDownloadURL(snapshot.ref);
+                imageUrls.push(url);
+              }
+            }
+
+            // 更新 Firestore
+            await updateDoc(petRef, {
+              ...data,
+              images: imageUrls
+            });
+
+            Swal.fire({
+              icon: "success",
+              title: "修改成功！",
+              text: `已更新「${data.name}」`,
+              timer: 1000,
+              showConfirmButton: false
+            });
+
+            // 重置編輯狀態
+            editingId = null;
+            form.reset();
+            window.filesState = [];
+            preview.innerHTML = "";
+
+            document.querySelector("button[type='submit']").textContent = "登錄";
+
+            loadPets();
+
+          } catch (err) {
+            console.error(err);
+            Swal.fire("錯誤", "更新失敗", "error");
+          }
+
+          return; // 🚀 中斷新增流程
+        }
 
         // === 🔍 1. 檢查名字是否重複 ===
         const q = await getDocs(collection(db, "pets"));
