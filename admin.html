@@ -568,11 +568,15 @@
       // 🧹 重置函數
       function resetBreed() {
         breedType.value = "";
-        breed.innerHTML = "";
         breedTypeWrap.classList.add("hidden");
-        breedWrap.classList.add("hidden");
-        breedType.disabled = true;
         breed.disabled = true;
+        breedType.disabled = true;
+
+        // ⭐ 改成保留 placeholder，不要清空
+        breed.innerHTML = `<option value="">請選擇</option>`;
+
+        // ⭐ 一樣隱藏
+        breedWrap.classList.add("hidden");
       }
 
       // 🐾 切換
