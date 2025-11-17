@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>關於簡媽媽｜浪浪轉運站</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="color-scheme" content="light only">
+</head>
+<body class="bg-gradient-to-b from-rose-50 to-white text-gray-900">
+  <!-- Header -->
+  <header class="sticky top-0 z-30 bg-white/70 backdrop-blur border-b">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
+      <a href="index.html" class="font-semibold">浪浪轉運站</a>
+      <nav class="hidden sm:flex items-center gap-6 text-sm">
+        <a href="cats.html" class="hover:text-gray-900 text-gray-600">我想養貓咪</a>
+        <a href="dogs.html" class="hover:text-gray-900 text-gray-600">我想養狗狗</a>
+        <a href="about.html" class="font-medium text-gray-900">關於簡媽媽</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
+    <div class="grid md:grid-cols-2 gap-8 lg:gap-12 items-start">
+      <!-- 文案 -->
+      <section>
+        <h1 class="text-3xl sm:text-4xl font-extrabold leading-tight">
+          關於簡媽媽
+        </h1>
+
+        <div class="mt-5 space-y-4 text-gray-700 leading-relaxed">
+          <p>這裡，是浪浪等家的地方。<br>
+          簡媽媽救援浪浪近二十年，租下土地，搭起簡單狗舍，安置那些無法在街頭生存的毛孩們。</p>
+
+          <p>從幾隻開始，到如今百餘孩子在這等待家。需要的照顧、醫療和資源也越來越多，於是簡媽在幾位志工協助下成立
+          <strong>社團法人簡媽媽愛護動物協會</strong>，努力撐起送醫、結紮、照顧與送養的每一步。</p>
+
+          <p>沒有華麗設施，只有溫暖守護。<br>
+          我們相信：買得到的是寵物，認養到的是家人。邀請你，和我們一起，讓更多等待的孩子回家。</p>
+
+          <p class="text-sm text-gray-500">📌 中市社團字第1140036732號</p>
+        </div>
+
+        <!-- CTA -->
+        <div class="mt-8 flex flex-col sm:flex-row gap-3">
+          <a href="dogs.html" class="inline-flex items-center justify-center rounded-xl px-5 py-3 bg-gray-900 text-white hover:bg-black">
+            看狗狗待領養名單
+          </a>
+          <a href="cats.html" class="inline-flex items-center justify-center rounded-xl px-5 py-3 ring-1 ring-gray-300 text-gray-800 hover:bg-gray-50">
+            看貓咪待領養名單
+          </a>
+        </div>
+
+        <!-- 大標語 -->
+        <p class="mt-10 text-2xl sm:text-3xl font-bold">
+          用領養，給牠們一生的幸福
+        </p>
+      </section>
+
+      <!-- 圖片 -->
+      <section class="order-first md:order-none">
+        <figure class="rounded-3xl overflow-hidden shadow-sm ring-1 ring-gray-200">
+          <img src="chienma.jpg" alt="簡媽媽擁抱狗狗的照片" class="w-full h-full object-cover">
+        </figure>
+      </section>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 text-sm text-gray-500">
+      © <span id="y"></span> 浪浪轉運站．社團法人簡媽媽愛護動物協會
+    </div>
+  </footer>
+
+  <script>
+    document.getElementById('y').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
