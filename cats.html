@@ -657,23 +657,17 @@
 
     loadPets();
 
-    // 用事件委派，避免重繪後事件遺失
     const petDialog = document.getElementById('petDialog');
     petDialog.addEventListener('click', async (e) => {
       const shareBtn = e.target.closest('#dlgShare');
       if (shareBtn) {
-        try {
-          const url = location.href;
-          const title = document.getElementById('dlgName')?.textContent?.trim() || '浪浪轉運站';
-          if (navigator.share) {
-            await navigator.share({ title, url });
-          } else {
-            await navigator.clipboard.writeText(url);
-            Swal.fire({ icon: 'success', title: '連結已複製', timer: 1600, showConfirmButton: false });
-          }
-        } catch (err) { console.error('share failed', err); }
+        const url = location.href;
+        const title = document.getElementById('dlgName')?.textContent?.trim() || '浪浪轉運站';
+        const shareText = `${title}｜浪浪轉運站\n${url}`;
+        const lineUrl = `https://line.me/R/msg/text/?${encodeURIComponent(shareText)}`;
+        const w = window.open(lineUrl, '_blank');
+        if (!w) location.href = lineUrl; // 退路：被擋彈窗就同頁打開
       }
-      //（保留 adopt/close 的委派，避免其他按鈕也失效）
     });
   </script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
