@@ -581,6 +581,8 @@
         if (speciesSelect.value === "貓" || speciesSelect.value === "狗") {
           breedTypeWrap.classList.remove("hidden");
           breedType.disabled = false;
+          breedWrap.classList.add("hidden");
+          breed.disabled = true;
           // 根據選擇的更新選項文字
           breedType.innerHTML = `
             <option value="">請選擇</option>
@@ -620,7 +622,19 @@
           breed.disabled = false;
         } else {
           breedWrap.classList.add("hidden");
-          breed.disabled = true;
+          if (options.length) {
+            options.forEach(opt => {
+              const option = document.createElement("option");
+              option.value = option.textContent = opt;
+              breed.appendChild(option);
+            });
+
+            breedWrap.classList.remove("hidden");
+            breed.disabled = false;   // ⭐ 讓品種/毛色能選
+          } else {
+            breedWrap.classList.add("hidden");
+            breed.disabled = true;
+          }
         }
       });
 
