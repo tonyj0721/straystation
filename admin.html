@@ -559,8 +559,34 @@
         document.body.style.overflow = "";
       };
 
-      document.getElementById("adoptBtn").onclick = () => {
-        window.location.href = "home.html";
+      document.getElementById("adoptBtn").onclick = async () => {
+
+        const result = await Swal.fire({
+          title: "確認？",
+          text: `「${pet.name}」已被領養？`,
+          icon: "question",
+          showCancelButton: true,
+          confirmButtonText: "是，已領養",
+          cancelButtonText: "取消",
+          confirmButtonColor: "#16a34a"
+        });
+
+        if (!result.isConfirmed) return;
+
+        // ⬆️ 使用者確認 → 更新 Firestore
+        await updateDoc(doc(db, "pets", id), { adopted: true });
+
+        await Swal.fire({
+          icon: "success",
+          title: "已更新",
+          text: `「${pet.name}」已標記為已領養。`,
+          timer: 1200,
+          showConfirmButton: false
+        });
+
+        modal.style.display = "none";
+        document.body.style.overflow = "";
+        loadPets();  // 重新更新列表
       };
     }
 
