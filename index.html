@@ -572,6 +572,13 @@
       el.classList.toggle('hidden');
     });
 
+    // 點選連結後自動關閉
+    document.querySelectorAll('#mobileNav a').forEach(a=>{
+      a.addEventListener('click', ()=>{
+        document.getElementById('mobileNav').classList.add('hidden');
+      });
+    });
+
     // ======= Init =======
     document.getElementById('year').textContent = new Date().getFullYear();
     loadIndexPets();   // 🚀 這裡去 Firestore 抓資料
