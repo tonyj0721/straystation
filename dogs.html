@@ -656,6 +656,19 @@
     document.getElementById('year').textContent = new Date().getFullYear();
 
     loadPets();
+
+    const petDialog = document.getElementById('petDialog');
+    petDialog.addEventListener('click', async (e) => {
+      const shareBtn = e.target.closest('#dlgShare');
+      if (shareBtn) {
+        const url = location.href;
+        const title = document.getElementById('dlgName')?.textContent?.trim() || '浪浪轉運站';
+        const shareText = `${title}｜浪浪轉運站\n${url}`;
+        const lineUrl = `https://line.me/R/msg/text/?${encodeURIComponent(shareText)}`;
+        const w = window.open(lineUrl, '_blank');
+        if (!w) location.href = lineUrl; // 退路：被擋彈窗就同頁打開
+      }
+    });
   </script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </body>
