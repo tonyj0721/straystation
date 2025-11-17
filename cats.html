@@ -258,6 +258,43 @@
       font-weight: 700;
       border: 1px solid #ffc9d9;
     }
+
+    /* ============================
+   肉球粉圓角標籤（品牌風格 B）
+   ============================ */
+
+/* 上方物種標籤（貓 / 狗） */
+#dlgSpeciesPill {
+  background: #F9C6CD;       /* 肉球粉背景 */
+  color: #C2546F;            /* 深粉紅文字 */
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  border: 1px solid #F4A8B7; /* 粉色外框，柔和乾淨 */
+}
+
+/* 年齡 / 性別 / 毛色等小標籤 */
+#dlgTags span {
+  background: #F9C6CD;       /* 肉球粉背景 */
+  color: #C2546F;            /* 深粉紅字更清楚 */
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  border: 1px solid #F4A8B7; /* 粉色描邊 */
+  display: inline-block;
+  margin-right: 8px;
+  margin-bottom: 6px;
+  transition: transform 0.2s, background 0.2s;
+}
+
+/* 輕微 hover 效果（更有質感） */
+#dlgTags span:hover {
+  transform: translateY(-2px);
+  background: #FDE7EB;       /* 更淡一階的粉 */
+}
+
   </style>
 </head>
 <body class="text-gray-800 bg-gradient-to-br from-brand-50 to-white">
