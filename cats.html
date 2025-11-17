@@ -284,7 +284,7 @@
       const years = numMatch ? parseFloat(numMatch[1]) : null;
 
       if (s.includes("月") || (years !== null && years < 1)) return "1以下";
-      
+
       if (years !== null) {
         if (years <= 5) return "1-5";   // 1~5 歲
         if (years <= 10) return "6-10"; // 6~10 歲
