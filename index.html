@@ -186,6 +186,33 @@
         </div>
     </section>
 
+    <!-- 💻 桌機：一行 4 張（左：貓 x2、右：狗 x2） -->
+    <section id="deskRow" class="hidden sm:block mt-2">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        <!-- 左：新來的貓 -->
+        <div>
+          <div class="mb-2 flex items-center justify-between">
+            <h3 class="text-base font-semibold">新來的貓</h3>
+            <a href="cats.html" class="text-sm text-gray-500 hover:text-gray-900 inline-flex items-center gap-1">
+              看更多<span aria-hidden="true">→</span>
+            </a>
+          </div>
+          <div id="deskCats" class="grid grid-cols-2 gap-6"></div>
+        </div>
+        <!-- 右：新來的狗 -->
+        <div>
+          <div class="mb-2 flex items-center justify-between">
+            <h3 class="text-base font-semibold">新來的狗</h3>
+            <a href="dogs.html" class="text-sm text-gray-500 hover:text-gray-900 inline-flex items-center gap-1">
+              看更多<span aria-hidden="true">→</span>
+            </a>
+          </div>
+          <div id="deskDogs" class="grid grid-cols-2 gap-6"></div>
+        </div>
+      </div>
+    </section>
+
+
     <!-- sm 以上維持原本格狀 -->
     <div id="grid" class="mt-8 hidden sm:grid gap-6 sm:grid-cols-2 lg:grid-cols-3"></div>
 
@@ -371,17 +398,13 @@
       `;
     }
 
-    // 🚀 桌機/平板：原本的格狀
-    function renderDesktop(allPets){
-      const grid = document.getElementById('grid');
-      grid.innerHTML = '';
-      if(!allPets.length){
-        document.getElementById('emptyState').classList.remove('hidden');
-        return;
-      }
-      document.getElementById('emptyState').classList.add('hidden');
-      grid.innerHTML = allPets.map(createCardHTML).join('');
-    }    
+    // 🚀 桌機：一行 4 張（左：貓2、右：狗2）
+    function renderDesktopRow(cats, dogs){
+      const dc = document.getElementById('deskCats');
+      const dd = document.getElementById('deskDogs');
+      if (dc) dc.innerHTML = cats.map(createCardHTML).join('');   // 2欄 x 3列 = 6
+      if (dd) dd.innerHTML = dogs.map(createCardHTML).join('');   // 2欄 x 3列 = 6
+    }
 
     // 手機：左右兩欄（左=貓、右=狗）
     function renderMobileColumns(cats, dogs){
@@ -403,13 +426,13 @@
       const snap = await getDocs(qRef);
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      const cats = all.filter(p => p.species === "貓").slice(0, 5);
-      const dogs = all.filter(p => p.species === "狗").slice(0, 5);
+      const cats = all.filter(p => p.species === "貓").slice(0, 6);
+      const dogs = all.filter(p => p.species === "狗").slice(0, 6);
 
       pets = [...cats, ...dogs];          // 供 modal 使用
       applyStats();
 
-      renderDesktop(pets);                // sm 以上會顯示
+      renderDesktopRow(cats, dogs);      // sm 以上顯示 2+2
       renderMobileColumns(cats, dogs);
       bindDetailButtons();
 
