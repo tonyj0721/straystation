@@ -155,11 +155,35 @@
 
   <!-- Filters + Pets -->
   <main id="pets" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-    <div id="grid" class="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-      <!-- Cards injected here -->
-    </div>
+    <!-- ✅ 手機：兩列（貓/狗），每列橫向滑動、同時看到 2 張 -->
+    <section class="sm:hidden space-y-8">
+      <div>
+        <h3 class="text-lg font-semibold">最新貓咪</h3>
+        <div class="mt-3 overflow-x-auto">
+          <div id="catsTrack"
+               class="grid grid-flow-col auto-cols-[minmax(45%,_1fr)] gap-4 snap-x snap-mandatory">
+            <!-- cats cards inject here -->
+          </div>
+        </div>
+      </div>
 
-    <div id="emptyState" class="hidden mt-10 text-center text-gray-500">沒有符合條件的毛孩，試試看調整篩選條件。</div>
+      <div>
+        <h3 class="text-lg font-semibold">最新狗狗</h3>
+        <div class="mt-3 overflow-x-auto">
+          <div id="dogsTrack"
+               class="grid grid-flow-col auto-cols-[minmax(45%,_1fr)] gap-4 snap-x snap-mandatory">
+            <!-- dogs cards inject here -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ✅ sm↑：沿用原本的卡片格（2/3 欄） -->
+    <div id="grid" class="mt-8 hidden sm:grid gap-6 sm:grid-cols-2 lg:grid-cols-3"></div>
+
+    <div id="emptyState" class="hidden mt-10 text-center text-gray-500">
+      沒有符合條件的毛孩，試試看調整篩選條件。
+    </div>
   </main>
 
   <!-- FAQ -->
@@ -302,24 +326,85 @@
       return new Date(p.createdAt).getTime() || 0;
     }
 
-    async function loadIndexPets() {
-      // 只用 createdAt 排序，避免複合索引
-      const qRef = query(
-        collection(db, "pets"),
-        orderBy("createdAt", "desc")
-      );
+    // 把卡片產生抽成函式，給桌機與手機共用
+    function createCardHTML(p){
+      const imgs = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
+      const img = imgs[0] || '';
+      return `
+        <article class="group rounded-2xl overflow-hidden ring-1 ring-gray-200 bg-white hover:shadow-soft transition-shadow snap-start">
+          <div class="blur-fit rounded-t-2xl aspect-[4/3]" style="--bg: url('${img}')">
+            <img src="${img}" alt="${p.name || '動物照片'}">
+          </div>
+          <div class="p-4 flex-1 flex flex-col">
+            <div class="flex items-start justify-between gap-2">
+              <h3 class="font-semibold text-lg leading-snug line-clamp-1">${p.name || '未命名'}</h3>
+              <span class="shrink-0 rounded-full text-xs px-2 py-1
+                ${/(狗|犬)/.test(String(p.species||'')) ? 'bg-sky-50 text-sky-700' : 'bg-emerald-50 text-emerald-700'}">
+                ${/(狗|犬)/.test(String(p.species||'')) ? '狗狗' : '貓咪'}
+              </span>
+            </div>
+            <div class="mt-2 mb-3 flex flex-col gap-2 text-xs">
+              <span class="self-start inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-2.5 py-1 whitespace-nowrap max-w-full truncate">
+                ${formatBreed(p)}
+              </span>
+              <span class="self-start inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-2.5 py-1 whitespace-nowrap max-w-full truncate">
+                ${formatAge(p) || '—'}
+              </span>
+              <span class="self-start inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-2.5 py-1 whitespace-nowrap max-w-full truncate">
+                ${p.gender || '—'}
+              </span>
+            </div>
+            <button class="mt-auto w-full px-3 py-2 rounded-xl bg-gray-900 text-white hover:bg-black btn-detail"
+                    data-id="${p.id}">
+              查看
+            </button>
+          </div>
+        </article>
+      `;
+    }
 
+    // 🚀 桌機/平板：原本的格狀
+    function renderDesktop(allPets){
+      const grid = document.getElementById('grid');
+      grid.innerHTML = '';
+      if(!allPets.length){
+        document.getElementById('emptyState').classList.remove('hidden');
+        return;
+      }
+      document.getElementById('emptyState').classList.add('hidden');
+      grid.innerHTML = allPets.map(createCardHTML).join('');
+    }
+
+    // 🚀 手機：一列一個物種、同時 2 張卡片（橫向滑動）
+    function renderMobileRows(cats, dogs){
+      const catsTrack = document.getElementById('catsTrack');
+      const dogsTrack = document.getElementById('dogsTrack');
+      catsTrack.innerHTML = cats.map(createCardHTML).join('');
+      dogsTrack.innerHTML = dogs.map(createCardHTML).join('');
+    }
+
+    // 重新掛 detail 事件（桌機與手機都適用）
+    function bindDetailButtons(){
+      document.querySelectorAll('.btn-detail')
+        .forEach(btn => btn.addEventListener('click', (e) => openDialog(e.currentTarget.dataset.id)));
+    }
+
+    // 載入資料後，分流渲染
+    async function loadIndexPets() {
+      const qRef = query(collection(db, "pets"), orderBy("createdAt", "desc"));
       const snap = await getDocs(qRef);
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      // 取最新的貓 5 隻 + 狗 5 隻
       const cats = all.filter(p => p.species === "貓").slice(0, 5);
       const dogs = all.filter(p => p.species === "狗").slice(0, 5);
 
-      pets = [...cats, ...dogs];
-
+      pets = [...cats, ...dogs];          // 供 modal 使用
       applyStats();
-      render(pets);
+
+      renderDesktop(pets);                // sm 以上會顯示
+      renderMobileRows(cats, dogs);       // 手機顯示兩列
+      bindDetailButtons();
+
       openFromDeepLink();
     }
 
@@ -343,68 +428,6 @@
       if (!p.age || p.age.trim() === "" || p.age === "—") return "年齡不詳";
       return p.age;
     }
-
-    // ======= Render Cards =======
-    function render(petList){
-      const grid = $('#grid');
-      grid.innerHTML = '';
-      if(!petList.length){
-        $('#emptyState').classList.remove('hidden');
-        return;
-      }
-      $('#emptyState').classList.add('hidden');
-
-      petList.forEach(p => {
-        const card = document.createElement('article');
-        card.className = 'group rounded-2xl overflow-hidden ring-1 ring-gray-200 bg-white hover:shadow-soft transition-shadow';
-
-        const cover = (p.images && p.images.length ? p.images[0] : p.image) || '';
-
-        // 取封面圖（先用 p.images[0]，沒有的話退回 p.image）
-        const imgs = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
-        const img = imgs[0] || '';
-
-        card.innerHTML = `
-          <div class="blur-fit rounded-t-2xl aspect-[4/3]" style="--bg: url('${img}')">
-            <img src="${img}" alt="${p.name || '動物照片'}">
-          </div>
-          <div class="p-4 flex-1 flex flex-col">
-            <!-- 第一行：左邊名字、右上角圓角標籤 -->
-            <div class="flex items-start justify-between gap-2">
-              <h3 class="font-semibold text-lg leading-snug line-clamp-1">${p.name || '未命名'}</h3>
-              <span class="shrink-0 rounded-full text-xs px-2 py-1
-                ${/(狗|犬)/.test(String(p.species||'')) ? 'bg-sky-50 text-sky-700' : 'bg-emerald-50 text-emerald-700'}">
-                ${/(狗|犬)/.test(String(p.species||'')) ? '狗狗' : '貓咪'}
-              </span>
-            </div>
-
-            <!-- 明細三行 -->
-            <div class="mt-2 mb-3 flex flex-col gap-2 text-xs">
-              <span class="self-start inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-2.5 py-1 whitespace-nowrap max-w-full truncate">
-                ${formatBreed(p)}
-              </span>
-              <span class="self-start inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-2.5 py-1 whitespace-nowrap max-w-full truncate">
-                ${formatAge(p) || '—'}
-              </span>
-              <span class="self-start inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-2.5 py-1 whitespace-nowrap max-w-full truncate">
-                ${p.gender || '—'}
-              </span>
-            </div>
-
-            <!-- 按鈕貼底 -->
-            <button class="mt-auto w-full px-3 py-2 rounded-xl bg-gray-900 text-white hover:bg-black btn-detail"
-                    data-id="${p.id}">
-              查看
-            </button>
-          </div>
-        `;
-
-        grid.appendChild(card);
-      });
-
-      // Detail modal
-      $$('.btn-detail').forEach(btn => btn.addEventListener('click', (e) => openDialog(e.target.dataset.id)));
-    }    
 
     // ======= Modal =======
     const dlg = document.getElementById('petDialog');
