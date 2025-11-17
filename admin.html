@@ -622,19 +622,7 @@
           breed.disabled = false;
         } else {
           breedWrap.classList.add("hidden");
-          if (options.length) {
-            options.forEach(opt => {
-              const option = document.createElement("option");
-              option.value = option.textContent = opt;
-              breed.appendChild(option);
-            });
-
-            breedWrap.classList.remove("hidden");
-            breed.disabled = false;   // ⭐ 讓品種/毛色能選
-          } else {
-            breedWrap.classList.add("hidden");
-            breed.disabled = true;
-          }
+          breed.disabled = true;
         }
       });
 
