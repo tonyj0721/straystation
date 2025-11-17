@@ -4,387 +4,104 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>浪浪轉運站｜後台管理</title>
-  
   <style>
-    :root {
-      --bg: #f9fafb;
-      --bg-elevated: #ffffff;
-      --bg-soft: #eef2ff;
-      --border: #e5e7eb;
-      --text-main: #111827;
-      --text-muted: #6b7280;
-      --primary: #2563eb;
-      --primary-soft: rgba(37,99,235,0.08);
-      --primary-hover: #1d4ed8;
-      --danger: #dc2626;
-      --success: #16a34a;
-    }
-
-    body[data-theme="dark"] {
-      --bg: #020617;
-      --bg-elevated: #020617;
-      --bg-soft: #020617;
-      --border: #1f2937;
-      --text-main: #e5e7eb;
-      --text-muted: #9ca3af;
-      --primary: #60a5fa;
-      --primary-soft: rgba(96,165,250,0.22);
-      --primary-hover: #93c5fd;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
     body {
-      margin: 0;
-      font-family: "Noto Sans TC", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background-color: var(--bg);
-      color: var(--text-main);
+      font-family: "Noto Sans TC", sans-serif;
+      background-color: #fff7ed;
+      color: #333;
       min-height: 100vh;
-    }
-
-    .layout {
       display: flex;
-      min-height: 100vh;
-    }
-
-    /* ========== Sidebar ========== */
-    .sidebar {
-      width: 240px;
-      padding: 20px 16px;
-      background: var(--bg-soft);
-      border-right: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    .sidebar-logo {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 8px;
-      border-radius: 999px;
-      background: var(--bg-elevated);
-      border: 1px solid var(--border);
-    }
-
-    .logo-circle {
-      width: 32px;
-      height: 32px;
-      border-radius: 999px;
-      display: flex;
-      align-items: center;
       justify-content: center;
-      background: var(--primary-soft);
-      font-size: 18px;
-    }
-
-    .logo-text {
-      display: flex;
-      flex-direction: column;
-      line-height: 1.2;
-    }
-
-    .logo-title {
-      font-size: 0.9rem;
-      font-weight: 700;
-    }
-
-    .logo-sub {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-    }
-
-    .sidebar-nav {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      margin-top: 8px;
-    }
-
-    .nav-label {
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-muted);
-      margin: 8px 4px 2px;
-    }
-
-    .nav-link {
-      border-radius: 999px;
-      border: 1px solid transparent;
-      padding: 8px 10px;
-      font-size: 0.85rem;
-      display: flex;
       align-items: center;
-      justify-content: flex-start;
-      gap: 6px;
-      color: var(--text-main);
-      background: transparent;
-      cursor: pointer;
-      text-decoration: none;
-      transition: background-color 0.15s, border-color 0.15s, color 0.15s;
-    }
-
-    .nav-link:hover {
-      background: var(--primary-soft);
-      border-color: var(--primary);
-      color: var(--primary);
-    }
-
-    .nav-link-active {
-      background: var(--primary);
-      color: #fff;
-      border-color: var(--primary);
-    }
-
-    .sidebar-footer {
-      margin-top: auto;
-      padding-top: 8px;
-      border-top: 1px dashed var(--border);
-    }
-
-    .sidebar-toggle {
-      width: 100%;
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      background: var(--bg-elevated);
-      padding: 8px 10px;
-      font-size: 0.85rem;
-      cursor: pointer;
-      color: var(--text-main);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-    }
-
-    /* ========== Main area ========== */
-    .main {
-      flex: 1;
-      min-width: 0;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .topbar {
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 14px 24px;
-      background: rgba(255,255,255,0.9);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border);
-    }
-
-    body[data-theme="dark"] .topbar {
-      background: rgba(15,23,42,0.9);
-    }
-
-    .topbar-title {
-      font-size: 1.05rem;
-      font-weight: 700;
-    }
-
-    .topbar-subtitle {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-    }
-
-    .topbar-toggle {
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      padding: 6px 12px;
-      font-size: 0.85rem;
-      cursor: pointer;
-      background: var(--bg-elevated);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .main-content {
-      padding: 20px 24px 28px;
-    }
-
-    /* ========== Cards & Layout ========== */
-    .container {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 24px;
-      width: 100%;
-      justify-content: stretch;
-    }
-
-    .form-card,
-    .list-card {
-      background: var(--bg-elevated);
-      border-radius: 16px;
-      box-shadow: 0 10px 30px rgba(15,23,42,0.08);
-      padding: 20px 22px;
-      border: 1px solid var(--border);
+      padding: 20px;
     }
 
     .form-card {
-      flex: 1 1 340px;
-      max-width: 420px;
-    }
-
-    .list-card {
-      flex: 2 1 420px;
-    }
-
-    h1, h2 {
-      margin: 0 0 12px;
-      font-weight: 700;
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+      padding: 32px;
+      width: 100%;
+      max-width: 540px;
+      animation: fadeIn 0.3s ease-in-out;
     }
 
     h1 {
-      font-size: 1.4rem;
-    }
-
-    h2 {
-      font-size: 1.1rem;
-    }
-
-    p, small {
-      color: var(--text-muted);
+      font-size: 1.8rem;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 1.5rem;
+      color: #c2410c;
     }
 
     label {
       display: block;
       font-weight: 600;
-      margin-top: 0.9rem;
+      margin-top: 1rem;
       margin-bottom: 0.25rem;
-      font-size: 0.9rem;
     }
 
     input,
     select,
     textarea {
       width: 100%;
-      border: 1px solid var(--border);
+      border: 1px solid #e5e7eb;
       border-radius: 8px;
-      padding: 9px 11px;
-      font-size: 0.95rem;
-      transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s, color 0.15s;
-      background: var(--bg-elevated);
-      color: var(--text-main);
-    }
-
-    select {
-      appearance: none;
-      -webkit-appearance: none;
-      -moz-appearance: none;
-      background-image: linear-gradient(45deg, transparent 50%, var(--text-muted) 50%), 
-                        linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
-      background-position: right 10px top 50%, right 6px top 50%;
-      background-size: 6px 6px;
-      background-repeat: no-repeat;
+      padding: 10px 12px;
+      font-size: 1rem;
+      transition: all 0.2s;
     }
 
     input:focus,
     select:focus,
     textarea:focus {
       outline: none;
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px var(--primary-soft);
+      border-color: #f97316;
+      box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2);
     }
 
     textarea {
       resize: vertical;
-      min-height: 80px;
     }
 
-    small {
-      font-size: 0.8rem;
-    }
-
-    .note {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      margin-left: 6px;
-    }
-
-    .hidden {
-      display: none !important;
-    }
-
-    /* Buttons */
     button {
-      font-family: inherit;
-    }
-
-    .primary-btn,
-    .form-card button[type="submit"],
-    .form-card button:not([type]) {
       width: 100%;
-      margin-top: 1.3rem;
-      background: var(--primary);
-      color: #fff;
+      margin-top: 1.5rem;
+      background-color: #f97316;
+      color: white;
       border: none;
-      border-radius: 999px;
-      padding: 11px 0;
-      font-size: 0.98rem;
+      padding: 12px 0;
+      border-radius: 8px;
+      font-size: 1rem;
       font-weight: 600;
       cursor: pointer;
-      box-shadow: 0 8px 20px rgba(37,99,235,0.35);
-      transition: background-color 0.15s, transform 0.08s, box-shadow 0.15s;
+      transition: background-color 0.2s;
     }
 
-    .primary-btn:hover,
-    .form-card button[type="submit"]:hover,
-    .form-card button:not([type]):hover {
-      background: var(--primary-hover);
-      transform: translateY(-1px);
-      box-shadow: 0 10px 25px rgba(37,99,235,0.4);
+    button:hover {
+      background-color: #ea580c;
     }
 
-    .upload-btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      margin-top: 0.4rem;
-      margin-bottom: 0.4rem;
-      background: var(--bg-soft);
-      border-radius: 999px;
-      padding: 7px 14px;
-      border: 1px dashed var(--primary);
-      color: var(--primary);
-      font-size: 0.9rem;
-      cursor: pointer;
-      gap: 6px;
-    }
-
-    .upload-btn:hover {
-      background: var(--primary-soft);
-    }
-
-    /* Preview thumbnails */
+    /* 照片預覽 */
     #preview {
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
-      margin-top: 8px;
+      margin-top: 10px;
     }
 
     .preview-item {
       position: relative;
-      width: 96px;
-      height: 96px;
+      width: 110px;
+      height: 110px;
       overflow: hidden;
       border-radius: 10px;
-      border: 1px solid var(--border);
-      background: var(--bg-soft);
+      border: 2px solid #fed7aa;
+      background: #fff7ed;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 2px 6px rgba(15,23,42,0.1);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
     }
 
     .preview-item img {
@@ -397,69 +114,92 @@
       position: absolute;
       top: 5px;
       right: 5px;
-      margin: 0;
-      background: rgba(0, 0, 0, 0.65);
+      margin: 0 ;
+      background: rgba(0, 0, 0, 0.6);
       color: white;
       border: none;
       font-size: 12px;
-      border-radius: 999px;
+      border-radius: 50%;
       width: 22px;
       height: 22px;
       cursor: pointer;
-      line-height: 0;
+      line-height: 0px;
+      text-align: center;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    /* ✅ 統一欄位寬度與樣式 */
+    input,
+    select,
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 1rem;
+      transition: all 0.2s;
+    }
+
+    /* ✅ 讓 select 跟 input 一樣寬 */
+    select {
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      background-color: white;
+    }
+
+    /* ✅ 聚焦時橘色高亮（溫暖橘） */
+    input:focus,
+    select:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #f97316;
+      box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2);
+    }
+
+    .container {
       display: flex;
-      align-items: center;
+      flex-wrap: wrap;
+      gap: 24px;
+      width: 100%;
       justify-content: center;
     }
 
-    /* Table */
-    .search-box {
-      display: flex;
-      justify-content: flex-end;
-      margin-bottom: 12px;
+    .form-card, .list-card {
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+      padding: 24px;
     }
 
-    .search-box input {
-      padding: 7px 11px;
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      font-size: 0.9rem;
-      width: 200px;
-      background: var(--bg-elevated);
+    .form-card {
+      flex: 1 1 40%;
+      max-width: 480px;
     }
 
-    .search-box input:focus {
-      outline: none;
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px var(--primary-soft);
+    .list-card {
+      flex: 1 1 50%;
+      max-width: 720px;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 0.92rem;
     }
 
     th, td {
-      padding: 9px 6px;
+      padding: 10px;
       text-align: center;
-      border-bottom: 1px solid var(--border);
-    }
-
-    th {
-      text-align: left;
-      font-weight: 600;
-      font-size: 0.85rem;
-      color: var(--text-muted);
-    }
-
-    td:first-child,
-    th:first-child {
-      text-align: left;
+      border-bottom: 1px solid #eee;
     }
 
     tr:hover {
-      background-color: var(--primary-soft);
+      background-color: #fff7ed;
       cursor: pointer;
     }
 
@@ -468,167 +208,174 @@
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(15,23,42,0.55);
-      backdrop-filter: blur(3px);
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(2px);
       justify-content: center;
       align-items: center;
       z-index: 1000;
-      overflow: auto;
+      overflow: auto; /* 整個視窗可捲動 */
     }
 
     .modal-content {
-      background: var(--bg-elevated);
-      padding: 18px 20px 14px;
-      border-radius: 14px;
+      background: #fff;
+      padding: 20px 24px 16px;
+      border-radius: 12px;
       width: 90%;
       max-width: 540px;
       margin: 40px auto;
       max-height: 88vh;
       overflow-y: auto;
       position: relative;
-      box-shadow: 0 16px 40px rgba(15,23,42,0.5);
-      border: 1px solid var(--border);
+    }
+
+    /* === 標題 === */
+    #modalName {
+      text-align: left;
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin: 4px 0 10px 0; /* 🔹 縮小上方空白 */
     }
 
     .close {
       position: absolute;
-      right: 16px;
-      top: 12px;
-      font-size: 24px;
-      color: var(--text-muted);
+      right: 20px;
+      top: 15px;
+      font-size: 28px;
+      color: #666;
       cursor: pointer;
     }
 
-    .modal-title {
-      font-size: 1.2rem;
-      font-weight: 700;
-      margin: 0 0 8px;
+    /* === 按鈕區 === */
+    .modal-actions {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 4px; /* 🔹 減少按鈕上方空白 */
     }
 
+    .modal-actions button {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .modal-actions button:hover {
+      opacity: 0.85;
+    }
+
+    button.danger {
+      background-color: #dc2626;
+    }
+    
+    button.success {
+      background-color: #16a34a;
+    }
+    
+    button.edit {
+      background-color: #f97316;
+    }
+
+    /* === 搜尋框 === */
+    .search-box {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 12px;
+    }
+
+    .search-box input {
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 1rem;
+      width: 200px;
+      transition: border-color 0.2s;
+    }
+
+    .search-box input:focus {
+      outline: none;
+      border-color: #f97316;
+      box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+    }
+
+    /* === Modal 圖片區 === */
+    /* === 主圖 === */
     .modal-main-photo {
       width: 100%;
-      max-height: 260px;
+      max-height: 300px;
       border-radius: 10px;
       object-fit: contain;
-      background-color: var(--bg-soft);
+      background-color: #f9f9f9;
       display: block;
-      margin: 0 auto 8px auto;
-      box-shadow: 0 2px 6px rgba(15,23,42,0.2);
+      margin: 0 auto 8px auto; /* 🔹 縮小下方距離 */
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
     }
-
+    
+    /* === 縮圖列：剛好一列 5 張 === */
     .modal-photos {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(18%, 1fr));
+      /* 💡 每張約占 18%，含間距後剛好五張一排 */
       gap: 6px;
       margin-bottom: 12px;
       justify-items: center;
       align-items: center;
     }
 
+    /* 每張縮圖自適應寬高、固定比例 */
     .modal-photos img {
       width: 100%;
-      aspect-ratio: 1 / 1;
+      aspect-ratio: 1 / 1; /* ✅ 保持正方形 */
       object-fit: cover;
       border-radius: 8px;
       border: 2px solid transparent;
       cursor: pointer;
-      transition: transform 0.15s, border-color 0.15s;
+      transition: transform 0.2s, border-color 0.2s;
     }
 
     .modal-photos img:hover {
-      transform: scale(1.03);
+      transform: scale(1.05);
     }
 
     .modal-photos img.active {
-      border-color: var(--primary);
+      border-color: #f97316;
     }
 
+    /* === 動物資訊 === */
     .modal-info {
       display: flex;
       justify-content: flex-start;
       flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 8px;
+      gap: 10px;
+      margin-bottom: 10px; /* 🔹 縮小上下距離 */
     }
 
     .modal-info span {
-      background: var(--bg-soft);
+      background: #fff7ed;
       padding: 5px 12px;
-      border-radius: 999px;
-      color: var(--text-main);
+      border-radius: 16px;
+      color: #92400e;
       font-weight: 500;
-      font-size: 0.85rem;
+      font-size: 0.95rem;
     }
 
+    /* === 敘述文字 === */
     #modalDesc {
-      background: var(--bg-soft);
+      background: #fffaf4;
       padding: 10px 14px;
       border-radius: 8px;
-      color: var(--text-main);
+      color: #444;
       font-size: 0.95rem;
       line-height: 1.6;
       white-space: pre-wrap;
       word-break: break-word;
-      margin-bottom: 14px;
-    }
-
-    .modal-actions {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      margin-top: 4px;
-    }
-
-    .modal-actions button {
-      flex: 1;
-      padding: 9px 0;
-      border: none;
-      border-radius: 999px;
-      color: white;
-      font-weight: 600;
-      cursor: pointer;
-      font-size: 0.9rem;
-      transition: opacity 0.15s, transform 0.08s;
-    }
-
-    .modal-actions button:hover {
-      opacity: 0.9;
-      transform: translateY(-1px);
-    }
-
-    button.danger {
-      background-color: var(--danger);
-    }
-
-    button.success {
-      background-color: var(--success);
-    }
-
-    button.edit {
-      background-color: var(--primary);
-    }
-
-    /* Responsive */
-    @media (max-width: 900px) {
-      .sidebar {
-        display: none;
-      }
-      .layout {
-        flex-direction: column;
-      }
-      .topbar {
-        padding-inline: 16px;
-      }
-      .main-content {
-        padding-inline: 16px;
-      }
-      .form-card,
-      .list-card {
-        max-width: 100%;
-      }
+      margin-bottom: 16px; /* 🔹 與按鈕距離更小 */
     }
   </style>
-
 
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
@@ -1051,36 +798,7 @@
 </head>
 
 <body>
-  <div class="layout">
-    <aside class="sidebar">
-      <div class="sidebar-logo">
-        <div class="logo-circle">🐾</div>
-        <div class="logo-text">
-          <div class="logo-title">浪浪轉運站</div>
-          <div class="logo-sub">後台管理</div>
-        </div>
-      </div>
-      <nav class="sidebar-nav">
-        <a href="index.html" class="nav-link">回前台首頁</a>
-        <span class="nav-label">管理功能</span>
-        <button type="button" class="nav-link nav-link-active">新增 / 管理名單</button>
-      </nav>
-      <div class="sidebar-footer">
-        <button type="button" id="themeToggleSidebar" class="sidebar-toggle">🌙 深色模式</button>
-      </div>
-    </aside>
-
-    <div class="main">
-      <header class="topbar">
-        <div>
-          <div class="topbar-title">浪浪名單管理</div>
-          <div class="topbar-subtitle">新增、編輯與審核待領養貓狗</div>
-        </div>
-        <button type="button" id="themeToggle" class="topbar-toggle">🌙 深色模式</button>
-      </header>
-
-      <main class="main-content">
-        <div class="container">
+  <div class="container">
     <!-- 左邊：新增動物 -->
     <div class="form-card">
       <h1>🐾 新增浪浪資料</h1>
@@ -1155,8 +873,6 @@
         </thead>
         <tbody id="petList"></tbody>
       </table>
-        </div>
-      </main>
     </div>
   </div>
 
@@ -1241,51 +957,6 @@
           : "尚未選擇";
     }
 
-  })();
-
-  // 深色模式切換
-  (function () {
-    const THEME_KEY = 'admin-theme';
-
-    function applyTheme(mode) {
-      if (mode === 'dark') {
-        document.body.setAttribute('data-theme', 'dark');
-      } else {
-        document.body.removeAttribute('data-theme');
-      }
-    }
-
-    const saved = window.localStorage ? localStorage.getItem(THEME_KEY) : null;
-    applyTheme(saved === 'dark' ? 'dark' : 'light');
-
-    function syncButtons(mode) {
-      const isDark = mode === 'dark';
-      const label = isDark ? '☀️ 淺色模式' : '🌙 深色模式';
-      ['themeToggle', 'themeToggleSidebar'].forEach(id => {
-        const btn = document.getElementById(id);
-        if (btn) btn.textContent = label;
-      });
-    }
-
-    function toggleTheme() {
-      const isDark = document.body.getAttribute('data-theme') === 'dark';
-      const next = isDark ? 'light' : 'dark';
-      applyTheme(next);
-      if (window.localStorage) {
-        localStorage.setItem(THEME_KEY, next);
-      }
-      syncButtons(next);
-    }
-
-    ['themeToggle', 'themeToggleSidebar'].forEach(id => {
-      const btn = document.getElementById(id);
-      if (btn) {
-        btn.addEventListener('click', toggleTheme);
-      }
-    });
-
-    // 初次同步按鈕文字
-    syncButtons(saved === 'dark' ? 'dark' : 'light');
   })();
   </script>
 </body>
