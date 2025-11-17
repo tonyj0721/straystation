@@ -403,16 +403,22 @@
       const snap = await getDocs(qRef);
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      const cats = all.filter(p => p.species === "貓").slice(0, 5);
-      const dogs = all.filter(p => p.species === "狗").slice(0, 5);
+      // 🔥 這裡：只留下「尚未領養」的（adopted !== true）
+      const visible = all.filter(p => p.adopted !== true);
 
-      pets = [...cats, ...dogs];          // 供 modal 使用
+      // 原本首頁只挑幾隻新來的貓 / 狗，這邏輯維持不變
+      const cats = visible.filter(p => p.species === "貓").slice(0, 5);
+      const dogs = visible.filter(p => p.species === "狗").slice(0, 5);
+
+      // modal / 統計用
+      pets = [...cats, ...dogs];
       applyStats();
 
-      renderDesktop(pets);                // sm 以上會顯示
-      renderMobileColumns(cats, dogs);
+      renderDesktop(pets);         // sm 以上
+      renderMobileColumns(cats, dogs); // 手機左右欄
       bindDetailButtons();
 
+      // 如果有分享連結 ?pet=xxx 就開 modal
       openFromDeepLink();
     }
 
