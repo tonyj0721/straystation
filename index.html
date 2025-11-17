@@ -731,5 +731,35 @@
   }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+
+// 🧩 Use event delegation so buttons work even after dialog open/close re-render
+const petDialog = document.getElementById('petDialog');
+petDialog.addEventListener('click', async (e) => {
+  const shareBtn = e.target.closest('#dlgShare');
+  const adoptBtn = e.target.closest('#dlgAdopt');
+  const closeBtn = e.target.closest('#dlgClose');
+  if (shareBtn) {
+    try {
+      const url = window.location.href;
+      const title = document.getElementById('dlgName')?.textContent?.trim() || '浪浪轉運站';
+      if (navigator.share) {
+        await navigator.share({ title, url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        Swal.fire({ icon: 'success', title: '連結已複製', timer: 1600, showConfirmButton: false });
+      }
+    } catch (err) {
+      console.error('share failed', err);
+    }
+  } else if (adoptBtn) {
+    // keep original adopt behavior by dispatching a custom event if needed
+    document.dispatchEvent(new CustomEvent('dlg:adopt-click'));
+  } else if (closeBtn) {
+    document.getElementById('dlgBackdrop')?.classList.add('hidden');
+  }
+});
+
+</script>
 </body>
 </html>
