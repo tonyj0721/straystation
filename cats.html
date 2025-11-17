@@ -85,15 +85,16 @@
     /* --- 後台 Modal 風格搬到前台（cats / dogs 共用） --- */
 
     /* 主圖：對應後台 .modal-main-photo */
+    /* 修復前台 modal 主圖變形與留白問題 */
     #dlgImg {
       width: 100%;
-      max-height: 300px;
-      border-radius: 10px;
-      object-fit: contain;
-      background-color: #f9f9f9;
+      height: auto;           /* 依原圖比例自動調整 */
+      max-height: none;       /* 移除強制高度限制 */
+      object-fit: cover;      /* 讓圖片自然填滿 */
+      border-radius: 12px;
+      background-color: transparent;  /* 移除灰底 */
       display: block;
-      margin: 0 auto 8px auto;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+      margin: 0 auto 12px auto;
     }
 
     /* 縮圖容器：對應後台 .modal-photos */
