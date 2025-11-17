@@ -647,6 +647,13 @@
       $('#mobileNav').classList.toggle('hidden');
     });
 
+    // 點選連結後自動關閉
+    document.querySelectorAll('#mobileNav a').forEach(a=>{
+      a.addEventListener('click', ()=>{
+        document.getElementById('mobileNav').classList.add('hidden');
+      });
+    });
+
     document.getElementById('year').textContent = new Date().getFullYear();
 
     loadPets();
