@@ -416,15 +416,21 @@
       const qRef = query(collection(db, "pets"), orderBy("createdAt", "desc"));
       const snap = await getDocs(qRef);
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      pets = all.filter(p => p.species === SPECIES);
-      buildBreedOptionsByType(); // ← 新的
+
+      // 🔥 先排除已領養
+      const visible = all.filter(p => p.adopted !== true);
+
+      // 只顯示「狗狗」＋「未領養」
+      pets = visible.filter(p => p.species === SPECIES);
+
+      buildBreedOptionsByType(); // 原本就有的
       render(pets);
       openFromDeepLink();
 
-      // 即時篩選：任一選單變更就篩
+      // 篩選事件監聽維持不動
       $('#fBreedType').addEventListener('change', () => {
-        buildBreedOptionsByType(); // 先重建子選項
-        $('#fBreed').value = '';   // 切換類型時清空子選擇
+        buildBreedOptionsByType();
+        $('#fBreed').value = '';
         applyFilters();
       });
 
