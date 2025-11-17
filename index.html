@@ -743,12 +743,10 @@ petDialog.addEventListener('click', async (e) => {
     try {
       const url = window.location.href;
       const title = document.getElementById('dlgName')?.textContent?.trim() || '浪浪轉運站';
-      if (navigator.share) {
-        await navigator.share({ title, url });
-      } else {
-        await navigator.clipboard.writeText(url);
-        Swal.fire({ icon: 'success', title: '連結已複製', timer: 1600, showConfirmButton: false });
-      }
+      const shareText = `${title}｜浪浪轉運站\n${url}`;
+      const lineUrl = `https://line.me/R/msg/text/?${encodeURIComponent(shareText)}`;
+      const w = window.open(lineUrl, '_blank');
+      if (!w) { location.href = lineUrl; }
     } catch (err) {
       console.error('share failed', err);
     }
