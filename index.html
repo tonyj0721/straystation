@@ -84,36 +84,6 @@
       object-fit: contain; z-index:1; /* 上層放原圖，保持比例 */
     }
   </style>
-<style>
-
-/* ===== Admin 風格 Modal 樣式（精簡版） ===== */
-.modal { 
-  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-  backdrop-filter: blur(2px); justify-content: center; align-items: center; z-index: 1000;
-}
-.modal[open], .modal.show { display: flex; }
-.modal-content { background:#fff; padding:20px 24px 16px; border-radius:12px; width:90%; max-width:540px;
-  margin:40px auto; max-height:88vh; overflow-y:auto; position:relative; }
-.close { position:absolute; right:20px; top:15px; font-size:28px; color:#666; cursor:pointer; }
-.modal-main-photo { width:100%; max-height:300px; border-radius:10px; object-fit:contain; background:#f9f9f9;
-  display:block; margin:0 auto 8px auto; box-shadow:0 2px 6px rgba(0,0,0,0.05); }
-.modal-photos { display:grid; grid-template-columns: repeat(auto-fill, minmax(18%, 1fr)); gap:6px; margin-bottom:12px;
-  justify-items:center; align-items:center; }
-.modal-photos img { width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:8px; border:2px solid transparent;
-  cursor:pointer; transition: transform .2s, border-color .2s; }
-.modal-photos img:hover { transform: scale(1.05); }
-.modal-photos img.active { border-color: #f97316; }
-.modal-info { display:flex; justify-content:flex-start; flex-wrap:wrap; gap:10px; margin-bottom:10px; }
-.modal-info span { background:#fff7ed; padding:5px 12px; border-radius:16px; color:#92400e; font-weight:500; font-size:.95rem; }
-#dlgDesc { background:#fffaf4; padding:10px 14px; border-radius:8px; color:#444; font-size:.95rem; line-height:1.6;
-  white-space: pre-wrap; word-break: break-word; margin-bottom: 16px; }
-.modal-actions { display:flex; justify-content:space-between; gap:10px; margin-top:4px; }
-.modal-actions button { flex:1; padding:10px; border:none; border-radius:6px; color:white; font-weight:600; cursor:pointer; transition:opacity .2s; }
-.modal-actions button:hover { opacity:.85; }
-button.success { background-color:#16a34a; }
-button.edit { background-color:#f97316; }
-
-</style>
 </head>
 <body class="bg-white text-gray-800">
   <!-- Navbar -->
@@ -275,38 +245,43 @@ button.edit { background-color:#f97316; }
     </div>
   </section>
 
-  
-  <!-- Pet Detail Modal (樣式統一為 admin.html 風格，但保留既有 ID 以相容既有 JS) -->
-  <dialog id="petDialog" class="modal w-full max-w-2xl max-h-[90vh] rounded-2xl p-0 overflow-y-auto" style="display:none;">
-    <div class="modal-content bg-white">
-      <span id="dlgClose" class="close" aria-label="關閉">×</span>
-
-      <!-- 主圖 -->
-      <img id="dlgImg" alt="毛孩照片" class="modal-main-photo"/>
-
-      <!-- 縮圖列 -->
-      <div id="dlgThumbs" class="modal-photos"></div>
-
-      <!-- 標題與標籤 -->
-      <h3 id="dlgName">—</h3>
-      <div class="modal-info">
-        <span id="dlgSpeciesPill">—</span>
-        <span id="dlgTagBreed">—</span>
-        <span id="dlgTagAge">—</span>
-        <span id="dlgTagGender">—</span>
+  <!-- Pet Detail Modal -->
+  <dialog id="petDialog" class="w-full max-w-2xl max-h-[90vh] rounded-2xl p-0 overflow-y-auto">
+    <div class="bg-white">
+      <div class="relative aspect-video bg-gray-100">
+        <img id="dlgImg" alt="毛孩照片" class="w-full h-full object-contain cursor-pointer"/>
+        <button id="dlgClose" class="absolute top-3 right-3 bg-black/60 text-white p-2 rounded-full" aria-label="關閉">✕</button>
       </div>
+      <div id="dlgThumbs" class="flex gap-2 overflow-x-auto p-3"></div>
+      <div class="p-5 space-y-4">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <!-- 標題 + 右上角物種圓角標籤 -->
+            <div class="flex items-start justify-between gap-2">
+              <h3 id="dlgName" class="text-lg font-semibold leading-snug">—</h3>
+              <span id="dlgSpeciesPill"
+                    class="shrink-0 rounded-full text-xs px-2 py-1 bg-emerald-50 text-emerald-700">貓咪</span>
+            </div>
 
-      <!-- 敘述 -->
-      <div id="dlgDesc">—</div>
-
-      <!-- 動作按鈕 -->
-      <div class="modal-actions">
-        <button id="dlgAdopt" class="success">我要認養</button>
-        <button id="dlgShare" class="edit">分享</button>
+            <!-- 三個圓角標籤：不換行、可水平捲動 -->
+            <div id="dlgTags" class="mt-1 flex flex-nowrap gap-2 text-xs">
+              <span id="dlgTagBreed"
+                    class="inline-flex items-center rounded-full ring-1 ring-gray-200 bg-white text-gray-700 px-2.5 py-1 whitespace-nowrap"></span>
+              <span id="dlgTagAge"
+                    class="inline-flex items-center rounded-full ring-1 ring-gray-200 bg-white text-gray-700 px-2.5 py-1 whitespace-nowrap"></span>
+              <span id="dlgTagGender"
+                    class="inline-flex items-center rounded-full ring-1 ring-gray-200 bg-white text-gray-700 px-2.5 py-1 whitespace-nowrap"></span>
+            </div>
+          </div>
+        </div>
+        <p id="dlgDesc" class="text-gray-700 text-sm leading-7 whitespace-pre-line break-words">—</p>
+        <div class="flex justify-end gap-3 pt-2">
+          <button id="dlgAdopt" class="px-4 py-2 rounded-xl bg-brand-600 text-white">我要認養</button>
+          <button id="dlgShare" class="px-4 py-2 rounded-xl border border-gray-300">分享</button>
+        </div>
       </div>
     </div>
   </dialog>
-
 
   <!-- 🔥 Lightbox 全螢幕顯示 -->
   <div id="lightbox"
@@ -766,38 +741,5 @@ button.edit { background-color:#f97316; }
   }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
-<script>
-(function(){
-  // 如果原本使用 <dialog> 的 showModal，這裡改為用 class 控制顯示；保留既有 ID 與資料綁定。
-  const dlg = document.getElementById('petDialog');
-  const closeBtn = document.getElementById('dlgClose');
-  function show() {
-    if (!dlg) return;
-    dlg.classList.add('show');
-    document.body.style.overflow = 'hidden';
-  }
-  function hide() {
-    if (!dlg) return;
-    dlg.classList.remove('show');
-    document.body.style.overflow = '';
-  }
-  if (dlg && !dlg.showModal) {
-    // 替換全域的開關方法，供既有程式呼叫
-    dlg.showModal = show;
-    dlg.close = hide;
-  }
-  if (closeBtn) closeBtn.addEventListener('click', hide);
-  window.addEventListener('keydown', (e)=>{
-    if (e.key === 'Escape') hide();
-  });
-  // 若使用者點背景也關閉
-  if (dlg) dlg.addEventListener('click', (e)=>{
-    const content = dlg.querySelector('.modal-content');
-    if (content && !content.contains(e.target)) hide();
-  });
-})();
-</script>
-
 </body>
 </html>
