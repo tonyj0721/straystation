@@ -33,73 +33,156 @@
     input[type=number] { -moz-appearance: textfield; }
     dialog::backdrop{ background: rgba(0,0,0,.5)}
 
-    /* === Modal 主圖（套用 admin.html 風格） === */
-    #dlgImg {
-      width: 100%;
-      max-height: 300px;
-      border-radius: 10px;
-      object-fit: contain;
-      background-color: #f9f9f9;
-      display: block;
-      margin: 0 auto 8px auto;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-    }
+    /* 讓 <dialog> 本身透明，只當外框用，尺寸交給 .modal-content 控制 */
+#petDialog {
+  border: none;
+  padding: 0;
+  background: transparent;
+}
 
-    /* 縮圖列：改成 admin 一樣的網格排版，不要多餘高度 */
-    #dlgThumbs {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(18%, 1fr)); /* 約 5 張一排 */
-      gap: 6px;
-      padding: 0 1.25rem 0.75rem; /* 上面 0，下面一點間距就好 */
-      justify-items: center;
-      align-items: center;
-      align-content: start;       /* 有很多行時也貼上面，不會整塊被撐高 */
-    }
+/* ==== 以下直接套 admin.html 的 modal 風格 ==== */
 
-    /* 每張縮圖改成 admin 的樣式 */
-    .dlg-thumb {
-      width: 100%;
-      aspect-ratio: 1 / 1;         /* 保持正方形 */
-      object-fit: cover;
-      border-radius: 8px;
-      border: 2px solid transparent;
-      cursor: pointer;
-      transition: transform 0.2s, border-color 0.2s, opacity 0.2s;
-      background-color: #f9f9f9;
-      opacity: 0.85;
-    }
+/* 內層內容卡片 */
+.modal-content {
+  background: #fff;
+  padding: 20px 24px 16px;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 540px;
+  margin: 40px auto;
+  max-height: 88vh;
+  overflow-y: auto;
+  position: relative;
+}
 
-    .dlg-thumb:hover {
-      transform: scale(1.05);
-    }
+/* 標題（對應 admin 的 #modalName，這裡是 #dlgName） */
+#dlgName {
+  text-align: left;
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin: 4px 0 10px 0;
+}
 
-    .dlg-thumb.active {
-      border-color: #f97316;       /* 橘色框，跟 admin.html 一樣 */
-      opacity: 1;
-    }
+/* 關閉按鈕（跟 admin 一樣位置與大小） */
+#dlgClose {
+  position: absolute;
+  right: 20px;
+  top: 15px;
+  font-size: 28px;
+  color: #666;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  padding: 0;
+}
 
-    /* === 標籤區（品種 / 年齡 / 性別）套用 admin 的 chip 風格 === */
-    #dlgTags span {
-      background: #fff7ed;
-      padding: 5px 12px;
-      border-radius: 16px;
-      color: #92400e;
-      font-weight: 500;
-      font-size: 0.95rem;
-    }
+/* === 主圖（admin 的 .modal-main-photo） === */
+.modal-main-photo {
+  width: 100%;
+  max-height: 300px;
+  border-radius: 10px;
+  object-fit: contain;
+  background-color: #f9f9f9;
+  display: block;
+  margin: 0 auto 8px auto;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
 
-    /* === 敘述文字區塊（套用 admin 的 #modalDesc 風格） === */
-    #dlgDesc {
-      background: #fffaf4;
-      padding: 10px 14px;
-      border-radius: 8px;
-      color: #444;
-      font-size: 0.95rem;
-      line-height: 1.6;
-      white-space: pre-wrap;
-      word-break: break-word;
-      margin-bottom: 16px;
-    }
+/* === 縮圖列（一排 5 張） === */
+.modal-photos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18%, 1fr));
+  /* 每張約 18%，含間距剛好五張一排 */
+  gap: 6px;
+  margin-bottom: 12px;
+  justify-items: center;
+  align-items: center;
+}
+
+/* 縮圖（admin 是 .modal-photos img，這裡用 .dlg-thumb） */
+.dlg-thumb {
+  width: 100%;
+  aspect-ratio: 1 / 1;      /* 保持正方形 */
+  object-fit: cover;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.dlg-thumb:hover {
+  transform: scale(1.05);
+}
+
+.dlg-thumb.active {
+  border-color: #f97316;
+}
+
+/* === 四個標籤區（物種 / 品種 / 年齡 / 性別） === */
+.modal-info {
+  display: flex;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.modal-info span {
+  background: #fff7ed;
+  padding: 5px 12px;
+  border-radius: 16px;
+  color: #92400e;
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+/* === 敘述文字（admin 的 #modalDesc） === */
+#dlgDesc {
+  background: #fffaf4;
+  padding: 10px 14px;
+  border-radius: 8px;
+  color: #444;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-bottom: 16px;
+}
+
+/* === 按鈕區（位置跟 admin 一樣，顏色用你的文字） === */
+.modal-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.modal-actions button {
+  flex: 1;
+  padding: 10px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+/* 我要認養：實心色 */
+.modal-actions #dlgAdopt {
+  border: none;
+  background-color: #f97316;   /* 你可以換成原本的 brand 顏色 */
+  color: #fff;
+}
+
+/* 分享：白底框線 */
+.modal-actions #dlgShare {
+  border: 1px solid #e5e7eb;
+  background-color: #fff;
+  color: #374151;
+}
+
+.modal-actions button:hover {
+  opacity: 0.9;
+}
 
     #lightbox {
       position: fixed;
@@ -298,42 +381,39 @@
   </section>
 
   <!-- Pet Detail Modal -->
-  <dialog id="petDialog" class="w-full max-w-2xl max-h-[90vh] rounded-2xl p-0 overflow-y-auto">
-    <div class="bg-white">
-      <div class="relative bg-gray-100">
-        <img id="dlgImg" alt="毛孩照片" class="w-full object-contain cursor-pointer"/>
-        <button id="dlgClose" class="absolute top-3 right-3 bg-black/60 text-white p-2 rounded-full" aria-label="關閉">✕</button>
-      </div>
-      <div id="dlgThumbs"></div>
-      <div class="p-5 space-y-4">
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <!-- 標題 + 右上角物種圓角標籤 -->
-            <div class="flex items-start justify-between gap-2">
-              <h3 id="dlgName" class="text-lg font-semibold leading-snug">—</h3>
-              <span id="dlgSpeciesPill"
-                    class="shrink-0 rounded-full text-xs px-2 py-1 bg-emerald-50 text-emerald-700">貓咪</span>
-            </div>
+  <!-- Pet Detail Modal：改成跟 admin.html 一樣的結構 -->
+<dialog id="petDialog">
+  <div class="modal-content">
+    <!-- 關閉按鈕 -->
+    <button id="dlgClose" class="close" aria-label="關閉">&times;</button>
 
-            <!-- 三個圓角標籤：不換行、可水平捲動 -->
-            <div id="dlgTags" class="mt-1 flex flex-nowrap gap-2 text-xs">
-              <span id="dlgTagBreed"
-                    class="inline-flex items-center rounded-full ring-1 ring-gray-200 bg-white text-gray-700 px-2.5 py-1 whitespace-nowrap"></span>
-              <span id="dlgTagAge"
-                    class="inline-flex items-center rounded-full ring-1 ring-gray-200 bg-white text-gray-700 px-2.5 py-1 whitespace-nowrap"></span>
-              <span id="dlgTagGender"
-                    class="inline-flex items-center rounded-full ring-1 ring-gray-200 bg-white text-gray-700 px-2.5 py-1 whitespace-nowrap"></span>
-            </div>
-          </div>
-        </div>
-        <p id="dlgDesc" class="text-gray-700 text-sm leading-7 whitespace-pre-line break-words">—</p>
-        <div class="flex justify-end gap-3 pt-2">
-          <button id="dlgAdopt" class="px-4 py-2 rounded-xl bg-brand-600 text-white">我要認養</button>
-          <button id="dlgShare" class="px-4 py-2 rounded-xl border border-gray-300">分享</button>
-        </div>
-      </div>
+    <!-- 名稱 -->
+    <h3 id="dlgName"></h3>
+
+    <!-- 主圖 -->
+    <img id="dlgImg" class="modal-main-photo" src="" alt="毛孩照片">
+
+    <!-- 縮圖列 -->
+    <div id="dlgThumbs" class="modal-photos"></div>
+
+    <!-- 四個標籤：物種 / 品種 / 年齡 / 性別 -->
+    <div id="dlgTags" class="modal-info">
+      <span id="dlgSpeciesPill"></span>
+      <span id="dlgTagBreed"></span>
+      <span id="dlgTagAge"></span>
+      <span id="dlgTagGender"></span>
     </div>
-  </dialog>
+
+    <!-- 敘述 -->
+    <p id="dlgDesc"></p>
+
+    <!-- 按鈕區 -->
+    <div class="modal-actions">
+      <button id="dlgAdopt">我要認養</button>
+      <button id="dlgShare">分享</button>
+    </div>
+  </div>
+</dialog>
 
   <!-- 🔥 Lightbox 全螢幕顯示 -->
   <div id="lightbox"
