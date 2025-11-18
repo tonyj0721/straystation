@@ -45,16 +45,15 @@
       box-shadow: 0 2px 6px rgba(0,0,0,0.05);
     }
 
-    /* === 縮圖列：改成 admin.html 的網格排版 === */
+    /* 縮圖列：改成 admin 一樣的網格排版，不要多餘高度 */
     #dlgThumbs {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(18%, 1fr)); /* 約 5 張一排 */
       gap: 6px;
-      margin-bottom: 12px;
+      padding: 0 1.25rem 0.75rem; /* 上面 0，下面一點間距就好 */
       justify-items: center;
       align-items: center;
-      padding: 0 1.25rem 0.75rem; /* 類似原本 p-3 的感覺 */
-      overflow-x: visible;         /* 避免橫向捲動 */
+      align-content: start;       /* 有很多行時也貼上面，不會整塊被撐高 */
     }
 
     /* 每張縮圖改成 admin 的樣式 */
@@ -305,7 +304,7 @@
         <img id="dlgImg" alt="毛孩照片" class="w-full h-full object-contain cursor-pointer"/>
         <button id="dlgClose" class="absolute top-3 right-3 bg-black/60 text-white p-2 rounded-full" aria-label="關閉">✕</button>
       </div>
-      <div id="dlgThumbs" class="flex gap-2 overflow-x-auto p-3"></div>
+      <div id="dlgThumbs"></div>
       <div class="p-5 space-y-4">
         <div class="flex items-start justify-between gap-3">
           <div>
