@@ -186,33 +186,6 @@
         </div>
     </section>
 
-    <!-- 💻 桌機：一行 4 張（左：貓 x2、右：狗 x2） -->
-    <section id="deskRow" class="hidden sm:block mt-2">
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-        <!-- 左：新來的貓 -->
-        <div>
-          <div class="mb-2 flex items-center justify-between">
-            <h3 class="text-base font-semibold">新來的貓</h3>
-            <a href="cats.html" class="text-sm text-gray-500 hover:text-gray-900 inline-flex items-center gap-1">
-              看更多<span aria-hidden="true">→</span>
-            </a>
-          </div>
-          <div id="deskCats" class="grid grid-cols-2 gap-6"></div>
-        </div>
-        <!-- 右：新來的狗 -->
-        <div>
-          <div class="mb-2 flex items-center justify-between">
-            <h3 class="text-base font-semibold">新來的狗</h3>
-            <a href="dogs.html" class="text-sm text-gray-500 hover:text-gray-900 inline-flex items-center gap-1">
-              看更多<span aria-hidden="true">→</span>
-            </a>
-          </div>
-          <div id="deskDogs" class="grid grid-cols-2 gap-6"></div>
-        </div>
-      </div>
-    </section>
-
-
     <!-- sm 以上維持原本格狀 -->
     <div id="grid" class="mt-8 hidden sm:grid gap-6 sm:grid-cols-2 lg:grid-cols-3"></div>
 
@@ -285,7 +258,6 @@
         <p id="dlgDesc" class="text-gray-700 text-sm leading-7 whitespace-pre-line break-words">—</p>
         <div class="flex justify-end gap-3 pt-2">
           <button id="dlgAdopt" class="px-4 py-2 rounded-xl bg-brand-600 text-white">我要認養</button>
-          <button id="dlgCopy" class="px-4 py-2 rounded-xl bg-gray-100 text-gray-800 hover:bg-gray-200">複製連結</button>
           <button id="dlgShare" class="px-4 py-2 rounded-xl border border-gray-300">分享</button>
         </div>
       </div>
@@ -399,13 +371,17 @@
       `;
     }
 
-    // 🚀 桌機：一行 4 張（左：貓2、右：狗2）
-    function renderDesktopRow(cats, dogs){
-      const dc = document.getElementById('deskCats');
-      const dd = document.getElementById('deskDogs');
-      if (dc) dc.innerHTML = cats.map(createCardHTML).join('');   // 2欄 x 3列 = 6
-      if (dd) dd.innerHTML = dogs.map(createCardHTML).join('');   // 2欄 x 3列 = 6
-    }
+    // 🚀 桌機/平板：原本的格狀
+    function renderDesktop(allPets){
+      const grid = document.getElementById('grid');
+      grid.innerHTML = '';
+      if(!allPets.length){
+        document.getElementById('emptyState').classList.remove('hidden');
+        return;
+      }
+      document.getElementById('emptyState').classList.add('hidden');
+      grid.innerHTML = allPets.map(createCardHTML).join('');
+    }    
 
     // 手機：左右兩欄（左=貓、右=狗）
     function renderMobileColumns(cats, dogs){
@@ -427,13 +403,13 @@
       const snap = await getDocs(qRef);
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      const cats = all.filter(p => p.species === "貓").slice(0, 6);
-      const dogs = all.filter(p => p.species === "狗").slice(0, 6);
+      const cats = all.filter(p => p.species === "貓").slice(0, 5);
+      const dogs = all.filter(p => p.species === "狗").slice(0, 5);
 
       pets = [...cats, ...dogs];          // 供 modal 使用
       applyStats();
 
-      renderDesktopRow(cats, dogs);      // sm 以上顯示 2+2
+      renderDesktop(pets);                // sm 以上會顯示
       renderMobileColumns(cats, dogs);
       bindDetailButtons();
 
@@ -732,47 +708,5 @@
   }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script>
-
-// 🧩 Use event delegation so buttons work even after dialog open/close re-render
-const petDialog = document.getElementById('petDialog');
-petDialog.addEventListener('click', async (e) => {
-  
-  const copyBtn = e.target.closest('#dlgCopy');
-  if (copyBtn) {
-    try {
-      await navigator.clipboard.writeText(location.href);
-      if (window.Swal) {
-        Swal.fire({ icon: 'success', title: '連結已複製', timer: 1600, showConfirmButton: false });
-      } else {
-        alert('連結已複製');
-      }
-    } catch (err) {
-      console.error('copy failed', err);
-    }
-    return;
-  }
-const shareBtn = e.target.closest('#dlgShare');
-  const adoptBtn = e.target.closest('#dlgAdopt');
-  const closeBtn = e.target.closest('#dlgClose');
-  if (shareBtn) {
-    try {
-      const url = window.location.href;
-      const title = document.getElementById('dlgName')?.textContent?.trim() || '浪浪轉運站';
-      const lineUrl = `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}`;
-      const w = window.open(lineUrl, '_blank');
-      if (!w) { location.href = lineUrl; }
-    } catch (err) {
-      console.error('share failed', err);
-    }
-  } else if (adoptBtn) {
-    // keep original adopt behavior by dispatching a custom event if needed
-    document.dispatchEvent(new CustomEvent('dlg:adopt-click'));
-  } else if (closeBtn) {
-    document.getElementById('dlgBackdrop')?.classList.add('hidden');
-  }
-});
-
-</script>
 </body>
 </html>
