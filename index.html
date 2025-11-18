@@ -10,22 +10,27 @@
   <link rel="apple-touch-icon" href="favicon.png">
   <meta name="theme-color" content="#fcd34d">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    // Tailwind config
+  <script src="https://cdn.tailwindcss.com"></script>
+<script>
+  // Tailwind config：先檢查有沒有載到再設定
+  if (window.tailwind) {
     tailwind.config = {
       theme: {
         extend: {
           colors: {
-            brand: {
-              50: '#fff1f2', 100:'#ffe4e6', 200:'#fecdd3', 300:'#fda4af', 400:'#fb7185',
-              500:'#f43f5e', 600:'#e11d48', 700:'#be123c', 800:'#9f1239', 900:'#881337'
-            }
+            brand: "#f97316",
+            brandDark: "#ea580c",
+            brandLight: "#ffedd5",
+            cardBg: "#f9fafb"
           },
-          boxShadow: { soft: '0 10px 30px rgba(0,0,0,0.08)'}
+          boxShadow: {
+            soft: "0 10px 30px rgba(15, 23, 42, 0.15)"
+          }
         }
       }
-    }
-  </script>
+    };
+  }
+</script>
   <style>
     /* Hide number input arrows */
     input[type=number]::-webkit-outer-spin-button,
