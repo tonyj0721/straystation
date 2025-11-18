@@ -186,8 +186,32 @@
         </div>
     </section>
 
-    <!-- sm 以上維持原本格狀 -->
-    <div id="grid" class="mt-8 hidden sm:grid gap-6 sm:grid-cols-2 lg:grid-cols-3"></div>
+    <!-- sm 以上：一行 4 張，左貓 x2、右狗 x2，且上方有標題與「看更多」 -->
+    <section id="rowDesktop" class="hidden sm:block mt-8">
+      <!-- 標題列 -->
+      <div class="grid grid-cols-2 gap-6">
+        <!-- 左：貓 -->
+        <div class="mb-2 flex items-center justify-between">
+          <h3 class="text-base font-semibold">新來的貓</h3>
+          <a href="cats.html" class="text-sm text-gray-500 hover:text-gray-900 inline-flex items-center gap-1">
+            看更多<span aria-hidden="true">→</span>
+          </a>
+        </div>
+        <!-- 右：狗 -->
+        <div class="mb-2 flex items-center justify-between">
+          <h3 class="text-base font-semibold">新來的狗</h3>
+          <a href="dogs.html" class="text-sm text-gray-500 hover:text-gray-900 inline-flex items-center gap-1">
+            看更多<span aria-hidden="true">→</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- 圖片列：一排四張（貓 2 + 狗 2） -->
+      <div class="grid grid-cols-4 gap-6">
+        <div id="deskCats" class="col-span-2 grid grid-cols-2 gap-6"></div>
+        <div id="deskDogs" class="col-span-2 grid grid-cols-2 gap-6"></div>
+      </div>
+    </section>
 
     <div id="emptyState" class="hidden mt-10 text-center text-gray-500">
       沒有符合條件的毛孩，試試看調整篩選條件。
@@ -371,17 +395,12 @@
       `;
     }
 
-    // 🚀 桌機/平板：原本的格狀
-    function renderDesktop(allPets){
-      const grid = document.getElementById('grid');
-      grid.innerHTML = '';
-      if(!allPets.length){
-        document.getElementById('emptyState').classList.remove('hidden');
-        return;
-      }
-      document.getElementById('emptyState').classList.add('hidden');
-      grid.innerHTML = allPets.map(createCardHTML).join('');
-    }    
+    function renderDesktopRow(cats, dogs){
+      const deskCats = document.getElementById('deskCats');
+      const deskDogs = document.getElementById('deskDogs');
+      if (deskCats) deskCats.innerHTML = cats.slice(0, 2).map(createCardHTML).join('');
+      if (deskDogs) deskDogs.innerHTML = dogs.slice(0, 2).map(createCardHTML).join('');
+    }
 
     // 手機：左右兩欄（左=貓、右=狗）
     function renderMobileColumns(cats, dogs){
@@ -403,8 +422,8 @@
       const snap = await getDocs(qRef);
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      const cats = all.filter(p => p.species === "貓").slice(0, 5);
-      const dogs = all.filter(p => p.species === "狗").slice(0, 5);
+      const cats = all.filter(p => p.species === "貓").slice(0, 6);
+      const dogs = all.filter(p => p.species === "狗").slice(0, 6);
 
       pets = [...cats, ...dogs];          // 供 modal 使用
       applyStats();
