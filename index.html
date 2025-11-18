@@ -516,10 +516,12 @@
 
     // 防止使用者按 ESC 或點 backdrop 關掉時，背景卡死
     dlg.addEventListener('close', () => {
-      // 保險：確保有恢復
+      // 若是因 Lightbox 開啟而關掉 dialog → 不要清除 currentPetId
+      if (!lb.classList.contains("flex")) {
+        currentPetId = null;
+        history.replaceState(null, '', location.pathname);
+      }
       unlockScroll();
-      history.replaceState(null, '', location.pathname);
-      currentPetId = null;
     });
 
     let scrollTop = 0;
