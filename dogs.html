@@ -519,9 +519,12 @@
     });
 
     dlg.addEventListener('close', () => {
+      // 若是因 Lightbox 開啟而關掉 dialog → 不要清除 currentPetId
+      if (!lb.classList.contains("flex")) {
+        currentPetId = null;
+        history.replaceState(null, '', location.pathname);
+      }
       unlockScroll();
-      history.replaceState(null, '', location.pathname);
-      currentPetId = null;
     });
 
     $('#dlgShare').addEventListener('click', () => {
