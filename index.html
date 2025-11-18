@@ -33,20 +33,73 @@
     input[type=number] { -moz-appearance: textfield; }
     dialog::backdrop{ background: rgba(0,0,0,.5)}
 
-    /* 🔥 Modal 縮圖 */
-    .dlg-thumb {
-      width: 70px;
-      height: 70px;
+    /* === Modal 主圖（套用 admin.html 風格） === */
+    #dlgImg {
+      width: 100%;
+      max-height: 300px;
+      border-radius: 10px;
       object-fit: contain;
-      background-color: #f3f4f6;
-      border-radius: 8px;
-      cursor: pointer;
-      opacity: 0.7;
-      transition: 0.2s;
+      background-color: #f9f9f9;
+      display: block;
+      margin: 0 auto 8px auto;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
     }
+
+    /* === 縮圖列：改成 admin.html 的網格排版 === */
+    #dlgThumbs {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(18%, 1fr)); /* 約 5 張一排 */
+      gap: 6px;
+      margin-bottom: 12px;
+      justify-items: center;
+      align-items: center;
+      padding: 0 1.25rem 0.75rem; /* 類似原本 p-3 的感覺 */
+      overflow-x: visible;         /* 避免橫向捲動 */
+    }
+
+    /* 每張縮圖改成 admin 的樣式 */
+    .dlg-thumb {
+      width: 100%;
+      aspect-ratio: 1 / 1;         /* 保持正方形 */
+      object-fit: cover;
+      border-radius: 8px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: transform 0.2s, border-color 0.2s, opacity 0.2s;
+      background-color: #f9f9f9;
+      opacity: 0.85;
+    }
+
+    .dlg-thumb:hover {
+      transform: scale(1.05);
+    }
+
     .dlg-thumb.active {
-      border: 2px solid #000;
+      border-color: #f97316;       /* 橘色框，跟 admin.html 一樣 */
       opacity: 1;
+    }
+
+    /* === 標籤區（品種 / 年齡 / 性別）套用 admin 的 chip 風格 === */
+    #dlgTags span {
+      background: #fff7ed;
+      padding: 5px 12px;
+      border-radius: 16px;
+      color: #92400e;
+      font-weight: 500;
+      font-size: 0.95rem;
+    }
+
+    /* === 敘述文字區塊（套用 admin 的 #modalDesc 風格） === */
+    #dlgDesc {
+      background: #fffaf4;
+      padding: 10px 14px;
+      border-radius: 8px;
+      color: #444;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin-bottom: 16px;
     }
 
     #lightbox {
