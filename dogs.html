@@ -521,8 +521,8 @@
       const speciesPill = document.getElementById('dlgSpeciesPill');
       const isDog = /(狗|犬)/.test(String(p.species||''));
       speciesPill.textContent = isDog ? '狗狗' : '貓咪';
-      speciesPill.className = `shrink-0 rounded-full text-xs px-2 py-1 ${
-        isDog ? 'bg-sky-50 text-sky-700' : 'bg-emerald-50 text-emerald-700'
+      speciesPill.className = `shrink-0 rounded-full text-sm px-3 py-1 ${
+        isDog ? 'bg-sky-100 text-sky-700' : 'bg-emerald-100 text-emerald-700'
       }`;
 
       // 三個圓角標籤（不換行，超出可橫向捲動）
