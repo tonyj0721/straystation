@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>StrayStation</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>浪浪轉運站｜首頁</title>
 
-  <!-- Google Font（後台使用的字體，前台同步） -->
+  <!-- Google Font：與後台相同 -->
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
 
   <!-- Tailwind -->
@@ -14,10 +14,9 @@
   <style>
     body {
       font-family: "Noto Sans TC", sans-serif;
-      background: #fafafa;
     }
 
-    /* --- Admin Modal 主圖樣式移植 --- */
+    /* --- Admin Modal 主圖 --- */
     .modal-main-photo {
       width: 100%;
       max-height: 360px;
@@ -29,7 +28,7 @@
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
 
-    /* --- Admin Modal 縮圖列表 --- */
+    /* --- Admin Modal 縮圖 --- */
     .modal-photos {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(18%, 1fr));
@@ -50,143 +49,165 @@
     }
 
     .modal-photos img.active {
-      border-color: #f97316; /* 橘色框：與後台一致 */
+      border-color: #f97316;
     }
 
     .modal-photos img:hover {
       transform: scale(1.05);
     }
 
-    /* --- Admin 樣式：描述框 --- */
+    /* 描述（admin 同款） */
     .modal-desc-box {
       background: #fffaf4;
       padding: 14px 16px;
       border-radius: 10px;
       font-size: 0.95rem;
-      line-height: 1.65;
+      line-height: 1.7;
       white-space: pre-wrap;
       color: #333;
     }
 
-    /* Modal 遮罩 */
     dialog::backdrop {
       background: rgba(0, 0, 0, 0.4);
-      backdrop-filter: blur(2px);
+      backdrop-filter: blur(1px);
     }
 
-    /* Modal 本體 */
     dialog {
       border: none;
       padding: 0;
       border-radius: 16px;
-      max-width: 420px;
+      max-width: 440px;
       width: 100%;
     }
   </style>
 </head>
+<body class="bg-white">
 
-<body class="p-4">
+  <h1 class="text-2xl font-bold p-4">浪浪轉運站（前台）</h1>
 
-  <!-- 前台內容省略（原本列表的地方保持不動） -->
-  <h1 class="text-xl font-bold mb-4">StrayStation 寵物列表</h1>
-  <div id="petList" class="grid gap-4"></div>
+  <!-- 寵物列表 -->
+  <div id="petList" class="grid grid-cols-2 sm:grid-cols-3 gap-4 p-4"></div>
 
-  <!-- ========================== -->
-  <!-- ★★★ Admin Modal 移植版 ★★★ -->
-  <!-- ========================== -->
-  <dialog id="petDialog" class="shadow-xl">
+  <!-- =============================== -->
+  <!-- ★★★ Admin Modal（移植到前台） ★★★ -->
+  <!-- =============================== -->
+  <dialog id="petDialog">
 
-    <div class="p-4 pb-2 text-center border-b">
+    <div class="p-4 border-b text-center relative">
       <span id="dlgName" class="text-lg font-bold"></span>
-      <button id="dlgClose" class="float-right text-gray-500 hover:text-black text-xl">&times;</button>
+      <button id="dlgClose"
+              class="absolute right-3 top-2 text-gray-500 hover:text-black text-2xl">&times;</button>
     </div>
 
     <div class="p-4">
 
-      <!-- 主圖（Admin Style） -->
+      <!-- 主圖 -->
       <img id="dlgImg" class="modal-main-photo" alt="主圖">
 
-      <!-- 縮圖列（Admin Style） -->
+      <!-- 縮圖 -->
       <div id="dlgThumbs" class="modal-photos"></div>
 
-      <!-- Tag -->
+      <!-- 標籤（品種／年齡／性別） -->
       <div id="dlgTags" class="flex flex-wrap gap-2 mb-4"></div>
 
       <!-- 描述 -->
       <div id="dlgDesc" class="modal-desc-box"></div>
+
     </div>
   </dialog>
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+  import { getFirestore, collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 
-  <!-- ========================== -->
-  <!-- ★★★ 前台 JS（整合 Admin Modal）★★★ -->
-  <!-- ========================== -->
-<script>
-const petList = document.querySelector("#petList");
-const dlg = document.querySelector("#petDialog");
-const dlgClose = document.querySelector("#dlgClose");
+  const firebaseConfig = {
+    apiKey: "AIzaSyC4NT2KOm_Cw2OEdaaOimxI0ruoNv_u_9g",
+    authDomain: "straystation.firebaseapp.com",
+    projectId: "straystation",
+    storageBucket: "straystation.firebasestorage.app",
+    messagingSenderId: "611366379195",
+    appId: "1:611366379195:web:ef5a632e88d8bba1d6139e"
+  };
 
-dlgClose.addEventListener("click", () => dlg.close());
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
 
-// 載入列表資料（與前台原本功能一致）
-async function loadPets() {
-  const res = await fetch("pets.json");
-  const pets = await res.json();
+  const petList = document.querySelector("#petList");
+  const dlg = document.querySelector("#petDialog");
+  const dlgClose = document.querySelector("#dlgClose");
 
-  pets.forEach(pet => {
-    const div = document.createElement("div");
-    div.className = "bg-white shadow rounded p-3 cursor-pointer";
-    div.innerHTML = `
-      <img src="${pet.photos[0]}" class="w-full rounded mb-2" />
-      <div class="font-bold text-lg">${pet.name}</div>
-    `;
-    div.onclick = () => openPet(pet);
-    petList.appendChild(div);
-  });
-}
+  dlgClose.onclick = () => dlg.close();
 
-// 打開 admin-style modal
-function openPet(pet) {
-  dlg.querySelector("#dlgName").textContent = pet.name;
-  dlg.querySelector("#dlgDesc").textContent = pet.desc;
+  // ⭐ 讀 Firestore（前台原本就這樣）
+  async function loadPets() {
+    const qRef = query(collection(db, "pets"), orderBy("createdAt", "desc"));
+    const snap = await getDocs(qRef);
 
-  // 主圖
-  const dlgImg = dlg.querySelector("#dlgImg");
-  dlgImg.src = pet.photos[0];
+    snap.forEach(doc => {
+      const p = { id: doc.id, ...doc.data() };
 
-  // 縮圖區
-  const thumbs = dlg.querySelector("#dlgThumbs");
-  thumbs.innerHTML = "";
+      const div = document.createElement("div");
+      div.className = "bg-white shadow rounded p-3 cursor-pointer";
+      div.innerHTML = `
+        <img src="${p.images?.[0] || ''}" class="w-full rounded mb-2" />
+        <div class="font-bold text-lg">${p.name}</div>
+      `;
+      div.onclick = () => openModal(p);
 
-  pet.photos.forEach((src, i) => {
-    const img = document.createElement("img");
-    img.src = src;
-    img.className = i === 0 ? "active" : "";
-    img.onclick = () => {
-      dlgImg.src = src;
+      petList.appendChild(div);
+    });
+  }
 
-      // active 外框
-      thumbs.querySelectorAll("img").forEach(t => t.classList.remove("active"));
-      img.classList.add("active");
-    };
-    thumbs.appendChild(img);
-  });
+  // ⭐ Modal 開啟（Admin 版）
+  function openModal(p) {
 
-  // tags
-  const tags = dlg.querySelector("#dlgTags");
-  tags.innerHTML = "";
-  pet.tags.forEach(tag => {
+    document.querySelector("#dlgName").textContent = p.name;
+    document.querySelector("#dlgDesc").textContent = p.desc || "";
+
+    // 主圖
+    const dlgImg = document.querySelector("#dlgImg");
+    dlgImg.src = p.images?.[0] || "";
+
+    // 縮圖列
+    const thumbs = document.querySelector("#dlgThumbs");
+    thumbs.innerHTML = "";
+
+    (p.images || []).forEach((url, i) => {
+      const img = document.createElement("img");
+      img.src = url;
+      img.className = i === 0 ? "active" : "";
+      img.onclick = () => {
+        dlgImg.src = url;
+        thumbs.querySelectorAll("img").forEach(t => t.classList.remove("active"));
+        img.classList.add("active");
+      };
+      thumbs.appendChild(img);
+    });
+
+    // Tags（品種／年齡／性別）
+    const tags = document.querySelector("#dlgTags");
+    tags.innerHTML = "";
+
+    const t1 = makeTag(p.breedType === "米克斯"
+        ? `米克斯 / ${p.breed}`
+        : p.breed);
+    const t2 = makeTag(p.age);
+    const t3 = makeTag(p.gender);
+
+    tags.append(t1, t2, t3);
+
+    dlg.showModal();
+  }
+
+  function makeTag(text) {
     const span = document.createElement("span");
     span.className =
-      "px-3 py-1 bg-orange-100 text-orange-600 rounded-full text-sm";
-    span.textContent = tag;
-    tags.appendChild(span);
-  });
+      "px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm whitespace-nowrap";
+    span.textContent = text || "—";
+    return span;
+  }
 
-  dlg.showModal();
-}
-
-loadPets();
-
+  loadPets();
 </script>
 
 </body>
