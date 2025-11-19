@@ -37,7 +37,7 @@
     .dlg-thumb {
       width: 70px;
       height: 70px;
-      object-fit: contain;
+      object-fit: cover;      /* 讓縮圖撐滿 */
       background-color: #f3f4f6;
       border-radius: 8px;
       cursor: pointer;
@@ -244,7 +244,7 @@
   <dialog id="petDialog" class="w-full max-w-2xl max-h-[90vh] rounded-2xl p-0 overflow-y-auto">
     <div class="bg-white">
       <div class="relative aspect-video bg-gray-100">
-        <img id="dlgImg" alt="毛孩照片" class="w-full h-full object-contain cursor-pointer"/>
+        <img id="dlgImg" alt="毛孩照片" class="w-full h-full object-contain object-bottom cursor-pointer"/>
         <button id="dlgClose" class="absolute top-3 right-3 bg-black/60 text-white p-2 rounded-full" aria-label="關閉">✕</button>
       </div>
       <div id="dlgThumbs" class="flex gap-2 overflow-x-auto p-3"></div>
