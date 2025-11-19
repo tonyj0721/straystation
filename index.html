@@ -35,15 +35,18 @@
 
     /* 🔥 Modal 縮圖 */
     .dlg-thumb {
-  width: 70px;              /* 固定寬度 */
-  height: 70px;             /* 固定高度 */
-  object-fit: contain;      /* 不裁切，不壓縮 */
+  width: 70px;
+  height: 70px;
+  object-fit: cover;       /* 🔥 填滿區域，被裁切也沒關係 */
   background-color: #f3f4f6;
-  border-radius: 8px;
+  border-radius: 6px;      /* 你想多圓都可調整 */
   cursor: pointer;
-  padding: 4px;             /* 加 padding，看起來更舒服 */
-  opacity: 0.7;
+  opacity: 0.8;
   transition: 0.2s;
+}
+.dlg-thumb.active {
+  outline: 3px solid #4b5563; /* 或你的品牌色都可以 */
+  opacity: 1;
 }
 
     .dlg-thumb.active {
