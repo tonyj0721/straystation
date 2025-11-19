@@ -37,15 +37,15 @@
     .dlg-thumb {
       width: 70px;
       height: 70px;
-      object-fit: contain;
+      object-fit: cover;       /* 🔥 填滿區域，被裁切也沒關係 */
       background-color: #f3f4f6;
-      border-radius: 8px;
+      border-radius: 6px;      /* 你想多圓都可調整 */
       cursor: pointer;
-      opacity: 0.7;
+      opacity: 0.8;
       transition: 0.2s;
     }
     .dlg-thumb.active {
-      border: 2px solid #000;
+      outline: 3px solid #4b5563; /* 或你的品牌色都可以 */
       opacity: 1;
     }
 
@@ -261,11 +261,11 @@
             <!-- 三個圓角標籤：不換行、可水平捲動 -->
             <div id="dlgTags" class="mt-1 flex flex-nowrap gap-2 text-xs">
               <span id="dlgTagBreed"
-                    class="inline-flex items-center rounded-full ring-1 ring-gray-200 bg-white text-gray-700 px-2.5 py-1 whitespace-nowrap"></span>
+                    class="inline-flex items-center rounded-full ring-1 ring-gray-200 bg-[#FBE8D3] text-[#C46B1C] px-2.5 py-1 whitespace-nowrap"></span>
               <span id="dlgTagAge"
-                    class="inline-flex items-center rounded-full ring-1 ring-gray-200 bg-white text-gray-700 px-2.5 py-1 whitespace-nowrap"></span>
+                    class="inline-flex items-center rounded-full ring-1 ring-gray-200 bg-[#FBE8D3] text-[#C46B1C] px-2.5 py-1 whitespace-nowrap"></span>
               <span id="dlgTagGender"
-                    class="inline-flex items-center rounded-full ring-1 ring-gray-200 bg-white text-gray-700 px-2.5 py-1 whitespace-nowrap"></span>
+                    class="inline-flex items-center rounded-full ring-1 ring-gray-200 bg-[#FBE8D3] text-[#C46B1C] px-2.5 py-1 whitespace-nowrap"></span>
             </div>
           </div>
         </div>
