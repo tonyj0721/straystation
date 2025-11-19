@@ -245,11 +245,24 @@
     <div class="bg-white">
       <!-- 新增：與下方縮圖 p-3 對齊 -->
       <div class="px-3 pt-3">
-        <div class="relative aspect-video bg-gray-100 rounded-lg">
-          <img id="dlgImg" alt="毛孩照片" class="w-full h-full object-contain cursor-pointer"/>
-          <button id="dlgClose" class="absolute top-3 right-3 bg-black/60 text-white p-2 rounded-full" aria-label="關閉">✕</button>
-        </div>
+        <div class="relative aspect-video bg-gray-100 overflow-hidden rounded-lg">
+        <!-- 只模糊這張背景圖 -->
+        <img id="dlgBg" aria-hidden="true"
+             class="absolute inset-0 w-full h-full object-cover blur-md scale-110">
+
+        <!-- 可選：柔化一下背景，沒有加任何 blur -->
+        <div class="absolute inset-0 bg-white/20"></div>
+
+        <!-- 主圖在最上層，沒有 blur -->
+        <img id="dlgImg"
+             alt="毛孩照片"
+             class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg">
+
+        <button id="dlgClose"
+                class="absolute top-3 right-3 z-20 bg-black/60 text-white p-2 rounded-full"
+                aria-label="關閉">✕</button>
       </div>
+    </div>
 
       <div id="dlgThumbs" class="flex gap-2 overflow-x-auto p-3"></div>
       <div class="p-5 space-y-4">
@@ -543,6 +556,7 @@
       if(!p) return;
 
       const dlgImg = document.getElementById("dlgImg");
+      const dlgBg = document.getElementById("dlgBg");
       const dlgThumbs = document.getElementById("dlgThumbs");
 
       // 取所有圖片（images 是陣列；後台 upload 時必定有）
@@ -552,6 +566,7 @@
 
       // 設定主圖
       dlgImg.src = imgs[0] || "";
+      if (dlgBg) dlgBg.src = dlgImg.src;
       dlgImg.onclick = () => openLightbox(imgs, 0);  // 讓主圖可進入 Lightbox
 
       // 生成縮圖列
@@ -565,6 +580,7 @@
         // 點縮圖 → 切換主圖 + 啟動對應的 Lightbox 頁面
         thumb.addEventListener("click", () => {
           dlgImg.src = url;
+          if (dlgBg) dlgBg.src = url;
 
           // 更新 active 樣式
           document.querySelectorAll(".dlg-thumb")
