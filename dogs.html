@@ -480,6 +480,7 @@
       if (!p) return;
 
       const dlgImg = document.getElementById("dlgImg");
+      const dlgBg = document.getElementById("dlgBg");
       const dlgThumbs = document.getElementById("dlgThumbs");
 
       const imgs = Array.isArray(p.images) && p.images.length > 0
@@ -487,6 +488,7 @@
         : (p.image ? [p.image] : []);
 
       dlgImg.src = imgs[0] || "";
+      if (dlgBg) dlgBg.src = dlgImg.src;
       dlgImg.onclick = () => openLightbox(imgs, 0);
 
       dlgThumbs.innerHTML = "";
@@ -498,6 +500,7 @@
 
         thumb.addEventListener("click", () => {
           dlgImg.src = url;
+          if (dlgBg) dlgBg.src = url;
           document.querySelectorAll(".dlg-thumb").forEach(el => el.classList.remove("active"));
           thumb.classList.add("active");
         });
