@@ -278,9 +278,10 @@
 
   <!-- Pet Detail Modal -->
   <dialog id="petDialog" class="w-full max-w-2xl max-h-[90vh] rounded-2xl p-0 overflow-y-auto">
-    <div class="bg-white">
-      <div class="relative bg-white flex items-end justify-center h-[320px] md:h-[420px]">
-        <img id="dlgImg" alt="毛孩照片" class="max-h-full max-w-full object-contain cursor-pointer" />
+    <div class="px-4"> <!-- 新增這層，數值用和縮圖列一樣的 px -->
+      <div class="relative bg-white flex items-end justify-center h-[300px] md:h-[380px] rounded-xl overflow-hidden">
+        <img id="dlgImg" alt="毛孩照片"
+             class="max-h-full max-w-full object-contain cursor-pointer" />
         <button id="dlgClose" class="absolute top-3 right-3 bg-black/60 text-white p-2 rounded-full"
           aria-label="關閉">✕</button>
       </div>
