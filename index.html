@@ -243,8 +243,10 @@
   <!-- Pet Detail Modal -->
   <dialog id="petDialog" class="w-full max-w-2xl max-h-[90vh] rounded-2xl p-0 overflow-y-auto">
     <div class="bg-white">
-      <div class="relative bg-gray-100 pt-4 px-4 max-w-[90%] mx-auto rounded-xl">
-        <img id="dlgImg" class="w-full h-auto object-contain cursor-pointer" />
+      <div class="relative bg-gray-100 pt-4 px-3 mx-auto rounded-xl"
+         style="max-width: calc(100% - 24px);">
+      <img id="dlgImg"
+           class="w-full h-auto object-contain cursor-pointer rounded-lg" />
         <button id="dlgClose" class="absolute top-3 right-3 bg-black/60 text-white p-2 rounded-full" aria-label="關閉">✕</button>
       </div>
       <div id="dlgThumbs" class="flex gap-2 overflow-x-auto p-3"></div>
