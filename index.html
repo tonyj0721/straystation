@@ -278,18 +278,22 @@
 
   <!-- Pet Detail Modal -->
   <dialog id="petDialog" class="w-full max-w-2xl max-h-[90vh] rounded-2xl p-0 overflow-y-auto">
-    <div class="px-4"> <!-- 新增這層，數值用和縮圖列一樣的 px -->
-      <div class="relative bg-white flex items-end justify-center h-[300px] md:h-[380px] rounded-xl overflow-hidden">
-        <img id="dlgImg" alt="毛孩照片"
-             class="max-h-full max-w-full object-contain cursor-pointer" />
-        <button id="dlgClose" class="absolute top-3 right-3 bg-black/60 text-white p-2 rounded-full"
-          aria-label="關閉">✕</button>
-      </div>
+    <div class="px-4">
+  <!-- 主圖 -->
+  <div class="relative w-full bg-white flex items-end justify-center h-[300px] md:h-[360px] rounded-xl overflow-hidden">
+    <img id="dlgImg" alt="毛孩照片"
+         class="max-h-full max-w-full object-contain cursor-pointer" />
+    <button id="dlgClose"
+            class="absolute top-3 right-3 bg-black/60 text-white p-2 rounded-full"
+            aria-label="關閉">✕</button>
+  </div>
 
 
-      <div id="dlgThumbs" class="flex gap-2 overflow-x-auto p-3"></div>
-      <div class="p-5 space-y-4">
-        <div class="flex items-start justify-between gap-3">
+      <div class="mt-3">
+    <div class="flex gap-2">
+      <!-- 每張縮圖 -->
+      <img class="dlg-thumb active" src="..." alt="">
+      <img class="dlg-thumb" src="..." alt="">
           <div>
             <!-- 標題 + 右上角物種圓角標籤 -->
             <div class="flex items-start justify-between gap-2">
