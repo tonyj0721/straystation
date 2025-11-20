@@ -328,8 +328,14 @@
 
     const $ = (q) => document.querySelector(q);
     const BREEDS = {
-      貓: { '品種貓': ['美短','英短','藍貓','暹羅貓','波斯貓','布偶貓','曼赤肯'], 米克斯: ['橘貓','黑貓','虎斑貓','白底虎斑貓','三花貓','賓士貓','玳瑁貓','白貓'] },
-      狗: { '品種犬': ['博美','貴賓','吉娃娃','馬爾濟斯','柯基','柴犬','哈士奇','高山犬','黃金獵犬'], 米克斯: ['黑色','黑白色','白色','白黃色','黃色','棕色','虎斑','花花'] }
+      貓: {
+        '品種貓': ['美短','英短','藍貓','暹羅貓','波斯貓','布偶貓','曼赤肯'],
+        米克斯: ['橘貓','黑貓','虎斑貓','白底虎斑貓','三花貓','賓士貓','玳瑁貓','白貓']
+      },
+      狗: {
+        '品種犬': ['博美','貴賓','吉娃娃','馬爾濟斯','柯基','柴犬','哈士奇','高山犬','黃金獵犬'],
+        米克斯: ['黑色','黑白色','白色','白黃色','黃色','棕色','虎斑','花花']
+      }
     };
 
     // === 類別/品種連動 ===
@@ -338,40 +344,206 @@
     const breedSel = $('#breed');
     const breedLabel = $('#breedLabel');
     const getSpecies = () => (Array.from(speciesInputs).find(i=>i.checked)?.value || '貓');
-    const updateBreedLabel = () => { const t = breedTypeSel.value; breedLabel.textContent = !t ? '品種/毛色' : (t==='米克斯'?'毛色':'品種'); };
-    const resetBreedRight = () => { breedSel.disabled = true; breedSel.innerHTML = '<option value="">請先選擇品種</option>'; };
-    function syncBreedSelectors(){ const isCat = getSpecies()==='貓'; breedTypeSel.innerHTML = isCat ? '<option value="">請選擇</option><option value="品種貓">品種貓</option><option value="米克斯">米克斯</option>' : '<option value="">請選擇</option><option value="品種犬">品種犬</option><option value="米克斯">米克斯</option>'; resetBreedRight(); updateBreedLabel(); }
-    function buildBreedOptions(){ const list=(BREEDS[getSpecies()]||{})[breedTypeSel.value]||[]; if(!breedTypeSel.value){ resetBreedRight(); return;} breedSel.disabled=false; breedSel.innerHTML=['<option value="">請選擇</option>'].concat(list.map(b=>`<option value="${b}">${b}</option>`)).join(''); }
+    const updateBreedLabel = () => {
+      const t = breedTypeSel.value;
+      breedLabel.textContent = !t ? '品種/毛色' : (t==='米克斯'?'毛色':'品種');
+    };
+    const resetBreedRight = () => {
+      breedSel.disabled = true;
+      breedSel.innerHTML = '<option value="">請先選擇品種</option>';
+    };
+    function syncBreedSelectors(){
+      const isCat = getSpecies()==='貓';
+      breedTypeSel.innerHTML = isCat
+        ? '<option value="">請選擇</option><option value="品種貓">品種貓</option><option value="米克斯">米克斯</option>'
+        : '<option value="">請選擇</option><option value="品種犬">品種犬</option><option value="米克斯">米克斯</option>';
+      resetBreedRight();
+      updateBreedLabel();
+    }
+    function buildBreedOptions(){
+      const list=(BREEDS[getSpecies()]||{})[breedTypeSel.value]||[];
+      if(!breedTypeSel.value){ resetBreedRight(); return;}
+      breedSel.disabled=false;
+      breedSel.innerHTML=['<option value="">請選擇</option>']
+        .concat(list.map(b=>`<option value="${b}">${b}</option>`)).join('');
+    }
     speciesInputs.forEach(i=>i.addEventListener('change',syncBreedSelectors));
     breedTypeSel.addEventListener('change',()=>{ buildBreedOptions(); updateBreedLabel(); });
     syncBreedSelectors();
 
     // === 圖片選取/預覽（<=5） ===
     const imgFiles=$('#imgFiles'), btnPick=$('#btnPick'), fileCount=$('#fileCount'), imgPreview=$('#imgPreview');
-    let selectedFiles=[]; btnPick?.addEventListener('click',()=>imgFiles.click());
-    function renderPreviews(){ fileCount.textContent=`已選 ${selectedFiles.length} / 5 張`; imgPreview.innerHTML=selectedFiles.map((f,i)=>{ const u=URL.createObjectURL(f); return `<div class="relative"><img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽"><button data-idx="${i}" class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button></div>`;}).join(''); imgPreview.querySelectorAll('button[data-idx]').forEach(btn=>btn.addEventListener('click',e=>{ e.preventDefault();e.stopPropagation(); const i=+btn.dataset.idx; selectedFiles.splice(i,1); renderPreviews(); })); }
-    imgFiles?.addEventListener('change',()=>{ const incoming=Array.from(imgFiles.files||[]); const next=selectedFiles.concat(incoming); if(next.length>5){ Swal.fire({icon:'warning',title:'最多選取 5 張'});} selectedFiles=next.slice(0,5); renderPreviews(); imgFiles.value=''; });
+    let selectedFiles=[];
+    btnPick?.addEventListener('click',()=>imgFiles.click());
+    function renderPreviews(){
+      fileCount.textContent=`已選 ${selectedFiles.length} / 5 張`;
+      imgPreview.innerHTML=selectedFiles.map((f,i)=>{
+        const u=URL.createObjectURL(f);
+        return `<div class="relative">
+          <img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽">
+          <button data-idx="${i}" class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button>
+        </div>`;
+      }).join('');
+      imgPreview.querySelectorAll('button[data-idx]').forEach(btn=>btn.addEventListener('click',e=>{
+        e.preventDefault();e.stopPropagation();
+        const i=+btn.dataset.idx;
+        selectedFiles.splice(i,1);
+        renderPreviews();
+      }));
+    }
+    imgFiles?.addEventListener('change',()=>{
+      const incoming=Array.from(imgFiles.files||[]);
+      const next=selectedFiles.concat(incoming);
+      if(next.length>5){ Swal.fire({icon:'warning',title:'最多選取 5 張'});}
+      selectedFiles=next.slice(0,5);
+      renderPreviews();
+      imgFiles.value='';
+    });
 
     // === 點點進度 ===
-    function startDots(span, base){ let i=0; span.textContent=base; const t=setInterval(()=>{ i=(i+1)%4; span.textContent=base+'.'.repeat(i); },350); return ()=>clearInterval(t); }
+    function startDots(span, base){
+      let i=0;
+      span.textContent=base;
+      const t=setInterval(()=>{
+        i=(i+1)%4;
+        span.textContent=base+'.'.repeat(i);
+      },350);
+      return ()=>clearInterval(t);
+    }
 
     // === 登錄 ===
     $('#petForm').addEventListener('submit', async (e)=>{
       e.preventDefault();
-      const name=($('#name')?.value||'').trim(); if(!name){ await Swal.fire({icon:'error',title:'請填名字'}); return; }
-      const payload={ species:getSpecies(), name, breedType:breedTypeSel.value||'', breed:breedSel.value||'', age:($('#age')?.value||'').trim(), gender:$('#gender')?.value||'', desc:($('#desc')?.value||'').trim(), images:[], status:'available', showOnHome:false, showOnCats:true, showOnDogs:true, showOnIndex:true, createdAt:serverTimestamp() };
-      try{ const dupQ=query(collection(db,'pets'), where('name','==', name)); const dupSnap=await getDocs(dupQ); if(!dupSnap.empty){ const r=await Swal.fire({icon:'question',title:`名字「${name}」已存在，仍要新增嗎？`,showCancelButton:true,confirmButtonText:'繼續新增',cancelButtonText:'取消'}); if(!r.isConfirmed) return; } }catch(e){}
-      const submitBtn=$('#submitBtn'), submitText=$('#submitText'); submitBtn.disabled=true; const stopDots=startDots(submitText,'登錄中');
-      try{ const docRef=await addDoc(collection(db,'pets'), payload); const urls=[]; for(const f of selectedFiles){ const path=`pets/${docRef.id}/${Date.now()}_${f.name}`; const r=sRef(storage,path); await uploadBytes(r,f); urls.push(await getDownloadURL(r)); } if(urls.length) await updateDoc(doc(db,'pets',docRef.id),{images:urls}); stopDots(); submitBtn.disabled=false; submitText.textContent='登錄'; Swal.fire({icon:'success',title:'已登錄成功！'}); e.target.reset(); imgPreview.innerHTML=''; selectedFiles=[]; fileCount.textContent='已選 0 / 5 張'; syncBreedSelectors(); await loadPets(); } catch(err){ stopDots(); submitBtn.disabled=false; submitText.textContent='登錄'; Swal.fire({icon:'error',title:'登錄失敗',text:err.message}); }
+      const name=($('#name')?.value||'').trim();
+      if(!name){
+        await Swal.fire({icon:'error',title:'請填名字'});
+        return;
+      }
+      const payload={
+        species:getSpecies(),
+        name,
+        breedType:breedTypeSel.value||'',
+        breed:breedSel.value||'',
+        age:($('#age')?.value||'').trim(),
+        gender:$('#gender')?.value||'',
+        desc:($('#desc')?.value||'').trim(),
+        images:[],
+        status:'available',
+        showOnHome:false,
+        showOnCats:true,
+        showOnDogs:true,
+        showOnIndex:true,
+        createdAt:serverTimestamp()
+      };
+      try{
+        const dupQ=query(collection(db,'pets'), where('name','==', name));
+        const dupSnap=await getDocs(dupQ);
+        if(!dupSnap.empty){
+          const r=await Swal.fire({
+            icon:'question',
+            title:`名字「${name}」已存在，仍要新增嗎？`,
+            showCancelButton:true,
+            confirmButtonText:'繼續新增',
+            cancelButtonText:'取消'
+          });
+          if(!r.isConfirmed) return;
+        }
+      }catch(e){}
+      const submitBtn=$('#submitBtn'), submitText=$('#submitText');
+      submitBtn.disabled=true;
+      const stopDots=startDots(submitText,'登錄中');
+      try{
+        const docRef=await addDoc(collection(db,'pets'), payload);
+        const urls=[];
+        for(const f of selectedFiles){
+          const path=`pets/${docRef.id}/${Date.now()}_${f.name}`;
+          const r=sRef(storage,path);
+          await uploadBytes(r,f);
+          urls.push(await getDownloadURL(r));
+        }
+        if(urls.length) await updateDoc(doc(db,'pets',docRef.id),{images:urls});
+        stopDots();
+        submitBtn.disabled=false;
+        submitText.textContent='登錄';
+        Swal.fire({icon:'success',title:'已登錄成功！'});
+        e.target.reset();
+        imgPreview.innerHTML='';
+        selectedFiles=[];
+        fileCount.textContent='已選 0 / 5 張';
+        syncBreedSelectors();
+        await loadPets();
+      } catch(err){
+        stopDots();
+        submitBtn.disabled=false;
+        submitText.textContent='登錄';
+        Swal.fire({icon:'error',title:'登錄失敗',text:err.message});
+      }
     });
 
     // === 資料表 + 搜尋 ===
-    let allList=[]; async function loadPets(){ const snap=await getDocs(query(collection(db,'pets'), orderBy('createdAt','desc'), fbLimit(15))); allList=snap.docs.map(d=>({id:d.id,...d.data()})); applyFilterAndRender(); }
-    const searchInput=$('#searchName'); searchInput.addEventListener('input',()=>applyFilterAndRender());
-    const displayBreed=p=> ( (p.breedType==='品種犬'||p.breedType==='品種貓') && p.breed ) ? p.breed : (p.breedType==='米克斯' ? (p.breed?`米克斯/${p.breed}`:'米克斯') : (p.breed||'—') );
-    function applyFilterAndRender(){ const kw=searchInput.value.trim().toLowerCase(); const list=kw?allList.filter(p=>String(p.name||'').toLowerCase().includes(kw)):allList; renderRows(list); renderRowsMobile(list); }
-    function renderRows(list){ const tb=document.getElementById('rows'); if(!tb) return; tb.innerHTML=list.map(p=>`<tr class="border-t hover:bg-gray-50 cursor-pointer" data-id="${p.id}"><td class="py-2 pr-2 font-medium">${p.name||'—'}</td><td class="py-2 pr-2">${p.species||'—'}</td><td class="py-2 pr-2">${displayBreed(p)}</td><td class="py-2 pr-2">${p.gender||'—'}</td></tr>`).join(''); tb.querySelectorAll('tr').forEach(tr=>tr.addEventListener('click',()=>{ const id=tr.dataset.id; const data=list.find(p=>p.id===id); if(data) openDialog(data);})); }
-    function renderRowsMobile(list){ const wrap=document.getElementById('rowsMobile'); if(!wrap) return; wrap.innerHTML=list.map(p=>{ const img=(Array.isArray(p.images)&&p.images[0])||p.image||''; return `<div class="rounded-xl ring-1 ring-gray-200 p-3 flex gap-3 items-center cursor-pointer" data-id="${p.id}"><img src="${img}" class="w-16 h-16 object-cover rounded-lg bg-gray-100"><div class="min-w-0 flex-1"><div class="font-semibold truncate">${p.name||'未命名'}</div><div class="text-xs text-gray-600 mt-1 truncate">${p.species||'—'}・${displayBreed(p)}・${p.gender||'—'}</div></div></div>`; }).join(''); wrap.querySelectorAll('[data-id]').forEach(card=>card.addEventListener('click',()=>{ const id=card.dataset.id; const data=list.find(p=>p.id===id); if(data) openDialog(data);})); }
+    let allList=[];
+    async function loadPets(){
+      const snap=await getDocs(
+        query(collection(db,'pets'), orderBy('createdAt','desc'), fbLimit(15))
+      );
+      allList=snap.docs.map(d=>({id:d.id,...d.data()}));
+      applyFilterAndRender();
+    }
+    const searchInput=$('#searchName');
+    searchInput.addEventListener('input',()=>applyFilterAndRender());
+    const displayBreed=p=>(
+      (p.breedType==='品種犬'||p.breedType==='品種貓') && p.breed
+    ) ? p.breed
+      : (p.breedType==='米克斯'
+        ? (p.breed?`米克斯/${p.breed}`:'米克斯')
+        : (p.breed||'—')
+      );
+    function applyFilterAndRender(){
+      const kw=searchInput.value.trim().toLowerCase();
+      const list=kw?allList.filter(p=>String(p.name||'').toLowerCase().includes(kw)):allList;
+      renderRows(list);
+      renderRowsMobile(list);
+    }
+    function renderRows(list){
+      const tb=document.getElementById('rows');
+      if(!tb) return;
+      tb.innerHTML=list.map(p=>`
+        <tr class="border-t hover:bg-gray-50 cursor-pointer" data-id="${p.id}">
+          <td class="py-2 pr-2 font-medium">${p.name||'—'}</td>
+          <td class="py-2 pr-2">${p.species||'—'}</td>
+          <td class="py-2 pr-2">${displayBreed(p)}</td>
+          <td class="py-2 pr-2">${p.gender||'—'}</td>
+        </tr>
+      `).join('');
+      tb.querySelectorAll('tr').forEach(tr=>tr.addEventListener('click',()=>{
+        const id=tr.dataset.id;
+        const data=list.find(p=>p.id===id);
+        if(data) openDialog(data);
+      }));
+    }
+    function renderRowsMobile(list){
+      const wrap=document.getElementById('rowsMobile');
+      if(!wrap) return;
+      wrap.innerHTML=list.map(p=>{
+        const img=(Array.isArray(p.images)&&p.images[0])||p.image||'';
+        return `
+          <div class="rounded-xl ring-1 ring-gray-200 p-3 flex gap-3 items-center cursor-pointer" data-id="${p.id}">
+            <img src="${img}" class="w-16 h-16 object-cover rounded-lg bg-gray-100">
+            <div class="min-w-0 flex-1">
+              <div class="font-semibold truncate">${p.name||'未命名'}</div>
+              <div class="text-xs text-gray-600 mt-1 truncate">
+                ${p.species||'—'}・${displayBreed(p)}・${p.gender||'—'}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+      wrap.querySelectorAll('[data-id]').forEach(card=>card.addEventListener('click',()=>{
+        const id=card.dataset.id;
+        const data=list.find(p=>p.id===id);
+        if(data) openDialog(data);
+      }));
+    }
 
     // === Modal / Lightbox ===
     const dlg=document.getElementById('petDialog');
@@ -382,12 +554,14 @@
     const lbBackdrop=document.getElementById('lbBackdrop');
     const lbThumbsEl=document.getElementById('lbThumbs');
 
-    let lbImages=[], lbIndex=0, oldHtmlOverflow='', currentDocId=null, currentDoc=null, dlgWasOpenForLb=false, closingForLightbox=false;
+    let lbImages=[], lbIndex=0, oldHtmlOverflow='', currentDocId=null, currentDoc=null,
+        dlgWasOpenForLb=false, closingForLightbox=false;
 
     function openDialog(p){
       currentDoc=p; currentDocId=p.id;
       renderDialogView(p);
-      if(typeof dlg.showModal==='function') dlg.showModal(); else dlg.setAttribute('open','');
+      if(typeof dlg.showModal==='function') dlg.showModal();
+      else dlg.setAttribute('open','');
       oldHtmlOverflow=document.documentElement.style.overflow;
       document.documentElement.style.overflow='hidden';
     }
@@ -404,8 +578,16 @@
       document.getElementById('dlgTagAge').textContent=(p.age&&p.age.trim()!=='')?p.age:'年齡不詳';
       document.getElementById('dlgTagGender').textContent=p.gender||'—';
       document.getElementById('dlgDesc').textContent=p.desc||p.description||'';
-      const thumbs=document.getElementById('dlgThumbs'); thumbs.innerHTML='';
-      imgs.forEach((src,i)=>{ const im=document.createElement('img'); im.src=src; im.alt='縮圖'; im.className='dlg-thumb'+(i===0?' active':''); im.addEventListener('click',()=>setMainImage(i,imgs)); thumbs.appendChild(im); });
+      const thumbs=document.getElementById('dlgThumbs');
+      thumbs.innerHTML='';
+      imgs.forEach((src,i)=>{
+        const im=document.createElement('img');
+        im.src=src;
+        im.alt='縮圖';
+        im.className='dlg-thumb'+(i===0?' active':'');
+        im.addEventListener('click',()=>setMainImage(i,imgs));
+        thumbs.appendChild(im);
+      });
 
       // 編輯區同步
       document.getElementById('editName').value=p.name||'';
@@ -418,14 +600,22 @@
         document.getElementById('editBreedType').value=p.breedType;
         buildEditBreedOptions();
         updateEditBreedLabel();
-        if(p.breed){ document.getElementById('editBreed').disabled=false; document.getElementById('editBreed').value=p.breed; }
+        if(p.breed){
+          document.getElementById('editBreed').disabled=false;
+          document.getElementById('editBreed').value=p.breed;
+        }
       }
       renderEditImages(imgs);
       setEditMode(false);
       bindDialogActions();
     }
 
-    function setMainImage(i,imgs){ const src=imgs[i]; document.getElementById('dlgImg').src=src; document.getElementById('dlgBg').src=src; lbIndex=i; }
+    function setMainImage(i,imgs){
+      const src=imgs[i];
+      document.getElementById('dlgImg').src=src;
+      document.getElementById('dlgBg').src=src;
+      lbIndex=i;
+    }
 
     document.getElementById('dlgClose').addEventListener('click',()=>{
       if (dlg.open) dlg.close();
@@ -443,7 +633,11 @@
     document.getElementById('dlgImg').addEventListener('click',()=>{
       // 記住：當前是否為由 dialog 進入 lightbox
       dlgWasOpenForLb = !!dlg.open;
-      if(dlg.open) { closingForLightbox = true; dlg.close(); closingForLightbox = false; }
+      if(dlg.open) {
+        closingForLightbox = true;
+        dlg.close();
+        closingForLightbox = false;
+      }
       openLightbox(lbIndex);
     });
 
@@ -462,88 +656,299 @@
       dlgWasOpenForLb = false;
     }
 
-    function lbShow(idx){ if(!lbImages.length) return; lbIndex=(idx+lbImages.length)%lbImages.length; lbImg.src=lbImages[lbIndex]; const thumbs=document.getElementById('lbThumbsInner'); thumbs.innerHTML=lbImages.map((src,i)=>`<img src="${src}" class="${i===lbIndex?'active':''}">`).join(''); thumbs.querySelectorAll('img').forEach((im,i)=>im.addEventListener('click',(e)=>{ e.stopPropagation(); lbShow(i); })); }
-    lbPrev.addEventListener('click',(e)=>{ e.stopPropagation(); lbShow(lbIndex-1); }); lbNext.addEventListener('click',(e)=>{ e.stopPropagation(); lbShow(lbIndex+1); });
+    function lbShow(idx){
+      if(!lbImages.length) return;
+      lbIndex=(idx+lbImages.length)%lbImages.length;
+      lbImg.src=lbImages[lbIndex];
+      const thumbs=document.getElementById('lbThumbsInner');
+      thumbs.innerHTML=lbImages.map((src,i)=>`<img src="${src}" class="${i===lbIndex?'active':''}">`).join('');
+      thumbs.querySelectorAll('img').forEach((im,i)=>im.addEventListener('click',(e)=>{
+        e.stopPropagation();
+        lbShow(i);
+      }));
+    }
+    lbPrev.addEventListener('click',(e)=>{
+      e.stopPropagation();
+      lbShow(lbIndex-1);
+    });
+    lbNext.addEventListener('click',(e)=>{
+      e.stopPropagation();
+      lbShow(lbIndex+1);
+    });
 
     // 關閉條件：點背景、點容器空白、Esc
     lbBackdrop.addEventListener('click', closeLightbox);
     lb.addEventListener('click', (e) => {
       const clickOnImage  = e.target === lbImg;
       const clickOnArrow  = e.target === lbPrev || e.target === lbNext;
-      if (e.target === lb) { closeLightbox(); }
-      else if (!clickOnImage && !clickOnArrow) {
+      if (e.target === lb) {
+        closeLightbox();
+      } else if (!clickOnImage && !clickOnArrow) {
         // 不是點大圖/箭頭（例如空白區），才關閉
         if (!lbThumbsEl.contains(e.target)) closeLightbox();
       }
     });
     // 防止點縮圖區被父層抓到而關閉
-    lbThumbsEl.addEventListener('click', (e)=>{ e.stopPropagation(); });
+    lbThumbsEl.addEventListener('click', (e)=>{
+      e.stopPropagation();
+    });
 
-    window.addEventListener('keydown',(e)=>{ if(lb.classList.contains('hidden')) return; if(e.key==='Escape') closeLightbox(); if(e.key==='ArrowLeft') lbShow(lbIndex-1); if(e.key==='ArrowRight') lbShow(lbIndex+1); });
-    let touchX=null; lb.addEventListener('touchstart',e=>{ touchX=e.changedTouches[0].clientX; },{passive:true}); lb.addEventListener('touchend',e=>{ if(touchX===null) return; const dx=e.changedTouches[0].clientX-touchX; if(Math.abs(dx)>50){ if(dx<0) lbShow(lbIndex+1); else lbShow(lbIndex-1);} touchX=null; });
+    window.addEventListener('keydown',(e)=>{
+      if(lb.classList.contains('hidden')) return;
+      if(e.key==='Escape') closeLightbox();
+      if(e.key==='ArrowLeft') lbShow(lbIndex-1);
+      if(e.key==='ArrowRight') lbShow(lbIndex+1);
+    });
+    let touchX=null;
+    lb.addEventListener('touchstart',e=>{
+      touchX=e.changedTouches[0].clientX;
+    },{passive:true});
+    lb.addEventListener('touchend',e=>{
+      if(touchX===null) return;
+      const dx=e.changedTouches[0].clientX-touchX;
+      if(Math.abs(dx)>50){
+        if(dx<0) lbShow(lbIndex+1);
+        else lbShow(lbIndex-1);
+      }
+      touchX=null;
+    });
 
-    function bindDialogActions(){ document.getElementById('btnDelete').onclick=onDelete; document.getElementById('btnEdit').onclick=()=>setEditMode(true); document.getElementById('btnAdopted').onclick=()=>{ document.getElementById('adoptedUpload').classList.remove('hidden'); }; document.getElementById('btnPickAdopted').onclick=()=>document.getElementById('adoptedFiles').click(); document.getElementById('btnConfirmAdopted').onclick=onConfirmAdopted; document.getElementById('btnSave').onclick=saveEdit; document.getElementById('btnCancel').onclick=()=>{ renderDialogView(currentDoc); }; }
+    function bindDialogActions(){
+      document.getElementById('btnDelete').onclick=onDelete;
+      document.getElementById('btnEdit').onclick=()=>setEditMode(true);
+      document.getElementById('btnAdopted').onclick=()=>{
+        document.getElementById('adoptedUpload').classList.remove('hidden');
+      };
+      document.getElementById('btnPickAdopted').onclick=()=>document.getElementById('adoptedFiles').click();
+      document.getElementById('btnConfirmAdopted').onclick=onConfirmAdopted;
+      document.getElementById('btnSave').onclick=saveEdit;
+      document.getElementById('btnCancel').onclick=()=>{
+        renderDialogView(currentDoc);
+      };
+    }
 
-    async function onDelete(){ const wasOpen=dlg.open; if(wasOpen) dlg.close(); const ok=await Swal.fire({icon:'warning',title:'確認刪除此筆？',showCancelButton:true,confirmButtonText:'刪除',cancelButtonText:'取消'}); if(!ok.isConfirmed){ if(wasOpen) dlg.showModal(); return; } try{ await deleteDoc(doc(db,'pets',currentDocId)); await loadPets(); await Swal.fire({icon:'success',title:'刪除成功',timer:1000,showConfirmButton:false}); }catch(err){ await Swal.fire({icon:'error',title:'刪除失敗',text:err.message}); if(wasOpen) dlg.showModal(); } }
+    async function onDelete(){
+      const wasOpen=dlg.open;
+      if(wasOpen) dlg.close();
+      const ok=await Swal.fire({
+        icon:'warning',
+        title:'確認刪除此筆？',
+        showCancelButton:true,
+        confirmButtonText:'刪除',
+        cancelButtonText:'取消'
+      });
+      if(!ok.isConfirmed){
+        if(wasOpen) dlg.showModal();
+        return;
+      }
+      try{
+        await deleteDoc(doc(db,'pets',currentDocId));
+        await loadPets();
+        await Swal.fire({
+          icon:'success',
+          title:'刪除成功',
+          timer:1000,
+          showConfirmButton:false
+        });
+      }catch(err){
+        await Swal.fire({
+          icon:'error',
+          title:'刪除失敗',
+          text:err.message
+        });
+        if(wasOpen) dlg.showModal();
+      }
+    }
 
-    function setEditMode(on){ document.getElementById('editArea').classList.toggle('hidden',!on); document.getElementById('actionBar').classList.toggle('hidden',on); document.getElementById('editActionBar').classList.toggle('hidden',!on); if(on){ document.getElementById('adoptedUpload').classList.add('hidden'); } }
+    function setEditMode(on){
+      document.getElementById('editArea').classList.toggle('hidden',!on);
+      document.getElementById('actionBar').classList.toggle('hidden',on);
+      document.getElementById('editActionBar').classList.toggle('hidden',!on);
+      if(on){
+        document.getElementById('adoptedUpload').classList.add('hidden');
+      }
+    }
 
     async function saveEdit(){
       const btn=document.getElementById('btnSave'), txt=document.getElementById('saveText');
-      btn.disabled=true; const stopDots=startDots(txt,'儲存中');
-      const newData={ name:document.getElementById('editName').value.trim(), age:document.getElementById('editAge').value.trim(), gender:document.getElementById('editGender').value, desc:document.getElementById('editDesc').value.trim(), species:document.getElementById('editSpecies').value, breedType:document.getElementById('editBreedType').value||'', breed:document.getElementById('editBreed').value||'' };
+      btn.disabled=true;
+      const stopDots=startDots(txt,'儲存中');
+      const newData={
+        name:document.getElementById('editName').value.trim(),
+        age:document.getElementById('editAge').value.trim(),
+        gender:document.getElementById('editGender').value,
+        desc:document.getElementById('editDesc').value.trim(),
+        species:document.getElementById('editSpecies').value,
+        breedType:document.getElementById('editBreedType').value||'',
+        breed:document.getElementById('editBreed').value||''
+      };
       try{
-        const {keep,add,remove}=editImagesState; const newUrls=[...keep];
-        for(const f of add){ const path=`pets/${currentDocId}/${Date.now()}_${f.name}`; const r=sRef(storage,path); await uploadBytes(r,f); newUrls.push(await getDownloadURL(r)); }
-        for(const url of remove){ try{ const path=url.split('/o/')[1].split('?')[0]; await deleteObject(sRef(storage, decodeURIComponent(path))); }catch(e){} }
+        const {keep,add,remove}=editImagesState;
+        const newUrls=[...keep];
+        for(const f of add){
+          const path=`pets/${currentDocId}/${Date.now()}_${f.name}`;
+          const r=sRef(storage,path);
+          await uploadBytes(r,f);
+          newUrls.push(await getDownloadURL(r));
+        }
+        for(const url of remove){
+          try{
+            const path=url.split('/o/')[1].split('?')[0];
+            await deleteObject(sRef(storage, decodeURIComponent(path)));
+          }catch(e){}
+        }
         newData.images=newUrls;
         await updateDoc(doc(db,'pets',currentDocId), newData);
         await loadPets();
         currentDoc={...currentDoc,...newData};
-        stopDots(); btn.disabled=false; txt.textContent='儲存';
-        const wasOpen=dlg.open; if(wasOpen) dlg.close();
+        stopDots();
+        btn.disabled=false;
+        txt.textContent='儲存';
+        const wasOpen=dlg.open;
+        if(wasOpen) dlg.close();
         await Swal.fire({icon:'success',title:'已儲存'});
         if(wasOpen) dlg.showModal();
-        setEditMode(false); renderDialogView(currentDoc);
+        setEditMode(false);
+        renderDialogView(currentDoc);
       }catch(err){
-        stopDots(); btn.disabled=false; txt.textContent='儲存';
+        stopDots();
+        btn.disabled=false;
+        txt.textContent='儲存';
         await Swal.fire({icon:'error',title:'更新失敗',text:err.message});
       }
     }
 
     // 編輯模式：品種連動
-    const editSpeciesSel=$('#editSpecies'), editBreedTypeSel=$('#editBreedType'), editBreedSel=$('#editBreed'), editBreedLabel=$('#editBreedLabel');
-    function updateEditBreedLabel(){ const t=editBreedTypeSel.value; editBreedLabel.textContent=!t?'品種/毛色':(t==='米克斯'?'毛色':'品種'); }
-    function resetEditBreedRight(){ editBreedSel.disabled=true; editBreedSel.innerHTML='<option value="">請先選擇品種</option>'; }
-    function syncEditBreedSelectors(){ const isCat=(editSpeciesSel.value==='貓'); editBreedTypeSel.innerHTML=isCat?'<option value="">請選擇</option><option value="品種貓">品種貓</option><option value="米克斯">米克斯</option>':'<option value="">請選擇</option><option value="品種犬">品種犬</option><option value="米克斯">米克斯</option>'; resetEditBreedRight(); updateEditBreedLabel(); }
-    function buildEditBreedOptions(){ const list=(BREEDS[editSpeciesSel.value]||{})[editBreedTypeSel.value]||[]; if(!editBreedTypeSel.value){ resetEditBreedRight(); return; } editBreedSel.disabled=false; editBreedSel.innerHTML=['<option value="">請選擇</option>'].concat(list.map(b=>`<option value="${b}">${b}</option>`)).join(''); }
-    editSpeciesSel.addEventListener('change',syncEditBreedSelectors); editBreedTypeSel.addEventListener('change',()=>{ buildEditBreedOptions(); updateEditBreedLabel(); });
+    const editSpeciesSel=$('#editSpecies'),
+          editBreedTypeSel=$('#editBreedType'),
+          editBreedSel=$('#editBreed'),
+          editBreedLabel=$('#editBreedLabel');
+    function updateEditBreedLabel(){
+      const t=editBreedTypeSel.value;
+      editBreedLabel.textContent=!t?'品種/毛色':(t==='米克斯'?'毛色':'品種');
+    }
+    function resetEditBreedRight(){
+      editBreedSel.disabled=true;
+      editBreedSel.innerHTML='<option value="">請先選擇品種</option>';
+    }
+    function syncEditBreedSelectors(){
+      const isCat=(editSpeciesSel.value==='貓');
+      editBreedTypeSel.innerHTML=isCat
+        ?'<option value="">請選擇</option><option value="品種貓">品種貓</option><option value="米克斯">米克斯</option>'
+        :'<option value="">請選擇</option><option value="品種犬">品種犬</option><option value="米克斯">米克斯</option>';
+      resetEditBreedRight();
+      updateEditBreedLabel();
+    }
+    function buildEditBreedOptions(){
+      const list=(BREEDS[editSpeciesSel.value]||{})[editBreedTypeSel.value]||[];
+      if(!editBreedTypeSel.value){
+        resetEditBreedRight();
+        return;
+      }
+      editBreedSel.disabled=false;
+      editBreedSel.innerHTML=['<option value="">請選擇</option>']
+        .concat(list.map(b=>`<option value="${b}">${b}</option>`)).join('');
+    }
+    editSpeciesSel.addEventListener('change',syncEditBreedSelectors);
+    editBreedTypeSel.addEventListener('change',()=>{
+      buildEditBreedOptions();
+      updateEditBreedLabel();
+    });
 
     // 內嵌編輯：圖片管理
-    const editFiles=$('#editFiles'), btnPickEdit=$('#btnPickEdit'), editPreview=$('#editPreview'), editCount=$('#editCount');
-    let editImagesState={keep:[], add:[], remove:[]}; btnPickEdit.addEventListener('click',()=>editFiles.click());
-    function renderEditImages(urls){ editImagesState.keep=[...urls]; editImagesState.add=[]; editImagesState.remove=[]; paintEditPreview(); }
+    const editFiles=$('#editFiles'),
+          btnPickEdit=$('#btnPickEdit'),
+          editPreview=$('#editPreview'),
+          editCount=$('#editCount');
+    let editImagesState={keep:[], add:[], remove:[]};
+    btnPickEdit.addEventListener('click',()=>editFiles.click());
+    function renderEditImages(urls){
+      editImagesState.keep=[...urls];
+      editImagesState.add=[];
+      editImagesState.remove=[];
+      paintEditPreview();
+    }
     function paintEditPreview(){
-      const total=editImagesState.keep.length+editImagesState.add.length; editCount.textContent=`共 ${total} / 5 張（含新增）`;
-      const current=[...editImagesState.keep.map((u,i)=>({type:'keep',url:u,idx:i})), ...editImagesState.add.map((f,i)=>({type:'add',file:f,idx:i}))];
+      const total=editImagesState.keep.length+editImagesState.add.length;
+      editCount.textContent=`共 ${total} / 5 張（含新增）`;
+      const current=[
+        ...editImagesState.keep.map((u,i)=>({type:'keep',url:u,idx:i})),
+        ...editImagesState.add.map((f,i)=>({type:'add',file:f,idx:i}))
+      ];
       editPreview.innerHTML=current.map(item=>{
         const src=item.type==='keep'?item.url:URL.createObjectURL(item.file);
-        const data=item.type==='keep'?`data-keep="${item.idx}"`:`data-add="${item.idx}"`;
-        return `<div class="relative"><img class="w-full aspect-square object-cover rounded-lg" src="${src}"/><button ${data} class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button></div>`;
+        const data=item.type==='keep'
+          ?`data-keep="${item.idx}"`
+          :`data-add="${item.idx}"`;
+        return `<div class="relative">
+          <img class="w-full aspect-square object-cover rounded-lg" src="${src}"/>
+          <button ${data} class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button>
+        </div>`;
       }).join('');
-      editPreview.querySelectorAll('button[data-keep]').forEach(btn=>btn.addEventListener('click',()=>{ const i=+btn.getAttribute('data-keep'); editImagesState.remove.push(editImagesState.keep[i]); editImagesState.keep.splice(i,1); paintEditPreview(); }));
-      editPreview.querySelectorAll('button[data-add]').forEach(btn=>btn.addEventListener('click',()=>{ const i=+btn.getAttribute('data-add'); editImagesState.add.splice(i,1); paintEditPreview(); }));
+      editPreview.querySelectorAll('button[data-keep]').forEach(btn=>btn.addEventListener('click',()=>{
+        const i=+btn.getAttribute('data-keep');
+        editImagesState.remove.push(editImagesState.keep[i]);
+        editImagesState.keep.splice(i,1);
+        paintEditPreview();
+      }));
+      editPreview.querySelectorAll('button[data-add]').forEach(btn=>btn.addEventListener('click',()=>{
+        const i=+btn.getAttribute('data-add');
+        editImagesState.add.splice(i,1);
+        paintEditPreview();
+      }));
     }
-    editFiles.addEventListener('change',()=>{ const incoming=Array.from(editFiles.files||[]); const total=editImagesState.keep.length+editImagesState.add.length+incoming.length; if(total>5){ Swal.fire({icon:'warning',title:'最多 5 張圖片'});} const room=5-(editImagesState.keep.length+editImagesState.add.length); editImagesState.add=editImagesState.add.concat(incoming.slice(0, Math.max(0,room))); paintEditPreview(); editFiles.value=''; });
+    editFiles.addEventListener('change',()=>{
+      const incoming=Array.from(editFiles.files||[]);
+      const total=editImagesState.keep.length+editImagesState.add.length+incoming.length;
+      if(total>5){
+        Swal.fire({icon:'warning',title:'最多 5 張圖片'});
+      }
+      const room=5-(editImagesState.keep.length+editImagesState.add.length);
+      editImagesState.add=editImagesState.add.concat(incoming.slice(0, Math.max(0,room)));
+      paintEditPreview();
+      editFiles.value='';
+    });
 
     // 已領養合照
-    function updateAdoptedPreview(files){ const wrap=document.getElementById('adoptedPreview'); wrap.innerHTML=files.map(f=>`<img class="w-full aspect-square object-cover rounded-lg" src="${URL.createObjectURL(f)}"/>`).join(''); document.getElementById('adoptedCount').textContent=`已選 ${files.length} 張`; }
-    document.getElementById('adoptedFiles').addEventListener('change',()=>{ const fs=Array.from(document.getElementById('adoptedFiles').files||[]).slice(0,5); updateAdoptedPreview(fs); });
-    async function onConfirmAdopted(){ const files=Array.from(document.getElementById('adoptedFiles').files||[]).slice(0,5); const urls=[]; try{ for(const f of files){ const path=`adopted/${currentDocId}/${Date.now()}_${f.name}`; const r=sRef(storage,path); await uploadBytes(r,f); urls.push(await getDownloadURL(r)); } await updateDoc(doc(db,'pets',currentDocId),{ status:'adopted', adoptedPhotos:urls, showOnHome:true, showOnCats:false, showOnDogs:false, showOnIndex:false }); Swal.fire({icon:'success',title:'已標記為已領養'}); await loadPets(); }catch(err){ Swal.fire({icon:'error',title:'領養標記失敗',text:err.message}); } }
+    function updateAdoptedPreview(files){
+      const wrap=document.getElementById('adoptedPreview');
+      wrap.innerHTML=files.map(f=>`<img class="w-full aspect-square object-cover rounded-lg" src="${URL.createObjectURL(f)}"/>`).join('');
+      document.getElementById('adoptedCount').textContent=`已選 ${files.length} 張`;
+    }
+    document.getElementById('adoptedFiles').addEventListener('change',()=>{
+      const fs=Array.from(document.getElementById('adoptedFiles').files||[]).slice(0,5);
+      updateAdoptedPreview(fs);
+    });
+    async function onConfirmAdopted(){
+      const files=Array.from(document.getElementById('adoptedFiles').files||[]).slice(0,5);
+      const urls=[];
+      try{
+        for(const f of files){
+          const path=`adopted/${currentDocId}/${Date.now()}_${f.name}`;
+          const r=sRef(storage,path);
+          await uploadBytes(r,f);
+          urls.push(await getDownloadURL(r));
+        }
+        await updateDoc(doc(db,'pets',currentDocId),{
+          status:'adopted',
+          adoptedPhotos:urls,
+          showOnHome:true,
+          showOnCats:false,
+          showOnDogs:false,
+          showOnIndex:false
+        });
+        Swal.fire({icon:'success',title:'已標記為已領養'});
+        await loadPets();
+      }catch(err){
+        Swal.fire({icon:'error',title:'領養標記失敗',text:err.message});
+      }
+    }
 
     document.getElementById('btnRefreshSm')?.addEventListener('click',loadPets);
     document.getElementById('btnRefresh')?.addEventListener('click',loadPets);
-    (async()=>{ try{ await loadPets(); }catch(e){ console.error('loadPets failed', e); } })();
+    (async()=>{
+      try{ await loadPets(); }catch(e){ console.error('loadPets failed', e); }
+    })();
 
     // ---- 測試 ----
     (function selfTest(){
@@ -567,7 +972,9 @@
         bt.value = '品種貓';
         updateBreedLabel();
         console.assert(bl.textContent==='品種','breedLabel 品種貓→ 品種');
-      }catch(e){ console.warn('extraTests skipped:', e?.message||e); }
+      }catch(e){
+        console.warn('extraTests skipped:', e?.message||e);
+      }
     })();
   </script>
 </body>
