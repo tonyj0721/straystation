@@ -407,31 +407,89 @@
     function startDots(span, base){ let i=0; span.textContent=base; const t=setInterval(()=>{ i=(i+1)%4; span.textContent=base+'.'.repeat(i); },350); return ()=>clearInterval(t); }
 
     // === 登錄 ===
-    $('#petForm').addEventListener('submit', async (e)=>{
-      e.preventDefault();
-      const name=($('#name')?.value||'').trim(); if(!name){ await Swal.fire({icon:'error',title:'請填名字'}); return; }
-      const payload={ species:getSpecies(), name, breedType:breedTypeSel.value||'', breed:breedSel.value||'', age:($('#age')?.value||'').trim(), gender:$('#gender')?.value||'', desc:($('#desc')?.value||'').trim(), images:[], status:'available', showOnHome:false, showOnCats:true, showOnDogs:true, showOnIndex:true, createdAt:serverTimestamp() };
-      try{ const dupQ=query(collection(db,'pets'), where('name','==', name)); const dupSnap=await getDocs(dupQ); if(!dupSnap.empty){ const r=await Swal.fire({icon:'question',title:`名字「${name}」已存在，仍要新增嗎？`,showCancelButton:true,confirmButtonText:'繼續新增',cancelButtonText:'取消'}); if(!r.isConfirmed) return; } }catch(e){}
-      const submitBtn=$('#submitBtn'), submitText=$('#submitText'); submitBtn.disabled=true; const stopDots=startDots(submitText,'登錄中');
-      try{ const docRef=await addDoc(collection(db,'pets'), payload); const urls=[]; for(const f of selectedFiles){ const path=`pets/${docRef.id}/${Date.now()}_${f.name}`; const r=sRef(storage,path); await uploadBytes(r,f); urls.push(await getDownloadURL(r)); } if(urls.length) await updateDoc(doc(db,'pets',docRef.id),{images:urls}); stopDots(); submitBtn.disabled=false; submitText.textContent='登錄'; Swal.fire({icon:'success',title:'已登錄成功！'}); e.target.reset(); imgPreview.innerHTML=''; selectedFiles=[]; fileCount.textContent='已選 0 / 5 張'; syncBreedSelectors(); await loadPets(); } catch(err){ stopDots(); submitBtn.disabled=false; submitText.textContent='登錄'; Swal.fire({icon:'error',title:'登錄失敗',text:err.message}); }
-      // …上傳、更新 Firestore 完成後
-      stopDots();
-      submitBtn.disabled=false;
-      submitText.textContent='登錄';
+$('#petForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
 
-      // 準備本地物件並打開 modal
-      const newPet = { id: docRef.id, ...payload, images: urls };
-      openDialog(newPet);
+  const name = ($('#name')?.value || '').trim();
+  if (!name) {
+    await Swal.fire({icon:'error', title:'請填名字'});
+    return;
+  }
 
-      // 清空表單（會在 modal 打開後仍可繼續）
-      e.target.reset();
-      imgPreview.innerHTML='';
-      selectedFiles=[];
-      fileCount.textContent='已選 0 / 5 張';
-      syncBreedSelectors(); // 回到「請選擇」
+  const payload = {
+    species: getSpecies(),
+    name,
+    breedType: breedTypeSel.value || '',
+    breed: breedSel.value || '',
+    age: ($('#age')?.value || '').trim(),
+    gender: $('#gender')?.value || '',
+    desc: ($('#desc')?.value || '').trim(),
+    images: [],
+    status: 'available',
+    showOnHome:false, showOnCats:true, showOnDogs:true, showOnIndex:true,
+    createdAt: serverTimestamp()
+  };
 
-      await loadPets();
-    });
+  // 名稱重複確認（保留你的需求）
+  try {
+    const dupQ = query(collection(db,'pets'), where('name','==', name));
+    const dupSnap = await getDocs(dupQ);
+    if (!dupSnap.empty) {
+      const r = await Swal.fire({
+        icon:'question',
+        title:`名字「${name}」已存在，仍要新增嗎？`,
+        showCancelButton:true, confirmButtonText:'繼續新增', cancelButtonText:'取消'
+      });
+      if (!r.isConfirmed) return;
+    }
+  } catch(_) {}
+
+  const submitBtn = $('#submitBtn');
+  const submitText = $('#submitText');
+  submitBtn.disabled = true;
+  const stopDots = startDots(submitText, '登錄中');
+
+  try {
+    // 新增文件
+    const docRef = await addDoc(collection(db,'pets'), payload);
+
+    // 上傳圖片並回寫 URLs
+    const urls = [];
+    for (const f of selectedFiles) {
+      const path = `pets/${docRef.id}/${Date.now()}_${f.name}`;
+      const r = sRef(storage, path);
+      await uploadBytes(r, f);
+      urls.push(await getDownloadURL(r));
+    }
+    if (urls.length) {
+      await updateDoc(doc(db,'pets', docRef.id), { images: urls });
+    }
+
+    // UI 復位
+    stopDots();
+    submitBtn.disabled = false;
+    submitText.textContent = '登錄';
+
+    // 立刻開 modal 檢視新資料
+    const newPet = { id: docRef.id, ...payload, images: urls };
+    openDialog(newPet);
+
+    // 清表單
+    e.target.reset();
+    imgPreview.innerHTML = '';
+    selectedFiles = [];
+    fileCount.textContent = '已選 0 / 5 張';
+    syncBreedSelectors();          // 回到「請選擇」
+
+    await loadPets();
+    await Swal.fire({icon:'success', title:'已登錄成功！'});
+  } catch (err) {
+    stopDots();
+    submitBtn.disabled = false;
+    submitText.textContent = '登錄';
+    await Swal.fire({icon:'error', title:'登錄失敗', text: err.message});
+  }
+});
 
     // === 資料表 + 搜尋 ===
     let allList=[]; async function loadPets(){ const snap=await getDocs(query(collection(db,'pets'), orderBy('createdAt','desc'), fbLimit(15))); allList=snap.docs.map(d=>({id:d.id,...d.data()})); applyFilterAndRender(); }
