@@ -349,6 +349,29 @@
     const getSpecies = () => (Array.from(speciesInputs).find(i=>i.checked)?.value || '貓');
     const updateBreedLabel = () => { const t = breedTypeSel.value; breedLabel.textContent = !t ? '品種/毛色' : (t==='米克斯'?'毛色':'品種'); };
     const resetBreedRight = () => { breedSel.disabled = true; breedSel.innerHTML = '<option value="">請先選擇品種</option>'; };
+    // 防止瀏覽器自動帶值或 bfcache 讓 select 停在非空
+    window.addEventListener('DOMContentLoaded', () => {
+      // 若你表單 id 為 petForm，可先 reset 一次避免自動帶值
+      document.getElementById('petForm')?.reset();
+
+      // 重新建置並強制回空
+      syncBreedSelectors();
+
+      // 再保險一次：確保左邊為空、右邊關閉且文字正確
+      breedTypeSel.value = '';
+      resetBreedRight();         // 右：<option value="">請先選擇品種</option> + disabled
+      updateBreedLabel();        // 標籤顯示「品種/毛色」
+    });
+
+    // 針對返回上一頁的 bfcache 也做一次
+    window.addEventListener('pageshow', (e) => {
+      if (e.persisted) {
+        syncBreedSelectors();
+        breedTypeSel.value = '';
+        resetBreedRight();
+        updateBreedLabel();
+      }
+    });
     function syncBreedSelectors(){
       const isCat = getSpecies()==='貓';
       breedTypeSel.innerHTML = isCat
