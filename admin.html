@@ -35,22 +35,36 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <style>
     dialog::backdrop { background: rgba(0,0,0,.5) }
-    .dlg-thumb{ width:70px; height:70px; object-fit:cover; background:#f3f4f6; border-radius:6px; cursor:pointer; opacity:.8; transition:.2s }
-    .dlg-thumb.active{ outline:3px solid #ff6900; opacity:1 }
-    /* Lightbox 縮圖：與 cats.html 一致 */
-    #lbThumbs img{
-      width: 60px;
-      height: 60px;
-      object-fit: contain;
-      border-radius: 6px;
-      opacity: .5;
-      cursor: pointer;
-      background: #444;
-    }
-    #lbThumbs img.active{
-      opacity: 1;
-      border: 2px solid #fff;
-    }
+    /* modal 內縮圖（70x70，cover） */
+.dlg-thumb{
+  width: 70px;
+  height: 70px;
+  object-fit: cover;
+  background: #f3f4f6;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: .85;
+  transition: .2s;
+}
+.dlg-thumb.active{
+  outline: 3px solid #ff6900;
+  opacity: 1;
+}
+
+/* Lightbox 縮圖（60x60，contain）— 和 cats.html 完全一致 */
+#lbThumbs img{
+  width: 60px;
+  height: 60px;
+  object-fit: contain;
+  border-radius: 6px;
+  opacity: 0.5;
+  cursor: pointer;
+  background: #444;
+}
+#lbThumbs img.active{
+  opacity: 1;
+  border: 2px solid #fff;
+}
     .swal2-container{ z-index:2147483647 !important }
   </style>
 </head>
@@ -314,22 +328,21 @@
   </dialog>
 
   <!-- Lightbox -->
-  <div id="lightbox" class="fixed inset-0 z-[99999] bg-black/90 hidden items-center justify-center">
+  <!-- Lightbox：與 cats.html 同構 -->
+<div id="lightbox" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[9999]">
   <div id="lbBackdrop" class="absolute inset-0"></div>
-    <button id="lbPrev"
-          class="absolute left-3 md:left-10 text-white text-4xl select-none z-[100002]">❮</button>
-    <img id="lbImg"
-       class="relative z-[100001] max-h-[90vh] max-w-[90vw] object-contain rounded-lg" />
-    <div id="lbThumbs"
-       class="absolute bottom-4 left-0 w-full z-[100003] pointer-events-auto">
-      <div id="lbThumbsInner"
-         class="mx-auto w-max flex gap-3 overflow-x-auto px-4 py-2
-                bg-black/30 backdrop-blur-sm rounded-xl"></div>
-    </div>
-    <button id="lbNext"
-          class="absolute right-3 md:right-10 text-white text-4xl select-none z-[100002]">❯</button>
 
+  <button id="lbPrev" class="absolute left-3 md:left-10 text-white text-4xl select-none">❮</button>
+
+  <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg relative z-[1]" />
+
+  <div id="lbThumbs" class="absolute bottom-20 left-0 w-full flex justify-center px-4 py-2 pb-[env(safe-area-inset-bottom)]">
+    <div id="lbThumbsInner" class="flex gap-3"></div>
   </div>
+
+  <button id="lbNext" class="absolute right-3 md:right-10 text-white text-4xl select-none">❯</button>
+</div>
+
 
   <script type="module">
     history.scrollRestoration = 'manual';
@@ -501,12 +514,12 @@ $('#petForm').addEventListener('submit', async (e)=>{
 
     // === Modal / Lightbox ===
     const dlg=document.getElementById('petDialog');
-    const lb=document.getElementById('lightbox');
-    const lbImg=document.getElementById('lbImg');
-    const lbPrev=document.getElementById('lbPrev');
-    const lbNext=document.getElementById('lbNext');
-    const lbBackdrop=document.getElementById('lbBackdrop');
-    const lbThumbsEl=document.getElementById('lbThumbs');
+    =document.getElementById('lightbox');
+    Img=document.getElementById('lbImg');
+    Prev=document.getElementById('lbPrev');
+    Next=document.getElementById('lbNext');
+    Backdrop=document.getElementById('lbBackdrop');
+    ThumbsEl=document.getElementById('lbThumbs');
 
     let lbImages=[], lbIndex=0, oldHtmlOverflow='', currentDocId=null, currentDoc=null, dlgWasOpenForLb=false, closingForLightbox=false;
 
@@ -587,7 +600,20 @@ $('#petForm').addEventListener('submit', async (e)=>{
       dlgWasOpenForLb = false;
     }
 
-    function lbShow(idx){ if(!lbImages.length) return; lbIndex=(idx+lbImages.length)%lbImages.length; lbImg.src=lbImages[lbIndex]; const thumbs=document.getElementById('lbThumbsInner'); thumbs.innerHTML=lbImages.map((src,i)=>`<img src="${src}" class="${i===lbIndex?'active':''}">`).join(''); thumbs.querySelectorAll('img').forEach((im,i)=>im.addEventListener('click',(e)=>{ e.stopPropagation(); lbShow(i); })); }
+    function lbShow(idx){
+  if (!lbImages.length) return;
+  lbIndex = (idx + lbImages.length) % lbImages.length;
+  lbImg.src = lbImages[lbIndex];
+
+  const inner = document.getElementById('lbThumbsInner');
+  inner.innerHTML = lbImages
+    .map((src, i) => `<img src="${src}" class="${i===lbIndex ? 'active' : ''}">`)
+    .join('');
+  inner.querySelectorAll('img').forEach((im, i) => {
+    im.addEventListener('click', (e) => { e.stopPropagation(); lbShow(i); });
+  });
+}
+
     lbPrev.addEventListener('click',(e)=>{ e.stopPropagation(); lbShow(lbIndex-1); }); lbNext.addEventListener('click',(e)=>{ e.stopPropagation(); lbShow(lbIndex+1); });
 
     // 關閉條件：點背景、點容器空白、Esc
