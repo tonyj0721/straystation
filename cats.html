@@ -227,7 +227,7 @@
     </div>
     <button id="lbNext" class="absolute right-3 md:right-10 text-white text-4xl select-none">❯</button>
   </div>
-
+  <script src="modal-lightbox.js"></script>
   <script type="module">
     history.scrollRestoration = "manual";
     window.scrollTo(0, 0);
@@ -265,6 +265,7 @@
 
     const SPECIES = "貓";
     let pets = [];
+    const modal = ModalLightbox.create();
 
     const $ = (q) => document.querySelector(q);
     const $$ = (q) => document.querySelectorAll(q);
@@ -482,32 +483,13 @@
 
       const dlgImg = document.getElementById("dlgImg");
       const dlgBg = document.getElementById("dlgBg");
-      const dlgThumbs = document.getElementById("dlgThumbs");
 
       const imgs = Array.isArray(p.images) && p.images.length > 0
         ? p.images
         : (p.image ? [p.image] : []);
 
-      dlgImg.src = imgs[0] || "";
-      if (dlgBg) dlgBg.src = dlgImg.src;
-      dlgImg.onclick = () => openLightbox(imgs, 0);
-
-      dlgThumbs.innerHTML = "";
-      imgs.forEach((url, i) => {
-        const thumb = document.createElement("img");
-        thumb.src = url;
-        thumb.className = "dlg-thumb" + (i === 0 ? " active" : "");
-        thumb.dataset.index = i;
-
-        thumb.addEventListener("click", () => {
-          dlgImg.src = url;
-          if (dlgBg) dlgBg.src = url;
-          document.querySelectorAll(".dlg-thumb").forEach(el => el.classList.remove("active"));
-          thumb.classList.add("active");
-        });
-
-        dlgThumbs.appendChild(thumb);
-      });
+      // 交給共用模組建立縮圖 + 主圖 + active 切換
+      modal.setImages(imgs);
 
       document.getElementById('dlgName').textContent = p.name || '未命名';
       document.getElementById('dlgDesc').textContent = p.desc || '';
@@ -582,56 +564,7 @@
         if (r.isConfirmed) window.location.href = goto;
       });
     };
-
-    function openLightbox(images, index = 0) {
-      lbImages = images;
-      lbIndex = index;
-
-      lbImg.src = lbImages[lbIndex];
-
-      const lbThumbsInner = document.getElementById("lbThumbsInner");
-      lbThumbsInner.innerHTML = "";
-
-      lbImages.forEach((url, i) => {
-        const t = document.createElement("img");
-        t.src = url;
-        t.className = i === lbIndex ? "active" : "";
-
-        t.addEventListener("click", () => {
-          lbIndex = i;
-          lbImg.src = lbImages[lbIndex];
-          lbThumbsInner.querySelectorAll("img").forEach(el => el.classList.remove("active"));
-          t.classList.add("active");
-        });
-
-        lbThumbsInner.appendChild(t);
-      });
-
-      if (dlg.open) dlg.close();
-      unlockScroll();
-
-      lb.classList.remove("hidden");
-      lb.classList.add("flex");
-    }
-
-    function closeLightbox() {
-      lb.classList.add("hidden");
-      lb.classList.remove("flex");
-      dlg.showModal();
-      lockScroll();
-    }
-
-    function lbShow(delta) {
-      if (!lbImages.length) return;
-      lbIndex = (lbIndex + delta + lbImages.length) % lbImages.length;
-      lbImg.src = lbImages[lbIndex];
-
-      const lbThumbsInner = document.getElementById("lbThumbsInner");
-      lbThumbsInner.querySelectorAll("img").forEach((el, i) => {
-        el.classList.toggle("active", i === lbIndex);
-      });
-    }
-
+    
     lbPrev.onclick = () => lbShow(-1);
     lbNext.onclick = () => lbShow(1);
 
