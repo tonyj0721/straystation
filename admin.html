@@ -304,12 +304,12 @@
   <!-- Lightbox -->
   <div id="lightbox" class="fixed inset-0 z-[99999] bg-black/90 hidden items-center justify-center">
     <div id="lbBackdrop" class="absolute inset-0"></div>
-    <button id="lbPrev" class="absolute left-3 md:left-10 text-white text-4xl select-none">❮</button>
-    <img id="lbImg" class="relative max-h-[90vh] max-w-[90vw] object-contain rounded-lg" />
+    <button id="lbPrev" class="absolute left-3 md:left-6 top-1/2 -translate-y-1/2 z-[100002] bg-black/40 rounded-full px-3 py-2 text-white text-3xl select-none">❮</button>
+    <img id="lbImg" class="relative z-[100001] max-h-[90vh] max-w-[90vw] object-contain rounded-lg" />
     <div id="lbThumbs" class="absolute bottom-20 left-0 w-full flex justify-center px-4 py-2 pb-[env(safe-area-inset-bottom)]">
       <div id="lbThumbsInner" class="flex gap-3"></div>
     </div>
-    <button id="lbNext" class="absolute right-3 md:right-10 text-white text-4xl select-none">❯</button>
+    <button id="lbNext" class="absolute right-3 md:right-6 top-1/2 -translate-y-1/2 z-[100002] bg-black/40 rounded-full px-3 py-2 text-white text-3xl select-none">❯</button>
   </div>
 
   <script type="module">
@@ -340,7 +340,16 @@
     const getSpecies = () => (Array.from(speciesInputs).find(i=>i.checked)?.value || '貓');
     const updateBreedLabel = () => { const t = breedTypeSel.value; breedLabel.textContent = !t ? '品種/毛色' : (t==='米克斯'?'毛色':'品種'); };
     const resetBreedRight = () => { breedSel.disabled = true; breedSel.innerHTML = '<option value="">請先選擇品種</option>'; };
-    function syncBreedSelectors(){ const isCat = getSpecies()==='貓'; breedTypeSel.innerHTML = isCat ? '<option value="">請選擇</option><option value="品種貓">品種貓</option><option value="米克斯">米克斯</option>' : '<option value="">請選擇</option><option value="品種犬">品種犬</option><option value="米克斯">米克斯</option>'; resetBreedRight(); updateBreedLabel(); }
+    function syncBreedSelectors(){
+      const isCat = getSpecies()==='貓';
+      breedTypeSel.innerHTML = isCat
+        ? '<option value="">請選擇</option><option value="品種貓">品種貓</option><option value="米克斯">米克斯</option>'
+        : '<option value="">請選擇</option><option value="品種犬">品種犬</option><option value="米克斯">米克斯</option>';
+      // 強制回到空值
+      breedTypeSel.value = '';
+      resetBreedRight();
+      updateBreedLabel();
+    }
     function buildBreedOptions(){ const list=(BREEDS[getSpecies()]||{})[breedTypeSel.value]||[]; if(!breedTypeSel.value){ resetBreedRight(); return;} breedSel.disabled=false; breedSel.innerHTML=['<option value="">請選擇</option>'].concat(list.map(b=>`<option value="${b}">${b}</option>`)).join(''); }
     speciesInputs.forEach(i=>i.addEventListener('change',syncBreedSelectors));
     breedTypeSel.addEventListener('change',()=>{ buildBreedOptions(); updateBreedLabel(); });
@@ -363,6 +372,23 @@
       try{ const dupQ=query(collection(db,'pets'), where('name','==', name)); const dupSnap=await getDocs(dupQ); if(!dupSnap.empty){ const r=await Swal.fire({icon:'question',title:`名字「${name}」已存在，仍要新增嗎？`,showCancelButton:true,confirmButtonText:'繼續新增',cancelButtonText:'取消'}); if(!r.isConfirmed) return; } }catch(e){}
       const submitBtn=$('#submitBtn'), submitText=$('#submitText'); submitBtn.disabled=true; const stopDots=startDots(submitText,'登錄中');
       try{ const docRef=await addDoc(collection(db,'pets'), payload); const urls=[]; for(const f of selectedFiles){ const path=`pets/${docRef.id}/${Date.now()}_${f.name}`; const r=sRef(storage,path); await uploadBytes(r,f); urls.push(await getDownloadURL(r)); } if(urls.length) await updateDoc(doc(db,'pets',docRef.id),{images:urls}); stopDots(); submitBtn.disabled=false; submitText.textContent='登錄'; Swal.fire({icon:'success',title:'已登錄成功！'}); e.target.reset(); imgPreview.innerHTML=''; selectedFiles=[]; fileCount.textContent='已選 0 / 5 張'; syncBreedSelectors(); await loadPets(); } catch(err){ stopDots(); submitBtn.disabled=false; submitText.textContent='登錄'; Swal.fire({icon:'error',title:'登錄失敗',text:err.message}); }
+      // …上傳、更新 Firestore 完成後
+      stopDots();
+      submitBtn.disabled=false;
+      submitText.textContent='登錄';
+
+      // 準備本地物件並打開 modal
+      const newPet = { id: docRef.id, ...payload, images: urls };
+      openDialog(newPet);
+
+      // 清空表單（會在 modal 打開後仍可繼續）
+      e.target.reset();
+      imgPreview.innerHTML='';
+      selectedFiles=[];
+      fileCount.textContent='已選 0 / 5 張';
+      syncBreedSelectors(); // 回到「請選擇」
+
+      await loadPets();
     });
 
     // === 資料表 + 搜尋 ===
@@ -406,6 +432,7 @@
       document.getElementById('dlgDesc').textContent=p.desc||p.description||'';
       const thumbs=document.getElementById('dlgThumbs'); thumbs.innerHTML='';
       imgs.forEach((src,i)=>{ const im=document.createElement('img'); im.src=src; im.alt='縮圖'; im.className='dlg-thumb'+(i===0?' active':''); im.addEventListener('click',()=>setMainImage(i,imgs)); thumbs.appendChild(im); });
+      highlightDlgThumb(0);
 
       // 編輯區同步
       document.getElementById('editName').value=p.name||'';
@@ -534,7 +561,22 @@
       editPreview.querySelectorAll('button[data-keep]').forEach(btn=>btn.addEventListener('click',()=>{ const i=+btn.getAttribute('data-keep'); editImagesState.remove.push(editImagesState.keep[i]); editImagesState.keep.splice(i,1); paintEditPreview(); }));
       editPreview.querySelectorAll('button[data-add]').forEach(btn=>btn.addEventListener('click',()=>{ const i=+btn.getAttribute('data-add'); editImagesState.add.splice(i,1); paintEditPreview(); }));
     }
-    editFiles.addEventListener('change',()=>{ const incoming=Array.from(editFiles.files||[]); const total=editImagesState.keep.length+editImagesState.add.length+incoming.length; if(total>5){ Swal.fire({icon:'warning',title:'最多 5 張圖片'});} const room=5-(editImagesState.keep.length+editImagesState.add.length); editImagesState.add=editImagesState.add.concat(incoming.slice(0, Math.max(0,room))); paintEditPreview(); editFiles.value=''; });
+    editFiles.addEventListener('change',()=>{
+      const incoming = Array.from(editFiles.files || []);
+      const used = editImagesState.keep.length + editImagesState.add.length;
+      if (used >= 5) {
+        Swal.fire({icon:'warning', title:'最多 5 張圖片'});
+        editFiles.value = '';
+        return;
+      }
+      const room = 5 - used;
+      if (incoming.length > room) {
+        Swal.fire({icon:'warning', title:`最多 5 張圖片（本次只能再選 ${room} 張）`});
+      }
+      editImagesState.add = editImagesState.add.concat(incoming.slice(0, Math.max(0, room)));
+      paintEditPreview();
+      editFiles.value = '';
+    });
 
     // 已領養合照
     function updateAdoptedPreview(files){ const wrap=document.getElementById('adoptedPreview'); wrap.innerHTML=files.map(f=>`<img class="w-full aspect-square object-cover rounded-lg" src="${URL.createObjectURL(f)}"/>`).join(''); document.getElementById('adoptedCount').textContent=`已選 ${files.length} 張`; }
@@ -544,6 +586,20 @@
     document.getElementById('btnRefreshSm')?.addEventListener('click',loadPets);
     document.getElementById('btnRefresh')?.addEventListener('click',loadPets);
     (async()=>{ try{ await loadPets(); }catch(e){ console.error('loadPets failed', e); } })();
+
+    function highlightDlgThumb(i){
+      const thumbs = document.querySelectorAll('#dlgThumbs .dlg-thumb');
+      thumbs.forEach((el, idx) => {
+        el.classList.toggle('active', idx === i);
+      });
+    }
+    function setMainImage(i, imgs){
+      const src = imgs[i];
+      document.getElementById('dlgImg').src = src;
+      document.getElementById('dlgBg').src = src;
+      lbIndex = i;
+      highlightDlgThumb(i);          // <== 新增：同步高亮
+    }
 
     // ---- 測試 ----
     (function selfTest(){
