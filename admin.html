@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>管理後台｜浪浪轉運站</title>
   <meta name="description" content="TailwindCSS + Firebase Firestore 後台：登錄、管理動物資料；沿用前台 Modal/Lightbox。" />
-  <link rel="icon" type="image/png" href="favicon.png" sizes="16x16 32x32 64x64">
-  <link rel="apple-touch-icon" href="favicon.png">
-  <meta name="theme-color" content="#fcd34d">
+  <link rel="icon" type="image/png" href="favicon.png" sizes="16x16 32x32 64x64" />
+  <link rel="apple-touch-icon" href="favicon.png" />
+  <meta name="theme-color" content="#fcd34d" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -15,29 +15,34 @@
         extend: {
           colors: {
             brand: {
-              50:'#fff1f2',100:'#ffe4e6',200:'#fecdd3',300:'#fda4af',400:'#fb7185',
-              500:'#f43f5e',600:'#e11d48',700:'#be123c',800:'#9f1239',900:'#881337'
+              50: '#fff1f2',
+              100: '#ffe4e6',
+              200: '#fecdd3',
+              300: '#fda4af',
+              400: '#fb7185',
+              500: '#f43f5e',
+              600: '#e11d48',
+              700: '#be123c',
+              800: '#9f1239',
+              900: '#881337'
             }
           },
-          boxShadow:{ soft:'0 10px 30px rgba(0,0,0,0.08)'}
+          boxShadow: { soft: '0 10px 30px rgba(0,0,0,.08)' }
         }
       }
-    }
+    };
   </script>
-  <!-- SweetAlert2 -->
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <style>
-    dialog::backdrop{ background: rgba(0,0,0,.5)}
+    dialog::backdrop { background: rgba(0,0,0,.5) }
     .dlg-thumb{ width:70px; height:70px; object-fit:cover; background:#f3f4f6; border-radius:6px; cursor:pointer; opacity:.8; transition:.2s }
     .dlg-thumb.active{ outline:3px solid #ff6900; opacity:1 }
     #lbThumbs img{ width:60px; height:60px; object-fit:contain; border-radius:6px; opacity:.5; cursor:pointer; background:#444 }
-    #lbThumbs img.active{ opacity:1; border:2px solid white }
-    /* 讓 SweetAlert2 永遠壓到最上層（避免被 <dialog> 蓋住） */
-    .swal2-container{ z-index:2147483647 !important; }
+    #lbThumbs img.active{ opacity:1; border:2px solid #fff }
+    .swal2-container{ z-index:2147483647 !important }
   </style>
 </head>
 <body class="bg-gradient-to-br from-brand-50 to-white text-gray-800">
-  <!-- Navbar -->
   <header class="bg-white/80 backdrop-blur border-b border-gray-200">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="h-16 flex items-center justify-between">
@@ -68,23 +73,19 @@
     </div>
   </header>
 
-  <!-- Main -->
   <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
     <h1 class="text-xl sm:text-2xl font-bold mb-4">新增／管理動物資料</h1>
 
     <div class="grid lg:grid-cols-3 gap-6">
-      <!-- Form Card -->
+      <!-- 左：登錄表單 -->
       <section class="lg:col-span-1 bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
         <h2 class="text-lg font-semibold">登錄表單</h2>
         <p class="text-sm text-gray-500 mb-4">＊建議先登入並在 Firestore 規則限制寫入權限。</p>
-
         <form id="petForm" class="space-y-4">
-          <!-- 名字最上方 -->
           <div>
             <label class="block text-sm font-medium mb-1">名字 <span class="text-red-500">*</span></label>
             <input id="name" class="w-full rounded-xl border border-gray-300 p-2" placeholder="例：橘子" required />
           </div>
-
           <div>
             <label class="block text-sm font-medium mb-1">類別 <span class="text-red-500">*</span></label>
             <div class="flex gap-3">
@@ -92,13 +93,11 @@
               <label class="inline-flex items-center gap-2"><input type="radio" name="species" value="狗" class="accent-brand-600"><span>狗</span></label>
             </div>
           </div>
-
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-sm font-medium mb-1">品種</label>
               <select id="breedType" class="w-full rounded-xl border border-gray-300 bg-white p-2 text-sm">
                 <option value="">請選擇</option>
-                <!-- 其餘選項由 JS 注入 -->
               </select>
             </div>
             <div>
@@ -108,7 +107,6 @@
               </select>
             </div>
           </div>
-
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-sm font-medium mb-1">年齡</label>
@@ -123,13 +121,10 @@
               </select>
             </div>
           </div>
-
           <div>
             <label class="block text-sm font-medium mb-1">簡介</label>
             <textarea id="desc" rows="4" class="w-full rounded-xl border border-gray-300 p-2" placeholder="個性、救援背景、注意事項…"></textarea>
           </div>
-
-          <!-- 圖片檔案上傳（最多 5 張） -->
           <div>
             <div class="flex items-center justify-between mb-1">
               <label class="block text-sm font-medium">圖片</label>
@@ -138,23 +133,19 @@
             <input id="imgFiles" type="file" accept="image/*" multiple class="sr-only" />
             <div class="flex items-center gap-3">
               <button id="btnPick" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">選擇檔案</button>
-              <span id="fakeHint" class="text-sm text-gray-400">可多次選取直至 5 張</span>
+              <span class="text-sm text-gray-400">可多次選取直至 5 張</span>
             </div>
             <div id="imgPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
           </div>
-
           <div class="flex gap-3 pt-2">
-            <button id="submitBtn" type="submit" class="px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-black flex items-center gap-2">
-              <span class="inline-block invisible" id="submitSpin">
-                <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
-              </span>
+            <button id="submitBtn" type="submit" class="px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-gray-800 flex items-center gap-2">
               <span id="submitText">登錄</span>
             </button>
           </div>
         </form>
       </section>
 
-      <!-- 管理表 -->
+      <!-- 右：資料表 -->
       <section class="lg:col-span-2 space-y-6">
         <div class="bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -189,7 +180,7 @@
     </div>
   </footer>
 
-  <!-- ====== Modal（內嵌編輯 + 圖片增刪） ====== -->
+  <!-- 詳細資料 Modal -->
   <dialog id="petDialog" class="w-full max-w-2xl max-h-[90vh] rounded-2xl p-0 overflow-y-auto">
     <div class="bg-white">
       <div class="px-3 pt-3">
@@ -200,25 +191,27 @@
           <button id="dlgClose" class="absolute top-3 right-3 z-20 bg-black/60 text-white p-2 rounded-full" aria-label="關閉">✕</button>
         </div>
       </div>
+
       <div id="dlgThumbs" class="flex gap-2 overflow-x-auto p-3"></div>
       <div class="p-5 space-y-4">
-        <div>
-          <div class="flex items-center justify-between gap-3">
-            <h3 id="dlgName" class="text-2xl font-semibold leading-snug truncate flex-1">—</h3>
-            <!-- ✅ 類別 pill 固定與名字同一行右側 -->
-            <span id="dlgSpeciesPill" class="shrink-0 rounded-full text-sm px-2.5 py-1 bg-emerald-50 text-emerald-700">貓咪</span>
-          </div>
-          <div id="dlgTags" class="mt-2 flex flex-wrap gap-2 text-sm">
-            <span id="dlgTagBreed" class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap"></span>
-            <span id="dlgTagAge" class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap"></span>
-            <span id="dlgTagGender" class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap"></span>
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <div class="flex items-end justify-between gap-2">
+              <h3 id="dlgName" class="text-2xl font-semibold leading-snug">—</h3>
+              <span id="dlgSpeciesPill" class="shrink-0 rounded-full text-sm px-2 py-1 bg-emerald-50 text-emerald-700">貓咪</span>
+            </div>
+            <div id="dlgTags" class="mt-1 flex flex-nowrap gap-2 text-sm">
+              <span id="dlgTagBreed" class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap"></span>
+              <span id="dlgTagAge" class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap"></span>
+              <span id="dlgTagGender" class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap"></span>
+            </div>
           </div>
         </div>
         <div class="bg-orange-50 rounded-xl p-4 leading-7">
           <p id="dlgDesc" class="text-gray-700 text-sm whitespace-pre-line break-words"></p>
         </div>
 
-        <!-- 內嵌編輯區（含 類別/品種 下拉） -->
+        <!-- 內嵌編輯區 -->
         <div id="editArea" class="hidden space-y-3">
           <div class="grid grid-cols-2 gap-3">
             <div>
@@ -280,24 +273,20 @@
           </div>
         </div>
 
-        <!-- 底部操作列：一般模式 -->
+        <!-- 動作列 -->
         <div id="actionBar" class="pt-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
           <button id="btnEdit" class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm">編輯</button>
           <button id="btnAdopted" class="w-full px-4 py-3 rounded-xl bg-emerald-600 text-white text-sm">已領養</button>
           <button id="btnDelete" class="w-full px-4 py-3 rounded-xl border border-red-300 text-red-600 text-sm">刪除</button>
         </div>
-        <!-- 底部操作列：編輯模式 -->
         <div id="editActionBar" class="hidden pt-2 grid grid-cols-2 gap-3">
           <button id="btnSave" class="w-full px-4 py-3 rounded-xl bg-gray-900 text-white text-sm flex items-center justify-center gap-2">
-            <span id="saveSpin" class="inline-block invisible">
-              <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
-            </span>
             <span id="saveText">儲存</span>
           </button>
           <button id="btnCancel" class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm">取消</button>
         </div>
 
-        <!-- 領養照片上傳（點已領養後展開） -->
+        <!-- 已領養合照上傳 -->
         <div id="adoptedUpload" class="hidden">
           <label class="block text-sm font-medium mb-1">上傳領養合照（最多 5 張）</label>
           <input id="adoptedFiles" type="file" accept="image/*" multiple class="sr-only" />
@@ -312,10 +301,11 @@
     </div>
   </dialog>
 
-  <!-- 🔥 Lightbox -->
+  <!-- Lightbox -->
   <div id="lightbox" class="fixed inset-0 z-[99999] bg-black/90 hidden items-center justify-center">
+    <div id="lbBackdrop" class="absolute inset-0"></div>
     <button id="lbPrev" class="absolute left-3 md:left-10 text-white text-4xl select-none">❮</button>
-    <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg"/>
+    <img id="lbImg" class="relative max-h-[90vh] max-w-[90vw] object-contain rounded-lg" />
     <div id="lbThumbs" class="absolute bottom-20 left-0 w-full flex justify-center px-4 py-2 pb-[env(safe-area-inset-bottom)]">
       <div id="lbThumbsInner" class="flex gap-3"></div>
     </div>
@@ -323,223 +313,262 @@
   </div>
 
   <script type="module">
-    history.scrollRestoration = "manual";
-    window.scrollTo(0,0);
-    document.getElementById('year').textContent = new Date().getFullYear();
+    history.scrollRestoration = 'manual';
+    window.scrollTo(0, 0);
+    const y = document.getElementById('year'); if (y) y.textContent = new Date().getFullYear();
 
-    // ===== Firebase =====
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp, deleteDoc, doc, updateDoc, limit as fbLimit, where } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
-    import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js';
+    import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp, deleteDoc, doc, updateDoc, limit as fbLimit, where } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js';
+    import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js';
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyC4NT2KOm_Cw2OEdaaOimxI0ruoNv_u_9g",
-      authDomain: "straystation.firebaseapp.com",
-      projectId: "straystation",
-      storageBucket: "straystation.firebasestorage.app",
-      messagingSenderId: "611366379195",
-      appId: "1:611366379195:web:ef5a632e88d8bba1d6139e"
-    };
+    const firebaseConfig = { apiKey: 'AIzaSyC4NT2KOm_Cw2OEdaaOimxI0ruoNv_u_9g', authDomain: 'straystation.firebaseapp.com', projectId: 'straystation', storageBucket: 'straystation.firebasestorage.app', messagingSenderId: '611366379195', appId: '1:611366379195:web:ef5a632e88d8bba1d6139e' };
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const storage = getStorage(app);
 
-    // ===== UI Helpers =====
-    const $ = (q)=>document.querySelector(q);
-    const $$ = (q)=>document.querySelectorAll(q);
-
+    const $ = (q) => document.querySelector(q);
     const BREEDS = {
-      貓:{ '品種貓':["美短","英短","藍貓","暹羅貓","波斯貓","布偶貓","曼赤肯"], '米克斯':["橘貓","黑貓","虎斑貓","白底虎斑貓","三花貓","賓士貓","玳瑁貓","白貓"] },
-      狗:{ '品種犬':["博美","貴賓","吉娃娃","馬爾濟斯","柯基","柴犬","哈士奇","高山犬","黃金獵犬"], '米克斯':["黑色","黑白色","白色","白黃色","黃色","棕色","虎斑","花花"] }
+      貓: { '品種貓': ['美短','英短','藍貓','暹羅貓','波斯貓','布偶貓','曼赤肯'], 米克斯: ['橘貓','黑貓','虎斑貓','白底虎斑貓','三花貓','賓士貓','玳瑁貓','白貓'] },
+      狗: { '品種犬': ['博美','貴賓','吉娃娃','馬爾濟斯','柯基','柴犬','哈士奇','高山犬','黃金獵犬'], 米克斯: ['黑色','黑白色','白色','白黃色','黃色','棕色','虎斑','花花'] }
     };
 
-    // ======= 登錄表單：類別/品種連動 =======
+    // === 類別/品種連動 ===
     const speciesInputs = document.querySelectorAll('input[name="species"]');
     const breedTypeSel = $('#breedType');
     const breedSel = $('#breed');
     const breedLabel = $('#breedLabel');
-
-    function syncBreedSelectors(){
-      const species = getSpecies(); const isCat = species === '貓';
-      // "請選擇" 為可選項目
-      breedTypeSel.innerHTML = (isCat
-        ? '<option value="">請選擇</option><option value="品種貓">品種貓</option><option value="米克斯">米克斯</option>'
-        : '<option value="">請選擇</option><option value="品種犬">品種犬</option><option value="米克斯">米克斯</option>');
-      resetBreedRight();
-      updateBreedLabel();
-    }
-    function resetBreedRight(){ breedSel.disabled = true; breedSel.innerHTML = '<option value="">請先選擇品種</option>'; }
-    function updateBreedLabel(){ const type = breedTypeSel.value; breedLabel.textContent = !type ? '品種/毛色' : (type==='米克斯'?'毛色':'品種'); }
-    function buildBreedOptions(){ const species = getSpecies(); const type = breedTypeSel.value; if(!type){ resetBreedRight(); return; } const list=(BREEDS[species]&&BREEDS[species][type])||[]; breedSel.disabled=false; breedSel.innerHTML=['<option value="">請選擇</option>'].concat(list.map(b=>`<option value="${b}">${b}</option>`)).join(''); }
-    function getSpecies(){ const checked = Array.from(speciesInputs).find(i=>i.checked); return checked ? checked.value : '貓'; }
-    speciesInputs.forEach(i=>i.addEventListener('change', syncBreedSelectors));
-    breedTypeSel.addEventListener('change', ()=>{ buildBreedOptions(); updateBreedLabel(); });
+    const getSpecies = () => (Array.from(speciesInputs).find(i=>i.checked)?.value || '貓');
+    const updateBreedLabel = () => { const t = breedTypeSel.value; breedLabel.textContent = !t ? '品種/毛色' : (t==='米克斯'?'毛色':'品種'); };
+    const resetBreedRight = () => { breedSel.disabled = true; breedSel.innerHTML = '<option value="">請先選擇品種</option>'; };
+    function syncBreedSelectors(){ const isCat = getSpecies()==='貓'; breedTypeSel.innerHTML = isCat ? '<option value="">請選擇</option><option value="品種貓">品種貓</option><option value="米克斯">米克斯</option>' : '<option value="">請選擇</option><option value="品種犬">品種犬</option><option value="米克斯">米克斯</option>'; resetBreedRight(); updateBreedLabel(); }
+    function buildBreedOptions(){ const list=(BREEDS[getSpecies()]||{})[breedTypeSel.value]||[]; if(!breedTypeSel.value){ resetBreedRight(); return;} breedSel.disabled=false; breedSel.innerHTML=['<option value="">請選擇</option>'].concat(list.map(b=>`<option value="${b}">${b}</option>`)).join(''); }
+    speciesInputs.forEach(i=>i.addEventListener('change',syncBreedSelectors));
+    breedTypeSel.addEventListener('change',()=>{ buildBreedOptions(); updateBreedLabel(); });
     syncBreedSelectors();
 
-    // ===== 檔案選取（自訂 UI）與預覽，最多 5 張 =====
-    const imgFiles = $('#imgFiles'); const btnPick = $('#btnPick'); const fileCount = $('#fileCount'); const imgPreview = $('#imgPreview');
-    let selectedFiles = [];
-    btnPick.addEventListener('click', ()=> imgFiles.click());
-    function renderPreviews(){ fileCount.textContent = `已選 ${selectedFiles.length} / 5 張`; imgPreview.innerHTML = selectedFiles.map((f,idx)=>{ const url = URL.createObjectURL(f); return `<div class="relative"><img class=\"w-full aspect-square object-cover rounded-lg\" src=\"${url}\" alt=\"預覽\" /><button data-idx=\"${idx}\" class=\"absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center\">✕</button></div>` }).join(''); imgPreview.querySelectorAll('button[data-idx]').forEach(btn=> btn.addEventListener('click', (e)=>{ e.preventDefault(); e.stopPropagation(); const i=+btn.dataset.idx; selectedFiles.splice(i,1); renderPreviews(); })); }
-    imgFiles.addEventListener('change', ()=>{ const incoming = Array.from(imgFiles.files||[]); const next = selectedFiles.concat(incoming); if(next.length>5){ Swal.fire({icon:'warning', title:'最多選取 5 張', confirmButtonText:'好的'}); } selectedFiles = next.slice(0,5); renderPreviews(); imgFiles.value=''; });
+    // === 圖片選取/預覽（<=5） ===
+    const imgFiles=$('#imgFiles'), btnPick=$('#btnPick'), fileCount=$('#fileCount'), imgPreview=$('#imgPreview');
+    let selectedFiles=[]; btnPick?.addEventListener('click',()=>imgFiles.click());
+    function renderPreviews(){ fileCount.textContent=`已選 ${selectedFiles.length} / 5 張`; imgPreview.innerHTML=selectedFiles.map((f,i)=>{ const u=URL.createObjectURL(f); return `<div class="relative"><img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽"><button data-idx="${i}" class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button></div>`;}).join(''); imgPreview.querySelectorAll('button[data-idx]').forEach(btn=>btn.addEventListener('click',e=>{ e.preventDefault();e.stopPropagation(); const i=+btn.dataset.idx; selectedFiles.splice(i,1); renderPreviews(); })); }
+    imgFiles?.addEventListener('change',()=>{ const incoming=Array.from(imgFiles.files||[]); const next=selectedFiles.concat(incoming); if(next.length>5){ Swal.fire({icon:'warning',title:'最多選取 5 張'});} selectedFiles=next.slice(0,5); renderPreviews(); imgFiles.value=''; });
 
-    // ===== 送出：登錄（含重名檢查＆進度） =====
+    // === 點點進度 ===
+    function startDots(span, base){ let i=0; span.textContent=base; const t=setInterval(()=>{ i=(i+1)%4; span.textContent=base+'.'.repeat(i); },350); return ()=>clearInterval(t); }
+
+    // === 登錄 ===
     $('#petForm').addEventListener('submit', async (e)=>{
       e.preventDefault();
-      const species = getSpecies(); const name = $('#name').value.trim(); if(!name){ Swal.fire({icon:'error', title:'請填名字'}); return; }
-      const breedType = breedTypeSel.value || ''; const breed = breedSel.value || '';
-      const age = $('#age').value.trim(); const gender = $('#gender').value; const desc = $('#desc').value.trim();
-      const payload = { species, name, breedType, breed, age, gender, desc, images: [], status:'available', showOnHome:false, showOnCats:true, showOnDogs:true, showOnIndex:true, createdAt: serverTimestamp() };
-
-      // 重名檢查
-      try{
-        const dupQ = query(collection(db,'pets'), where('name','==', name));
-        const dupSnap = await getDocs(dupQ);
-        if(!dupSnap.empty){
-          const r = await Swal.fire({icon:'question', title:`名字「${name}」已存在，仍要新增嗎？`, showCancelButton:true, confirmButtonText:'繼續新增', cancelButtonText:'取消'});
-          if(!r.isConfirmed) return;
-        }
-      }catch(err){ console.warn('重名檢查失敗', err); }
-
-      // 進度：鎖定按鈕
-      const submitBtn = $('#submitBtn'); const submitSpin=$('#submitSpin'); const submitText=$('#submitText');
-      submitBtn.disabled = true; submitSpin.classList.remove('invisible'); submitText.textContent='登錄中…';
-
-      try{
-        const colRef = collection(db,'pets'); const docRef = await addDoc(colRef, payload);
-        const urls = [];
-        for(const file of selectedFiles){ const path = `pets/${docRef.id}/${Date.now()}_${file.name}`; const r = sRef(storage, path); await uploadBytes(r, file); const url = await getDownloadURL(r); urls.push(url); }
-        if(urls.length){ await updateDoc(doc(db,'pets', docRef.id), { images: urls }); }
-        await Swal.fire({icon:'success', title:'已登錄成功！'});
-        e.target.reset(); imgPreview.innerHTML=''; selectedFiles=[]; fileCount.textContent='已選 0 / 5 張'; syncBreedSelectors();
-        await loadPets();
-      }catch(err){ console.error(err); Swal.fire({icon:'error', title:'登錄失敗', text: err.message}); }
-      finally{ submitBtn.disabled=false; submitSpin.classList.add('invisible'); submitText.textContent='登錄'; }
+      const name=($('#name')?.value||'').trim(); if(!name){ await Swal.fire({icon:'error',title:'請填名字'}); return; }
+      const payload={ species:getSpecies(), name, breedType:breedTypeSel.value||'', breed:breedSel.value||'', age:($('#age')?.value||'').trim(), gender:$('#gender')?.value||'', desc:($('#desc')?.value||'').trim(), images:[], status:'available', showOnHome:false, showOnCats:true, showOnDogs:true, showOnIndex:true, createdAt:serverTimestamp() };
+      try{ const dupQ=query(collection(db,'pets'), where('name','==', name)); const dupSnap=await getDocs(dupQ); if(!dupSnap.empty){ const r=await Swal.fire({icon:'question',title:`名字「${name}」已存在，仍要新增嗎？`,showCancelButton:true,confirmButtonText:'繼續新增',cancelButtonText:'取消'}); if(!r.isConfirmed) return; } }catch(e){}
+      const submitBtn=$('#submitBtn'), submitText=$('#submitText'); submitBtn.disabled=true; const stopDots=startDots(submitText,'登錄中');
+      try{ const docRef=await addDoc(collection(db,'pets'), payload); const urls=[]; for(const f of selectedFiles){ const path=`pets/${docRef.id}/${Date.now()}_${f.name}`; const r=sRef(storage,path); await uploadBytes(r,f); urls.push(await getDownloadURL(r)); } if(urls.length) await updateDoc(doc(db,'pets',docRef.id),{images:urls}); stopDots(); submitBtn.disabled=false; submitText.textContent='登錄'; Swal.fire({icon:'success',title:'已登錄成功！'}); e.target.reset(); imgPreview.innerHTML=''; selectedFiles=[]; fileCount.textContent='已選 0 / 5 張'; syncBreedSelectors(); await loadPets(); } catch(err){ stopDots(); submitBtn.disabled=false; submitText.textContent='登錄'; Swal.fire({icon:'error',title:'登錄失敗',text:err.message}); }
     });
 
-    // ===== 表格（最新 15 筆 + 即時搜尋） =====
-    let allList = [];
-    async function loadPets(){ const qRef = query(collection(db,'pets'), orderBy('createdAt','desc'), fbLimit(15)); const snap = await getDocs(qRef); allList = snap.docs.map(d=>({ id:d.id, ...d.data() })); applyFilterAndRender(); }
-    const searchInput = $('#searchName'); searchInput.addEventListener('input', ()=> applyFilterAndRender());
-    function applyFilterAndRender(){ const kw = searchInput.value.trim().toLowerCase(); const list = kw? allList.filter(p=> String(p.name||'').toLowerCase().includes(kw)) : allList; renderRows(list); renderRowsMobile(list); }
-    function displayBreed(p){ if((p.breedType==='品種犬'||p.breedType==='品種貓')&&p.breed){return p.breed;} if(p.breedType==='米克斯'){return p.breed?`米克斯/${p.breed}`:'米克斯'}; return p.breed||'—'; }
-    function renderRows(list){ const tb=$('#rows'); if(!tb) return; tb.innerHTML=list.map(p=>`<tr class="border-t hover:bg-gray-50 cursor-pointer" data-id="${p.id}"><td class="py-2 pr-2 font-medium">${p.name||'—'}</td><td class="py-2 pr-2">${p.species||'—'}</td><td class="py-2 pr-2">${displayBreed(p)}</td><td class="py-2 pr-2">${p.gender||'—'}</td></tr>`).join(''); tb.querySelectorAll('tr').forEach(tr=> tr.addEventListener('click', ()=>{ const id=tr.dataset.id; const data=list.find(p=>p.id===id); if(data) openDialog(data); })); }
-    function renderRowsMobile(list){ const wrap=$('#rowsMobile'); if(!wrap) return; wrap.innerHTML=list.map(p=>{ const img=(Array.isArray(p.images)&&p.images[0])||p.image||''; return `<div class=\"rounded-xl ring-1 ring-gray-200 p-3 flex gap-3 items-center cursor-pointer\" data-id=\"${p.id}\"><img src=\"${img}\" alt=\"${p.name||'動物照片'}\" class=\"w-16 h-16 object-cover rounded-lg bg-gray-100\"><div class=\"min-w-0 flex-1\"><div class=\"font-semibold truncate\">${p.name||'未命名'}</div><div class=\"text-xs text-gray-600 mt-1 truncate\">${p.species||'—'}・${displayBreed(p)}・${p.gender||'—'}</div></div></div>` }).join(''); wrap.querySelectorAll('[data-id]').forEach(card=> card.addEventListener('click', ()=>{ const id=card.dataset.id; const data=list.find(p=>p.id===id); if(data) openDialog(data); })); }
+    // === 資料表 + 搜尋 ===
+    let allList=[]; async function loadPets(){ const snap=await getDocs(query(collection(db,'pets'), orderBy('createdAt','desc'), fbLimit(15))); allList=snap.docs.map(d=>({id:d.id,...d.data()})); applyFilterAndRender(); }
+    const searchInput=$('#searchName'); searchInput.addEventListener('input',()=>applyFilterAndRender());
+    const displayBreed=p=> ( (p.breedType==='品種犬'||p.breedType==='品種貓') && p.breed ) ? p.breed : (p.breedType==='米克斯' ? (p.breed?`米克斯/${p.breed}`:'米克斯') : (p.breed||'—') );
+    function applyFilterAndRender(){ const kw=searchInput.value.trim().toLowerCase(); const list=kw?allList.filter(p=>String(p.name||'').toLowerCase().includes(kw)):allList; renderRows(list); renderRowsMobile(list); }
+    function renderRows(list){ const tb=document.getElementById('rows'); if(!tb) return; tb.innerHTML=list.map(p=>`<tr class="border-t hover:bg-gray-50 cursor-pointer" data-id="${p.id}"><td class="py-2 pr-2 font-medium">${p.name||'—'}</td><td class="py-2 pr-2">${p.species||'—'}</td><td class="py-2 pr-2">${displayBreed(p)}</td><td class="py-2 pr-2">${p.gender||'—'}</td></tr>`).join(''); tb.querySelectorAll('tr').forEach(tr=>tr.addEventListener('click',()=>{ const id=tr.dataset.id; const data=list.find(p=>p.id===id); if(data) openDialog(data);})); }
+    function renderRowsMobile(list){ const wrap=document.getElementById('rowsMobile'); if(!wrap) return; wrap.innerHTML=list.map(p=>{ const img=(Array.isArray(p.images)&&p.images[0])||p.image||''; return `<div class="rounded-xl ring-1 ring-gray-200 p-3 flex gap-3 items-center cursor-pointer" data-id="${p.id}"><img src="${img}" class="w-16 h-16 object-cover rounded-lg bg-gray-100"><div class="min-w-0 flex-1"><div class="font-semibold truncate">${p.name||'未命名'}</div><div class="text-xs text-gray-600 mt-1 truncate">${p.species||'—'}・${displayBreed(p)}・${p.gender||'—'}</div></div></div>`; }).join(''); wrap.querySelectorAll('[data-id]').forEach(card=>card.addEventListener('click',()=>{ const id=card.dataset.id; const data=list.find(p=>p.id===id); if(data) openDialog(data);})); }
 
-    // ===== Modal & Lightbox（含內嵌編輯與圖片增刪） =====
-    const dlg = document.getElementById('petDialog');
-    const lb = document.getElementById('lightbox');
-    const lbImg = document.getElementById('lbImg');
-    const lbPrev = document.getElementById('lbPrev');
-    const lbNext = document.getElementById('lbNext');
-    let lbImages = []; let lbIndex = 0; let oldHtmlOverflow = '';
-    let currentDocId = null; let currentDoc = null; let dlgWasOpenForLb=false;
+    // === Modal / Lightbox ===
+    const dlg=document.getElementById('petDialog');
+    const lb=document.getElementById('lightbox');
+    const lbImg=document.getElementById('lbImg');
+    const lbPrev=document.getElementById('lbPrev');
+    const lbNext=document.getElementById('lbNext');
+    const lbBackdrop=document.getElementById('lbBackdrop');
+    const lbThumbsEl=document.getElementById('lbThumbs');
 
-    function openDialog(p){ currentDoc=p; currentDocId=p.id; renderDialogView(p); if(typeof dlg.showModal==='function') dlg.showModal(); else dlg.setAttribute('open',''); oldHtmlOverflow=document.documentElement.style.overflow; document.documentElement.style.overflow='hidden'; }
+    let lbImages=[], lbIndex=0, oldHtmlOverflow='', currentDocId=null, currentDoc=null, dlgWasOpenForLb=false, closingForLightbox=false;
+
+    function openDialog(p){
+      currentDoc=p; currentDocId=p.id;
+      renderDialogView(p);
+      if(typeof dlg.showModal==='function') dlg.showModal(); else dlg.setAttribute('open','');
+      oldHtmlOverflow=document.documentElement.style.overflow;
+      document.documentElement.style.overflow='hidden';
+    }
 
     function renderDialogView(p){
-      const imgs = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
-      const first = imgs[0] || '';
-      $('#dlgBg').src = first; $('#dlgImg').src = first; lbImages = imgs; lbIndex=0; 
-      $('#dlgName').textContent = p.name || '未命名';
-      $('#dlgSpeciesPill').textContent = /(狗|犬)/.test(String(p.species||'')) ? '狗狗' : '貓咪';
-      $('#dlgTagBreed').textContent = displayBreed(p);
-      $('#dlgTagAge').textContent = p.age && p.age.trim()!=='' ? p.age : '年齡不詳';
-      $('#dlgTagGender').textContent = p.gender || '—';
-      $('#dlgDesc').textContent = p.desc || p.description || '';
-      const thumbs=$('#dlgThumbs'); thumbs.innerHTML=''; imgs.forEach((src,i)=>{ const im=document.createElement('img'); im.src=src; im.alt='縮圖'; im.className='dlg-thumb'+(i===0?' active':''); im.addEventListener('click', ()=> setMainImage(i, imgs)); thumbs.appendChild(im); });
-      // 初始化編輯區資料
-      $('#editName').value = p.name || '';
-      $('#editAge').value = p.age || '';
-      $('#editGender').value = p.gender || '';
-      $('#editDesc').value = p.desc || '';
-      $('#editSpecies').value = p.species || '貓';
+      const imgs=Array.isArray(p.images)&&p.images.length?p.images:(p.image?[p.image]:[]);
+      const first=imgs[0]||'';
+      document.getElementById('dlgBg').src=first;
+      document.getElementById('dlgImg').src=first;
+      lbImages=imgs; lbIndex=0;
+      document.getElementById('dlgName').textContent=p.name||'未命名';
+      document.getElementById('dlgSpeciesPill').textContent=/(狗|犬)/.test(String(p.species||''))?'狗狗':'貓咪';
+      document.getElementById('dlgTagBreed').textContent=displayBreed(p);
+      document.getElementById('dlgTagAge').textContent=(p.age&&p.age.trim()!=='')?p.age:'年齡不詳';
+      document.getElementById('dlgTagGender').textContent=p.gender||'—';
+      document.getElementById('dlgDesc').textContent=p.desc||p.description||'';
+      const thumbs=document.getElementById('dlgThumbs'); thumbs.innerHTML='';
+      imgs.forEach((src,i)=>{ const im=document.createElement('img'); im.src=src; im.alt='縮圖'; im.className='dlg-thumb'+(i===0?' active':''); im.addEventListener('click',()=>setMainImage(i,imgs)); thumbs.appendChild(im); });
+
+      // 編輯區同步
+      document.getElementById('editName').value=p.name||'';
+      document.getElementById('editAge').value=p.age||'';
+      document.getElementById('editGender').value=p.gender||'';
+      document.getElementById('editDesc').value=p.desc||'';
+      document.getElementById('editSpecies').value=p.species||'貓';
       syncEditBreedSelectors();
-      if(p.breedType){ $('#editBreedType').value=p.breedType; buildEditBreedOptions(); updateEditBreedLabel(); if(p.breed){ $('#editBreed').disabled=false; $('#editBreed').value=p.breed; } }
+      if(p.breedType){
+        document.getElementById('editBreedType').value=p.breedType;
+        buildEditBreedOptions();
+        updateEditBreedLabel();
+        if(p.breed){ document.getElementById('editBreed').disabled=false; document.getElementById('editBreed').value=p.breed; }
+      }
       renderEditImages(imgs);
       setEditMode(false);
       bindDialogActions();
     }
 
-    function setMainImage(i, imgs){ const src=imgs[i]; $('#dlgImg').src=src; $('#dlgBg').src=src; lbIndex=i; }
+    function setMainImage(i,imgs){ const src=imgs[i]; document.getElementById('dlgImg').src=src; document.getElementById('dlgBg').src=src; lbIndex=i; }
 
-    $('#dlgClose').addEventListener('click', ()=>{ if(dlg.open) dlg.close(); document.documentElement.style.overflow = oldHtmlOverflow; });
-
-    // Lightbox：點大圖開，點大圖外區域關（不用額外關閉鈕）
-    $('#dlgImg').addEventListener('click', ()=>{ dlgWasOpenForLb = dlg.open; if(dlgWasOpenForLb) dlg.close(); openLightbox(); });
-    function openLightbox(){ lb.classList.remove('hidden'); lb.style.display='flex'; lbShow(lbIndex); }
-    function closeLightbox(){ lb.classList.add('hidden'); if(dlgWasOpenForLb) { dlg.showModal(); } }
-    function lbShow(idx){ if(!lbImages.length) return; lbIndex=(idx+lbImages.length)%lbImages.length; lbImg.src=lbImages[lbIndex]; const thumbs=document.getElementById('lbThumbsInner'); thumbs.innerHTML=lbImages.map((src,i)=>`<img src="${src}" class="${i===lbIndex?'active':''}">`).join(''); thumbs.querySelectorAll('img').forEach((im,i)=> im.addEventListener('click', ()=> lbShow(i))); }
-    lbPrev.addEventListener('click', ()=> lbShow(lbIndex-1)); lbNext.addEventListener('click', ()=> lbShow(lbIndex+1));
-    // 點擊大圖外關閉（不依賴 target id）
-    lb.addEventListener('click', (e)=>{ const rect = lbImg.getBoundingClientRect(); if(e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom){ closeLightbox(); } });
-    window.addEventListener('keydown', (e)=>{ if(lb.classList.contains('hidden')) return; if(e.key==='Escape') closeLightbox(); if(e.key==='ArrowLeft') lbShow(lbIndex-1); if(e.key==='ArrowRight') lbShow(lbIndex+1); });
-    // Touch swipe
-    let touchX=null; lb.addEventListener('touchstart', (e)=>{ touchX = e.changedTouches[0].clientX; }, {passive:true});
-    lb.addEventListener('touchend', (e)=>{ if(touchX===null) return; const dx = e.changedTouches[0].clientX - touchX; if(Math.abs(dx)>50){ if(dx<0) lbShow(lbIndex+1); else lbShow(lbIndex-1); } touchX=null; });
-
-    function bindDialogActions(){
-      $('#btnDelete').onclick = onDelete;
-      $('#btnEdit').onclick = ()=> setEditMode(true);
-      $('#btnAdopted').onclick = ()=>{ $('#adoptedUpload').classList.remove('hidden'); };
-      $('#btnPickAdopted').onclick = ()=> $('#adoptedFiles').click();
-      $('#btnConfirmAdopted').onclick = onConfirmAdopted;
-      $('#btnSave').onclick = saveEdit;
-      $('#btnCancel').onclick = ()=>{ renderDialogView(currentDoc); };
+    document.getElementById('dlgClose').addEventListener('click',()=>{
+      if (dlg.open) dlg.close();
+      document.documentElement.style.overflow=oldHtmlOverflow;
+    });
+    if (dlg) {
+      dlg.addEventListener('close',()=>{
+        if (!closingForLightbox) {
+          document.documentElement.style.overflow=oldHtmlOverflow;
+        }
+      });
     }
 
-    // 刪除（先關 modal，再詢問；成功後顯示 1 秒提示）
-    async function onDelete(){
-      const wasOpen = dlg.open; if(wasOpen) dlg.close();
-      const ok=await Swal.fire({icon:'warning', title:'確認刪除此筆？', showCancelButton:true, confirmButtonText:'刪除', cancelButtonText:'取消'});
-      if(!ok.isConfirmed){ if(wasOpen) dlg.showModal(); return; }
-      try{ await deleteDoc(doc(db,'pets', currentDocId)); await loadPets(); await Swal.fire({icon:'success', title:'刪除成功', timer:1000, showConfirmButton:false}); }
-      catch(err){ await Swal.fire({icon:'error', title:'刪除失敗', text:err.message}); if(wasOpen) dlg.showModal(); }
+    // 開大圖
+    document.getElementById('dlgImg').addEventListener('click',()=>{
+      // 記住：當前是否為由 dialog 進入 lightbox
+      dlgWasOpenForLb = !!dlg.open;
+      if(dlg.open) { closingForLightbox = true; dlg.close(); closingForLightbox = false; }
+      openLightbox(lbIndex);
+    });
+
+    function openLightbox(startIndex = 0){
+      lb.classList.remove('hidden');
+      lb.style.display = 'flex';
+      lbShow(startIndex);
+    }
+    function closeLightbox(){
+      lb.classList.add('hidden');
+      lb.style.display='none';
+      // 只有從 dialog 進來時才回到 dialog
+      if (dlgWasOpenForLb && typeof dlg.showModal === 'function') {
+        dlg.showModal();
+      }
+      dlgWasOpenForLb = false;
     }
 
-    // 編輯狀態切換
-    function setEditMode(on){ $('#editArea').classList.toggle('hidden', !on); $('#actionBar').classList.toggle('hidden', on); $('#editActionBar').classList.toggle('hidden', !on); if(on){ $('#adoptedUpload').classList.add('hidden'); } }
+    function lbShow(idx){ if(!lbImages.length) return; lbIndex=(idx+lbImages.length)%lbImages.length; lbImg.src=lbImages[lbIndex]; const thumbs=document.getElementById('lbThumbsInner'); thumbs.innerHTML=lbImages.map((src,i)=>`<img src="${src}" class="${i===lbIndex?'active':''}">`).join(''); thumbs.querySelectorAll('img').forEach((im,i)=>im.addEventListener('click',(e)=>{ e.stopPropagation(); lbShow(i); })); }
+    lbPrev.addEventListener('click',(e)=>{ e.stopPropagation(); lbShow(lbIndex-1); }); lbNext.addEventListener('click',(e)=>{ e.stopPropagation(); lbShow(lbIndex+1); });
+
+    // 關閉條件：點背景、點容器空白、Esc
+    lbBackdrop.addEventListener('click', closeLightbox);
+    lb.addEventListener('click', (e) => {
+      const clickOnImage  = e.target === lbImg;
+      const clickOnArrow  = e.target === lbPrev || e.target === lbNext;
+      if (e.target === lb) { closeLightbox(); }
+      else if (!clickOnImage && !clickOnArrow) {
+        // 不是點大圖/箭頭（例如空白區），才關閉
+        if (!lbThumbsEl.contains(e.target)) closeLightbox();
+      }
+    });
+    // 防止點縮圖區被父層抓到而關閉
+    lbThumbsEl.addEventListener('click', (e)=>{ e.stopPropagation(); });
+
+    window.addEventListener('keydown',(e)=>{ if(lb.classList.contains('hidden')) return; if(e.key==='Escape') closeLightbox(); if(e.key==='ArrowLeft') lbShow(lbIndex-1); if(e.key==='ArrowRight') lbShow(lbIndex+1); });
+    let touchX=null; lb.addEventListener('touchstart',e=>{ touchX=e.changedTouches[0].clientX; },{passive:true}); lb.addEventListener('touchend',e=>{ if(touchX===null) return; const dx=e.changedTouches[0].clientX-touchX; if(Math.abs(dx)>50){ if(dx<0) lbShow(lbIndex+1); else lbShow(lbIndex-1);} touchX=null; });
+
+    function bindDialogActions(){ document.getElementById('btnDelete').onclick=onDelete; document.getElementById('btnEdit').onclick=()=>setEditMode(true); document.getElementById('btnAdopted').onclick=()=>{ document.getElementById('adoptedUpload').classList.remove('hidden'); }; document.getElementById('btnPickAdopted').onclick=()=>document.getElementById('adoptedFiles').click(); document.getElementById('btnConfirmAdopted').onclick=onConfirmAdopted; document.getElementById('btnSave').onclick=saveEdit; document.getElementById('btnCancel').onclick=()=>{ renderDialogView(currentDoc); }; }
+
+    async function onDelete(){ const wasOpen=dlg.open; if(wasOpen) dlg.close(); const ok=await Swal.fire({icon:'warning',title:'確認刪除此筆？',showCancelButton:true,confirmButtonText:'刪除',cancelButtonText:'取消'}); if(!ok.isConfirmed){ if(wasOpen) dlg.showModal(); return; } try{ await deleteDoc(doc(db,'pets',currentDocId)); await loadPets(); await Swal.fire({icon:'success',title:'刪除成功',timer:1000,showConfirmButton:false}); }catch(err){ await Swal.fire({icon:'error',title:'刪除失敗',text:err.message}); if(wasOpen) dlg.showModal(); } }
+
+    function setEditMode(on){ document.getElementById('editArea').classList.toggle('hidden',!on); document.getElementById('actionBar').classList.toggle('hidden',on); document.getElementById('editActionBar').classList.toggle('hidden',!on); if(on){ document.getElementById('adoptedUpload').classList.add('hidden'); } }
 
     async function saveEdit(){
-      const saveBtn = $('#btnSave'); const saveSpin=$('#saveSpin'); const saveText=$('#saveText');
-      saveBtn.disabled=true; saveSpin.classList.remove('invisible'); saveText.textContent='儲存中…';
-      const newData = { name:$('#editName').value.trim(), age:$('#editAge').value.trim(), gender:$('#editGender').value, desc:$('#editDesc').value.trim(), species: $('#editSpecies').value };
-      const eType = $('#editBreedType').value || ''; const eBreed = $('#editBreed').value || '';
-      newData.breedType = eType; newData.breed = eBreed;
+      const btn=document.getElementById('btnSave'), txt=document.getElementById('saveText');
+      btn.disabled=true; const stopDots=startDots(txt,'儲存中');
+      const newData={ name:document.getElementById('editName').value.trim(), age:document.getElementById('editAge').value.trim(), gender:document.getElementById('editGender').value, desc:document.getElementById('editDesc').value.trim(), species:document.getElementById('editSpecies').value, breedType:document.getElementById('editBreedType').value||'', breed:document.getElementById('editBreed').value||'' };
       try{
-        const { keep, add, remove } = editImagesState; const newUrls=[...keep];
-        for(const f of add){ const path=`pets/${currentDocId}/${Date.now()}_${f.name}`; const r=sRef(storage,path); await uploadBytes(r,f); const url=await getDownloadURL(r); newUrls.push(url); }
-        for(const url of remove){ try{ const path=url.split('/o/')[1].split('?')[0]; const decoded=decodeURIComponent(path); await deleteObject(sRef(storage, decoded)); }catch(_){} }
-        newData.images=newUrls; await updateDoc(doc(db,'pets', currentDocId), newData); await loadPets(); currentDoc = { ...currentDoc, ...newData }; await Swal.fire({icon:'success', title:'已儲存'});
-      }catch(err){ Swal.fire({icon:'error', title:'更新失敗', text:err.message}); }
-      finally{ saveBtn.disabled=false; saveSpin.classList.add('invisible'); saveText.textContent='儲存'; renderDialogView(currentDoc); }
+        const {keep,add,remove}=editImagesState; const newUrls=[...keep];
+        for(const f of add){ const path=`pets/${currentDocId}/${Date.now()}_${f.name}`; const r=sRef(storage,path); await uploadBytes(r,f); newUrls.push(await getDownloadURL(r)); }
+        for(const url of remove){ try{ const path=url.split('/o/')[1].split('?')[0]; await deleteObject(sRef(storage, decodeURIComponent(path))); }catch(e){} }
+        newData.images=newUrls;
+        await updateDoc(doc(db,'pets',currentDocId), newData);
+        await loadPets();
+        currentDoc={...currentDoc,...newData};
+        stopDots(); btn.disabled=false; txt.textContent='儲存';
+        const wasOpen=dlg.open; if(wasOpen) dlg.close();
+        await Swal.fire({icon:'success',title:'已儲存'});
+        if(wasOpen) dlg.showModal();
+        setEditMode(false); renderDialogView(currentDoc);
+      }catch(err){
+        stopDots(); btn.disabled=false; txt.textContent='儲存';
+        await Swal.fire({icon:'error',title:'更新失敗',text:err.message});
+      }
     }
 
-    // 編輯模式：類別/品種連動（允許回選「請選擇」）
-    const editSpeciesSel = $('#editSpecies'); const editBreedTypeSel=$('#editBreedType'); const editBreedSel=$('#editBreed'); const editBreedLabel=$('#editBreedLabel');
-    function syncEditBreedSelectors(){ const species=editSpeciesSel.value; const isCat=species==='貓'; editBreedTypeSel.innerHTML = isCat? '<option value="">請選擇</option><option value="品種貓">品種貓</option><option value="米克斯">米克斯</option>' : '<option value=\"\">請選擇</option><option value="品種犬">品種犬</option><option value="米克斯">米克斯</option>'; resetEditBreedRight(); updateEditBreedLabel(); }
+    // 編輯模式：品種連動
+    const editSpeciesSel=$('#editSpecies'), editBreedTypeSel=$('#editBreedType'), editBreedSel=$('#editBreed'), editBreedLabel=$('#editBreedLabel');
+    function updateEditBreedLabel(){ const t=editBreedTypeSel.value; editBreedLabel.textContent=!t?'品種/毛色':(t==='米克斯'?'毛色':'品種'); }
     function resetEditBreedRight(){ editBreedSel.disabled=true; editBreedSel.innerHTML='<option value="">請先選擇品種</option>'; }
-    function updateEditBreedLabel(){ const t=editBreedTypeSel.value; editBreedLabel.textContent = !t? '品種/毛色' : (t==='米克斯'?'毛色':'品種'); }
-    function buildEditBreedOptions(){ const species=editSpeciesSel.value; const t=editBreedTypeSel.value; if(!t){ resetEditBreedRight(); return; } const list=(BREEDS[species]&&BREEDS[species][t])||[]; editBreedSel.disabled=false; editBreedSel.innerHTML=['<option value="">請選擇</option>'].concat(list.map(b=>`<option value="${b}">${b}</option>`)).join(''); }
-    editSpeciesSel.addEventListener('change', syncEditBreedSelectors);
-    editBreedTypeSel.addEventListener('change', ()=>{ buildEditBreedOptions(); updateEditBreedLabel(); });
+    function syncEditBreedSelectors(){ const isCat=(editSpeciesSel.value==='貓'); editBreedTypeSel.innerHTML=isCat?'<option value="">請選擇</option><option value="品種貓">品種貓</option><option value="米克斯">米克斯</option>':'<option value="">請選擇</option><option value="品種犬">品種犬</option><option value="米克斯">米克斯</option>'; resetEditBreedRight(); updateEditBreedLabel(); }
+    function buildEditBreedOptions(){ const list=(BREEDS[editSpeciesSel.value]||{})[editBreedTypeSel.value]||[]; if(!editBreedTypeSel.value){ resetEditBreedRight(); return; } editBreedSel.disabled=false; editBreedSel.innerHTML=['<option value="">請選擇</option>'].concat(list.map(b=>`<option value="${b}">${b}</option>`)).join(''); }
+    editSpeciesSel.addEventListener('change',syncEditBreedSelectors); editBreedTypeSel.addEventListener('change',()=>{ buildEditBreedOptions(); updateEditBreedLabel(); });
 
-    // 編輯圖片管理（上限 5）
-    const editFiles = $('#editFiles'); const btnPickEdit = $('#btnPickEdit'); const editPreview = $('#editPreview'); const editCount = $('#editCount');
-    let editImagesState = { keep:[], add:[], remove:[] };
-    btnPickEdit.addEventListener('click', ()=> editFiles.click());
+    // 內嵌編輯：圖片管理
+    const editFiles=$('#editFiles'), btnPickEdit=$('#btnPickEdit'), editPreview=$('#editPreview'), editCount=$('#editCount');
+    let editImagesState={keep:[], add:[], remove:[]}; btnPickEdit.addEventListener('click',()=>editFiles.click());
     function renderEditImages(urls){ editImagesState.keep=[...urls]; editImagesState.add=[]; editImagesState.remove=[]; paintEditPreview(); }
-    function paintEditPreview(){ const total=editImagesState.keep.length + editImagesState.add.length; editCount.textContent=`共 ${total} / 5 張（含新增）`; const current=[ ...editImagesState.keep.map((url,idx)=>({type:'keep', url, idx})), ...editImagesState.add.map((file,idx)=>({type:'add', file, idx}))]; editPreview.innerHTML=current.map(item=>{ const src=item.type==='keep'? item.url: URL.createObjectURL(item.file); const data=item.type==='keep'? `data-keep="${item.idx}"`:`data-add="${item.idx}"`; return `<div class=\"relative\"><img class=\"w-full aspect-square object-cover rounded-lg\" src=\"${src}\" /><button ${data} class=\"absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center\">✕</button></div>` }).join(''); editPreview.querySelectorAll('button[data-keep]').forEach(btn=> btn.addEventListener('click', ()=>{ const i=+btn.getAttribute('data-keep'); editImagesState.remove.push(editImagesState.keep[i]); editImagesState.keep.splice(i,1); paintEditPreview(); })); editPreview.querySelectorAll('button[data-add]').forEach(btn=> btn.addEventListener('click', ()=>{ const i=+btn.getAttribute('data-add'); editImagesState.add.splice(i,1); paintEditPreview(); })); }
-    editFiles.addEventListener('change', ()=>{ const incoming=Array.from(editFiles.files||[]); const total=editImagesState.keep.length + editImagesState.add.length + incoming.length; if(total>5){ Swal.fire({icon:'warning', title:'最多 5 張圖片'}); } const room = 5 - (editImagesState.keep.length + editImagesState.add.length); editImagesState.add = editImagesState.add.concat(incoming.slice(0, Math.max(0, room))); paintEditPreview(); editFiles.value=''; });
+    function paintEditPreview(){
+      const total=editImagesState.keep.length+editImagesState.add.length; editCount.textContent=`共 ${total} / 5 張（含新增）`;
+      const current=[...editImagesState.keep.map((u,i)=>({type:'keep',url:u,idx:i})), ...editImagesState.add.map((f,i)=>({type:'add',file:f,idx:i}))];
+      editPreview.innerHTML=current.map(item=>{
+        const src=item.type==='keep'?item.url:URL.createObjectURL(item.file);
+        const data=item.type==='keep'?`data-keep="${item.idx}"`:`data-add="${item.idx}"`;
+        return `<div class="relative"><img class="w-full aspect-square object-cover rounded-lg" src="${src}"/><button ${data} class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button></div>`;
+      }).join('');
+      editPreview.querySelectorAll('button[data-keep]').forEach(btn=>btn.addEventListener('click',()=>{ const i=+btn.getAttribute('data-keep'); editImagesState.remove.push(editImagesState.keep[i]); editImagesState.keep.splice(i,1); paintEditPreview(); }));
+      editPreview.querySelectorAll('button[data-add]').forEach(btn=>btn.addEventListener('click',()=>{ const i=+btn.getAttribute('data-add'); editImagesState.add.splice(i,1); paintEditPreview(); }));
+    }
+    editFiles.addEventListener('change',()=>{ const incoming=Array.from(editFiles.files||[]); const total=editImagesState.keep.length+editImagesState.add.length+incoming.length; if(total>5){ Swal.fire({icon:'warning',title:'最多 5 張圖片'});} const room=5-(editImagesState.keep.length+editImagesState.add.length); editImagesState.add=editImagesState.add.concat(incoming.slice(0, Math.max(0,room))); paintEditPreview(); editFiles.value=''; });
 
-    // 已領養（合照上傳）
-    function updateAdoptedPreview(files){ const wrap=$('#adoptedPreview'); wrap.innerHTML=files.map(f=>`<img class="w-full aspect-square object-cover rounded-lg" src="${URL.createObjectURL(f)}" />`).join(''); $('#adoptedCount').textContent = `已選 ${files.length} 張`; }
-    $('#adoptedFiles').addEventListener('change', ()=>{ const fs=Array.from($('#adoptedFiles').files||[]).slice(0,5); updateAdoptedPreview(fs); });
-    async function onConfirmAdopted(){ const files=Array.from($('#adoptedFiles').files||[]).slice(0,5); const urls=[]; try{ for(const f of files){ const path=`adopted/${currentDocId}/${Date.now()}_${f.name}`; const r=sRef(storage,path); await uploadBytes(r,f); const url=await getDownloadURL(r); urls.push(url); } await updateDoc(doc(db,'pets', currentDocId), { status:'adopted', adoptedPhotos:urls, showOnHome:true, showOnCats:false, showOnDogs:false, showOnIndex:false }); Swal.fire({icon:'success', title:'已標記為已領養'}); await loadPets(); }catch(err){ Swal.fire({icon:'error', title:'領養標記失敗', text:err.message}); } }
+    // 已領養合照
+    function updateAdoptedPreview(files){ const wrap=document.getElementById('adoptedPreview'); wrap.innerHTML=files.map(f=>`<img class="w-full aspect-square object-cover rounded-lg" src="${URL.createObjectURL(f)}"/>`).join(''); document.getElementById('adoptedCount').textContent=`已選 ${files.length} 張`; }
+    document.getElementById('adoptedFiles').addEventListener('change',()=>{ const fs=Array.from(document.getElementById('adoptedFiles').files||[]).slice(0,5); updateAdoptedPreview(fs); });
+    async function onConfirmAdopted(){ const files=Array.from(document.getElementById('adoptedFiles').files||[]).slice(0,5); const urls=[]; try{ for(const f of files){ const path=`adopted/${currentDocId}/${Date.now()}_${f.name}`; const r=sRef(storage,path); await uploadBytes(r,f); urls.push(await getDownloadURL(r)); } await updateDoc(doc(db,'pets',currentDocId),{ status:'adopted', adoptedPhotos:urls, showOnHome:true, showOnCats:false, showOnDogs:false, showOnIndex:false }); Swal.fire({icon:'success',title:'已標記為已領養'}); await loadPets(); }catch(err){ Swal.fire({icon:'error',title:'領養標記失敗',text:err.message}); } }
 
-    // 初次載入
-    document.getElementById('btnRefreshSm')?.addEventListener('click', loadPets); document.getElementById('btnRefresh')?.addEventListener('click', loadPets); await loadPets();
+    document.getElementById('btnRefreshSm')?.addEventListener('click',loadPets);
+    document.getElementById('btnRefresh')?.addEventListener('click',loadPets);
+    (async()=>{ try{ await loadPets(); }catch(e){ console.error('loadPets failed', e); } })();
 
+    // ---- 測試 ----
+    (function selfTest(){
+      const must=['rows','rowsMobile','petDialog','dlgImg','dlgBg','dlgName','dlgSpeciesPill','lightbox','lbBackdrop','dlgDesc'];
+      const miss=must.filter(id=>!document.getElementById(id));
+      console.assert(miss.length===0,'缺少必要節點：',miss);
+      console.assert(typeof closeLightbox==='function','closeLightbox 未定義');
+      try { lbShow(0); } catch(err){ console.error('lbShow smoke test failed:', err); }
+    })();
+
+    (function extraTests(){
+      try{
+        const bt = document.getElementById('breedType');
+        const bl = document.getElementById('breedLabel');
+        bt.value = '';
+        updateBreedLabel();
+        console.assert(bl.textContent==='品種/毛色','breedLabel 預設應為 品種/毛色');
+        bt.value = '米克斯';
+        updateBreedLabel();
+        console.assert(bl.textContent==='毛色','breedLabel 米克斯→ 毛色');
+        bt.value = '品種貓';
+        updateBreedLabel();
+        console.assert(bl.textContent==='品種','breedLabel 品種貓→ 品種');
+      }catch(e){ console.warn('extraTests skipped:', e?.message||e); }
+    })();
   </script>
 </body>
 </html>
