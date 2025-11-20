@@ -452,8 +452,6 @@
       bindDialogActions();
     }
 
-    function setMainImage(i,imgs){ const src=imgs[i]; document.getElementById('dlgImg').src=src; document.getElementById('dlgBg').src=src; lbIndex=i; }
-
     document.getElementById('dlgClose').addEventListener('click',()=>{
       if (dlg.open) dlg.close();
       document.documentElement.style.overflow=oldHtmlOverflow;
