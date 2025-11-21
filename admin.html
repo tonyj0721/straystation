@@ -643,6 +643,10 @@
             document.getElementById('dlgTagAge').textContent = formatAge(p) || '—';
             document.getElementById('dlgTagGender').textContent = p.gender || '—';
 
+            currentDoc = p;
+            currentDocId = p.id;
+            renderDialogView(p);
+
             // 開啟前鎖住背景捲動
             lockScroll();
             dlg.showModal();
