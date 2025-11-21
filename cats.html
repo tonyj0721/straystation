@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="zh-Hant">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -10,13 +11,14 @@
   <link rel="icon" href="data:,">
   <link rel="apple-touch-icon" href="data:,">
   <script>
+    // Tailwind config
     tailwind.config = {
       theme: {
         extend: {
           colors: {
             brand: {
-              50: '#fff1f2', 100:'#ffe4e6', 200:'#fecdd3', 300:'#fda4af', 400:'#fb7185',
-              500:'#f43f5e', 600:'#e11d48', 700:'#be123c', 800:'#9f1239', 900:'#881337'
+              50: '#fff1f2', 100: '#ffe4e6', 200: '#fecdd3', 300: '#fda4af', 400: '#fb7185',
+              500: '#f43f5e', 600: '#e11d48', 700: '#be123c', 800: '#9f1239', 900: '#881337'
             }
           },
           boxShadow: { soft: '0 10px 30px rgba(0,0,0,0.08)' }
@@ -26,20 +28,27 @@
   </script>
 
   <style>
-    dialog::backdrop { background: rgba(0,0,0,.5); }
+    dialog::backdrop {
+      background: rgba(0, 0, 0, 0.5);
+    }
 
+    /* 🔥 Modal 縮圖 */
     .dlg-thumb {
       width: 70px;
       height: 70px;
-      object-fit: cover;       /* 🔥 填滿區域，被裁切也沒關係 */
+      object-fit: cover;
+      /* 🔥 填滿區域，被裁切也沒關係 */
       background-color: #f3f4f6;
-      border-radius: 6px;      /* 你想多圓都可調整 */
+      border-radius: 6px;
+      /* 你想多圓都可調整 */
       cursor: pointer;
       opacity: 0.8;
       transition: 0.2s;
     }
+
     .dlg-thumb.active {
-      outline: 3px solid #ff6900; /* 或你的品牌色都可以 */
+      outline: 3px solid #ff6900;
+      /* 或你的品牌色都可以 */
       opacity: 1;
     }
 
@@ -50,6 +59,7 @@
       height: 100vh;
       -webkit-backdrop-filter: none;
     }
+
     #lbThumbs img {
       width: 60px;
       height: 60px;
@@ -59,29 +69,53 @@
       cursor: pointer;
       background: #444;
     }
+
     #lbThumbs img.active {
       opacity: 1;
       border: 2px solid white;
     }
+
     /* 讓圖片容器用同張圖做模糊延伸背景 */
-    .blur-fit { position: relative; overflow: hidden; }
-    .blur-fit::before{
-      content:""; position:absolute; inset:0;
-      background: var(--bg) center/cover no-repeat; /* 這裡吃 inline style 的 --bg */
+    .blur-fit {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .blur-fit::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: var(--bg) center/cover no-repeat;
+      /* 這裡吃 inline style 的 --bg */
       filter: blur(24px);
-      transform: scale(1.1); /* 放大避免邊緣露白 */
+      transform: scale(1.1);
+      /* 放大避免邊緣露白 */
     }
-    .blur-fit > img{
-      position:absolute; inset:0; width:100%; height:100%;
-      object-fit: contain; z-index:1; /* 上層放原圖，保持比例 */
+
+    .blur-fit>img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      z-index: 1;
+      /* 上層放原圖，保持比例 */
     }
-    .swal2-confirm-btn{
-      background:#22c55e;color:#fff;border-radius:9999px;
-      padding:10px 20px;font-weight:600
+
+    .swal2-confirm-btn {
+      background: #22c55e;
+      color: #fff;
+      border-radius: 9999px;
+      padding: 10px 20px;
+      font-weight: 600
     }
-    .swal2-confirm-btn:hover{ background:#16a34a }
+
+    .swal2-confirm-btn:hover {
+      background: #16a34a
+    }
   </style>
 </head>
+
 <body class="text-gray-800 bg-gradient-to-br from-brand-50 to-white">
   <!-- Navbar -->
   <header class="bg-white/80 backdrop-blur border-b border-gray-200">
@@ -97,7 +131,9 @@
           <a href="admin.html" class="hover:text-brand-600">管理員登入</a>
         </nav>
         <button class="md:hidden p-2 rounded hover:bg-gray-100" aria-label="開啟選單" id="navToggle">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z" />
+          </svg>
         </button>
       </div>
       <div id="mobileNav" class="md:hidden hidden pb-4">
@@ -126,8 +162,7 @@
 
       <select id="fBreed"
         class="col-span-1 rounded-xl border border-gray-300 bg-white p-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-        disabled
-      >
+        disabled>
         <option value="">請先選擇「品種」</option>
       </select>
 
@@ -167,20 +202,17 @@
       <div class="px-3 pt-3">
         <div class="relative aspect-video bg-gray-100 overflow-hidden rounded-lg">
           <!-- 只模糊這張背景圖 -->
-          <img id="dlgBg" aria-hidden="true"
-               class="absolute inset-0 w-full h-full object-cover blur-md scale-110">
+          <img id="dlgBg" aria-hidden="true" class="absolute inset-0 w-full h-full object-cover blur-md scale-110">
 
           <!-- 可選：柔化一下背景，沒有加任何 blur -->
           <div class="absolute inset-0 bg-white/20"></div>
 
           <!-- 主圖在最上層，沒有 blur -->
-          <img id="dlgImg"
-               alt="毛孩照片"
-               class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg">
+          <img id="dlgImg" alt="毛孩照片"
+            class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg">
 
-          <button id="dlgClose"
-                  class="absolute top-3 right-3 z-20 bg-black/60 text-white p-2 rounded-full"
-                  aria-label="關閉">✕</button>
+          <button id="dlgClose" class="absolute top-3 right-3 z-20 bg-black/60 text-white p-2 rounded-full"
+            aria-label="關閉">✕</button>
         </div>
       </div>
 
@@ -192,23 +224,22 @@
             <div class="flex items-end justify-between gap-2">
               <h3 id="dlgName" class="text-2xl font-semibold leading-snug">—</h3>
               <span id="dlgSpeciesPill"
-                    class="shrink-0 rounded-full text-xs px-2 py-1 bg-emerald-50 text-emerald-700">貓咪</span>
+                class="shrink-0 rounded-full text-xs px-2 py-1 bg-emerald-50 text-emerald-700">貓咪</span>
             </div>
 
             <!-- 三個圓角標籤：不換行、可水平捲動 -->
             <div id="dlgTags" class="mt-1 flex flex-nowrap gap-2 text-sm">
               <span id="dlgTagBreed"
-                    class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap"></span>
+                class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap"></span>
               <span id="dlgTagAge"
-                    class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap"></span>
+                class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap"></span>
               <span id="dlgTagGender"
-                    class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap"></span>
+                class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap"></span>
             </div>
           </div>
         </div>
         <div class="bg-orange-50 rounded-xl p-4 leading-7">
-          <p id="dlgDesc"
-             class="text-gray-700 text-sm whitespace-pre-line break-words"></p>
+          <p id="dlgDesc" class="text-gray-700 text-sm whitespace-pre-line break-words"></p>
         </div>
         <div class="flex justify-end gap-3 pt-2">
           <button id="dlgAdopt" class="px-4 py-2 rounded-xl bg-brand-600 text-white text-sm">我要認養</button>
@@ -221,8 +252,9 @@
   <!-- Lightbox -->
   <div id="lightbox" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[9999]">
     <button id="lbPrev" class="absolute left-3 md:left-10 text-white text-4xl select-none">❮</button>
-    <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg"/>
-    <div id="lbThumbs" class="absolute bottom-20 left-0 w-full flex justify-center px-4 py-2 pb-[env(safe-area-inset-bottom)]">
+    <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg" />
+    <div id="lbThumbs"
+      class="absolute bottom-20 left-0 w-full flex justify-center px-4 py-2 pb-[env(safe-area-inset-bottom)]">
       <div id="lbThumbsInner" class="flex gap-3"></div>
     </div>
     <button id="lbNext" class="absolute right-3 md:right-10 text-white text-4xl select-none">❯</button>
@@ -269,7 +301,7 @@
     const $ = (q) => document.querySelector(q);
     const $$ = (q) => document.querySelectorAll(q);
 
-        // 固定下拉清單
+    // 固定下拉清單
     const BREED_DICT = {
       "品種貓": ["美短", "英短", "藍貓", "暹羅貓", "波斯貓", "布偶貓", "曼赤肯"],
       "米克斯": ["橘貓", "黑貓", "虎斑貓", "白底虎斑貓", "三花貓", "賓士貓", "玳瑁貓", "白貓"]
@@ -344,8 +376,8 @@
             <div class="flex items-start justify-between gap-2">
               <h3 class="font-semibold text-lg leading-snug line-clamp-1">${p.name || '未命名'}</h3>
               <span class="shrink-0 rounded-full text-xs px-2 py-1
-                ${/(狗|犬)/.test(String(p.species||'')) ? 'bg-sky-50 text-sky-700' : 'bg-emerald-50 text-emerald-700'}">
-                ${/(狗|犬)/.test(String(p.species||'')) ? '狗狗' : '貓咪'}
+                ${/(狗|犬)/.test(String(p.species || '')) ? 'bg-sky-50 text-sky-700' : 'bg-emerald-50 text-emerald-700'}">
+                ${/(狗|犬)/.test(String(p.species || '')) ? '狗狗' : '貓咪'}
               </span>
             </div>
 
@@ -461,6 +493,7 @@
     let lbImages = [];
     let lbIndex = 0;
 
+    // 用來記住原本 scroll 狀態
     let oldHtmlOverflow = "";
     let oldBodyOverflow = "";
 
@@ -484,14 +517,17 @@
       const dlgBg = document.getElementById("dlgBg");
       const dlgThumbs = document.getElementById("dlgThumbs");
 
+      // 取所有圖片（images 是陣列；後台 upload 時必定有）
       const imgs = Array.isArray(p.images) && p.images.length > 0
         ? p.images
         : (p.image ? [p.image] : []);
 
+      // 設定主圖
       dlgImg.src = imgs[0] || "";
       if (dlgBg) dlgBg.src = dlgImg.src;
-      dlgImg.onclick = () => openLightbox(imgs, 0);
+      dlgImg.onclick = () => openLightbox(imgs, 0);  // 讓主圖可進入 Lightbox
 
+      // 生成縮圖列
       dlgThumbs.innerHTML = "";
       imgs.forEach((url, i) => {
         const thumb = document.createElement("img");
@@ -499,9 +535,12 @@
         thumb.className = "dlg-thumb" + (i === 0 ? " active" : "");
         thumb.dataset.index = i;
 
+        // 點縮圖 → 切換主圖 + 啟動對應的 Lightbox 頁面
         thumb.addEventListener("click", () => {
           dlgImg.src = url;
           if (dlgBg) dlgBg.src = url;
+
+          // 更新 active 樣式
           document.querySelectorAll(".dlg-thumb").forEach(el => el.classList.remove("active"));
           thumb.classList.add("active");
         });
@@ -509,6 +548,7 @@
         dlgThumbs.appendChild(thumb);
       });
 
+      // 基本資料（原本的）
       document.getElementById('dlgName').textContent = p.name || '未命名';
       document.getElementById('dlgDesc').textContent = p.desc || '';
 
@@ -517,21 +557,22 @@
 
       // 右上角物種圓角標籤（貓咪/狗狗 + 顏色）
       const speciesPill = document.getElementById('dlgSpeciesPill');
-      const isDog = /(狗|犬)/.test(String(p.species||''));
+      const isDog = /(狗|犬)/.test(String(p.species || ''));
       speciesPill.textContent = isDog ? '狗狗' : '貓咪';
-      speciesPill.className = `shrink-0 rounded-full text-sm px-3 py-1 ${
-        isDog ? 'bg-sky-100 text-sky-700' : 'bg-emerald-100 text-emerald-700'
-      }`;
+      speciesPill.className = `shrink-0 rounded-full text-sm px-3 py-1 ${isDog ? 'bg-sky-100 text-sky-700' : 'bg-emerald-100 text-emerald-700'
+        }`;
 
       // 三個圓角標籤（不換行，超出可橫向捲動）
-      document.getElementById('dlgTagBreed').textContent  = formatBreed(p) || '—';
-      document.getElementById('dlgTagAge').textContent    = formatAge(p)   || '—';
-      document.getElementById('dlgTagGender').textContent = p.gender       || '—';
+      document.getElementById('dlgTagBreed').textContent = formatBreed(p) || '—';
+      document.getElementById('dlgTagAge').textContent = formatAge(p) || '—';
+      document.getElementById('dlgTagGender').textContent = p.gender || '—';
 
+      // 開啟前鎖住背景捲動
       lockScroll();
       dlg.showModal();
     }
 
+    // 鎖住 / 恢復背景捲動
     $('#dlgClose').addEventListener('click', () => {
       dlg.close();
       unlockScroll();
@@ -539,6 +580,7 @@
       currentPetId = null;
     });
 
+    // 防止使用者按 ESC 或點 backdrop 關掉時，背景卡死
     dlg.addEventListener('close', () => {
       // 若是因 Lightbox 開啟而關掉 dialog → 不要清除 currentPetId
       if (!lb.classList.contains("flex")) {
@@ -557,10 +599,10 @@
     });
 
     document.getElementById('dlgAdopt').onclick = () => {
-      const dlg   = document.getElementById('petDialog');   // 目標 dialog
-      const name  = document.getElementById('dlgName').textContent.trim();
+      const dlg = document.getElementById('petDialog');   // 目標 dialog
+      const name = document.getElementById('dlgName').textContent.trim();
       const petId = (window.currentPetId || (typeof p !== 'undefined' && p.id) || '');
-      const goto  = `adopt.html?pet=${encodeURIComponent(petId)}&name=${encodeURIComponent(name)}`;
+      const goto = `adopt.html?pet=${encodeURIComponent(petId)}&name=${encodeURIComponent(name)}`;
 
       Swal.fire({
         target: dlg,          // 關鍵：把彈窗掛在 dialog 內
@@ -583,12 +625,14 @@
       });
     };
 
+    // 🔥 開啟 Lightbox：完全關掉 dialog + 鎖定背景
     function openLightbox(images, index = 0) {
       lbImages = images;
       lbIndex = index;
 
       lbImg.src = lbImages[lbIndex];
 
+      // 建立縮圖列
       const lbThumbsInner = document.getElementById("lbThumbsInner");
       lbThumbsInner.innerHTML = "";
 
@@ -607,20 +651,31 @@
         lbThumbsInner.appendChild(t);
       });
 
+      // ❶ 正確：關掉 Modal（移除 backdrop）
       if (dlg.open) dlg.close();
+
+      // ❷ 正確：解除背景鎖定（避免 Lightbox 卡死）
       unlockScroll();
 
+      // ❸ 顯示 Lightbox
       lb.classList.remove("hidden");
       lb.classList.add("flex");
     }
 
+    // 🔥 關閉 Lightbox：恢復背景 + 回到 dialog
     function closeLightbox() {
+      // 隱藏 Lightbox
       lb.classList.add("hidden");
       lb.classList.remove("flex");
+
+      // 回到 Modal
       dlg.showModal();
+
+      // Modal 需要背景固定 → 再鎖一次
       lockScroll();
     }
 
+    // 🔥 左右切換
     function lbShow(delta) {
       if (!lbImages.length) return;
       lbIndex = (lbIndex + delta + lbImages.length) % lbImages.length;
@@ -632,19 +687,29 @@
       });
     }
 
-    lbPrev.onclick = () => lbShow(-1);
-    lbNext.onclick = () => lbShow(1);
+    lbPrev.addEventListener('click', (e) => {
+      e.stopPropagation();
+      lbShow(-1);
+    });
 
+    lbNext.addEventListener('click', (e) => {
+      e.stopPropagation();
+      lbShow(1);
+    });
+
+    // 🔥 點黑幕關閉
     lb.addEventListener("click", (e) => {
       if (e.target === lb) closeLightbox();
     });
 
+    // 🔥 ESC 關閉
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && !lb.classList.contains("hidden")) {
         closeLightbox();
       }
     });
 
+    // 🔥 手機滑動切換
     let touchStartX = 0;
     lb.addEventListener("touchstart", (e) => {
       touchStartX = e.touches[0].clientX;
@@ -656,6 +721,7 @@
       if (diff < -50) lbShow(1);
     }, { passive: true });
 
+    // 🔥 完全阻止背景滑動（桌機 + 手機都有效）
     lb.addEventListener("wheel", (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -666,22 +732,25 @@
       e.stopPropagation();
     }, { passive: false });
 
-    // Nav toggle
+    // ======= Theme & Nav（原樣保留） =======
     $('#navToggle').addEventListener('click', () => {
-      $('#mobileNav').classList.toggle('hidden');
+      const el = $('#mobileNav');
+      el.classList.toggle('hidden');
     });
 
     // 點選連結後自動關閉
-    document.querySelectorAll('#mobileNav a').forEach(a=>{
-      a.addEventListener('click', ()=>{
+    document.querySelectorAll('#mobileNav a').forEach(a => {
+      a.addEventListener('click', () => {
         document.getElementById('mobileNav').classList.add('hidden');
       });
     });
 
-    document.getElementById('year').textContent = new Date().getFullYear();
+    const y = document.getElementById('year');
+    if (y) y.textContent = new Date().getFullYear();
 
     loadPets();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </body>
+
 </html>
