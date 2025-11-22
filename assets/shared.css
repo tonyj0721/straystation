@@ -1,0 +1,73 @@
+dialog::backdrop {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+/* 🔥 Modal 縮圖 */
+.dlg-thumb {
+    width: 70px;
+    height: 70px;
+    object-fit: cover;
+    /* 🔥 填滿區域，被裁切也沒關係 */
+    background-color: #f3f4f6;
+    border-radius: 6px;
+    /* 你想多圓都可調整 */
+    cursor: pointer;
+    opacity: 0.8;
+    transition: 0.2s;
+}
+
+.dlg-thumb.active {
+    outline: 3px solid #ff6900;
+    /* 或你的品牌色都可以 */
+    opacity: 1;
+}
+
+#lightbox {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    -webkit-backdrop-filter: none;
+}
+
+#lbThumbs img {
+    width: 60px;
+    height: 60px;
+    object-fit: contain;
+    border-radius: 6px;
+    opacity: 0.5;
+    cursor: pointer;
+    background: #444;
+}
+
+#lbThumbs img.active {
+    opacity: 1;
+    border: 2px solid white;
+}
+
+/* 讓圖片容器用同張圖做模糊延伸背景 */
+.blur-fit {
+    position: relative;
+    overflow: hidden;
+}
+
+.blur-fit::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--bg) center/cover no-repeat;
+    /* 這裡吃 inline style 的 --bg */
+    filter: blur(24px);
+    transform: scale(1.1);
+    /* 放大避免邊緣露白 */
+}
+
+.blur-fit>img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    z-index: 1;
+    /* 上層放原圖，保持比例 */
+}
