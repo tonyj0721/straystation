@@ -99,7 +99,7 @@
       </div>
       <div class="relative">
         <div class="aspect-[4/3] rounded-3xl overflow-hidden shadow-soft ring-1 ring-gray-200">
-          <img src="images/hero-bg.jpg" alt="狗園大門" class="w-full h-full object-cover" loading="lazy">
+          <img src="hero-bg.jpg" alt="狗園大門" class="w-full h-full object-cover" loading="lazy">
         </div>
         <div
           class="absolute -bottom-6 -left-6 bg-white rounded-2xl shadow-soft ring-1 ring-gray-200 p-4 flex items-center gap-3">
@@ -434,20 +434,6 @@
       if (!p.age || p.age.trim() === "" || p.age === "—") return "年齡不詳";
       return p.age;
     }
-
-    // ---- Modal + Lightbox 共用狀態 ----
-    const dlg = document.getElementById('petDialog');
-    const lb = document.getElementById("lightbox");
-    const lbImg = document.getElementById("lbImg");
-    const lbPrev = document.getElementById("lbPrev");
-    const lbNext = document.getElementById("lbNext");
-
-    let lbImages = [];
-    let lbIndex = 0;
-
-    // 用來記住原本 scroll 狀態
-    let oldHtmlOverflow = "";
-    let oldBodyOverflow = "";
 
     function lockScroll() {
       oldHtmlOverflow = document.documentElement.style.overflow;

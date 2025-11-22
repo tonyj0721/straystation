@@ -1,5 +1,18 @@
 const $ = (id) => document.getElementById(id);
 
+// ---- Modal + Lightbox 共用狀態 ----
+const dlg = document.getElementById('petDialog');
+const lb = document.getElementById("lightbox");
+const lbImg = document.getElementById("lbImg");
+const lbPrev = document.getElementById("lbPrev");
+const lbNext = document.getElementById("lbNext");
+
+let lbImages = [];
+let lbIndex = 0;
+// 用來記住原本 scroll 狀態
+let oldHtmlOverflow = "";
+let oldBodyOverflow = "";
+
 // 🔥 左右切換
 function lbShow(delta) {
     if (!lbImages.length) return;
