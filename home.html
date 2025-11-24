@@ -4,8 +4,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>關於簡媽媽｜台中簡媽媽狗園</title>
-  <meta name="description" content="瀏覽待認養貓咪清單，支援品種、毛色、年齡、性別篩選，快速找到適合你的毛孩。">
+  <title>已領養牆｜台中簡媽媽狗園</title>
+  <meta name="description" content="曾被認養的毛孩故事與合照。">
   <meta name="theme-color" content="#fcd34d">
   <link rel="icon" href="data:,">
   <link rel="apple-touch-icon" href="data:,">
@@ -22,29 +22,29 @@
           <span>台中簡媽媽狗園</span>
         </a>
 
-        <!-- 桌機導覽 -->
-        <nav class="hidden md:flex items-center gap-6 ml-auto">
-          <a href="cats.html" class="hover:text-brand-600">我想養貓咪</a>
-          <a href="dogs.html" class="hover:text-brand-600">我想養狗狗</a>
-          <a href="about.html" class="hover:text-brand-600">關於簡媽媽</a>
-          <a href="home.html" class="hover:text-brand-600">幸福的家</a>
-          <a href="admin.html" class="hover:text-brand-600">管理員登入</a>
-        </nav>
+      <!-- 桌機導覽 -->
+      <nav class="hidden md:flex items-center gap-6 ml-auto">
+        <a href="cats.html" class="hover:text-brand-600">我想養貓咪</a>
+        <a href="dogs.html" class="hover:text-brand-600">我想養狗狗</a>
+        <a href="about.html" class="hover:text-brand-600">關於簡媽媽</a>
+        <a href="home.html" class="hover:text-brand-600">幸福的家</a>
+        <a href="admin.html" class="hover:text-brand-600">管理員登入</a>
+      </nav>
 
-        <!-- 手機漢堡鈕 -->
-        <div class="flex items-center gap-2">
+      <!-- 手機漢堡鈕 -->
+      <div class="flex items-center gap-2">
           <button id="menuBtn"
             class="md:hidden p-2 rounded-lg border border-[#AEDDEF] bg-white/80 hover:bg-[#AEDDEF]/10" aria-label="開啟選單"
             aria-haspopup="menu" aria-expanded="false" aria-controls="menuOverlay">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z" />
-            </svg>
-          </button>
-        </div>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z" />
+          </svg>
+        </button>
       </div>
     </div>
+    </div>
   </header>
-    <!-- 透明覆蓋層：專門接「點外面關閉」 -->
+  <!-- 透明覆蓋層：專門接「點外面關閉」 -->
   <div id="menuOverlay" class="fixed inset-0 z-50 hidden" role="dialog" aria-modal="true">
     <div id="overlayClickArea" class="absolute inset-0"></div>
 
@@ -163,55 +163,16 @@
     });
   </script>
 
-  <!-- Main -->
-  <main class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
-    <div class="grid md:grid-cols-2 gap-8 lg:gap-12 items-start">
-      <!-- 文案 -->
-      <section>
-        <h1 class="text-3xl sm:text-4xl font-extrabold leading-tight">
-          關於簡媽媽
-        </h1>
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <header class="mb-6">
+      <h1 class="text-3xl font-bold" style="text-align: center;"><span aria-hidden="true" class="text-5xl leading-none">🏠</span>幸 福 的 家<span aria-hidden="true" class="text-5xl leading-none">🏠</span></h1>
+      <p class="text-gray-600 mt-2">牠們現在都有家了！</p>
+      <p class="text-black mt-2" style="text-align: center;">也讓其他動物跟著你一起幸福～</p>
+    </header>
 
-        <div class="mt-5 space-y-4 text-gray-700 leading-relaxed">
-          <p>這裡，是浪浪等家的地方。<br>
-            近二十年前，簡媽媽開始救援浪浪，租下土地，搭起簡單狗舍，安置那些無法在街頭生存的毛孩們。</p>
-
-          <p>從幾隻開始，到如今百餘孩子在這等待家。需要的照顧、醫療和資源也越來越多，於是簡媽在幾位志工協助下成立
-            <strong>社團法人簡媽媽愛護動物協會</strong>，努力撐起送醫、結紮、照顧與送養的每一步。
-          </p>
-
-          <p>這裡沒有華麗設施，只有溫暖守護。</p>
-
-          我們相信：買得到的是寵物，認養到的是家人！邀請你，和我們一起，讓更多等待的孩子回家。</p>
-
-          <p class="text-sm text-gray-500">📌 中市社團字第1140036732號</p>
-        </div>
-
-        <!-- CTA -->
-        <div class="mt-8 flex flex-col sm:flex-row gap-3">
-          <a href="dogs.html"
-            class="inline-flex items-center justify-center rounded-xl px-5 py-3 bg-gray-900 text-white hover:bg-black">
-            看狗狗待領養名單
-          </a>
-          <a href="cats.html"
-            class="inline-flex items-center justify-center rounded-xl px-5 py-3 ring-1 ring-gray-300 text-gray-800 hover:bg-gray-50">
-            看貓咪待領養名單
-          </a>
-        </div>
-
-        <!-- 大標語 -->
-        <p class="mt-10 text-2xl sm:text-3xl font-bold">
-          用領養，給牠們一生的幸福
-        </p>
-      </section>
-
-      <!-- 圖片 -->
-      <section class="order-first md:order-none">
-        <figure class="rounded-3xl overflow-hidden shadow-sm ring-1 ring-gray-200">
-          <img src="images/chienma.jpg" alt="簡媽媽擁抱狗狗的照片" class="w-full h-full object-cover" loading="lazy">
-        </figure>
-      </section>
-    </div>
+    <section>
+      <div id="grid" class="mt-4 grid grid-cols-2 gap-6 sm:grid-cols-2 lg:grid-cols-3"></div>
+    </section>
   </main>
 
   <!-- Footer -->
@@ -221,8 +182,122 @@
     </div>
   </footer>
 
+  <!-- 這個 dialog 是為了讓 shared.js 的程式不報錯，用不到也沒關係 -->
+  <dialog id="petDialog"><button id="dlgClose" class="hidden">X</button></dialog>
+
+  <!-- Lightbox -->
+  <div id="lightbox" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[9999]">
+    <button id="lbPrev" class="absolute left-3 md:left-10 text-white text-4xl select-none">❮</button>
+    <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg" />
+    <div id="lbThumbs"
+      class="absolute bottom-20 left-0 w-full flex justify-center px-4 py-2 pb-[env(safe-area-inset-bottom)]">
+      <div id="lbThumbsInner" class="flex gap-3"></div>
+    </div>
+    <button id="lbNext" class="absolute right-3 md:right-10 text-white text-4xl select-none">❯</button>
+  </div>
+
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js';
+    import { getFirestore, collection, query, where, orderBy, getDocs } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyC4NT2KOm_Cw2OEdaaOimxI0ruoNv_u_9g",
+      authDomain: "straystation.firebaseapp.com",
+      projectId: "straystation",
+      storageBucket: "straystation.firebasestorage.app",
+      messagingSenderId: "611366379195",
+      appId: "1:611366379195:web:ef5a632e88d8bba1d6139e"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const grid = document.getElementById('grid');
+
+    function formatBreed(p) {
+      return p.breedType === "米克斯"
+        ? `米克斯/${p.breed || ""}`.replace(/\/$/, "")
+        : (p.breed || "—");
+    }
+
+    function formatAge(p) {
+      if (!p.age || p.age.trim() === "" || p.age === "—") return "年齡不詳";
+      return p.age;
+    }
+
+    function cardHTML(p) {
+      // 照你的規格：新合照優先（最多 5）→ 原圖（最多 5）= 最多 10 張
+      const newPhotos = Array.isArray(p.adoptedPhotos) ? p.adoptedPhotos.slice(0, 5) : [];
+      const origPhotos = Array.isArray(p.images) ? p.images.slice(0, 5) : [];
+      const imgs = [...newPhotos, ...origPhotos];
+      const img = imgs[0] || '';
+
+      const photosAttr = JSON.stringify(imgs).replace(/"/g, '&quot;');
+
+      return `
+        <article data-photos="${photosAttr}" class="group rounded-2xl overflow-hidden ring-1 ring-gray-200 bg-white hover:shadow-soft transition-shadow snap-start">
+          <div class="blur-fit rounded-t-2xl aspect-[4/3]" style="--bg: url('${img}')">
+            <img src="${img}" alt="${p.name || '動物照片'}">
+          </div>
+          <div class="p-4 flex-1 flex flex-col">
+            <!-- 第一行：左邊名字、右上角圓角標籤 -->
+            <div class="flex items-start justify-between gap-2">
+              <h3 class="font-semibold text-lg leading-snug line-clamp-1">${p.name || '未命名'}</h3>
+              <span class="shrink-0 rounded-full text-xs px-2 py-1
+                ${/(狗|犬)/.test(String(p.species || '')) ? 'bg-sky-50 text-sky-700' : 'bg-emerald-50 text-emerald-700'}">
+                ${/(狗|犬)/.test(String(p.species || '')) ? '狗狗' : '貓咪'}
+              </span>
+            </div>
+
+            <!-- 明細三行 -->
+            <div class="mt-2 mb-3 flex flex-col gap-2 text-xs">
+              <span class="self-start inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-2.5 py-1 whitespace-nowrap max-w-full truncate">
+                ${formatBreed(p)}
+              </span>
+              <span class="self-start inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-2.5 py-1 whitespace-nowrap max-w-full truncate">
+                ${formatAge(p) || '—'}
+              </span>
+              <span class="self-start inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-2.5 py-1 whitespace-nowrap max-w-full truncate">
+                ${p.gender || '—'}
+              </span>
+            </div>
+
+            
+          </div>
+        </article>
+      `;
+    }
+
+    async function loadPets() {
+      const qRef = query(collection(db, 'pets'), where('status', '==', 'adopted'), orderBy('createdAt', 'desc'));
+      const snap = await getDocs(qRef);
+      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      const list = all;
+      grid.innerHTML = list.map(cardHTML).join('');
+    }
+
+    // 點整張卡片 → 丟進 shared.js 的 openLightbox（索引從 0 開始）
+    grid.addEventListener('click', (e) => {
+      const card = e.target.closest('article[data-photos]');
+      if (!card) return;
+      const list = JSON.parse(card.getAttribute('data-photos') || '[]');
+      if (!list.length) return;
+      if (window.openLightbox) window.openLightbox(list, 0);
+    });
+
+    loadPets();
+  </script>
+  <script src="assets/shared.js"></script>
   <script>
-    document.getElementById('year').textContent = new Date().getFullYear();
+    window.closeLightbox = function () {
+      const lb = document.getElementById("lightbox");
+      if (lb) { lb.classList.add("hidden"); lb.classList.remove("flex"); }
+      document.documentElement.style.overflow = '';
+      document.body.style.overflow = '';
+    };
   </script>
 </body>
+
 </html>

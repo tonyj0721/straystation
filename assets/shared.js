@@ -153,18 +153,5 @@ lb.addEventListener("touchmove", (e) => {
   e.stopPropagation();
 }, { passive: false });
 
-// ======= Theme & Nav（原樣保留） =======
-$('#navToggle').addEventListener('click', () => {
-  const el = $('#mobileNav');
-  el.classList.toggle('hidden');
-});
-
-// 點選連結後自動關閉
-document.querySelectorAll('#mobileNav a').forEach(a => {
-  a.addEventListener('click', () => {
-    document.getElementById('mobileNav').classList.add('hidden');
-  });
-});
-
 const y = document.getElementById('year');
 if (y) y.textContent = new Date().getFullYear();

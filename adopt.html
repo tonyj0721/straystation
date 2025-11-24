@@ -24,8 +24,6 @@
       }
     };
   </script>
-
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 
 <body class="bg-pageBg text-gray-800 antialiased">
@@ -34,7 +32,7 @@
   <header class="bg-white/80 backdrop-blur border-b border-gray-200">
     <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="h-16 flex items-center justify-between">
-        <a href="index.html" class="flex items-center gap-2 font-semibold text-lg">
+        <a href="index.html" class="flex items-center gap-2 font-semibold text-2xl">
           <span>台中簡媽媽狗園</span>
         </a>
       </div>
@@ -45,8 +43,7 @@
   <main class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pt-2 pb-10">
 
     <!-- Back -->
-    <button onclick="history.back()"
-      class="inline-flex items-center gap-1 px-3 py-1.5 mb-1
+    <button onclick="history.back()" class="inline-flex items-center gap-1 px-3 py-1.5 mb-1
              border border-[#3B82F6] text-[#3B82F6] text-sm
              rounded-lg font-medium bg-white">
       ‹ 回上一頁
@@ -210,6 +207,13 @@
     </form>
   </main>
 
+  <!-- Footer -->
+  <footer class="bg-gray-50 border-t border-gray-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-sm text-gray-500">
+      © <span id="year"></span> 浪浪轉運站 StrayStation. 保留所有權利。
+    </div>
+  </footer>
+
   <!-- Popup -->
   <div id="popupOverlay" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-[999]">
     <div class="bg-white rounded-2xl p-6 max-w-sm w-[90%] text-center shadow-xl">
@@ -262,15 +266,7 @@
       popupOverlay.classList.add("hidden");
     });
   </script>
-
-  <!-- Footer -->
-  <footer class="bg-gray-50 border-t border-gray-200">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-sm text-gray-500">
-      © <span id="year"></span> 浪浪轉運站 StrayStation. 保留所有權利。
-    </div>
-  </footer>
-
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </body>
-
 
 </html>
