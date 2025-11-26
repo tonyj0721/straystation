@@ -27,7 +27,7 @@
           <a href="cats.html" class="hover:text-brand-600">我想養貓咪</a>
           <a href="dogs.html" class="hover:text-brand-600">我想養狗狗</a>
           <a href="about.html" class="hover:text-brand-600">關於簡媽媽</a>
-          <a href="home.html" class="hover:text-brand-600">幸福的家</a>
+          <a href="home.html" class="hover:text-brand-600">幸福的歸宿</a>
           <a href="admin.html" class="hover:text-brand-600">管理員登入</a>
         </nav>
 
@@ -44,7 +44,7 @@
       </div>
     </div>
   </header>
-    <!-- 透明覆蓋層：專門接「點外面關閉」 -->
+  <!-- 透明覆蓋層：專門接「點外面關閉」 -->
   <div id="menuOverlay" class="fixed inset-0 z-50 hidden" role="dialog" aria-modal="true">
     <div id="overlayClickArea" class="absolute inset-0"></div>
 
@@ -88,7 +88,7 @@
             text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
             focus:outline-none focus:ring-2 focus:ring-white/70">
             <span aria-hidden="true" class="text-xl leading-none">🏠</span>
-            <span>幸福的家</span>
+            <span>幸福的歸宿</span>
           </a>
         </li>
 
@@ -217,12 +217,17 @@
   <!-- Footer -->
   <footer class="bg-gray-50 border-t border-gray-200">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-sm text-gray-500">
-      © <span id="year"></span> 浪浪轉運站 StrayStation. 保留所有權利。
+      © <span id="year"></span> 浪浪轉運站 Stray Station. 保留所有權利。
     </div>
   </footer>
 
   <script>
-    document.getElementById('year').textContent = new Date().getFullYear();
+    const y = document.getElementById('year');
+    if (y) y.textContent = new Date().getFullYear();
+
+    history.scrollRestoration = "manual";
+    window.scrollTo(0, 0);
   </script>
 </body>
+
 </html>

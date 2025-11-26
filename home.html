@@ -1,303 +1,183 @@
 <!doctype html>
-<html lang="zh-Hant-TW">
-
+<html lang="zh-Hant">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>已領養牆｜台中簡媽媽狗園</title>
-  <meta name="description" content="曾被認養的毛孩故事與合照。">
-  <meta name="theme-color" content="#fcd34d">
-  <link rel="icon" href="data:,">
-  <link rel="apple-touch-icon" href="data:,">
-  <link rel="stylesheet" href="assets/tailwind.css">
-  <link rel="stylesheet" href="assets/shared.css">
+  <meta name="color-scheme" content="light dark" />
+  <title>網站建置中｜Under Construction</title>
+  <meta name="description" content="這個頁面正在建置中，很快就會與您見面。" />
+  <style>
+    :root {
+      --bg-1: #f7fafc;
+      --bg-2: #eef2f7;
+      --text: #0f172a;
+      --muted: #475569;
+      --accent: #2563eb;
+      --card: #ffffffcc;
+      --border: #e5e7eb80;
+      --shadow: 0 10px 30px rgba(2,6,23,.08);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-1: #0b1220;
+        --bg-2: #111827;
+        --text: #e5e7eb;
+        --muted: #94a3b8;
+        --accent: #60a5fa;
+        --card: #0b1220cc;
+        --border: #1f293780;
+        --shadow: 0 10px 30px rgba(0,0,0,.5);
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans TC", "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", sans-serif;
+      color: var(--text);
+      background: radial-gradient(1200px 600px at 10% -10%, var(--bg-2), transparent),
+                  radial-gradient(1000px 500px at 110% 10%, var(--bg-2), transparent),
+                  linear-gradient(180deg, var(--bg-1), var(--bg-2));
+      display: grid;
+      place-items: center;
+      min-height: 100svh;
+    }
+
+    .card {
+      width: min(680px, 92vw);
+      background: var(--card);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      padding: clamp(24px, 4vw, 36px);
+      text-align: center;
+    }
+
+    .icon {
+      width: 88px;
+      height: 88px;
+      margin-inline: auto;
+      display: block;
+      animation: float 3.5s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%,100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+
+    h1 {
+      font-size: clamp(24px, 4vw, 36px);
+      line-height: 1.15;
+      margin: 16px 0 8px;
+    }
+
+    p.lead {
+      font-size: clamp(14px, 2.4vw, 18px);
+      color: var(--muted);
+      margin: 0 0 18px;
+    }
+
+    .progress {
+      height: 10px;
+      width: 100%;
+      border-radius: 999px;
+      background: color-mix(in oklab, var(--accent) 15%, transparent);
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      margin: 14px auto 6px;
+    }
+
+    .progress::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      transform: translateX(-100%);
+      background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--accent) 40%, white), transparent);
+      animation: shimmer 1.4s linear infinite;
+    }
+
+    @keyframes shimmer {
+      100% { transform: translateX(100%); }
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 18px;
+    }
+
+    a.button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 16px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      text-decoration: none;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    a.button.primary {
+      background: var(--accent);
+      color: white;
+      border-color: transparent;
+    }
+
+    .small {
+      margin-top: 12px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    footer {
+      margin-top: 14px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+  </style>
 </head>
+<body>
+  <main class="card" role="main" aria-labelledby="headline">
+    <svg class="icon" viewBox="0 0 64 64" aria-hidden="true">
+      <!-- Simple construction cone -->
+      <defs>
+        <linearGradient id="g" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0" stop-color="#f59e0b"/>
+          <stop offset="1" stop-color="#d97706"/>
+        </linearGradient>
+      </defs>
+      <path d="M6 56h52a2 2 0 0 1 0 4H6a2 2 0 0 1 0-4z" fill="#94a3b8" opacity=".35"/>
+      <path d="M15 48h34L36 12h-8L15 48z" fill="url(#g)"/>
+      <rect x="22" y="20" width="20" height="4" rx="2" fill="#fef3c7"/>
+      <rect x="19" y="32" width="26" height="4" rx="2" fill="#fef3c7"/>
+    </svg>
 
-<body class="text-gray-800 bg-gradient-to-br from-brand-50 to-white">
-  <!-- Navbar -->
-  <header class="bg-white/80 backdrop-blur border-b border-gray-200">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="h-16 flex items-center justify-between">
-        <a href="index.html" class="flex items-center gap-2 font-semibold text-2xl">
-          <span>台中簡媽媽狗園</span>
-        </a>
+    <h1 id="headline">網頁建構中</h1>
+    <p class="lead">我們正在努力完成內容，敬請期待。</p>
 
-      <!-- 桌機導覽 -->
-      <nav class="hidden md:flex items-center gap-6 ml-auto">
-        <a href="cats.html" class="hover:text-brand-600">我想養貓咪</a>
-        <a href="dogs.html" class="hover:text-brand-600">我想養狗狗</a>
-        <a href="about.html" class="hover:text-brand-600">關於簡媽媽</a>
-        <a href="home.html" class="hover:text-brand-600">幸福的家</a>
-        <a href="admin.html" class="hover:text-brand-600">管理員登入</a>
-      </nav>
+    <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuetext="建置中"></div>
+    
 
-      <!-- 手機漢堡鈕 -->
-      <div class="flex items-center gap-2">
-          <button id="menuBtn"
-            class="md:hidden p-2 rounded-lg border border-[#AEDDEF] bg-white/80 hover:bg-[#AEDDEF]/10" aria-label="開啟選單"
-            aria-haspopup="menu" aria-expanded="false" aria-controls="menuOverlay">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z" />
-          </svg>
-        </button>
-      </div>
+    <div class="actions">
+      <a class="button primary" href="index.html">回到首頁</a>
     </div>
-    </div>
-  </header>
-  <!-- 透明覆蓋層：專門接「點外面關閉」 -->
-  <div id="menuOverlay" class="fixed inset-0 z-50 hidden" role="dialog" aria-modal="true">
-    <div id="overlayClickArea" class="absolute inset-0"></div>
 
-    <!-- 右上角彈出選單：固定位置，不推版，覆蓋 hero -->
-    <nav id="menuPanel" class="fixed opacity-0 scale-y-0 origin-top-right rounded-2xl shadow-xl
-            bg-[#AEDDEF] w-fit max-w-[90vw] p-3 transition duration-150 ease-out">
-      <!-- 小箭頭（同面板色） -->
-      <div class="absolute -top-2 right-5 w-3 h-3 rotate-45 bg-[#AEDDEF]"></div>
-
-      <!-- 按鈕群：保留 space-y-2、字體 18px -->
-      <ul class="space-y-2 py-1 text-[18px]" role="menu" aria-orientation="vertical" tabindex="-1">
-        <li>
-          <a href="cats.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
-                text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
-                focus:outline-none focus:ring-2 focus:ring-white/70">
-            <span aria-hidden="true" class="text-xl leading-none">🐱</span>
-            <span>我想養貓咪</span>
-          </a>
-        </li>
-
-        <li>
-          <a href="dogs.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
-                text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
-                focus:outline-none focus:ring-2 focus:ring-white/70">
-            <span aria-hidden="true" class="text-xl leading-none">🐶</span>
-            <span>我想養狗狗</span>
-          </a>
-        </li>
-
-        <li>
-          <a href="about.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
-                text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
-                focus:outline-none focus:ring-2 focus:ring-white/70">
-            <span aria-hidden="true" class="text-xl leading-none">ℹ️</span>
-            <span>關於簡媽媽</span>
-          </a>
-        </li>
-
-        <li>
-          <a href="home.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
-            text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
-            focus:outline-none focus:ring-2 focus:ring-white/70">
-            <span aria-hidden="true" class="text-xl leading-none">🏠</span>
-            <span>幸福的家</span>
-          </a>
-        </li>
-
-        <li>
-          <a href="admin.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
-                text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
-                focus:outline-none focus:ring-2 focus:ring-white/70">
-            <span aria-hidden="true" class="text-xl leading-none">🔒</span>
-            <span>管理員登入</span>
-          </a>
-        </li>
-      </ul>
-    </nav>
-  </div>
-  <script>
-    const menuBtn = document.getElementById('menuBtn');
-    const overlay = document.getElementById('menuOverlay');
-    const clickArea = document.getElementById('overlayClickArea');
-    const panel = document.getElementById('menuPanel');
-
-    function positionPanel() {
-      const r = menuBtn.getBoundingClientRect();
-      const gap = 8;
-      panel.style.top = '-1000px';
-      panel.style.left = '-1000px';
-      const w = panel.offsetWidth;
-      let left = r.right - w;
-      left = Math.max(8, Math.min(left, window.innerWidth - w - 8));
-      panel.style.top = (r.bottom + gap) + 'px';
-      panel.style.left = left + 'px';
-    }
-    function openMenu() {
-      overlay.classList.remove('hidden');
-      positionPanel();
-      requestAnimationFrame(() => {
-        panel.classList.remove('opacity-0', 'scale-y-0');
-        panel.classList.add('scale-y-100');
-      });
-      document.addEventListener('keydown', onEsc);
-      menuBtn.setAttribute('aria-expanded', 'true');
-      const firstItem = panel.querySelector('[role="menuitem"]');
-      if (firstItem) firstItem.focus();
-    }
-    function closeMenu() {
-      panel.classList.add('opacity-0');
-      panel.classList.remove('scale-y-100');
-      panel.classList.add('scale-y-0');
-      menuBtn.setAttribute('aria-expanded', 'false');
-      document.removeEventListener('keydown', onEsc);
-      setTimeout(() => overlay.classList.add('hidden'), 150);
-      menuBtn.focus();
-    }
-    function onEsc(e) { if (e.key === 'Escape') closeMenu(); }
-
-    menuBtn.addEventListener('click', () => {
-      const expanded = menuBtn.getAttribute('aria-expanded') === 'true';
-      expanded ? closeMenu() : openMenu();
-    });
-    clickArea.addEventListener('click', (e) => {
-      if (!panel.contains(e.target) && e.target !== menuBtn) closeMenu();
-    });
-    panel.addEventListener('keydown', (e) => {
-      const items = Array.from(panel.querySelectorAll('[role="menuitem"]'));
-      const i = items.indexOf(document.activeElement);
-      if (e.key === 'ArrowDown') { e.preventDefault(); items[(i + 1 + items.length) % items.length].focus(); }
-      if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
-      if (e.key === 'Home') { e.preventDefault(); items[0].focus(); }
-      if (e.key === 'End') { e.preventDefault(); items[items.length - 1].focus(); }
-    });
-    window.addEventListener('resize', () => {
-      if (!overlay.classList.contains('hidden')) positionPanel();
-    });
-  </script>
-
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-    <header class="mb-6">
-      <h1 class="text-3xl font-bold" style="text-align: center;"><span aria-hidden="true" class="text-5xl leading-none">🏠</span>幸 福 的 家<span aria-hidden="true" class="text-5xl leading-none">🏠</span></h1>
-      <p class="text-gray-600 mt-2">牠們現在都有家了！</p>
-      <p class="text-black mt-2" style="text-align: center;">也讓其他動物跟著你一起幸福～</p>
-    </header>
-
-    <section>
-      <div id="grid" class="mt-4 grid grid-cols-2 gap-6 sm:grid-cols-2 lg:grid-cols-3"></div>
-    </section>
+    <footer>© <span id="year"></span> 浪浪轉運站 Stray Station</footer>
   </main>
 
-  <!-- Footer -->
-  <footer class="bg-gray-50 border-t border-gray-200">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-sm text-gray-500">
-      © <span id="year"></span> 浪浪轉運站 StrayStation. 保留所有權利。
-    </div>
-  </footer>
-
-  <!-- 這個 dialog 是為了讓 shared.js 的程式不報錯，用不到也沒關係 -->
-  <dialog id="petDialog"><button id="dlgClose" class="hidden">X</button></dialog>
-
-  <!-- Lightbox -->
-  <div id="lightbox" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[9999]">
-    <button id="lbPrev" class="absolute left-3 md:left-10 text-white text-4xl select-none">❮</button>
-    <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg" />
-    <div id="lbThumbs"
-      class="absolute bottom-20 left-0 w-full flex justify-center px-4 py-2 pb-[env(safe-area-inset-bottom)]">
-      <div id="lbThumbsInner" class="flex gap-3"></div>
-    </div>
-    <button id="lbNext" class="absolute right-3 md:right-10 text-white text-4xl select-none">❯</button>
-  </div>
-
-
-  <script type="module">
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js';
-    import { getFirestore, collection, query, where, orderBy, getDocs } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js';
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyC4NT2KOm_Cw2OEdaaOimxI0ruoNv_u_9g",
-      authDomain: "straystation.firebaseapp.com",
-      projectId: "straystation",
-      storageBucket: "straystation.firebasestorage.app",
-      messagingSenderId: "611366379195",
-      appId: "1:611366379195:web:ef5a632e88d8bba1d6139e"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-
-    const grid = document.getElementById('grid');
-
-    function formatBreed(p) {
-      return p.breedType === "米克斯"
-        ? `米克斯/${p.breed || ""}`.replace(/\/$/, "")
-        : (p.breed || "—");
-    }
-
-    function formatAge(p) {
-      if (!p.age || p.age.trim() === "" || p.age === "—") return "年齡不詳";
-      return p.age;
-    }
-
-    function cardHTML(p) {
-      // 照你的規格：新合照優先（最多 5）→ 原圖（最多 5）= 最多 10 張
-      const newPhotos = Array.isArray(p.adoptedPhotos) ? p.adoptedPhotos.slice(0, 5) : [];
-      const origPhotos = Array.isArray(p.images) ? p.images.slice(0, 5) : [];
-      const imgs = [...newPhotos, ...origPhotos];
-      const img = imgs[0] || '';
-
-      const photosAttr = JSON.stringify(imgs).replace(/"/g, '&quot;');
-
-      return `
-        <article data-photos="${photosAttr}" class="group rounded-2xl overflow-hidden ring-1 ring-gray-200 bg-white hover:shadow-soft transition-shadow snap-start">
-          <div class="blur-fit rounded-t-2xl aspect-[4/3]" style="--bg: url('${img}')">
-            <img src="${img}" alt="${p.name || '動物照片'}">
-          </div>
-          <div class="p-4 flex-1 flex flex-col">
-            <!-- 第一行：左邊名字、右上角圓角標籤 -->
-            <div class="flex items-start justify-between gap-2">
-              <h3 class="font-semibold text-lg leading-snug line-clamp-1">${p.name || '未命名'}</h3>
-              <span class="shrink-0 rounded-full text-xs px-2 py-1
-                ${/(狗|犬)/.test(String(p.species || '')) ? 'bg-sky-50 text-sky-700' : 'bg-emerald-50 text-emerald-700'}">
-                ${/(狗|犬)/.test(String(p.species || '')) ? '狗狗' : '貓咪'}
-              </span>
-            </div>
-
-            <!-- 明細三行 -->
-            <div class="mt-2 mb-3 flex flex-col gap-2 text-xs">
-              <span class="self-start inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-2.5 py-1 whitespace-nowrap max-w-full truncate">
-                ${formatBreed(p)}
-              </span>
-              <span class="self-start inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-2.5 py-1 whitespace-nowrap max-w-full truncate">
-                ${formatAge(p) || '—'}
-              </span>
-              <span class="self-start inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-2.5 py-1 whitespace-nowrap max-w-full truncate">
-                ${p.gender || '—'}
-              </span>
-            </div>
-
-            
-          </div>
-        </article>
-      `;
-    }
-
-    async function loadPets() {
-      const qRef = query(collection(db, 'pets'), where('status', '==', 'adopted'), orderBy('createdAt', 'desc'));
-      const snap = await getDocs(qRef);
-      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-      const list = all;
-      grid.innerHTML = list.map(cardHTML).join('');
-    }
-
-    // 點整張卡片 → 丟進 shared.js 的 openLightbox（索引從 0 開始）
-    grid.addEventListener('click', (e) => {
-      const card = e.target.closest('article[data-photos]');
-      if (!card) return;
-      const list = JSON.parse(card.getAttribute('data-photos') || '[]');
-      if (!list.length) return;
-      if (window.openLightbox) window.openLightbox(list, 0);
-    });
-
-    loadPets();
-  </script>
-  <script src="assets/shared.js"></script>
   <script>
-    window.closeLightbox = function () {
-      const lb = document.getElementById("lightbox");
-      if (lb) { lb.classList.add("hidden"); lb.classList.remove("flex"); }
-      document.documentElement.style.overflow = '';
-      document.body.style.overflow = '';
-    };
-  </script>
+  // 動態年份
+  var yEl = document.getElementById('year');
+  if (yEl) yEl.textContent = new Date().getFullYear();
+</script>
 </body>
-
 </html>

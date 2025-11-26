@@ -96,3 +96,12 @@ dialog::backdrop {
   background-color: #3c39e6;
   /* hover 深一點 */
 }
+
+.swal2-cancel {
+  padding: 10px 24px;
+  border-radius: 12px;
+  /* 跟你的 UI 圓角一致 */
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+}
