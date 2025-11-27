@@ -11,6 +11,13 @@
   <link rel="apple-touch-icon" href="data:,">
   <link rel="stylesheet" href="assets/tailwind.css">
   <link rel="stylesheet" href="assets/shared.css">
+
+  <style>
+    /* Prevent scroll anchoring jitter while results re-render */
+    #rows, #rowsMobile { overflow-anchor: none; }
+    /* iOS Safari: ensure inputs don't trigger zoom on focus */
+    #searchName { font-size: 16px; }
+  </style>
 </head>
 
 <body class="text-gray-800 bg-gradient-to-br from-brand-50 to-white">
@@ -27,7 +34,7 @@
           <a href="cats.html" class="hover:text-brand-600">我想養貓咪</a>
           <a href="dogs.html" class="hover:text-brand-600">我想養狗狗</a>
           <a href="about.html" class="hover:text-brand-600">關於簡媽媽</a>
-          <a href="home.html" class="hover:text-brand-600">幸福的歸宿</a>
+          <a href="home.html" class="hover:text-brand-600">幸福的家</a>
           <a href="admin.html" class="hover:text-brand-600">管理員登入</a>
         </nav>
 
@@ -88,7 +95,7 @@
             text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
             focus:outline-none focus:ring-2 focus:ring-white/70">
             <span aria-hidden="true" class="text-xl leading-none">🏠</span>
-            <span>幸福的歸宿</span>
+            <span>幸福的家</span>
           </a>
         </li>
 
@@ -246,7 +253,7 @@
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <h2 class="text-lg font-semibold">資料表</h2>
             <div class="relative w-full sm:w-72">
-              <input id="searchName" class="w-full rounded-xl border border-gray-300 p-2 pl-9 text-sm"
+              <input id="searchName" class="w-full rounded-xl border border-gray-300 p-2 pl-9 text-base"
                 placeholder="搜尋名字…" />
               <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔎</span>
             </div>
@@ -273,7 +280,7 @@
   <!-- Footer -->
   <footer class="bg-gray-50 border-t border-gray-200">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-sm text-gray-500">
-      © <span id="year"></span> 浪浪轉運站 Stray Station. 保留所有權利。
+      © <span id="year"></span> 浪浪轉運站 StrayStation. 保留所有權利。
     </div>
   </footer>
 
@@ -448,6 +455,15 @@
   </div>
 
   <script type="module">
+// --- debounce helper (for search input) ---
+function debounce(fn, delay = 150) {
+  let t; 
+  return function(...args) {
+    clearTimeout(t);
+    t = setTimeout(() => fn.apply(this, args), delay);
+  };
+}
+
     // ===============================
     // Firebase 設定與初始化
     // ===============================
@@ -762,27 +778,27 @@
       const kw = (name || "").trim().toLowerCase();
       if (!kw) return false;
 
-      // 1) 以 nameLower 精準查，取最多 2 筆，避免只有自己時誤判為無重複
+      // 1) nameLower 精準查
       let snap = await getDocs(query(
         collection(db, "pets"),
         where("nameLower", "==", kw),
-        fbLimit(2)
+        fbLimit(1)
       ));
-      if (!snap.empty && snap.docs.some((d) => d.id !== exceptId)) return true;
+      if (!snap.empty && snap.docs[0].id !== exceptId) return true;
 
-      // 2) 舊資料沒 nameLower，再用 name 精準查一次，同樣取 2 筆
+      // 2) 舊資料沒 nameLower，再用 name 精準查一次
       snap = await getDocs(query(
         collection(db, "pets"),
         where("name", "==", name),
-        fbLimit(2)
+        fbLimit(1)
       ));
-      if (!snap.empty && snap.docs.some((d) => d.id !== exceptId)) return true;
+      if (!snap.empty && snap.docs[0].id !== exceptId) return true;
 
       return false;
     }
 
     const searchInput = $("#searchName");
-    searchInput.addEventListener("input", onSearchByName);
+    searchInput.addEventListener("input", debounce(onSearchByName, 150));
 
     function applyFilterAndRender() {
       const kw = searchInput.value.trim().toLowerCase();
