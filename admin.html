@@ -15,6 +15,12 @@
   <style>
     html, body { overflow-anchor: none; }
   </style>
+
+  <style>
+    /* Reserve stable space for mobile list thumbnails to prevent layout shifts */
+    #rowsMobile img { width: 64px; height: 64px; object-fit: cover; aspect-ratio: 1 / 1; }
+  </style>
+
 </head>
 
 <body class="text-gray-800 bg-gradient-to-br from-brand-50 to-white">
@@ -452,6 +458,18 @@
   </div>
 
   <script type="module">
+// Enforce width/height on mobile list images to avoid reflow when images load
+function stabilizeMobileThumbs() {
+  const imgs = document.querySelectorAll('#rowsMobile img');
+  imgs.forEach(img => {
+    if (!img.hasAttribute('width')) img.setAttribute('width', '64');
+    if (!img.hasAttribute('height')) img.setAttribute('height', '64');
+    img.style.width = '64px';
+    img.style.height = '64px';
+    img.style.objectFit = 'cover';
+  });
+}
+
 // --- Keyboard-safe padding + ensure-visible (focus/keyboard only; no per-keystroke scroll) ---
 (function keyboardSafeSearch() {
   const input = document.getElementById('searchName');
@@ -510,7 +528,7 @@ function debounce(fn, wait=160){ let t; return (...a)=>{ clearTimeout(t); t=setT
 function withStableSearchRender(renderFn){
   const inputEl = document.getElementById('searchName');
   const active = document.activeElement === inputEl;
-  if (active){ renderFn(); return; }
+  if (active){ renderFn(); stabilizeMobileThumbs(); return; }
   const doc = document.documentElement;
   const beforeH = doc.scrollHeight;
   const beforeY = window.pageYOffset;
@@ -872,6 +890,7 @@ function withStableSearchRender(renderFn){
         : pets;
       renderRows(list);
       renderRowsMobile(list);
+  stabilizeMobileThumbs();
     }
 
     // 後端依名字（前綴）查詢：有關鍵字→打 Firestore；空字串→回到預設清單
@@ -896,6 +915,7 @@ function withStableSearchRender(renderFn){
 
       renderRows(list);
       renderRowsMobile(list);
+  stabilizeMobileThumbs();
     }
 
     // 顯示品種的規則（品種犬/貓 → 直接顯示品種；米克斯 → 顯示「米克斯/毛色」）
