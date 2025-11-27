@@ -452,6 +452,58 @@
   </div>
 
   <script type="module">
+// --- Keyboard-safe padding + ensure-visible (focus/keyboard only; no per-keystroke scroll) ---
+(function keyboardSafeSearch() {
+  const input = document.getElementById('searchName');
+  if (!input) return;
+  let active = false;
+
+  function keyboardGap() {
+    const vv = window.visualViewport;
+    if (!vv) return 0;
+    // Approximate keyboard height: area not covered by visual viewport
+    return Math.max(0, window.innerHeight - (vv.height + vv.offsetTop));
+  }
+
+  function setPadding() {
+    if (!active) return;
+    const gap = keyboardGap();
+    document.body.style.paddingBottom = (gap + 16) + 'px';
+  }
+
+  function ensureVisible() {
+    const vv = window.visualViewport;
+    const vh = (vv && vv.height) || window.innerHeight;
+    const r = input.getBoundingClientRect();
+    const pad = 8;
+    if (r.bottom > vh - pad) {
+      window.scrollBy({ top: r.bottom - (vh - pad), behavior: 'auto' });
+    } else if (r.top < pad) {
+      window.scrollBy({ top: r.top - pad, behavior: 'auto' });
+    }
+  }
+
+  input.addEventListener('focus', () => {
+    active = true;
+    // allow keyboard animation to begin
+    requestAnimationFrame(() => { setPadding(); ensureVisible(); });
+    setTimeout(() => { setPadding(); ensureVisible(); }, 220);
+  });
+
+  input.addEventListener('blur', () => {
+    active = false;
+    document.body.style.paddingBottom = '';
+  });
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+      if (active) { setPadding(); ensureVisible(); }
+    });
+    window.visualViewport.addEventListener('scroll', () => {
+      if (active) { setPadding(); ensureVisible(); }
+    });
+  }
+})();
 // --- minimal search-stability helpers ---
 function debounce(fn, wait=160){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn.apply(this,a), wait); }; }
 // typing: do NOT adjust scroll; when not typing: keep bottom offset to avoid being pushed while browsing bottom
