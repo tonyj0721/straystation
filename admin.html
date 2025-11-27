@@ -13,7 +13,6 @@
   <link rel="stylesheet" href="assets/shared.css">
 
   <style>
-    /* Avoid browser auto scroll anchoring fighting our manual stabilization during search */
     html, body { overflow-anchor: none; }
   </style>
 
@@ -454,40 +453,73 @@
   </div>
 
   <script type="module">
-// --- search-stability helpers (minimal & local to search flows) ---
+// --- search-stability helpers (focus-aware) ---
 function debounce(fn, wait=160) {
   let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn.apply(this,args), wait); };
 }
 function withStableSearchRender(renderFn) {
   const doc = document.documentElement;
   const inputEl = document.getElementById('searchName');
-  const beforeH = doc.scrollHeight;
-  const beforeY = window.pageYOffset;
-  const vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
-  const bottomOffset = beforeH - (beforeY + vh);
-  const atBottom = Math.abs(beforeY + vh - beforeH) <= 2;
-  const beforeInputTop = inputEl ? inputEl.getBoundingClientRect().top : null;
+  const activeOnSearch = document.activeElement === inputEl;
+
+  let atBottom = false;
+  let bottomOffset = 0;
+  if (!activeOnSearch) {
+    const beforeH = doc.scrollHeight;
+    const beforeY = window.pageYOffset;
+    const vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+    bottomOffset = beforeH - (beforeY + vh);
+    atBottom = Math.abs(beforeY + vh - beforeH) <= 2;
+  }
 
   renderFn();
 
   requestAnimationFrame(() => {
-    // If user was effectively at the bottom, keep their distance from bottom constant
+    const vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+
+    if (activeOnSearch && inputEl) {
+      const r = inputEl.getBoundingClientRect();
+      const pad = 8;
+      if (r.bottom > vh - pad) {
+        window.scrollBy({ top: r.bottom - (vh - pad), behavior: 'auto' });
+      } else if (r.top < pad) {
+        window.scrollBy({ top: r.top - pad, behavior: 'auto' });
+      }
+      return;
+    }
+
     if (atBottom) {
       const afterH = doc.scrollHeight;
       const newY = Math.max(0, afterH - vh - bottomOffset);
       if (Math.abs(newY - window.pageYOffset) > 1) {
         window.scrollTo({ top: newY, behavior: 'auto' });
-        return;
       }
-    }
-    // Otherwise keep the search input visually steady
-    if (beforeInputTop != null && inputEl) {
-      const afterInputTop = inputEl.getBoundingClientRect().top;
-      const delta = beforeInputTop - afterInputTop;
-      if (Math.abs(delta) > 1) window.scrollBy({ top: delta, left: 0, behavior: 'auto' });
     }
   });
 }
+
+// make sure focusing the search keeps it in view above the keyboard
+(function setupSearchVisibility() {
+  const input = document.getElementById('searchName');
+  if (!input) return;
+  function ensureVisible() {
+    const vv = window.visualViewport;
+    const vh = (vv && vv.height) || window.innerHeight;
+    const r = input.getBoundingClientRect();
+    const pad = 8;
+    if (r.bottom > vh - pad) {
+      window.scrollBy({ top: r.bottom - (vh - pad), behavior: 'auto' });
+    } else if (r.top < pad) {
+      window.scrollBy({ top: r.top - pad, behavior: 'auto' });
+    }
+  }
+  input.addEventListener('focus', () => { requestAnimationFrame(ensureVisible); });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+      if (document.activeElement === input) ensureVisible();
+    });
+  }
+})();
 
     // ===============================
     // Firebase 設定與初始化
