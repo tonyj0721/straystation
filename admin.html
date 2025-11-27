@@ -11,16 +11,6 @@
   <link rel="apple-touch-icon" href="data:,">
   <link rel="stylesheet" href="assets/tailwind.css">
   <link rel="stylesheet" href="assets/shared.css">
-
-  <style>
-    html, body { overflow-anchor: none; }
-  </style>
-
-  <style>
-    /* Reserve stable space for mobile list thumbnails to prevent layout shifts */
-    #rowsMobile img { width: 64px; height: 64px; object-fit: cover; aspect-ratio: 1 / 1; }
-  </style>
-
 </head>
 
 <body class="text-gray-800 bg-gradient-to-br from-brand-50 to-white">
@@ -458,94 +448,15 @@
   </div>
 
   <script type="module">
-// Enforce width/height on mobile list images to avoid reflow when images load
-function stabilizeMobileThumbs() {
-  const imgs = document.querySelectorAll('#rowsMobile img');
-  imgs.forEach(img => {
-    if (!img.hasAttribute('width')) img.setAttribute('width', '64');
-    if (!img.hasAttribute('height')) img.setAttribute('height', '64');
-    img.style.width = '64px';
-    img.style.height = '64px';
-    img.style.objectFit = 'cover';
-  });
-}
-
-// --- Keyboard-safe padding + ensure-visible (focus/keyboard only; no per-keystroke scroll) ---
-(function keyboardSafeSearch() {
-  const input = document.getElementById('searchName');
-  if (!input) return;
-  let active = false;
-
-  function keyboardGap() {
-    const vv = window.visualViewport;
-    if (!vv) return 0;
-    // Approximate keyboard height: area not covered by visual viewport
-    return Math.max(0, window.innerHeight - (vv.height + vv.offsetTop));
-  }
-
-  function setPadding() {
-    if (!active) return;
-    const gap = keyboardGap();
-    document.body.style.paddingBottom = (gap + 16) + 'px';
-  }
-
-  function ensureVisible() {
-    const vv = window.visualViewport;
-    const vh = (vv && vv.height) || window.innerHeight;
-    const r = input.getBoundingClientRect();
-    const pad = 8;
-    if (r.bottom > vh - pad) {
-      window.scrollBy({ top: r.bottom - (vh - pad), behavior: 'auto' });
-    } else if (r.top < pad) {
-      window.scrollBy({ top: r.top - pad, behavior: 'auto' });
-    }
-  }
-
-  input.addEventListener('focus', () => {
-    active = true;
-    // allow keyboard animation to begin
-    requestAnimationFrame(() => { setPadding(); ensureVisible(); });
-    setTimeout(() => { setPadding(); ensureVisible(); }, 220);
-  });
-
-  input.addEventListener('blur', () => {
-    active = false;
-    document.body.style.paddingBottom = '';
-  });
-
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', () => {
-      if (active) { setPadding(); ensureVisible(); }
-    });
-    window.visualViewport.addEventListener('scroll', () => {
-      if (active) { setPadding(); ensureVisible(); }
-    });
+// --- Set a fixed minimum height for the results area (no inner scrolling) ---
+(function setResultsFloor(){
+  const rowsMobile = document.getElementById('rowsMobile');
+  const rows = document.getElementById('rows');
+  const host = rowsMobile ? rowsMobile.parentElement : (rows ? rows.closest('div') : null);
+  if (host) {
+    host.style.minHeight = '685px';
   }
 })();
-// --- minimal search-stability helpers ---
-function debounce(fn, wait=160){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn.apply(this,a), wait); }; }
-// typing: do NOT adjust scroll; when not typing: keep bottom offset to avoid being pushed while browsing bottom
-function withStableSearchRender(renderFn){
-  const inputEl = document.getElementById('searchName');
-  const active = document.activeElement === inputEl;
-  if (active){ renderFn(); stabilizeMobileThumbs(); return; }
-  const doc = document.documentElement;
-  const beforeH = doc.scrollHeight;
-  const beforeY = window.pageYOffset;
-  const vv = window.visualViewport;
-  const vh = (vv && vv.height) || window.innerHeight;
-  const bottomOffset = beforeH - (beforeY + vh);
-  const atBottom = Math.abs(beforeY + vh - beforeH) <= 2;
-  renderFn();
-  if (!atBottom) return;
-  requestAnimationFrame(()=>{
-    const afterH = doc.scrollHeight;
-    const newY = Math.max(0, afterH - vh - bottomOffset);
-    if (Math.abs(newY - window.pageYOffset) > 1){
-      window.scrollTo({ top: newY, behavior:'auto' });
-    }
-  });
-}
 
     // ===============================
     // Firebase 設定與初始化
@@ -881,7 +792,7 @@ function withStableSearchRender(renderFn){
     }
 
     const searchInput = $("#searchName");
-    searchInput.addEventListener("input", debounce(onSearchByName, 160));
+    searchInput.addEventListener("input", onSearchByName);
 
     function applyFilterAndRender() {
       const kw = searchInput.value.trim().toLowerCase();
@@ -890,7 +801,6 @@ function withStableSearchRender(renderFn){
         : pets;
       renderRows(list);
       renderRowsMobile(list);
-  stabilizeMobileThumbs();
     }
 
     // 後端依名字（前綴）查詢：有關鍵字→打 Firestore；空字串→回到預設清單
@@ -915,7 +825,6 @@ function withStableSearchRender(renderFn){
 
       renderRows(list);
       renderRowsMobile(list);
-  stabilizeMobileThumbs();
     }
 
     // 顯示品種的規則（品種犬/貓 → 直接顯示品種；米克斯 → 顯示「米克斯/毛色」）
