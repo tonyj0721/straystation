@@ -11,12 +11,6 @@
   <link rel="apple-touch-icon" href="data:,">
   <link rel="stylesheet" href="assets/tailwind.css">
   <link rel="stylesheet" href="assets/shared.css">
-
-  <style>
-    /* Avoid browser auto scroll anchoring fighting our manual stabilization during search */
-    html, body { overflow-anchor: none; }
-  </style>
-
 </head>
 
 <body class="text-gray-800 bg-gradient-to-br from-brand-50 to-white">
@@ -454,41 +448,6 @@
   </div>
 
   <script type="module">
-// --- search-stability helpers (minimal & local to search flows) ---
-function debounce(fn, wait=160) {
-  let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn.apply(this,args), wait); };
-}
-function withStableSearchRender(renderFn) {
-  const doc = document.documentElement;
-  const inputEl = document.getElementById('searchName');
-  const beforeH = doc.scrollHeight;
-  const beforeY = window.pageYOffset;
-  const vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
-  const bottomOffset = beforeH - (beforeY + vh);
-  const atBottom = Math.abs(beforeY + vh - beforeH) <= 2;
-  const beforeInputTop = inputEl ? inputEl.getBoundingClientRect().top : null;
-
-  renderFn();
-
-  requestAnimationFrame(() => {
-    // If user was effectively at the bottom, keep their distance from bottom constant
-    if (atBottom) {
-      const afterH = doc.scrollHeight;
-      const newY = Math.max(0, afterH - vh - bottomOffset);
-      if (Math.abs(newY - window.pageYOffset) > 1) {
-        window.scrollTo({ top: newY, behavior: 'auto' });
-        return;
-      }
-    }
-    // Otherwise keep the search input visually steady
-    if (beforeInputTop != null && inputEl) {
-      const afterInputTop = inputEl.getBoundingClientRect().top;
-      const delta = beforeInputTop - afterInputTop;
-      if (Math.abs(delta) > 1) window.scrollBy({ top: delta, left: 0, behavior: 'auto' });
-    }
-  });
-}
-
     // ===============================
     // Firebase 設定與初始化
     // ===============================
@@ -823,7 +782,7 @@ function withStableSearchRender(renderFn) {
     }
 
     const searchInput = $("#searchName");
-    searchInput.addEventListener("input", debounce(onSearchByName, 160));
+    searchInput.addEventListener("input", onSearchByName);
 
     function applyFilterAndRender() {
       const kw = searchInput.value.trim().toLowerCase();
