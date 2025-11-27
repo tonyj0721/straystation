@@ -1,0 +1,1905 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>管理後台｜台中簡媽媽狗園</title>
+  <meta name="description" content="TailwindCSS + Firebase Firestore 後台：登錄、管理動物資料；沿用前台 Modal/Lightbox。" />
+  <meta name="theme-color" content="#fcd34d">
+  <link rel="icon" href="data:,">
+  <link rel="apple-touch-icon" href="data:,">
+  <link rel="stylesheet" href="assets/tailwind.css">
+  <link rel="stylesheet" href="assets/shared.css">
+
+  <style>
+    html, body { overflow-anchor: none; }
+  </style>
+
+  <style>
+    /* Reserve stable space for mobile list thumbnails to prevent layout shifts */
+    #rowsMobile img { width: 64px; height: 64px; object-fit: cover; aspect-ratio: 1 / 1; }
+  </style>
+
+</head>
+
+<body class="text-gray-800 bg-gradient-to-br from-brand-50 to-white">
+  <!-- Navbar -->
+  <header class="bg-white/80 backdrop-blur border-b border-gray-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="h-16 flex items-center justify-between">
+        <a href="index.html" class="flex items-center gap-2 font-semibold text-2xl">
+          <span>管理後台</span>
+        </a>
+
+        <!-- 桌機導覽 -->
+        <nav class="hidden md:flex items-center gap-6 ml-auto">
+          <a href="cats.html" class="hover:text-brand-600">我想養貓咪</a>
+          <a href="dogs.html" class="hover:text-brand-600">我想養狗狗</a>
+          <a href="about.html" class="hover:text-brand-600">關於簡媽媽</a>
+          <a href="home.html" class="hover:text-brand-600">幸福的歸宿</a>
+          <a href="admin.html" class="hover:text-brand-600">管理員登入</a>
+        </nav>
+
+        <!-- 手機漢堡鈕 -->
+        <div class="flex items-center gap-2">
+          <button id="menuBtn"
+            class="md:hidden p-2 rounded-lg border border-[#AEDDEF] bg-white/80 hover:bg-[#AEDDEF]/10" aria-label="開啟選單"
+            aria-haspopup="menu" aria-expanded="false" aria-controls="menuOverlay">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+  <!-- 透明覆蓋層：專門接「點外面關閉」 -->
+  <div id="menuOverlay" class="fixed inset-0 z-50 hidden" role="dialog" aria-modal="true">
+    <div id="overlayClickArea" class="absolute inset-0"></div>
+
+    <!-- 右上角彈出選單：固定位置，不推版，覆蓋 hero -->
+    <nav id="menuPanel" class="fixed opacity-0 scale-y-0 origin-top-right rounded-2xl shadow-xl
+            bg-[#AEDDEF] w-fit max-w-[90vw] p-3 transition duration-150 ease-out">
+      <!-- 小箭頭（同面板色） -->
+      <div class="absolute -top-2 right-5 w-3 h-3 rotate-45 bg-[#AEDDEF]"></div>
+
+      <!-- 按鈕群：保留 space-y-2、字體 18px -->
+      <ul class="space-y-2 py-1 text-[18px]" role="menu" aria-orientation="vertical" tabindex="-1">
+        <li>
+          <a href="cats.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+                text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+                focus:outline-none focus:ring-2 focus:ring-white/70">
+            <span aria-hidden="true" class="text-xl leading-none">🐱</span>
+            <span>我想養貓咪</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="dogs.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+                text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+                focus:outline-none focus:ring-2 focus:ring-white/70">
+            <span aria-hidden="true" class="text-xl leading-none">🐶</span>
+            <span>我想養狗狗</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="about.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+                text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+                focus:outline-none focus:ring-2 focus:ring-white/70">
+            <span aria-hidden="true" class="text-xl leading-none">ℹ️</span>
+            <span>關於簡媽媽</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="home.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+            text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+            focus:outline-none focus:ring-2 focus:ring-white/70">
+            <span aria-hidden="true" class="text-xl leading-none">🏠</span>
+            <span>幸福的歸宿</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="admin.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+                text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+                focus:outline-none focus:ring-2 focus:ring-white/70">
+            <span aria-hidden="true" class="text-xl leading-none">🔒</span>
+            <span>管理員登入</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+  </div>
+  <script>
+    const menuBtn = document.getElementById('menuBtn');
+    const overlay = document.getElementById('menuOverlay');
+    const clickArea = document.getElementById('overlayClickArea');
+    const panel = document.getElementById('menuPanel');
+
+    function positionPanel() {
+      const r = menuBtn.getBoundingClientRect();
+      const gap = 8;
+      panel.style.top = '-1000px';
+      panel.style.left = '-1000px';
+      const w = panel.offsetWidth;
+      let left = r.right - w;
+      left = Math.max(8, Math.min(left, window.innerWidth - w - 8));
+      panel.style.top = (r.bottom + gap) + 'px';
+      panel.style.left = left + 'px';
+    }
+    function openMenu() {
+      overlay.classList.remove('hidden');
+      positionPanel();
+      requestAnimationFrame(() => {
+        panel.classList.remove('opacity-0', 'scale-y-0');
+        panel.classList.add('scale-y-100');
+      });
+      document.addEventListener('keydown', onEsc);
+      menuBtn.setAttribute('aria-expanded', 'true');
+      const firstItem = panel.querySelector('[role="menuitem"]');
+      if (firstItem) firstItem.focus();
+    }
+    function closeMenu() {
+      panel.classList.add('opacity-0');
+      panel.classList.remove('scale-y-100');
+      panel.classList.add('scale-y-0');
+      menuBtn.setAttribute('aria-expanded', 'false');
+      document.removeEventListener('keydown', onEsc);
+      setTimeout(() => overlay.classList.add('hidden'), 150);
+      menuBtn.focus();
+    }
+    function onEsc(e) { if (e.key === 'Escape') closeMenu(); }
+
+    menuBtn.addEventListener('click', () => {
+      const expanded = menuBtn.getAttribute('aria-expanded') === 'true';
+      expanded ? closeMenu() : openMenu();
+    });
+    clickArea.addEventListener('click', (e) => {
+      if (!panel.contains(e.target) && e.target !== menuBtn) closeMenu();
+    });
+    panel.addEventListener('keydown', (e) => {
+      const items = Array.from(panel.querySelectorAll('[role="menuitem"]'));
+      const i = items.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown') { e.preventDefault(); items[(i + 1 + items.length) % items.length].focus(); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
+      if (e.key === 'Home') { e.preventDefault(); items[0].focus(); }
+      if (e.key === 'End') { e.preventDefault(); items[items.length - 1].focus(); }
+    });
+    window.addEventListener('resize', () => {
+      if (!overlay.classList.contains('hidden')) positionPanel();
+    });
+  </script>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <h1 class="text-xl sm:text-2xl font-bold mb-4">新增／管理動物資料</h1>
+
+    <div class="grid lg:grid-cols-3 gap-6">
+      <!-- 左：登錄表單 -->
+      <section class="lg:col-span-1 bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
+        <h2 class="text-lg font-semibold">登錄表單</h2>
+        <p class="text-sm text-gray-500 mb-4">
+          ＊建議先登入並在 Firestore 規則限制寫入權限。
+        </p>
+        <form id="petForm" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">名字 <span class="text-red-500">*</span></label>
+            <input id="name" class="w-full rounded-xl border border-gray-300 p-2" required />
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">類別 <span class="text-red-500">*</span></label>
+            <div class="flex gap-3">
+              <label class="inline-flex items-center gap-2"><input type="radio" name="species" value="貓"
+                  class="accent-brand-600" checked /><span>貓</span></label>
+              <label class="inline-flex items-center gap-2"><input type="radio" name="species" value="狗"
+                  class="accent-brand-600" /><span>狗</span></label>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium mb-1">品種</label>
+              <select id="breedType" class="w-full rounded-xl border border-gray-300 bg-white p-2 text-sm">
+                <option value="">請選擇</option>
+              </select>
+            </div>
+            <div>
+              <label id="breedLabel" class="block text-sm font-medium mb-1">品種/毛色</label>
+              <select id="breed" class="w-full rounded-xl border border-gray-300 bg-white p-2 text-sm" disabled>
+                <option value="">請先選擇品種</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium mb-1">年齡</label>
+              <input id="age" class="w-full rounded-xl border border-gray-300 p-2" placeholder="例：2 歲 或 8 個月" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1">性別</label>
+              <select id="gender" class="w-full rounded-xl border border-gray-300 p-2">
+                <option value="">未設定</option>
+                <option value="男生">男生</option>
+                <option value="女生">女生</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">簡介</label>
+            <textarea id="desc" rows="4" class="w-full rounded-xl border border-gray-300 p-2"
+              placeholder="個性、習慣、背景故事、注意事項…"></textarea>
+          </div>
+          <div>
+            <input id="imgFiles" type="file" accept="image/*" multiple class="sr-only" />
+            <div class="flex items-center gap-3">
+              <button id="btnPick" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
+                新增照片
+              </button>
+              <span id="fileCount" class="text-xs text-gray-500">已選 0 / 5 張</span>
+              <span class="text-sm text-gray-400">最多 5 張</span>
+            </div>
+            <div id="imgPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
+          </div>
+          <div class="flex gap-3 pt-2">
+            <button id="submitBtn" type="submit"
+              class="px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-gray-800 flex items-center gap-2">
+              <span id="submitText">登錄</span>
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- 右：資料表 -->
+      <section class="lg:col-span-2 space-y-6">
+        <div class="bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <h2 class="text-lg font-semibold">資料表</h2>
+            <div class="relative w-full sm:w-72">
+              <input id="searchName" class="w-full rounded-xl border border-gray-300 p-2 pl-9 text-base"
+                placeholder="搜尋名字…" />
+              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔎</span>
+            </div>
+          </div>
+          <div class="hidden md:block overflow-x-auto mt-4">
+            <table class="min-w-[640px] w-full text-sm">
+              <thead>
+                <tr class="text-left text-gray-500">
+                  <th class="py-2">名字</th>
+                  <th class="py-2">類別</th>
+                  <th class="py-2">品種</th>
+                  <th class="py-2">性別</th>
+                </tr>
+              </thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+          <div class="md:hidden mt-4 grid gap-3" id="rowsMobile"></div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-gray-50 border-t border-gray-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-sm text-gray-500">
+      © <span id="year"></span> 浪浪轉運站 Stray Station. 保留所有權利。
+    </div>
+  </footer>
+
+  <!-- Pet Detail Modal -->
+  <dialog id="petDialog" class="w-full max-w-2xl max-h-[90vh] rounded-2xl p-0 overflow-y-auto">
+    <div class="bg-white">
+      <!-- 新增：與下方縮圖 p-3 對齊 -->
+      <div class="px-3 pt-3">
+        <div class="relative aspect-video bg-gray-100 overflow-hidden rounded-lg">
+          <!-- 只模糊這張背景圖 -->
+          <img id="dlgBg" aria-hidden="true" class="absolute inset-0 w-full h-full object-cover blur-md scale-110">
+
+          <!-- 可選：柔化一下背景，沒有加任何 blur -->
+          <div class="absolute inset-0 bg-white/20"></div>
+
+          <!-- 主圖在最上層，沒有 blur -->
+          <img id="dlgImg" alt="毛孩照片"
+            class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg">
+
+          <button id="dlgClose" class="absolute top-3 right-3 z-20 bg-black/60 text-white p-2 rounded-full"
+            aria-label="關閉">✕</button>
+        </div>
+      </div>
+
+      <div id="dlgThumbs" class="flex gap-2 overflow-x-auto p-3"></div>
+      <div class="p-5 space-y-4">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <!-- 標題 + 右上角物種圓角標籤 -->
+            <div class="flex items-end justify-between gap-2">
+              <h3 id="dlgName" class="text-2xl font-semibold leading-snug">—</h3>
+              <span id="dlgSpeciesPill"
+                class="shrink-0 rounded-full text-xs px-2 py-1 bg-emerald-50 text-emerald-700">貓咪</span>
+            </div>
+
+            <!-- 三個圓角標籤：不換行、可水平捲動 -->
+            <div id="dlgTags" class="mt-1 flex flex-nowrap gap-2 text-sm">
+              <span id="dlgTagBreed"
+                class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap"></span>
+              <span id="dlgTagAge"
+                class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap"></span>
+              <span id="dlgTagGender"
+                class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap"></span>
+            </div>
+          </div>
+        </div>
+        <div class="bg-orange-50 rounded-xl p-4 leading-7">
+          <p id="dlgDesc" class="text-gray-700 text-sm whitespace-pre-line break-words"></p>
+        </div>
+
+        <!-- 內嵌編輯區 -->
+        <div id="editArea" class="hidden space-y-3">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium mb-1">名字</label>
+              <input id="editName" class="w-full rounded-xl border border-gray-300 p-2" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1">年齡</label>
+              <input id="editAge" class="w-full rounded-xl border border-gray-300 p-2" />
+            </div>
+          </div>
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <label class="block text-sm font-medium mb-1">類別</label>
+              <select id="editSpecies" class="w-full rounded-xl border border-gray-300 p-2">
+                <option value="貓">貓</option>
+                <option value="狗">狗</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1">品種</label>
+              <select id="editBreedType" class="w-full rounded-xl border border-gray-300 p-2">
+                <option value="">請選擇</option>
+              </select>
+            </div>
+            <div>
+              <label id="editBreedLabel" class="block text-sm font-medium mb-1">品種/毛色</label>
+              <select id="editBreed" class="w-full rounded-xl border border-gray-300 p-2" disabled>
+                <option value="">請先選擇品種</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium mb-1">性別</label>
+              <select id="editGender" class="w-full rounded-xl border border-gray-300 p-2">
+                <option value="">未設定</option>
+                <option value="男生">男生</option>
+                <option value="女生">女生</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1">—</label>
+              <div class="text-sm text-gray-400">&nbsp;</div>
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">簡介</label>
+            <textarea id="editDesc" rows="4" class="w-full rounded-xl border border-gray-300 p-2"></textarea>
+          </div>
+          <div>
+            <input id="editFiles" type="file" accept="image/*" multiple class="sr-only" />
+            <div class="flex items-center gap-3 mb-2">
+              <button id="btnPickEdit" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
+                新增照片
+              </button>
+              <span id="editCount" class="text-xs text-gray-500"></span>
+              <span class="text-sm text-gray-400">最多 5 張</span>
+            </div>
+            <div id="editPreview" class="grid grid-cols-4 gap-2"></div>
+          </div>
+        </div>
+
+        <!-- 動作列 -->
+        <div id="actionBar" class="pt-2 grid grid-cols-1 sm:grid-cols-4 gap-3">
+          <button id="btnEdit" class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm">
+            編輯
+          </button>
+          <button id="btnAdopted" class="w-full px-4 py-3 rounded-xl bg-emerald-600 text-white text-sm">
+            已送養
+          </button>
+          <button id="btnUnadopt"
+            class="w-full px-4 py-3 rounded-xl border border-amber-300 text-amber-700 text-sm hidden">
+            退養
+          </button>
+          <button id="btnDelete" class="w-full px-4 py-3 rounded-xl border border-red-300 text-red-600 text-sm">
+            刪除
+          </button>
+        </div>
+        <div id="editActionBar" class="hidden pt-2 grid grid-cols-2 gap-3">
+          <button id="btnSave"
+            class="w-full px-4 py-3 rounded-xl bg-gray-900 text-white text-sm flex items-center justify-center gap-2">
+            <span id="saveText">儲存</span>
+          </button>
+          <button id="btnCancel" class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm">
+            取消
+          </button>
+        </div>
+
+        <!-- 已領養合照上傳 -->
+        <div id="adoptedUpload" class="hidden">
+          <input id="adoptedFiles" type="file" accept="image/*" multiple class="sr-only" />
+          <div class="flex items-center gap-3 mb-2">
+            <button id="btnPickAdopted" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
+              選擇合照
+            </button>
+            <span id="adoptedCount" class="text-xs text-gray-500"></span>
+            <span class="text-sm text-gray-400">最多 5 張</span>
+          </div>
+          <div id="adoptedPreview" class="mt-1 grid grid-cols-3 gap-2"></div>
+          <button id="btnConfirmAdopted" class="mt-3 px-4 py-2 rounded-xl bg-gray-900 text-white text-sm">
+            儲存領養資訊
+          </button>
+          <button id="btnCancel" type="button" class="px-3 py-2 rounded-lg bg-gray-200 text-gray-900 hover:bg-gray-300">
+            取消
+          </button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Lightbox -->
+  <div id="lightbox" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[9999]">
+    <button id="lbPrev" class="absolute left-3 md:left-10 text-white text-4xl select-none">❮</button>
+    <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg" />
+    <div id="lbThumbs"
+      class="absolute bottom-20 left-0 w-full flex justify-center px-4 py-2 pb-[env(safe-area-inset-bottom)]">
+      <div id="lbThumbsInner" class="flex gap-3"></div>
+    </div>
+    <button id="lbNext" class="absolute right-3 md:right-10 text-white text-4xl select-none">❯</button>
+  </div>
+
+  <script type="module">
+// Enforce width/height on mobile list images to avoid reflow when images load
+function stabilizeMobileThumbs() {
+  const imgs = document.querySelectorAll('#rowsMobile img');
+  imgs.forEach(img => {
+    if (!img.hasAttribute('width')) img.setAttribute('width', '64');
+    if (!img.hasAttribute('height')) img.setAttribute('height', '64');
+    img.style.width = '64px';
+    img.style.height = '64px';
+    img.style.objectFit = 'cover';
+  });
+}
+
+// --- Keyboard-safe padding + ensure-visible (focus/keyboard only; no per-keystroke scroll) ---
+(function keyboardSafeSearch() {
+  const input = document.getElementById('searchName');
+  if (!input) return;
+  let active = false;
+
+  function keyboardGap() {
+    const vv = window.visualViewport;
+    if (!vv) return 0;
+    // Approximate keyboard height: area not covered by visual viewport
+    return Math.max(0, window.innerHeight - (vv.height + vv.offsetTop));
+  }
+
+  function setPadding() {
+    if (!active) return;
+    const gap = keyboardGap();
+    document.body.style.paddingBottom = (gap + 16) + 'px';
+  }
+
+  function ensureVisible() {
+    const vv = window.visualViewport;
+    const vh = (vv && vv.height) || window.innerHeight;
+    const r = input.getBoundingClientRect();
+    const pad = 8;
+    if (r.bottom > vh - pad) {
+      window.scrollBy({ top: r.bottom - (vh - pad), behavior: 'auto' });
+    } else if (r.top < pad) {
+      window.scrollBy({ top: r.top - pad, behavior: 'auto' });
+    }
+  }
+
+  input.addEventListener('focus', () => {
+    active = true;
+    // allow keyboard animation to begin
+    requestAnimationFrame(() => { setPadding(); ensureVisible(); });
+    setTimeout(() => { setPadding(); ensureVisible(); }, 220);
+  });
+
+  input.addEventListener('blur', () => {
+    active = false;
+    document.body.style.paddingBottom = '';
+  });
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+      if (active) { setPadding(); ensureVisible(); }
+    });
+    window.visualViewport.addEventListener('scroll', () => {
+      if (active) { setPadding(); ensureVisible(); }
+    });
+  }
+})();
+// --- minimal search-stability helpers ---
+function debounce(fn, wait=160){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn.apply(this,a), wait); }; }
+// typing: do NOT adjust scroll; when not typing: keep bottom offset to avoid being pushed while browsing bottom
+function withStableSearchRender(renderFn){
+  const inputEl = document.getElementById('searchName');
+  const active = document.activeElement === inputEl;
+  if (active){ renderFn(); stabilizeMobileThumbs(); return; }
+  const doc = document.documentElement;
+  const beforeH = doc.scrollHeight;
+  const beforeY = window.pageYOffset;
+  const vv = window.visualViewport;
+  const vh = (vv && vv.height) || window.innerHeight;
+  const bottomOffset = beforeH - (beforeY + vh);
+  const atBottom = Math.abs(beforeY + vh - beforeH) <= 2;
+  renderFn();
+  if (!atBottom) return;
+  requestAnimationFrame(()=>{
+    const afterH = doc.scrollHeight;
+    const newY = Math.max(0, afterH - vh - bottomOffset);
+    if (Math.abs(newY - window.pageYOffset) > 1){
+      window.scrollTo({ top: newY, behavior:'auto' });
+    }
+  });
+}
+
+    // ===============================
+    // Firebase 設定與初始化
+    // ===============================
+    const firebaseConfig = {
+      apiKey: "AIzaSyC4NT2KOm_Cw2OEdaaOimxI0ruoNv_u_9g",
+      authDomain: "straystation.firebaseapp.com",
+      projectId: "straystation",
+      storageBucket: "straystation.firebasestorage.app",
+      messagingSenderId: "611366379195",
+      appId: "1:611366379195:web:ef5a632e88d8bba1d6139e",
+    };
+
+    // 以 ES Module 方式載入 Firebase SDK（v11）
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+    import {
+      getFirestore,
+      collection,
+      addDoc,
+      getDocs,
+      getDoc,
+      query,
+      orderBy,
+      serverTimestamp,
+      deleteDoc,
+      doc,
+      updateDoc,
+      limit as fbLimit,
+      where,
+    } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+    import {
+      getStorage,
+      ref as sRef,
+      uploadBytes,
+      getDownloadURL,
+      deleteObject,
+      listAll,
+    } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+
+    // 全域狀態
+    let pets = [];            // 目前載入的動物列表（最多 15 筆）
+    let currentPetId = null;  // 目前在 Dialog 中的動物 id（編輯/領養用）
+
+    // 小工具：選擇器
+    const $ = (q) => document.querySelector(q);
+
+    // ===============================
+    // 品種資料與「品種/毛色」連動邏輯
+    // ===============================
+    const BREEDS = {
+      貓: {
+        品種貓: ["美短", "英短", "藍貓", "暹羅貓", "波斯貓", "布偶貓", "曼赤肯"],
+        米克斯: ["橘貓", "黑貓", "虎斑貓", "白底虎斑貓", "三花貓", "賓士貓", "玳瑁貓", "白貓"],
+      },
+      狗: {
+        品種犬: ["博美", "貴賓", "吉娃娃", "馬爾濟斯", "柯基", "柴犬", "哈士奇", "高山犬", "黃金獵犬"],
+        米克斯: ["黑色", "黑白色", "白色", "白黃色", "黃色", "棕色", "虎斑", "花花"],
+      },
+    };
+
+    const speciesInputs = document.querySelectorAll('input[name="species"]');
+    const breedTypeSel = $("#breedType");
+    const breedSel = $("#breed");
+    const breedLabel = $("#breedLabel");
+
+    // 讀取目前勾選的物種
+    const getSpecies = () =>
+      Array.from(speciesInputs).find((i) => i.checked)?.value || "貓";
+
+    // 依「品種類型」調整右側標籤文字
+    const updateBreedLabel = () => {
+      const t = breedTypeSel.value;
+      breedLabel.textContent = !t ? "品種/毛色" : t === "米克斯" ? "毛色" : "品種";
+    };
+
+    // 重置右側下拉
+    const resetBreedRight = () => {
+      breedSel.disabled = true;
+      breedSel.innerHTML = '<option value="">請先選擇品種</option>';
+    };
+
+    // 左側「品種類型」與右側「品種/毛色」同步
+    function syncBreedSelectors() {
+      const isCat = getSpecies() === "貓";
+      breedTypeSel.innerHTML = isCat
+        ? '<option value="">請選擇</option><option value="品種貓">品種貓</option><option value="米克斯">米克斯</option>'
+        : '<option value="">請選擇</option><option value="品種犬">品種犬</option><option value="米克斯">米克斯</option>';
+      resetBreedRight();
+      updateBreedLabel();
+    }
+
+    // 依左側選擇，建立右側選項
+    function buildBreedOptions() {
+      const list = (BREEDS[getSpecies()] || {})[breedTypeSel.value] || [];
+      if (!breedTypeSel.value) {
+        resetBreedRight();
+        return;
+      }
+      breedSel.disabled = false;
+      breedSel.innerHTML = ['<option value="">請選擇</option>']
+        .concat(list.map((b) => `<option value="${b}">${b}</option>`))
+        .join("");
+    }
+
+    // 綁定事件
+    speciesInputs.forEach((i) => i.addEventListener("change", syncBreedSelectors));
+    breedTypeSel.addEventListener("change", () => {
+      buildBreedOptions();
+      updateBreedLabel();
+    });
+    syncBreedSelectors(); // 初始化一次
+
+    // ===============================
+    // 新增：圖片選取/預覽（最多 5 張）
+    // ===============================
+    const imgFiles = $("#imgFiles");
+    const btnPick = $("#btnPick");
+    const fileCount = $("#fileCount");
+    const imgPreview = $("#imgPreview");
+    let selectedFiles = []; // 暫存待上傳檔案
+
+    btnPick?.addEventListener("click", () => imgFiles.click());
+
+    // 渲染預覽格子 + 刪除按鈕
+    function renderPreviews() {
+      fileCount.textContent = `已選 ${selectedFiles.length} / 5 張`;
+
+      imgPreview.innerHTML = selectedFiles
+        .map((f, i) => {
+          const u = URL.createObjectURL(f);
+          return `
+        <div class="relative">
+          <img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽">
+          <button data-idx="${i}" class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button>
+        </div>
+      `;
+        })
+        .join("");
+
+      // 綁定刪除單張圖片
+      imgPreview.querySelectorAll("button[data-idx]").forEach((btn) =>
+        btn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const i = +btn.dataset.idx;
+          selectedFiles.splice(i, 1);
+          renderPreviews();
+        })
+      );
+    }
+
+    // 檔案挑選後：合併並截斷到 5 張
+    imgFiles?.addEventListener("change", () => {
+      const incoming = Array.from(imgFiles.files || []);
+      const next = selectedFiles.concat(incoming);
+      if (next.length > 5) {
+        Swal.fire({ icon: "warning", title: "最多選取 5 張" });
+      }
+      selectedFiles = next.slice(0, 5);
+      renderPreviews();
+      imgFiles.value = ""; // 清空 input，避免重複選取不到
+    });
+
+    // ===============================
+    // 小工具：按鈕上的「…」跳動
+    // ===============================
+    function startDots(span, base) {
+      let i = 0;
+      span.textContent = base;
+      const t = setInterval(() => {
+        i = (i + 1) % 4;
+        span.textContent = base + ".".repeat(i);
+      }, 350);
+      return () => clearInterval(t); // 回傳停止函式
+    }
+
+    // ===============================
+    // 表單送出：新增動物資料
+    // ===============================
+    $("#petForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      // 讀值
+      const name = ($("#name")?.value || "").trim();
+      const age = ($("#age")?.value || "").trim();
+      const gender = $("#gender")?.value || "";
+      const desc = ($("#desc")?.value || "").trim();
+
+      // 必填檢查：名字
+      if (!name) {
+        await Swal.fire({ icon: "error", title: "請填名字" });
+        return;
+      }
+
+      // 新增的基本 payload（圖片先空陣列，稍後補）
+      const payload = {
+        species: getSpecies(),
+        name,
+        nameLower: name.toLowerCase(),
+        breedType: breedTypeSel.value || "",
+        breed: breedSel.value || "",
+        age,
+        gender,
+        desc,
+        images: [],
+        status: "available",
+        showOnHome: false,
+        showOnCats: true,
+        showOnDogs: true,
+        showOnIndex: true,
+        createdAt: serverTimestamp(), // Firestore 伺服器時間
+      };
+
+      // 先檢查是否有同名（可選擇仍然新增）
+      try {
+        const dupQ = query(collection(db, "pets"), where("name", "==", name));
+        const dupSnap = await getDocs(dupQ);
+        if (!dupSnap.empty) {
+          const r = await Swal.fire({
+            icon: "question",
+            title: `名字「${name}」已存在`,
+            text: "確認是否繼續登錄？",
+            showCancelButton: true,
+            confirmButtonText: "繼續",
+            cancelButtonText: "取消",
+          });
+          if (!r.isConfirmed) return;
+        }
+      } catch (err) {
+        console.error("重複檢查錯誤：", err);
+      }
+
+      // 按鈕進度狀態
+      const submitBtn = $("#submitBtn");
+      const submitText = $("#submitText");
+      submitBtn.disabled = true;
+      const stopDots = startDots(submitText, "登錄中");
+
+      try {
+        // 1) 新增基本文件
+        const docRef = await addDoc(collection(db, "pets"), payload);
+
+        // 2) 逐張上傳圖片，取得 Storage URL
+        const urls = [];
+        for (const f of selectedFiles) {
+          const path = `pets/${docRef.id}/${Date.now()}_${f.name}`;
+          const r = sRef(storage, path);
+          await uploadBytes(r, f);
+          urls.push(await getDownloadURL(r));
+        }
+
+        // 3) 回寫 images 欄位
+        if (urls.length) {
+          await updateDoc(doc(db, "pets", docRef.id), { images: urls });
+        }
+
+        // UI 收尾
+        stopDots();
+        submitBtn.disabled = false;
+        submitText.textContent = "登錄";
+
+        // ★ 清空名字欄位 + 把「已被使用」提示/紅框移除
+        const nameInput = document.getElementById("name");
+        if (nameInput) nameInput.value = "";
+        if (window.resetNameCheck) resetNameCheck();
+
+        // ★ 登錄完成 → 捲到最上方
+        window.scrollTo({ top: 0, behavior: "smooth" });
+
+        // 成功提示後直接打開詳情
+        Swal.fire({
+        icon: "success",
+        title: "已成功登錄！",
+        showConfirmButton: false,
+        timer: 1000,
+      }).then(() => {
+        openDialog(docRef.id);
+      });
+
+        // 重置表單與選擇圖片
+        e.target.reset();
+        imgPreview.innerHTML = "";
+        selectedFiles = [];
+        fileCount.textContent = "已選 0 / 5 張";
+        syncBreedSelectors();
+
+        // 重新載入列表
+        await loadPets();
+      } catch (err) {
+        stopDots();
+        submitBtn.disabled = false;
+        submitText.textContent = "登錄";
+        Swal.fire({ icon: "error", title: "登錄失敗", text: err.message });
+      }
+    });
+
+    // ===============================
+    // 列表載入 + 搜尋 + 渲染（桌機/手機）
+    // ===============================
+    async function loadPets() {
+      const q = query(collection(db, "pets"), orderBy("createdAt", "desc"), fbLimit(15));
+      const snap = await getDocs(q);
+      pets = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      applyFilterAndRender();
+    }
+
+    // 用 nameLower / name 檢查是否重複；exceptId 表示忽略自己（編輯時用）
+    async function isNameTaken(name, exceptId = null) {
+      const kw = (name || "").trim().toLowerCase();
+      if (!kw) return false;
+
+      // 1) 以 nameLower 精準查，取最多 2 筆，避免只有自己時誤判為無重複
+      let snap = await getDocs(query(
+        collection(db, "pets"),
+        where("nameLower", "==", kw),
+        fbLimit(2)
+      ));
+      if (!snap.empty && snap.docs.some((d) => d.id !== exceptId)) return true;
+
+      // 2) 舊資料沒 nameLower，再用 name 精準查一次，同樣取 2 筆
+      snap = await getDocs(query(
+        collection(db, "pets"),
+        where("name", "==", name),
+        fbLimit(2)
+      ));
+      if (!snap.empty && snap.docs.some((d) => d.id !== exceptId)) return true;
+
+      return false;
+    }
+
+    const searchInput = $("#searchName");
+    searchInput.addEventListener("input", debounce(onSearchByName, 160));
+
+    function applyFilterAndRender() {
+      const kw = searchInput.value.trim().toLowerCase();
+      const list = kw
+        ? pets.filter((p) => String(p.name || "").toLowerCase().includes(kw))
+        : pets;
+      renderRows(list);
+      renderRowsMobile(list);
+  stabilizeMobileThumbs();
+    }
+
+    // 後端依名字（前綴）查詢：有關鍵字→打 Firestore；空字串→回到預設清單
+    async function onSearchByName() {
+      const kw = searchInput.value.trim().toLowerCase();
+      if (!kw) {
+        // 沒關鍵字 → 顯示預設清單（最近 N 筆）
+        applyFilterAndRender();  // 保留你原本的行為
+        return;
+      }
+
+      // 依 nameLower 做前綴查詢（最多 50 筆，可自行調整）
+      const qByName = query(
+        collection(db, "pets"),
+        orderBy("nameLower"),
+        where("nameLower", ">=", kw),
+        where("nameLower", "<=", kw + "\uf8ff"),
+        fbLimit(50)
+      );
+      const snap = await getDocs(qByName);
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      renderRows(list);
+      renderRowsMobile(list);
+  stabilizeMobileThumbs();
+    }
+
+    // 顯示品種的規則（品種犬/貓 → 直接顯示品種；米克斯 → 顯示「米克斯/毛色」）
+    const displayBreed = (p) => {
+      if ((p.breedType === "品種犬" || p.breedType === "品種貓") && p.breed) return p.breed;
+      if (p.breedType === "米克斯") return p.breed ? `米克斯/${p.breed}` : "米克斯";
+      return p.breed || "—";
+    };
+
+    // 桌機表格
+    function renderRows(list) {
+      const tb = document.getElementById("rows");
+      if (!tb) return;
+
+      tb.innerHTML = list
+        .map(
+          (p) => `
+      <tr class="border-t hover:bg-gray-50 cursor-pointer" data-id="${p.id}">
+        <td class="py-2 pr-2 font-medium">${p.name || "—"}</td>
+        <td class="py-2 pr-2">${p.species || "—"}</td>
+        <td class="py-2 pr-2">${displayBreed(p)}</td>
+        <td class="py-2 pr-2">${p.gender || "—"}</td>
+      </tr>`
+        )
+        .join("");
+
+      tb.querySelectorAll("tr").forEach((tr) =>
+        tr.addEventListener("click", () => {
+          const data = list.find((p) => p.id === tr.dataset.id);
+          if (data) openDialog(data.id);
+        })
+      );
+    }
+
+    // 手機卡片
+    function renderRowsMobile(list) {
+      const wrap = document.getElementById("rowsMobile");
+      if (!wrap) return;
+
+      wrap.innerHTML = list
+        .map((p) => {
+          const img = (Array.isArray(p.images) && p.images[0]) || p.image || "";
+          return `
+        <div class="rounded-xl ring-1 ring-gray-200 p-3 flex gap-3 items-center cursor-pointer"
+             data-id="${p.id}">
+          <img src="${img}" class="w-16 h-16 object-cover rounded-lg bg-gray-100">
+          <div class="min-w-0 flex-1">
+            <div class="font-semibold truncate">${p.name || "未命名"}</div>
+            <div class="text-xs text-gray-600 mt-1 truncate">
+              ${p.species || "—"}・${displayBreed(p)}・${p.gender || "—"}
+            </div>
+          </div>
+        </div>`;
+        })
+        .join("");
+
+      wrap.querySelectorAll("[data-id]").forEach((card) =>
+        card.addEventListener("click", () => {
+          const data = list.find((p) => p.id === card.dataset.id);
+          if (data) openDialog(data.id);
+        })
+      );
+    }
+
+    // ===============================
+    // 詳情 Dialog：開啟/渲染/編輯模式
+    // ===============================
+    let currentDocId = null;
+    let currentDoc = null;
+
+    async function openDialog(id) {
+      let p = pets.find((x) => x.id === id);
+      if (!p) {
+        try {
+          const snap = await getDoc(doc(db, "pets", id));
+          if (!snap.exists()) {
+            if (typeof swalInDialog === "function") {
+              await swalInDialog({ icon: "error", title: "找不到這筆資料" });
+            }
+            return;
+          }
+          p = { id: snap.id, ...snap.data() };
+        } catch (e) {
+          if (typeof swalInDialog === "function") {
+            await swalInDialog({ icon: "error", title: "讀取資料失敗", text: String(e) });
+          }
+          return;
+        }
+      }
+
+      const dlgImg = document.getElementById("dlgImg");
+      const dlgBg = document.getElementById("dlgBg");
+      const dlgThumbs = document.getElementById("dlgThumbs");
+
+      // 主圖與縮圖列（支援 images 陣列或舊欄位 image）
+      const imgs = Array.isArray(p.images) && p.images.length > 0 ? p.images : p.image ? [p.image] : [];
+      dlgImg.src = imgs[0] || "";
+      if (dlgBg) dlgBg.src = dlgImg.src;
+
+      // 點主圖 → Lightbox
+      dlgImg.onclick = () => openLightbox(imgs, 0);
+
+      // 生成縮圖列，點擊可切換主圖
+      dlgThumbs.innerHTML = "";
+      imgs.forEach((url, i) => {
+        const thumb = document.createElement("img");
+        thumb.src = url;
+        thumb.className = "dlg-thumb" + (i === 0 ? " active" : "");
+        thumb.dataset.index = i;
+        thumb.addEventListener("click", () => {
+          dlgImg.src = url;
+          if (dlgBg) dlgBg.src = url;
+          document.querySelectorAll(".dlg-thumb").forEach((el) => el.classList.remove("active"));
+          thumb.classList.add("active");
+        });
+        dlgThumbs.appendChild(thumb);
+      });
+
+      // 基本欄位
+      document.getElementById("dlgName").textContent = p.name || "未命名";
+      document.getElementById("dlgDesc").textContent = p.desc || "";
+
+      currentPetId = p.id;
+      history.replaceState(null, "", `?pet=${encodeURIComponent(p.id)}`);
+
+      // 類別圓角標籤（貓咪/狗狗）
+      const speciesPill = document.getElementById("dlgSpeciesPill");
+      const isDog = /(狗|犬)/.test(String(p.species || ""));
+      speciesPill.textContent = isDog ? "狗狗" : "貓咪";
+      speciesPill.className = `shrink-0 rounded-full text-sm px-3 py-1 ${isDog ? "bg-sky-100 text-sky-700" : "bg-emerald-100 text-emerald-700"
+        }`;
+
+      // 三個標籤
+      document.getElementById("dlgTagBreed").textContent = formatBreed(p) || "—";
+      document.getElementById("dlgTagAge").textContent = formatAge(p) || "—";
+      document.getElementById("dlgTagGender").textContent = p.gender || "—";
+
+      currentDoc = p;
+      currentDocId = p.id;
+
+      // 渲染視圖與綁定動作
+      renderDialogView(p);
+
+      // 開啟前鎖捲動（lockScroll/oldHtmlOverflow/dlg 由 shared.js 提供）
+      lockScroll();
+      dlg.showModal();
+    }
+
+    // 顯示用的小格式化
+    function formatBreed(p) {
+      if (!p.breed || p.breed.trim() === "" || p.breed === "—") return "品種不詳";
+      return p.breed;
+    }
+    function formatAge(p) {
+      if (!p.age || p.age.trim() === "" || p.age === "—") return "年齡不詳";
+      return p.age;
+    }
+    function formatGender(p) {
+      if (!p.gender || p.gender.trim() === "" || p.gender === "—") return "性別不詳";
+      return p.gender;
+    }
+
+    // 以資料物件渲染 Dialog（含縮圖、編輯欄位預填）
+    function renderDialogView(p) {
+      const imgs = Array.isArray(p.images) && p.images.length ? p.images : p.image ? [p.image] : [];
+      const first = imgs[0] || "";
+
+      document.getElementById("dlgBg").src = first;
+      document.getElementById("dlgImg").src = first;
+
+      // Lightbox 初始化（lbImages/lbIndex 由 lightbox 區塊使用）
+      lbImages = imgs;
+      lbIndex = 0;
+
+      // 標題與標籤
+      document.getElementById("dlgName").textContent = p.name || "未命名";
+      document.getElementById("dlgSpeciesPill").textContent = /(狗|犬)/.test(String(p.species || "")) ? "狗狗" : "貓咪";
+      document.getElementById("dlgTagBreed").textContent = displayBreed(p);
+      document.getElementById("dlgTagAge").textContent = p.age && p.age.trim() !== "" ? p.age : "年齡不詳";
+      document.getElementById("dlgTagGender").textContent = p.gender || "—";
+      document.getElementById("dlgDesc").textContent = p.desc || p.description || "";
+
+      // 重新繪製縮圖（含 active）
+      const thumbs = document.getElementById("dlgThumbs");
+      thumbs.innerHTML = "";
+      imgs.forEach((src, i) => {
+        const im = document.createElement("img");
+        im.src = src;
+        im.alt = "縮圖";
+        im.className = "dlg-thumb" + (i === 0 ? " active" : "");
+        im.addEventListener("click", () => {
+          setMainImage(i, imgs);
+          document.querySelectorAll(".dlg-thumb").forEach((el) => el.classList.remove("active"));
+          im.classList.add("active");
+        });
+        thumbs.appendChild(im);
+      });
+
+      // 編輯區預填
+      document.getElementById("editName").value = p.name || "";
+      document.getElementById("editAge").value = p.age || "";
+      document.getElementById("editGender").value = p.gender || "";
+      document.getElementById("editDesc").value = p.desc || "";
+      document.getElementById("editSpecies").value = p.species || "貓";
+      syncEditBreedSelectors();
+      if (p.breedType) {
+        document.getElementById("editBreedType").value = p.breedType;
+        buildEditBreedOptions();
+        updateEditBreedLabel();
+        if (p.breed) {
+          document.getElementById("editBreed").disabled = false;
+          document.getElementById("editBreed").value = p.breed;
+        }
+      }
+      renderEditImages(imgs);
+
+      // 預設顯示一般模式（非編輯）
+      setEditMode(false);
+
+      // 綁定按鈕動作
+      bindDialogActions();
+
+      // 送養/撤回按鈕切換
+      const isAdopted = p.status === "adopted";
+      const btnAdopted = document.getElementById("btnAdopted");
+      const btnUnadopt = document.getElementById("btnUnadopt");
+      if (btnAdopted) btnAdopted.classList.toggle("hidden", isAdopted);
+      if (btnUnadopt) {
+        btnUnadopt.classList.toggle("hidden", !isAdopted);
+        btnUnadopt.onclick = onUnadopt;
+      }
+
+      // 每次打開詳情，先收起「已領養合照」區
+      document.getElementById("adoptedUpload").classList.add("hidden");
+    }
+
+    // 切主圖
+    function setMainImage(i, imgs) {
+      const src = imgs[i];
+      document.getElementById("dlgImg").src = src;
+      document.getElementById("dlgBg").src = src;
+      lbIndex = i;
+    }
+
+    // 關閉 Dialog
+    document.getElementById("dlgClose").addEventListener("click", () => {
+      if (dlg.open) dlg.close();
+      document.documentElement.style.overflow = oldHtmlOverflow;
+    });
+
+    // 綁定 Dialog 內各種按鈕行為
+    function bindDialogActions() {
+      document.getElementById("btnDelete").onclick = onDelete;
+      document.getElementById("btnEdit").onclick = () => setEditMode(true);
+
+      document.getElementById("btnAdopted").onclick = () => {
+        const up = document.getElementById("adoptedUpload");
+        up.classList.remove("hidden");
+        document.getElementById("btnPickAdopted")?.focus();
+        up.scrollIntoView({ behavior: "smooth", block: "start" });
+      };
+
+      document.getElementById("btnPickAdopted").onclick = () =>
+        document.getElementById("adoptedFiles").click();
+
+      document.getElementById("btnConfirmAdopted").onclick = onConfirmAdopted;
+      document.getElementById("btnSave").onclick = saveEdit;
+
+      document.getElementById("btnCancel").onclick = () => {
+        // 取消編輯 → 回復顯示最新資料
+        renderDialogView(currentDoc);
+        resetAdoptedSelection();
+      };
+    }
+
+    // 刪除目前這筆
+    async function onDelete() {
+      const wasOpen = dlg.open;
+      if (wasOpen) dlg.close();
+
+      const ok = await Swal.fire({
+      icon: "warning",
+      title: "確認刪除此筆？",
+      showCancelButton: true,
+      confirmButtonText: "刪除",
+      cancelButtonText: "取消",
+    });
+      if (!ok.isConfirmed) {
+        if (wasOpen) dlg.showModal();
+        return;
+      }
+
+      try {
+        // 刪掉這筆的所有圖片與合照資料夾
+        await deleteAllUnder(`pets/${currentDocId}`);
+        await deleteAllUnder(`adopted/${currentDocId}`);
+        // 最後刪 Firestore 文件
+        await deleteDoc(doc(db, "pets", currentDocId));
+        await loadPets();
+        await Swal.fire({ icon: "success", title: "刪除成功", showConfirmButton: false, timer: 2000, });
+      } catch (err) {
+        await Swal.fire({ icon: "error", title: "刪除失敗", text: err.message });
+        if (wasOpen) dlg.showModal();
+      }
+    }
+
+    // 切換編輯模式
+    function setEditMode(on) {
+      document.getElementById("editArea").classList.toggle("hidden", !on);
+      document.getElementById("actionBar").classList.toggle("hidden", on);
+      document.getElementById("editActionBar").classList.toggle("hidden", !on);
+      if (on) {
+        document.getElementById("adoptedUpload").classList.add("hidden");
+      }
+    }
+
+    // ===============================
+    // 編輯模式：儲存資料與圖片同步（增/刪/保留）
+    // ===============================
+    async function saveEdit() {
+      const btn = document.getElementById("btnSave");
+      const txt = document.getElementById("saveText");
+      const dlg = document.getElementById("petDialog");
+
+      // 蒐集欄位
+      const newData = {
+        name: document.getElementById("editName").value.trim(),
+        nameLower: document.getElementById("editName").value.trim().toLowerCase(),
+        age: document.getElementById("editAge").value.trim(),
+        gender: document.getElementById("editGender").value,
+        desc: document.getElementById("editDesc").value.trim(),
+        species: document.getElementById("editSpecies").value,
+        breedType: document.getElementById("editBreedType").value || "",
+        breed: document.getElementById("editBreed").value || "",
+      };
+
+      // ① 送出前：名字重複 → 先詢問是否仍要儲存（此時不要啟動「儲存中」）
+      const newName = newData.name;
+      if (newName) {
+        const taken = await isNameTaken(newName, currentDocId);
+        if (taken) {
+          const { isConfirmed } = await (typeof swalInDialog === "function" ? swalInDialog : Swal.fire)({
+            icon: "warning",
+            title: `「${newName}」已存在`,
+            text: "確認是否繼續儲存？",
+            showCancelButton: true,
+            confirmButtonText: "繼續",
+            cancelButtonText: "取消",
+            reverseButtons: true,
+          });
+          if (!isConfirmed) {
+            // 使用者取消 → 直接結束，按鈕維持可按、文字維持「儲存」
+            return;
+          }
+        }
+        // 同步小寫欄位，避免之後搜尋不到
+        newData.nameLower = newName.toLowerCase();
+      }
+
+      // ② 確認後才開始「儲存中…」與鎖定按鈕
+      btn.disabled = true;
+      const stopDots = startDots(txt, "儲存中");
+
+      try {
+        // 依照狀態計算出最終 images：先保留 keep，再把 add 上傳，最後刪掉 remove 的 Storage 物件
+        const { keep, add, remove } = editImagesState;
+        const newUrls = [...keep];
+
+        // 上傳新增檔案
+        for (const f of add) {
+          const path = `pets/${currentDocId}/${Date.now()}_${f.name}`;
+          const r = sRef(storage, path);
+          await uploadBytes(r, f);
+          newUrls.push(await getDownloadURL(r));
+        }
+
+        // 刪除移除的檔案（忽略刪失敗）
+        for (const url of remove) {
+          try {
+            const path = url.split("/o/")[1].split("?")[0];
+            await deleteObject(sRef(storage, decodeURIComponent(path)));
+          } catch (e) {
+            // 靜默忽略
+          }
+        }
+
+        newData.images = newUrls;
+
+        // ③ 寫回 Firestore
+        await updateDoc(doc(db, "pets", currentDocId), newData);
+
+        // ④ 重載列表並同步當前物件
+        await loadPets();
+        currentDoc = { ...currentDoc, ...newData };
+
+        // ⑤ UI 收尾（無論彈窗狀態，成功提示一下）
+        stopDots();
+        btn.disabled = false;
+        txt.textContent = "儲存";
+
+        const wasOpen = dlg.open;
+        if (wasOpen) dlg.close();
+        await Swal.fire({ icon: "success", title: "已儲存", showConfirmButton: false, timer: 1000 });
+        if (wasOpen) dlg.showModal();
+
+        setEditMode(false);
+        renderDialogView(currentDoc);
+
+      } catch (err) {
+        // 失敗也要確保 UI 復原
+        stopDots();
+        btn.disabled = false;
+        txt.textContent = "儲存";
+        await Swal.fire({ icon: "error", title: "更新失敗", text: err.message });
+      }
+    }
+
+    // ===============================
+    // 編輯模式：品種連動（右側）
+    // ===============================
+    const editSpeciesSel = $("#editSpecies");
+    const editBreedTypeSel = $("#editBreedType");
+    const editBreedSel = $("#editBreed");
+    const editBreedLabel = $("#editBreedLabel");
+
+    function updateEditBreedLabel() {
+      const t = editBreedTypeSel.value;
+      editBreedLabel.textContent = !t ? "品種/毛色" : t === "米克斯" ? "毛色" : "品種";
+    }
+    function resetEditBreedRight() {
+      editBreedSel.disabled = true;
+      editBreedSel.innerHTML = '<option value="">請先選擇品種</option>';
+    }
+    function syncEditBreedSelectors() {
+      const isCat = editSpeciesSel.value === "貓";
+      editBreedTypeSel.innerHTML = isCat
+        ? '<option value="">請選擇</option><option value="品種貓">品種貓</option><option value="米克斯">米克斯</option>'
+        : '<option value="">請選擇</option><option value="品種犬">品種犬</option><option value="米克斯">米克斯</option>';
+      resetEditBreedRight();
+      updateEditBreedLabel();
+    }
+    function buildEditBreedOptions() {
+      const list = (BREEDS[editSpeciesSel.value] || {})[editBreedTypeSel.value] || [];
+      if (!editBreedTypeSel.value) {
+        resetEditBreedRight();
+        return;
+      }
+      editBreedSel.disabled = false;
+      editBreedSel.innerHTML = ['<option value="">請選擇</option>']
+        .concat(list.map((b) => `<option value="${b}">${b}</option>`))
+        .join("");
+    }
+
+    editSpeciesSel.addEventListener("change", syncEditBreedSelectors);
+    editBreedTypeSel.addEventListener("change", () => {
+      buildEditBreedOptions();
+      updateEditBreedLabel();
+    });
+
+    // ===============================
+    // 編輯模式：圖片管理（預覽 + 增刪）
+    // ===============================
+    const editFiles = $("#editFiles");
+    const btnPickEdit = $("#btnPickEdit");
+    const editPreview = $("#editPreview");
+    const editCount = $("#editCount");
+
+    // 狀態：現存保留 keep、新增 add、要刪 remove
+    let editImagesState = { keep: [], add: [], remove: [] };
+
+    btnPickEdit.addEventListener("click", () => editFiles.click());
+
+    // 初始化編輯圖片列表
+    function renderEditImages(urls) {
+      editImagesState.keep = [...urls];
+      editImagesState.add = [];
+      editImagesState.remove = [];
+      paintEditPreview();
+    }
+
+    // 依狀態重新畫縮圖
+    function paintEditPreview() {
+      const total = editImagesState.keep.length + editImagesState.add.length;
+      editCount.textContent = `已選 ${total} / 5 張`;
+
+      const current = [
+        ...editImagesState.keep.map((u, i) => ({ type: "keep", url: u, idx: i })),
+        ...editImagesState.add.map((f, i) => ({ type: "add", file: f, idx: i })),
+      ];
+
+      editPreview.innerHTML = current
+        .map((item) => {
+          const src = item.type === "keep" ? item.url : URL.createObjectURL(item.file);
+          const data = item.type === "keep" ? `data-keep="${item.idx}"` : `data-add="${item.idx}"`;
+          return `
+        <div class="relative">
+          <img class="w-full aspect-square object-cover rounded-lg" src="${src}"/>
+          <button ${data} class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button>
+        </div>`;
+        })
+        .join("");
+
+      // 移除 keep → 放入 remove
+      editPreview.querySelectorAll("button[data-keep]").forEach((btn) =>
+        btn.addEventListener("click", () => {
+          const i = +btn.getAttribute("data-keep");
+          editImagesState.remove.push(editImagesState.keep[i]);
+          editImagesState.keep.splice(i, 1);
+          paintEditPreview();
+        })
+      );
+
+      // 移除 add → 直接從 add 陣列刪除
+      editPreview.querySelectorAll("button[data-add]").forEach((btn) =>
+        btn.addEventListener("click", () => {
+          const i = +btn.getAttribute("data-add");
+          editImagesState.add.splice(i, 1);
+          paintEditPreview();
+        })
+      );
+    }
+
+    // 新增圖片（尊守上限 5）
+    editFiles.addEventListener("change", () => {
+      const incoming = Array.from(editFiles.files || []);
+      const total = editImagesState.keep.length + editImagesState.add.length + incoming.length;
+      if (total > 5) {
+        swalInDialog({ icon: "warning", title: "最多 5 張圖片" });
+      }
+      const room = 5 - (editImagesState.keep.length + editImagesState.add.length);
+      editImagesState.add = editImagesState.add.concat(incoming.slice(0, Math.max(0, room)));
+      paintEditPreview();
+      editFiles.value = "";
+    });
+
+    // ===============================
+    // 送養流程：上傳合照 / 標記 / 撤回
+    // ===============================
+
+    // 狀態：已選擇的合照（可多次疊加）
+    let adoptedSelected = [];
+
+    const adoptedFilesInput = document.getElementById("adoptedFiles");
+    const btnPickAdopted = document.getElementById("btnPickAdopted");
+    const adoptedCount = document.getElementById("adoptedCount");
+    const adoptedPreview = document.getElementById("adoptedPreview");
+
+    // 打開檔案挑選
+    btnPickAdopted.onclick = () => adoptedFilesInput.click();
+
+    // 渲染縮圖（右上角刪除鈕）
+    function renderAdoptedPreviews() {
+      adoptedCount.textContent = `已選 ${adoptedSelected.length} / 5 張`;
+      adoptedPreview.innerHTML = adoptedSelected
+        .map((f, i) => {
+          const u = URL.createObjectURL(f);
+          return `
+        <div class="relative">
+          <img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽">
+          <button data-idx="${i}"
+                  class="absolute top-1 right-1 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center"
+                  aria-label="刪除這張">✕</button>
+        </div>
+      `;
+        })
+        .join("");
+
+      adoptedPreview.querySelectorAll("button[data-idx]").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const i = +btn.dataset.idx;
+          adoptedSelected.splice(i, 1);
+          renderAdoptedPreviews();
+        });
+      });
+    }
+
+    renderAdoptedPreviews();
+
+    // 檔案變更：疊加並限制最多 5 張
+    adoptedFilesInput.addEventListener("change", () => {
+      const incoming = Array.from(adoptedFilesInput.files || []);
+      const next = adoptedSelected.concat(incoming);
+      if (next.length > 5) {
+        swalInDialog({ icon: "warning", title: "最多 5 張圖片" });
+      }
+      adoptedSelected = next.slice(0, 5);
+      renderAdoptedPreviews();
+      adoptedFilesInput.value = ""; // 清空，允許再次選同一檔
+    });
+
+    // 清空（成功/取消後呼叫）
+    function resetAdoptedSelection() {
+      adoptedSelected = [];
+      adoptedPreview.innerHTML = "";
+      adoptedCount.textContent = "已選 0 / 5 張";
+      adoptedFilesInput.value = "";
+    }
+
+    // 確認標記為已領養：上傳合照到 Storage，更新狀態與顯示頁面選項
+    async function onConfirmAdopted() {
+      const btn = document.getElementById("btnConfirmAdopted");
+
+      // 動態點點（沿用你檔案內的 startDots）
+      btn.disabled = true;
+      btn.setAttribute("aria-busy", "true");
+      const stopDots = startDots(btn, "儲存中");
+
+      const files = adoptedSelected.slice(0, 5);
+      const urls = [];
+      try {
+        for (const f of files) {
+          const path = `adopted/${currentDocId}/${Date.now()}_${f.name}`;
+          const r = sRef(storage, path);
+          await uploadBytes(r, f);
+          urls.push(await getDownloadURL(r));
+        }
+
+        await updateDoc(doc(db, "pets", currentDocId), {
+          status: "adopted",
+          adoptedPhotos: urls,
+          showOnHome: true,
+          showOnCats: false,
+          showOnDogs: false,
+          showOnIndex: false,
+        });
+
+        await loadPets();
+
+        // 先關閉 modal
+        const dlg = document.getElementById("petDialog");
+        if (dlg?.open) dlg.close();
+
+        // 用全域 Swal（不在 dialog 裡），所以關掉 modal 也看得到
+        await Swal.fire({
+          icon: "success",
+          title: "已標記為「已送養」",
+          showConfirmButton: false,
+          timer: 2000,
+        });
+
+        // 清空已領養選取（保險起見，關閉時通常也會清）
+        resetAdoptedSelection();
+      } catch (err) {
+        await swalInDialog({ icon: "error", title: "已送養標記失敗", text: err.message });
+      } finally {
+        stopDots();
+        btn.disabled = false;
+        btn.removeAttribute("aria-busy");
+        btn.textContent = "儲存領養資訊";
+      }
+    }
+
+    // 退養 → 還原狀態與顯示頁面選項
+    async function onUnadopt() {
+      const wasOpen = dlg.open;
+      if (wasOpen) dlg.close();
+
+      // 先確認是否撤回
+      const { isConfirmed } = await Swal.fire({
+        icon: "warning",
+        title: "確定要退養嗎？",
+        showCancelButton: true,
+        confirmButtonText: "確定",
+        cancelButtonText: "取消",
+        reverseButtons: true
+      });
+
+      if (!isConfirmed) {
+        if (wasOpen) dlg.showModal();
+        return;
+      }
+
+      try {
+        await deleteAllUnder(`adopted/${currentDocId}`); // 清掉合照
+        await updateDoc(doc(db, "pets", currentDocId), {
+          status: "available",
+          adoptedPhotos: [],
+          showOnHome: false,
+          showOnCats: true,
+          showOnDogs: true,
+          showOnIndex: true,
+        });
+
+        await loadPets();
+        await Swal.fire({ icon: "success", title: "已撤回「已送養」標記", showConfirmButton: false, timer: 2000, });
+      } catch (err) {
+        await Swal.fire({ icon: "error", title: "撤回失敗", text: err.message });
+      } finally {
+        if (wasOpen) dlg.showModal();
+        // 重新渲染讓按鈕狀態即時切換
+        const p = pets.find((x) => x.id === currentDocId);
+        if (p) renderDialogView(p);
+      }
+    }
+
+    // 讓 SweetAlert2 出現在 <dialog id="petDialog"> 裡，避免被覆蓋
+    function swalInDialog(opts) {
+      const dlg = document.getElementById("petDialog");
+      return Swal.fire({
+        target: dlg || document.body, // 有 dialog 就掛在 dialog 裡
+        backdrop: !!dlg,              // 掛在 dialog 時可保留 backdrop
+        ...opts,
+      });
+    }
+
+    // 保險：把 Swal 的 z-index 拉高（就算不是掛在 dialog 也不會被遮）
+    (() => {
+      if (!document.getElementById("swalZFix")) {
+        const s = document.createElement("style");
+        s.id = "swalZFix";
+        s.textContent = `.swal2-container{z-index:2147483647 !important;}`;
+        document.head.appendChild(s);
+      }
+    })();
+
+    // --- 關閉對話框時自動清空「已領養合照」選取 ---
+    // 這段會在：按右上角關閉、點 backdrop、按 Esc、程式呼叫 close()、甚至手動移除 open 屬性時，都清乾淨。
+    (function setupDialogCleanup() {
+      const dlg = document.getElementById("petDialog");
+      if (!dlg || dlg.dataset.cleanupBound) return;
+
+      // 確保有清空函式（如果你前面已定義 resetAdoptedSelection 就不會跑這段）
+      if (typeof window.resetAdoptedSelection !== "function") {
+        window.resetAdoptedSelection = function () {
+          try {
+            window.adoptedSelected = [];
+            const adoptedPreview = document.getElementById("adoptedPreview");
+            const adoptedCount = document.getElementById("adoptedCount");
+            const adoptedFilesInput = document.getElementById("adoptedFiles");
+            if (adoptedPreview) adoptedPreview.innerHTML = "";
+            if (adoptedCount) adoptedCount.textContent = "已選 0 / 5 張";
+            if (adoptedFilesInput) adoptedFilesInput.value = "";
+          } catch { }
+        };
+      }
+
+      // 1) 標準：dialog 關閉事件（按 X、點遮罩、呼叫 close() 都會觸發）
+      dlg.addEventListener("close", () => {
+        resetAdoptedSelection();
+      });
+
+      // 2) 取消事件（按 Esc）
+      dlg.addEventListener("cancel", () => {
+        resetAdoptedSelection();
+        // 不阻止預設，讓它照常關閉
+      });
+
+      // 3) 若你的程式是用移除 open / 切 aria-hidden 來關閉，也一併偵測
+      const mo = new MutationObserver(() => {
+        if (!dlg.open) {
+          resetAdoptedSelection();
+        }
+      });
+      mo.observe(dlg, { attributes: true, attributeFilter: ["open", "aria-hidden"] });
+
+      // 4) 如果你有自訂右上角關閉鍵（#dlgClose），也補一下
+      document.getElementById("dlgClose")?.addEventListener("click", () => {
+        // 這裡不直接清空，交給 close 事件統一處理；若你的按鈕不是呼叫 close()，可手動加：
+        // resetAdoptedSelection();
+      });
+
+      dlg.dataset.cleanupBound = "1";
+    })();
+
+    // === 取消：事件委派，避免動態重繪導致沒綁到 ===
+    document.addEventListener("click", (e) => {
+      const cancelBtn = e.target.closest?.("#btnCancel");
+      if (!cancelBtn) return;
+
+      e.preventDefault();
+
+      // 清空已領養選取（若專案內已有自訂版本會沿用）
+      try {
+        if (typeof resetAdoptedSelection === "function") resetAdoptedSelection();
+        else {
+          // 簡易後援：確保清乾淨
+          if (window.adoptedSelected) window.adoptedSelected.length = 0;
+          const adoptedPreview = document.getElementById("adoptedPreview");
+          const adoptedCount = document.getElementById("adoptedCount");
+          const adoptedFilesInput = document.getElementById("adoptedFiles");
+          if (adoptedPreview) adoptedPreview.innerHTML = "";
+          if (adoptedCount) adoptedCount.textContent = "已選 0 / 5 張";
+          if (adoptedFilesInput) adoptedFilesInput.value = "";
+        }
+      } catch { }
+
+      // 關閉 <dialog>
+      try {
+        const dlg = document.getElementById("petDialog");
+        if (dlg?.open) dlg.close();
+        // 若你不是用 close() 關 dialog，而是切 aria-hidden/open，也能配合這段：
+        // dlg?.removeAttribute?.("open");
+        // dlg?.setAttribute?.("aria-hidden", "true");
+      } catch { }
+    });
+
+    // ===============================
+    // 重新整理按鈕與啟動載入
+    // ===============================
+    document.getElementById("btnRefreshSm")?.addEventListener("click", loadPets);
+    document.getElementById("btnRefresh")?.addEventListener("click", loadPets);
+
+    (async () => {
+      try {
+        await loadPets();
+      } catch (e) {
+        console.error("loadPets failed", e);
+      }
+    })();
+
+    async function deleteAllUnder(path) {
+      const folderRef = sRef(storage, path);
+      const { items, prefixes } = await listAll(folderRef);
+      await Promise.all(items.map((it) => deleteObject(it)));
+      // 如果有子資料夾，遞迴刪除
+      for (const p of prefixes) {
+        await deleteAllUnder(p.fullPath);
+      }
+    }
+
+    // === 名字輸入：即時重複檢查（建立時用） ===
+    (() => {
+      const input = document.getElementById("name");
+      if (!input) return;
+
+      // 建一個提示元素（顯示 檢查中 / 可用 / 已被使用）
+      let hint = document.getElementById("nameHint");
+      if (!hint) {
+        hint = document.createElement("div");
+        hint.id = "nameHint";
+        hint.setAttribute("aria-live", "polite");
+        // 直接用內聯樣式，避免 Tailwind purge
+        hint.style.minHeight = "20px";   // 預留 1 行高度
+        hint.style.lineHeight = "20px";  // 讓文字置中該行
+        hint.style.whiteSpace = "nowrap";
+        hint.style.marginTop = "4px";
+        hint.style.fontSize = "0.875rem"; // 約等於 text-sm
+        hint.style.color = "#6b7280";     // 約等於 text-gray-500
+        // 放在名字輸入框的正後方
+        document.getElementById("name").insertAdjacentElement("afterend", hint);
+      }
+
+      // 簡單防抖，避免每個字都打 API
+      const debounce = (fn, d = 350) => {
+        let t;
+        return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), d); };
+      };
+
+      // 避免回應亂序：只處理最後一次查詢
+      let lastVer = 0;
+      const setState = (status, text) => {
+        // 邊框：只有 bad 用紅框，其餘恢復原樣
+        if (!input.dataset._origClass) input.dataset._origClass = input.className;
+        if (status === "bad") {
+          input.className = `${input.dataset._origClass} border-red-500 focus:outline-none`;
+        } else {
+          input.className = input.dataset._origClass;
+        }
+
+        // 提示：只有 bad 顯示文字，其餘清空
+        hint.textContent = (status === "bad") ? (text || "") : "";
+
+        // 顏色：只有 bad 顯示紅色
+        hint.style.color = (status === "bad") ? "#dc2626" /* red-600 */ : "#6b7280" /* gray-500 */;
+      };
+
+      const runCheck = debounce(async () => {
+        const ver = ++lastVer;
+        const name = (input.value || "").trim();
+        if (!name) { setState("idle", ""); return; }
+
+        hint.textContent = "";
+
+        const kw = name.toLowerCase();
+
+        try {
+          // 先用 nameLower 精準比對（你已在新增/編輯會寫入 nameLower）
+          const q1 = query(
+            collection(db, "pets"),
+            where("nameLower", "==", kw),
+            fbLimit(1)
+          );
+          const s1 = await getDocs(q1);
+          if (ver !== lastVer) return; // 只處理最新一次
+
+          // 若舊資料沒 nameLower，補做一次 name 精準比對（較慢，但只查 1 筆）
+          let duplicated = !s1.empty;
+          if (!duplicated) {
+            const q2 = query(
+              collection(db, "pets"),
+              where("name", "==", name),
+              fbLimit(1)
+            );
+            const s2 = await getDocs(q2);
+            duplicated = !s2.empty;
+            if (ver !== lastVer) return;
+          }
+
+          if (duplicated) {
+            setState("bad", `「${name}」已被使用`);
+          } else {
+            setState("idle", ""); // 不顯示「可以使用」
+          }
+        } catch (e) {
+          // 失敗時不要卡紅框，只顯示訊息
+          setState("idle", "檢查失敗，稍後再試");
+          console.error("name check error:", e);
+        } finally {
+          input.removeAttribute("aria-busy");
+        }
+      }, 100);
+
+      input.addEventListener("input", runCheck);
+
+      // 讓外部可在「登錄成功」後重置提示與樣式
+      window.resetNameCheck = () => {
+        // 把最新檢查版本往前推，避免舊請求回來覆蓋
+        lastVer++;
+        // 清除提示與紅框
+        setState("idle", "");
+        input.removeAttribute("aria-busy");
+      };
+    })();
+
+    // === 編輯：名字即時檢查（只在重複時顯示） ===
+    (() => {
+      const dlg = document.getElementById("petDialog");
+      if (!dlg) return;
+
+      let hint, input, _origClass = "";
+
+      function ensureHint() {
+        if (!input) return;
+        if (!hint) {
+          hint = document.createElement("div");
+          hint.id = "editNameHint";
+          // 固定高度，避免版面跳動
+          hint.style.minHeight = "20px";
+          hint.style.lineHeight = "20px";
+          hint.style.whiteSpace = "nowrap";
+          hint.style.marginTop = "4px";
+          hint.style.fontSize = "0.875rem";
+          hint.style.color = "#6b7280"; // gray-500
+          input.insertAdjacentElement("afterend", hint);
+        }
+      }
+
+      function setBad(msg) {
+        if (!_origClass) _origClass = input.className;
+        input.className = `${_origClass} border-red-500 focus:outline-none`;
+        hint.textContent = msg || "";
+        hint.style.color = "#dc2626"; // red-600
+      }
+      function clearState() {
+        if (_origClass) input.className = _origClass;
+        if (hint) { hint.textContent = ""; hint.style.color = "#6b7280"; }
+      }
+
+      // 每次 dialog 開啟後抓到當前的 #editName
+      dlg.addEventListener("close", clearState);
+      dlg.addEventListener("cancel", clearState);
+
+      document.addEventListener("input", async (e) => {
+        const el = e.target;
+        if (el.id !== "editName") return;
+        input = el; ensureHint();
+
+        const name = (input.value || "").trim();
+        if (!name) { clearState(); return; }
+
+        // 只在「重複」時顯示紅字／紅框，其他保持靜默
+        const dup = await isNameTaken(name, window.currentDocId || window.currentDoc?.id || null);
+        if (dup) setBad(`「${name}」已被使用`);
+        else clearState();
+      });
+    })();
+
+    // 再呼叫一次（與 IIFE 等價，保險）
+    loadPets();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="assets/shared.js"></script>
+</body>
+
+</html>
