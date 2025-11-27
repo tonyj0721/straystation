@@ -11,11 +11,6 @@
   <link rel="apple-touch-icon" href="data:,">
   <link rel="stylesheet" href="assets/tailwind.css">
   <link rel="stylesheet" href="assets/shared.css">
-
-  <style>
-    html, body { overflow-anchor: none; }
-  </style>
-
 </head>
 
 <body class="text-gray-800 bg-gradient-to-br from-brand-50 to-white">
@@ -453,130 +448,6 @@
   </div>
 
   <script type="module">
-// --- Keyboard-safe area for search input (iOS Safari friendly) ---
-(function keyboardSafeSearch() {
-  const input = document.getElementById('searchName');
-  if (!input) return;
-  let active = false;
-
-  function kbGap() {
-    const vv = window.visualViewport;
-    if (!vv) return 0;
-    // Layout viewport height minus visible viewport bottom -> approximate keyboard height
-    const gap = Math.max(0, window.innerHeight - (vv.height + vv.offsetTop));
-    return gap;
-  }
-
-  function setPadding() {
-    if (!active) return;
-    const gap = kbGap();
-    // Leave a bit of extra space so the caret isn't flush with the keyboard
-    document.body.style.paddingBottom = (gap + 16) + 'px';
-  }
-
-  function ensureVisible() {
-    const vv = window.visualViewport;
-    const vh = (vv && vv.height) || window.innerHeight;
-    const r = input.getBoundingClientRect(); // relative to visual viewport
-    const pad = 8;
-    if (r.bottom > vh - pad) {
-      window.scrollBy({ top: r.bottom - (vh - pad), behavior: 'auto' });
-    } else if (r.top < pad) {
-      window.scrollBy({ top: r.top - pad, behavior: 'auto' });
-    }
-  }
-
-  input.addEventListener('focus', () => {
-    active = true;
-    setPadding();
-    // Let keyboard animation start, then adjust twice
-    requestAnimationFrame(() => { setPadding(); ensureVisible(); });
-    setTimeout(() => { setPadding(); ensureVisible(); }, 250);
-  });
-
-  input.addEventListener('blur', () => {
-    active = false;
-    document.body.style.paddingBottom = '';
-  });
-
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', () => {
-      if (active) { setPadding(); ensureVisible(); }
-    });
-    window.visualViewport.addEventListener('scroll', () => {
-      if (active) { setPadding(); ensureVisible(); }
-    });
-  }
-})();
-
-// --- search-stability helpers (focus-aware) ---
-function debounce(fn, wait=160) {
-  let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn.apply(this,args), wait); };
-}
-function withStableSearchRender(renderFn) {
-  const doc = document.documentElement;
-  const inputEl = document.getElementById('searchName');
-  const activeOnSearch = document.activeElement === inputEl;
-
-  let atBottom = false;
-  let bottomOffset = 0;
-  if (!activeOnSearch) {
-    const beforeH = doc.scrollHeight;
-    const beforeY = window.pageYOffset;
-    const vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
-    bottomOffset = beforeH - (beforeY + vh);
-    atBottom = Math.abs(beforeY + vh - beforeH) <= 2;
-  }
-
-  renderFn();
-
-  requestAnimationFrame(() => {
-    const vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
-
-    if (activeOnSearch && inputEl) {
-      const r = inputEl.getBoundingClientRect();
-      const pad = 8;
-      if (r.bottom > vh - pad) {
-        window.scrollBy({ top: r.bottom - (vh - pad), behavior: 'auto' });
-      } else if (r.top < pad) {
-        window.scrollBy({ top: r.top - pad, behavior: 'auto' });
-      }
-      return;
-    }
-
-    if (atBottom) {
-      const afterH = doc.scrollHeight;
-      const newY = Math.max(0, afterH - vh - bottomOffset);
-      if (Math.abs(newY - window.pageYOffset) > 1) {
-        window.scrollTo({ top: newY, behavior: 'auto' });
-      }
-    }
-  });
-}
-
-// make sure focusing the search keeps it in view above the keyboard
-(function setupSearchVisibility() {
-  const input = document.getElementById('searchName');
-  if (!input) return;
-  function ensureVisible() {
-    const vv = window.visualViewport;
-    const vh = (vv && vv.height) || window.innerHeight;
-    const r = input.getBoundingClientRect();
-    const pad = 8;
-    if (r.bottom > vh - pad) {
-      window.scrollBy({ top: r.bottom - (vh - pad), behavior: 'auto' });
-    } else if (r.top < pad) {
-      window.scrollBy({ top: r.top - pad, behavior: 'auto' });
-    }
-  }
-  input.addEventListener('focus', () => { requestAnimationFrame(ensureVisible); });
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', () => {
-      if (document.activeElement === input) ensureVisible();
-    });
-  }
-})();
-
     // ===============================
     // Firebase 設定與初始化
     // ===============================
@@ -911,7 +782,7 @@ function withStableSearchRender(renderFn) {
     }
 
     const searchInput = $("#searchName");
-    searchInput.addEventListener("input", debounce(onSearchByName, 160));
+    searchInput.addEventListener("input", onSearchByName);
 
     function applyFilterAndRender() {
       const kw = searchInput.value.trim().toLowerCase();
