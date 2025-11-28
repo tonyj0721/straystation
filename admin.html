@@ -24,11 +24,11 @@
 
         <!-- 桌機導覽 -->
         <nav class="hidden md:flex items-center gap-6 ml-auto">
+          <a href="index.html" class="hover:text-brand-600">首頁</a>
           <a href="cats.html" class="hover:text-brand-600">我想養貓咪</a>
           <a href="dogs.html" class="hover:text-brand-600">我想養狗狗</a>
           <a href="about.html" class="hover:text-brand-600">關於簡媽媽</a>
           <a href="home.html" class="hover:text-brand-600">幸福的歸宿</a>
-          <a href="admin.html" class="hover:text-brand-600">管理員登入</a>
         </nav>
 
         <!-- 手機漢堡鈕 -->
@@ -56,6 +56,15 @@
 
       <!-- 按鈕群：保留 space-y-2、字體 18px -->
       <ul class="space-y-2 py-1 text-[18px]" role="menu" aria-orientation="vertical" tabindex="-1">
+        <li>
+          <a href="index.html" role="menuitem" tabindex="-1" class="flex w-full items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+            text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+            focus:outline-none focus:ring-2 focus:ring-white/70">
+            <span aria-hidden="true" class="grid size-8 place-items-center rounded-lg bg-white shadow text-xl">🧭</span>
+            <span class="flex-1 text-center">首&emsp;&emsp;頁</span>
+          </a>
+        </li>
+
         <li>
           <a href="cats.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
                 text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
@@ -89,15 +98,6 @@
             focus:outline-none focus:ring-2 focus:ring-white/70">
             <span aria-hidden="true" class="text-xl leading-none">🏠</span>
             <span>幸福的歸宿</span>
-          </a>
-        </li>
-
-        <li>
-          <a href="admin.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
-                text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
-                focus:outline-none focus:ring-2 focus:ring-white/70">
-            <span aria-hidden="true" class="text-xl leading-none">🔒</span>
-            <span>管理員登入</span>
           </a>
         </li>
       </ul>
@@ -160,6 +160,10 @@
     });
     window.addEventListener('resize', () => {
       if (!overlay.classList.contains('hidden')) positionPanel();
+    });
+    // 點任何選單項目後就關閉（避免停留）
+    panel.querySelectorAll('[role="menuitem"]').forEach(el => {
+      el.addEventListener('click', () => { try { closeMenu(); } catch (_) { } });
     });
   </script>
 
@@ -290,6 +294,13 @@
           <div class="absolute inset-0 bg-white/20"></div>
 
           <!-- 主圖在最上層，沒有 blur -->
+
+          <!-- 提示：點擊主圖可放大 -->
+          <div class="absolute top-2 left-2 z-20 pointer-events-none">
+            <span class="inline-block text-sm leading-none bg-black/60 text-white px-2 py-1 rounded-md shadow">
+              點擊主圖可放大
+            </span>
+          </div>
           <img id="dlgImg" alt="毛孩照片"
             class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg">
 
@@ -448,15 +459,20 @@
   </div>
 
   <script type="module">
-// --- Set a fixed minimum height for the results area (no inner scrolling) ---
-(function setResultsFloor(){
-  const rowsMobile = document.getElementById('rowsMobile');
-  const rows = document.getElementById('rows');
-  const host = rowsMobile ? rowsMobile.parentElement : (rows ? rows.closest('div') : null);
-  if (host) {
-    host.style.minHeight = '685px';
-  }
-})();
+    // 如果 withStableSearchRender 沒定義，就退成「直接渲染」
+    const renderStable = (typeof withStableSearchRender === 'function')
+      ? withStableSearchRender
+      : (fn) => fn();
+
+    // --- Set a fixed minimum height for the results area (no inner scrolling) ---
+    (function setResultsFloor() {
+      const rowsMobile = document.getElementById('rowsMobile');
+      const rows = document.getElementById('rows');
+      const host = rowsMobile ? rowsMobile.parentElement : (rows ? rows.closest('div') : null);
+      if (host) {
+        host.style.minHeight = '685px';
+      }
+    })();
 
     // ===============================
     // Firebase 設定與初始化
@@ -617,7 +633,7 @@
       const incoming = Array.from(imgFiles.files || []);
       const next = selectedFiles.concat(incoming);
       if (next.length > 5) {
-        Swal.fire({ icon: "warning", title: "最多選取 5 張" });
+        Swal.fire({ icon: "warning", title: "最多 5 張照片" });
       }
       selectedFiles = next.slice(0, 5);
       renderPreviews();
@@ -682,9 +698,9 @@
           const r = await Swal.fire({
             icon: "question",
             title: `名字「${name}」已存在`,
-            text: "確認是否繼續登錄？",
+            text: "確定繼續登錄？",
             showCancelButton: true,
-            confirmButtonText: "繼續",
+            confirmButtonText: "確定",
             cancelButtonText: "取消",
           });
           if (!r.isConfirmed) return;
@@ -732,13 +748,13 @@
 
         // 成功提示後直接打開詳情
         Swal.fire({
-        icon: "success",
-        title: "已成功登錄！",
-        showConfirmButton: false,
-        timer: 1000,
-      }).then(() => {
-        openDialog(docRef.id);
-      });
+          icon: "success",
+          title: "已成功登錄！",
+          showConfirmButton: false,
+          timer: 1500,
+        }).then(() => {
+          openDialog(docRef.id);
+        });
 
         // 重置表單與選擇圖片
         e.target.reset();
@@ -805,26 +821,79 @@
 
     // 後端依名字（前綴）查詢：有關鍵字→打 Firestore；空字串→回到預設清單
     async function onSearchByName() {
-      const kw = searchInput.value.trim().toLowerCase();
+      const kwRaw = searchInput.value.trim();
+      const kw = kwRaw.toLowerCase();
       if (!kw) {
-        // 沒關鍵字 → 顯示預設清單（最近 N 筆）
-        applyFilterAndRender();  // 保留你原本的行為
+        applyFilterAndRender();
         return;
       }
 
-      // 依 nameLower 做前綴查詢（最多 50 筆，可自行調整）
-      const qByName = query(
-        collection(db, "pets"),
-        orderBy("nameLower"),
-        where("nameLower", ">=", kw),
-        where("nameLower", "<=", kw + "\uf8ff"),
-        fbLimit(50)
-      );
-      const snap = await getDocs(qByName);
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      try {
+        // Phase 1：前綴（加速）
+        let prefix = [];
+        try {
+          const qPrefix = query(
+            collection(db, "pets"),
+            orderBy("nameLower"),
+            where("nameLower", ">=", kw),
+            where("nameLower", "<=", kw + "\uf8ff"),
+            fbLimit(100)
+          );
+          const snapPrefix = await getDocs(qPrefix);
+          prefix = snapPrefix.docs.map(d => ({ id: d.id, ...d.data() }));
+        } catch (e) {
+          console.warn("prefix search skipped:", e);
+        }
 
-      renderRows(list);
-      renderRowsMobile(list);
+        // Phase 2：最近 N 筆做「任意位置包含」
+        let recentDocs = [];
+        try {
+          const snapRecent = await getDocs(query(
+            collection(db, "pets"),
+            orderBy("createdAt", "desc"),
+            fbLimit(1200)
+          ));
+          recentDocs = snapRecent.docs;
+        } catch (e) {
+          // 若沒有 createdAt 可排序，退回 nameLower 排序拿一批
+          const snapRecent = await getDocs(query(
+            collection(db, "pets"),
+            orderBy("nameLower"),
+            fbLimit(1200)
+          ));
+          recentDocs = snapRecent.docs;
+        }
+
+        const contains = recentDocs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(p => {
+            const nm = String(p.name || "");
+            const nmLower = String(p.nameLower || nm).toLowerCase();
+            return nmLower.includes(kw) || nm.includes(kwRaw);
+          });
+
+        // 合併 + 去重（新者優先）
+        const byId = new Map();
+        [...contains, ...prefix].forEach(p => byId.set(p.id, p));
+        const list = Array.from(byId.values()).sort((a, b) => {
+          const ta = (a.createdAt && a.createdAt.seconds) ? a.createdAt.seconds : 0;
+          const tb = (b.createdAt && b.createdAt.seconds) ? b.createdAt.seconds : 0;
+          return tb - ta;
+        });
+
+        renderStable(() => {
+          renderRows(list);
+          renderRowsMobile(list);
+        });
+      } catch (err) {
+        console.error("search error", err);
+        // 後備：用目前記憶中的清單做包含搜尋
+        const list = pets.filter(p => String(p.name || "").toLowerCase().includes(kw));
+        renderStable(() => {
+          renderRows(list);
+          renderRowsMobile(list);
+        });
+      }
     }
 
     // 顯示品種的規則（品種犬/貓 → 直接顯示品種；米克斯 → 顯示「米克斯/毛色」）
@@ -1106,12 +1175,12 @@
       if (wasOpen) dlg.close();
 
       const ok = await Swal.fire({
-      icon: "warning",
-      title: "確認刪除此筆？",
-      showCancelButton: true,
-      confirmButtonText: "刪除",
-      cancelButtonText: "取消",
-    });
+        icon: "warning",
+        title: "確定刪除此筆動物資料？",
+        showCancelButton: true,
+        confirmButtonText: "確定",
+        cancelButtonText: "取消",
+      });
       if (!ok.isConfirmed) {
         if (wasOpen) dlg.showModal();
         return;
@@ -1124,7 +1193,7 @@
         // 最後刪 Firestore 文件
         await deleteDoc(doc(db, "pets", currentDocId));
         await loadPets();
-        await Swal.fire({ icon: "success", title: "刪除成功", showConfirmButton: false, timer: 2000, });
+        await Swal.fire({ icon: "success", title: "刪除成功", showConfirmButton: false, timer: 1500, });
       } catch (err) {
         await Swal.fire({ icon: "error", title: "刪除失敗", text: err.message });
         if (wasOpen) dlg.showModal();
@@ -1169,11 +1238,10 @@
           const { isConfirmed } = await (typeof swalInDialog === "function" ? swalInDialog : Swal.fire)({
             icon: "warning",
             title: `「${newName}」已存在`,
-            text: "確認是否繼續儲存？",
+            text: "確定繼續儲存？",
             showCancelButton: true,
-            confirmButtonText: "繼續",
+            confirmButtonText: "確定",
             cancelButtonText: "取消",
-            reverseButtons: true,
           });
           if (!isConfirmed) {
             // 使用者取消 → 直接結束，按鈕維持可按、文字維持「儲存」
@@ -1227,7 +1295,7 @@
 
         const wasOpen = dlg.open;
         if (wasOpen) dlg.close();
-        await Swal.fire({ icon: "success", title: "已儲存", showConfirmButton: false, timer: 1000 });
+        await Swal.fire({ icon: "success", title: "已儲存", showConfirmButton: false, timer: 1500 });
         if (wasOpen) dlg.showModal();
 
         setEditMode(false);
@@ -1352,7 +1420,7 @@
       const incoming = Array.from(editFiles.files || []);
       const total = editImagesState.keep.length + editImagesState.add.length + incoming.length;
       if (total > 5) {
-        swalInDialog({ icon: "warning", title: "最多 5 張圖片" });
+        swalInDialog({ icon: "warning", title: "最多 5 張照片" });
       }
       const room = 5 - (editImagesState.keep.length + editImagesState.add.length);
       editImagesState.add = editImagesState.add.concat(incoming.slice(0, Math.max(0, room)));
@@ -1410,7 +1478,7 @@
       const incoming = Array.from(adoptedFilesInput.files || []);
       const next = adoptedSelected.concat(incoming);
       if (next.length > 5) {
-        swalInDialog({ icon: "warning", title: "最多 5 張圖片" });
+        swalInDialog({ icon: "warning", title: "最多 5 張照片" });
       }
       adoptedSelected = next.slice(0, 5);
       renderAdoptedPreviews();
@@ -1464,7 +1532,7 @@
           icon: "success",
           title: "已標記為「已送養」",
           showConfirmButton: false,
-          timer: 2000,
+          timer: 1500,
         });
 
         // 清空已領養選取（保險起見，關閉時通常也會清）
@@ -1491,7 +1559,6 @@
         showCancelButton: true,
         confirmButtonText: "確定",
         cancelButtonText: "取消",
-        reverseButtons: true
       });
 
       if (!isConfirmed) {
@@ -1511,7 +1578,7 @@
         });
 
         await loadPets();
-        await Swal.fire({ icon: "success", title: "已撤回「已送養」標記", showConfirmButton: false, timer: 2000, });
+        await Swal.fire({ icon: "success", title: "已撤回「已送養」標記", showConfirmButton: false, timer: 1500, });
       } catch (err) {
         await Swal.fire({ icon: "error", title: "撤回失敗", text: err.message });
       } finally {

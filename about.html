@@ -24,7 +24,7 @@
 
         <!-- 桌機導覽 -->
         <nav class="hidden md:flex items-center gap-6 ml-auto">
-          <a href="index.html" class="hover:text-brand-600">首    頁</a>
+          <a href="index.html" class="hover:text-brand-600">首 頁</a>
           <a href="cats.html" class="hover:text-brand-600">我想養貓咪</a>
           <a href="dogs.html" class="hover:text-brand-600">我想養狗狗</a>
           <a href="home.html" class="hover:text-brand-600">幸福的歸宿</a>
@@ -57,11 +57,11 @@
       <!-- 按鈕群：保留 space-y-2、字體 18px -->
       <ul class="space-y-2 py-1 text-[18px]" role="menu" aria-orientation="vertical" tabindex="-1">
         <li>
-          <a href="index.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
-                text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
-                focus:outline-none focus:ring-2 focus:ring-white/70">
-            <span aria-hidden="true" class="text-xl leading-none">ℹ️</span>
-            <span>首    頁</span>
+          <a href="index.html" role="menuitem" tabindex="-1" class="flex w-full items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+            text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+            focus:outline-none focus:ring-2 focus:ring-white/70">
+            <span aria-hidden="true" class="grid size-8 place-items-center rounded-lg bg-white shadow text-xl">🧭</span>
+            <span class="flex-1 text-center">首&emsp;&emsp;頁</span>
           </a>
         </li>
 
@@ -160,6 +160,10 @@
     });
     window.addEventListener('resize', () => {
       if (!overlay.classList.contains('hidden')) positionPanel();
+    });
+    // 點任何選單項目後就關閉（避免停留）
+    panel.querySelectorAll('[role="menuitem"]').forEach(el => {
+      el.addEventListener('click', () => { try { closeMenu(); } catch (_) { } });
     });
   </script>
 

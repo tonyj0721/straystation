@@ -162,6 +162,10 @@
     window.addEventListener('resize', () => {
       if (!overlay.classList.contains('hidden')) positionPanel();
     });
+    // 點任何選單項目後就關閉（避免停留）
+    panel.querySelectorAll('[role="menuitem"]').forEach(el => {
+      el.addEventListener('click', () => { try { closeMenu(); } catch (_) { } });
+    });
   </script>
 
   <!-- Hero -->
@@ -303,6 +307,12 @@
           <div class="absolute inset-0 bg-white/20"></div>
 
           <!-- 主圖在最上層，沒有 blur -->
+          <!-- 提示：點擊主圖可放大 -->
+          <div class="absolute top-2 left-2 z-20 pointer-events-none">
+            <span class="inline-block text-sm leading-none bg-black/60 text-white px-2 py-1 rounded-md shadow">
+              點擊主圖可放大
+            </span>
+          </div>
           <img id="dlgImg" alt="毛孩照片"
             class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg">
 
