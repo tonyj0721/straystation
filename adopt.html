@@ -250,10 +250,33 @@
       let msg = "📋【認養申請表】\n";
       if (petName) msg += `認養動物：${petName}\n\n`;
 
-      const data = new FormData(adoptForm);
-      for (const [k, v] of data.entries()) {
-        if (v.trim()) msg += `${k}：${v}\n\n`;
-      }
+      // 問號一律換行、不加冒號；以下幾句也要換行
+const FORCE_NEWLINE = new Set([
+  "若有，請提供寵物資訊",
+  "認養動機",
+  "飼養方式"
+]);
+
+function shouldNewline(key) {
+  if (/[？?]$/.test(key)) return true;                 // 問句：換行
+  const base = key.trim().replace(/[：:]\s*$/, "");    // 去尾冒號比對白名單
+  return FORCE_NEWLINE.has(base);
+}
+
+const data = new FormData(adoptForm);
+for (const [k, v] of data.entries()) {
+  const key = String(k).trim();
+  const value = String(v).trim();
+  if (!value) continue;
+
+  if (shouldNewline(key)) {
+    const title = key.replace(/[：:]\s*$/, "");
+    msg += `${title}\n${value}\n\n`;                   // 換行貼內容
+  } else {
+    const sep = /[：:？?！!]$/.test(key) ? "" : "：";    // 其他情況才補「：」
+    msg += `${key}${sep}${value}\n\n`;
+  }
+}
 
       await navigator.clipboard.writeText(msg);
 
