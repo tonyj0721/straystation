@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="zh-Hant" class="scroll-smooth">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>我要認養｜台中簡媽媽狗園</title>
+
+  <!-- TailwindCSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: "#3B82F6",       /* 天藍 */
+            primaryDark: "#2563EB",
+            pageBg: "#F3F7FC"
+          },
+          boxShadow: {
+            soft: "0 8px 24px rgba(0,0,0,0.06)"
+          }
+        }
+      }
+    };
+  </script>
+</head>
+
+<body class="bg-pageBg text-gray-800 antialiased">
+
+  <!-- Header -->
+  <header class="bg-white/80 backdrop-blur border-b border-gray-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="h-16 flex items-center justify-between">
+        <a href="index.html" class="flex items-center gap-2 font-semibold text-2xl">
+          <span>台中簡媽媽狗園</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pt-2 pb-10">
+
+    <!-- Back -->
+    <button onclick="history.back()" class="inline-flex items-center gap-1 px-3 py-1.5 mb-1
+             border border-[#3B82F6] text-[#3B82F6] text-sm
+             rounded-lg font-medium bg-white">
+      ‹ 回上一頁
+    </button>
+
+    <!-- Title -->
+    <h1 id="title" class="text-3xl font-bold text-primary text-center mt-10 mb-7">
+      我要認養
+    </h1>
+    <p class="text-gray-600 text-center text-sm mt-2 mb-6">
+      請提供詳細的自我介紹，填寫越完整越好喔！😊😊
+    </p>
+
+    <!-- Form -->
+    <form id="adoptForm" class="space-y-8">
+
+      <!-- 基本資料 -->
+      <section class="bg-white shadow-soft rounded-2xl p-7 border border-gray-100">
+        <h2 class="text-xl font-bold text-primary mb-4">基本資料</h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+          <div class="space-y-1">
+            <label class="font-medium">姓名</label>
+            <input name="姓名" class="w-full px-4 py-2 border rounded-xl" required>
+          </div>
+
+          <div class="space-y-1">
+            <label class="font-medium">年齡</label>
+            <input name="年齡" class="w-full px-4 py-2 border rounded-xl" required>
+          </div>
+
+          <div class="space-y-1 md:col-span-2">
+            <label class="font-medium">居住地（縣市／區域）</label>
+            <input name="居住地" placeholder="例如：台中市龍井區" class="w-full px-4 py-2 border rounded-xl">
+          </div>
+
+          <div class="space-y-1 md:col-span-2">
+            <label class="font-medium">居住環境（租屋自宅／透天公寓）</label>
+            <input name="居住環境" placeholder="例如：自宅透天" class="w-full px-4 py-2 border rounded-xl">
+          </div>
+
+          <div class="space-y-1">
+            <label class="font-medium">職業</label>
+            <input name="職業" class="w-full px-4 py-2 border rounded-xl">
+          </div>
+
+          <div class="space-y-1">
+            <label class="font-medium">月收入</label>
+            <input name="月收入" placeholder="大約即可" class="w-full px-4 py-2 border rounded-xl">
+          </div>
+
+          <div class="space-y-1 md:col-span-2">
+            <label class="font-medium">家庭成員</label>
+            <input name="家庭成員" class="w-full px-4 py-2 border rounded-xl">
+          </div>
+
+          <div class="space-y-1">
+            <label class="font-medium">家庭成員總人數</label>
+            <input name="家庭成員總人數" class="w-full px-4 py-2 border rounded-xl">
+          </div>
+
+          <div class="space-y-1">
+            <label class="font-medium">現居住狀況</label>
+            <input name="現居住狀況" placeholder="與人同住或獨居" class="w-full px-4 py-2 border rounded-xl">
+          </div>
+
+          <div class="space-y-1 md:col-span-2">
+            <label class="font-medium">同居成員</label>
+            <input name="同居成員" placeholder="例如：伴侶、配偶、父母...等" class="w-full px-4 py-2 border rounded-xl">
+          </div>
+
+        </div>
+      </section>
+
+      <!-- 飼養經驗 -->
+      <section class="bg-white shadow-soft rounded-2xl p-7 border border-gray-100">
+        <h2 class="text-xl font-bold text-primary mb-4">飼養寵物經驗</h2>
+
+        <div class="space-y-3">
+          <div class="space-y-1">
+            <label class="font-medium">是否曾經飼養過寵物？</label>
+            <input name="是否曾經飼養過寵物？" class="w-full px-4 py-2 border rounded-xl">
+          </div>
+
+          <div class="space-y-1">
+            <label class="font-medium">若有，飼養過什麼寵物？</label>
+            <textarea name="若有，飼養過什麼寵物？" class="w-full px-4 py-2 border rounded-xl h-28"></textarea>
+          </div>
+        </div>
+      </section>
+
+      <!-- 現有寵物 -->
+      <section class="bg-white shadow-soft rounded-2xl p-7 border border-gray-100">
+        <h2 class="text-xl font-bold text-primary mb-4">現有寵物狀況</h2>
+
+        <div class="space-y-3">
+          <div class="space-y-1">
+            <label class="font-medium">目前家中是否有寵物？</label>
+            <input name="目前家中是否有寵物？" class="w-full px-4 py-2 border rounded-xl">
+          </div>
+
+          <div class="space-y-1">
+            <label class="font-medium">若有，請提供寵物資訊</label>
+            <textarea name="若有，請提供寵物資訊" placeholder="例如：種類、性別、是否已結紮...等"
+              class="w-full px-4 py-2 border rounded-xl h-28"></textarea>
+          </div>
+        </div>
+      </section>
+
+      <!-- 認養動機 -->
+      <section class="bg-white shadow-soft rounded-2xl p-7 border border-gray-100">
+        <h2 class="text-xl font-bold text-primary mb-4">認養動機</h2>
+
+        <label class="block text-gray-700 mb-2">
+          為什麼想認養這隻毛孩呢？
+        </label>
+
+        <textarea name="認養動機" class="w-full px-4 py-3 border rounded-xl h-32"></textarea>
+      </section>
+
+      <!-- 飼養方式 -->
+      <section class="bg-white shadow-soft rounded-2xl p-7 border border-gray-100">
+        <h2 class="text-xl font-bold text-primary mb-4">飼養方式</h2>
+
+        <label class="block text-gray-700 mb-2">
+          您會如何照顧這隻毛孩？
+        </label>
+
+        <textarea name="飼養方式" placeholder="例如：飲食安排、居住空間、教育方式...等"
+          class="w-full px-4 py-3 border rounded-xl h-32"></textarea>
+      </section>
+
+
+      <!-- 花費 -->
+      <section class="bg-white shadow-soft rounded-2xl p-7 border border-gray-100">
+        <h2 class="text-xl font-bold text-primary mb-4">飼養花費認知</h2>
+        <label class="block text-gray-700 mb-2">
+          您認為飼養寵物需要哪些支出？
+        </label>
+        <textarea name="飼養方式" placeholder="請舉例說明" class="w-full px-4 py-2 border rounded-xl h-32"></textarea>
+      </section>
+
+      <!-- 環境參考 -->
+      <section class="bg-white shadow-soft rounded-2xl p-7 border border-gray-100">
+        <h2 class="text-xl font-bold text-primary mb-3">環境參考</h2>
+        <p class="text-gray-700 leading-relaxed">
+          請拍攝或錄製毛孩未來的生活區域，
+          聯絡小編後再行上傳，供審核參考～謝謝！
+        </p>
+      </section>
+
+      <!-- 送出 -->
+      <div class="pt-2">
+        <button type="submit" class="w-full py-4 text-lg font-bold text-white rounded-2xl shadow-soft
+               bg-primary hover:bg-primaryDark transition">
+          📋 複製表單並聯絡小編
+        </button>
+      </div>
+
+    </form>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-gray-50 border-t border-gray-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-sm text-gray-500">
+      © <span id="year"></span> 浪浪轉運站 Stray Station. 保留所有權利。
+    </div>
+  </footer>
+
+  <!-- Popup -->
+  <div id="popupOverlay" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-[999]">
+    <div class="bg-white rounded-2xl p-6 max-w-sm w-[90%] text-center shadow-xl">
+      <p class="text-gray-700 leading-relaxed mb-6">
+        表單已複製到剪貼簿<br>
+        開啟 Messenger 後將自動填入<br>
+        若未代入請自行貼上。
+        <br><br>
+        🔖 每日訊息量較大，小編可能無法逐一回覆，
+        <br>最終僅會通知最合適的認養人。
+      </p>
+      <button id="continueBtn" class="bg-primary text-white py-2 px-6 rounded-xl font-semibold
+                   hover:bg-primaryDark">
+        繼續
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // set title
+    const params = new URLSearchParams(location.search);
+    const petName = params.get("name") || "";
+    if (petName) {
+      document.getElementById("title").textContent = `我要認養（${petName}）`;
+    }
+
+    // submit form
+    const adoptForm = document.getElementById("adoptForm");
+    const popupOverlay = document.getElementById("popupOverlay");
+
+    adoptForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      let msg = "📋【認養申請表】\n";
+      if (petName) msg += `認養動物：${petName}\n\n`;
+
+      const data = new FormData(adoptForm);
+      // 問號：不加冒號，直接換行
+// 指定清單：保留（或補上）冒號，然後換行
+const FORCE_NEWLINE_KEEP_COLON = new Set([
+  "若有，請提供寵物資訊",
+  "認養動機",
+  "飼養方式"
+]);
+
+for (const [k, v] of data.entries()) {
+  const rawKey = String(k).trim();
+  const value = String(v).trim();
+  if (!value) continue;
+
+  const base = rawKey.replace(/[：:]\s*$/, "");   // 去尾冒號作判斷
+  const isQuestion = /[？?]$/.test(rawKey);
+  const forceKeepColonNewline = FORCE_NEWLINE_KEEP_COLON.has(base);
+
+  if (isQuestion) {
+    // 問號 → 不加冒號，直接換行
+    msg += `${base}
+${value}
+
+`;
+  } else if (forceKeepColonNewline) {
+    // 指定幾句 → 保留(或補上)冒號，再換行
+    msg += `${base}：
+${value}
+
+`;
+  } else {
+    // 其他 → 若標題尾已有標點就不再加，否則補全形冒號
+    const sep = /[：:？?！!]$/.test(rawKey) ? "" : "：";
+    msg += `${rawKey}${sep}${value}
+
+`;
+  }
+}
+
+      await navigator.clipboard.writeText(msg);
+
+      popupOverlay.classList.remove("hidden");
+      popupOverlay.classList.add("flex");
+    });
+
+    document.getElementById("continueBtn").addEventListener("click", () => {
+      window.open("https://m.me/100070289411620", "_blank");
+      popupOverlay.classList.add("hidden");
+    });
+
+    const y = document.getElementById('year');
+    if (y) y.textContent = new Date().getFullYear();
+
+    history.scrollRestoration = "manual";
+    window.scrollTo(0, 0);
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</body>
+
+</html>
