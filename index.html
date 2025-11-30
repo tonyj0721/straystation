@@ -182,11 +182,11 @@
           </div>
           <div class="p-4 rounded-xl bg-white/70 border border-gray-200">
             <dt class="text-sm text-gray-500">待領養貓咪</dt>
-            <dd class="text-xl font-semibold" id="statAvailable">0</dd>
+            <dd class="text-xl font-semibold" id="statCats">0</dd>
           </div>
           <div class="p-4 rounded-xl bg-white/70 border border-gray-200">
             <dt class="text-sm text-gray-500">待領養狗狗</dt>
-            <dd class="text-xl font-semibold">24+</dd>
+            <dd class="text-xl font-semibold" id="statDogs">0</dd>
           </div>
         </dl>
       </div>
@@ -198,7 +198,7 @@
           class="absolute -bottom-6 -left-6 bg-white rounded-2xl shadow-soft ring-1 ring-gray-200 p-4 flex items-center gap-3">
           <span class="text-2xl">🎉</span>
           <div class="text-sm">
-            <p class="font-semibold">這週 8 位毛孩找到新家</p>
+            <p class="font-semibold">這週 <span id="statWeeklyAdopted">0</span> 位毛孩找到新家</p>
             <p class="text-gray-500">感謝每位認養人與志工</p>
           </div>
         </div>
@@ -341,6 +341,13 @@
               <span id="dlgTagGender"
                 class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap"></span>
             </div>
+            <!-- 第二排：結紮 / 預防針（淡藍色圓角標籤） -->
+            <div id="dlgTagsHealth" class="mt-2 flex gap-2 text-sm">
+              <span id="dlgTagNeutered"
+                class="inline-flex items-center rounded-full ring-1 ring-sky-200 bg-sky-50 text-sky-700 px-3 py-1 whitespace-nowrap"></span>
+              <span id="dlgTagVaccinated"
+                class="inline-flex items-center rounded-full ring-1 ring-sky-200 bg-sky-50 text-sky-700 px-3 py-1 whitespace-nowrap"></span>
+            </div>
           </div>
         </div>
         <div class="bg-orange-50 rounded-xl p-4 leading-7">
@@ -376,11 +383,14 @@
     };
 
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-    import { getFirestore, collection, getDocs, query, orderBy, where } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+    import { getFirestore, collection, getDocs, query, orderBy, where, getCountFromServer, Timestamp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
+
+    // 可調：統計起始基數（會加到真實數字上）
+    const STATS_BASE = { placed: 1021, cats: 89, dogs: 743 };
     let pets = [];
     let currentPetId = null;
 
@@ -407,9 +417,28 @@
     }
 
     function applyStats() {
-      $('#statAvailable').textContent = pets.length;
-      // 簡單示意：假設 128 已送養
-      $('#statPlaced').textContent = 128;
+      (async () => {
+        try {
+          const coll = collection(db, "pets");
+          const [adoptedSnap, catsSnap, dogsSnap] = await Promise.all([
+            getCountFromServer(query(coll, where("status", "==", "adopted"))),
+            getCountFromServer(query(coll, where("status", "==", "available"), where("species", "==", "貓"))),
+            getCountFromServer(query(coll, where("status", "==", "available"), where("species", "==", "狗")))
+          ]);
+          const placed = (STATS_BASE.placed || 0) + (adoptedSnap.data().count || 0);
+          const cats = (STATS_BASE.cats || 0) + (catsSnap.data().count || 0);
+          const dogs = (STATS_BASE.dogs || 0) + (dogsSnap.data().count || 0);
+
+          const elPlaced = document.getElementById('statPlaced');
+          const elCats = document.getElementById('statCats');
+          const elDogs = document.getElementById('statDogs');
+          if (elPlaced) elPlaced.textContent = placed.toLocaleString();
+          if (elCats) elCats.textContent = cats.toLocaleString();
+          if (elDogs) elDogs.textContent = dogs.toLocaleString();
+        } catch (err) {
+          console.error('applyStats error:', err);
+        }
+      })();
     }
 
     function makePetUrl(id) {
@@ -513,6 +542,15 @@
       const dlgImg = document.getElementById("dlgImg");
       const dlgBg = document.getElementById("dlgBg");
       const dlgThumbs = document.getElementById("dlgThumbs");
+      // 第二排：健康標籤
+      const isNeutered = !!p.neutered;
+      const isVaccinated = !!p.vaccinated;
+
+      document.getElementById('dlgTagNeutered').textContent = isNeutered
+        ? '已結紮' : '未結紮';
+
+      document.getElementById('dlgTagVaccinated').textContent = isVaccinated
+        ? '已注射預防針' : '未注射預防針';
 
       // 取所有圖片（images 是陣列；後台 upload 時必定有）
       const imgs = Array.isArray(p.images) && p.images.length > 0
@@ -624,7 +662,46 @@
       });
     };
 
+    // --- Weekly adopted counter (dynamic, pure index) ---
+    function getWeekStartLocal() {
+      const now = new Date();
+      const day = now.getDay(); // 0(日)~6(六)
+      const diffToMon = (day === 0 ? -6 : 1 - day);
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      d.setDate(d.getDate() + diffToMon);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    }
+
+    async function computeWeeklyAdopted() {
+      const coll = collection(db, "pets");
+
+      // 有全域/前面已宣告的 getWeekStartLocal 就用；沒有就用內建小函式計算
+      const weekStart = (typeof getWeekStartLocal === 'function')
+        ? getWeekStartLocal()
+        : (() => {
+          const now = new Date();
+          const day = now.getDay();                 // 0(日)~6(六)
+          const diffToMon = (day === 0 ? -6 : 1 - day);
+          const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          d.setDate(d.getDate() + diffToMon);
+          d.setHours(0, 0, 0, 0);
+          return d;
+        })();
+
+      const weekTs = Timestamp.fromDate(weekStart);
+
+      // 只用 adoptedAt（需要複合索引：status Asc, adoptedAt Asc；__name__ 自動附加沒問題）
+      const snap = await getCountFromServer(
+        query(coll, where("status", "==", "adopted"), where("adoptedAt", ">=", weekTs))
+      );
+
+      const n = snap.data().count || 0;
+      const el = document.getElementById("statWeeklyAdopted");
+      if (el) el.textContent = n.toLocaleString();
+    }
     loadPets();
+    computeWeeklyAdopted();
   </script>
 
   <!-- SEO: organization schema -->

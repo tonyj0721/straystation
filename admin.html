@@ -219,6 +219,20 @@
               </select>
             </div>
           </div>
+          <!-- 健康 -->
+          <div>
+            <label class="block text-sm font-medium mb-1">健康</label>
+            <div class="flex items-center gap-6">
+              <label class="inline-flex items-center gap-2">
+                <input id="neutered" type="checkbox" class="h-4 w-4">
+                <span>結紮</span>
+              </label>
+              <label class="inline-flex items-center gap-2">
+                <input id="vaccinated" type="checkbox" class="h-4 w-4">
+                <span>預防針</span>
+              </label>
+            </div>
+          </div>
           <div>
             <label class="block text-sm font-medium mb-1">簡介</label>
             <textarea id="desc" rows="4" class="w-full rounded-xl border border-gray-300 p-2"
@@ -329,6 +343,13 @@
               <span id="dlgTagGender"
                 class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap"></span>
             </div>
+            <!-- 第二排：結紮 / 預防針（淡藍色圓角標籤） -->
+            <div id="dlgTagsHealth" class="mt-2 flex gap-2 text-sm">
+              <span id="dlgTagNeutered"
+                class="inline-flex items-center rounded-full ring-1 ring-sky-200 bg-sky-50 text-sky-700 px-3 py-1 whitespace-nowrap"></span>
+              <span id="dlgTagVaccinated"
+                class="inline-flex items-center rounded-full ring-1 ring-sky-200 bg-sky-50 text-sky-700 px-3 py-1 whitespace-nowrap"></span>
+            </div>
           </div>
         </div>
         <div class="bg-orange-50 rounded-xl p-4 leading-7">
@@ -336,25 +357,27 @@
         </div>
 
         <!-- 內嵌編輯區 -->
-        <div id="editArea" class="hidden space-y-3">
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-sm font-medium mb-1">名字</label>
-              <input id="editName" class="w-full rounded-xl border border-gray-300 p-2" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium mb-1">年齡</label>
-              <input id="editAge" class="w-full rounded-xl border border-gray-300 p-2" />
+        <div id="editArea" class="hidden space-y-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">名字 <span class="text-red-500">*</span></label>
+            <input id="editName" class="w-full rounded-xl border border-gray-300 p-2" />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-1">類別 <span class="text-red-500">*</span></label>
+            <div class="flex gap-3">
+              <label class="inline-flex items-center gap-2">
+                <input type="radio" name="editSpecies" value="貓" class="accent-brand-600" />
+                <span>貓</span>
+              </label>
+              <label class="inline-flex items-center gap-2">
+                <input type="radio" name="editSpecies" value="狗" class="accent-brand-600" />
+                <span>狗</span>
+              </label>
             </div>
           </div>
-          <div class="grid grid-cols-3 gap-3">
-            <div>
-              <label class="block text-sm font-medium mb-1">類別</label>
-              <select id="editSpecies" class="w-full rounded-xl border border-gray-300 p-2">
-                <option value="貓">貓</option>
-                <option value="狗">狗</option>
-              </select>
-            </div>
+
+          <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-sm font-medium mb-1">品種</label>
               <select id="editBreedType" class="w-full rounded-xl border border-gray-300 p-2">
@@ -368,7 +391,12 @@
               </select>
             </div>
           </div>
+
           <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium mb-1">年齡</label>
+              <input id="editAge" class="w-full rounded-xl border border-gray-300 p-2" placeholder="例：2 歲 或 8 個月" />
+            </div>
             <div>
               <label class="block text-sm font-medium mb-1">性別</label>
               <select id="editGender" class="w-full rounded-xl border border-gray-300 p-2">
@@ -377,25 +405,38 @@
                 <option value="女生">女生</option>
               </select>
             </div>
-            <div>
-              <label class="block text-sm font-medium mb-1">—</label>
-              <div class="text-sm text-gray-400">&nbsp;</div>
+          </div>
+          <!-- 健康（編輯用） -->
+          <div>
+            <label class="block text-sm font-medium mb-1">健康</label>
+            <div class="flex items-center gap-6">
+              <label class="inline-flex items-center gap-2">
+                <input id="editNeutered" type="checkbox" class="h-4 w-4">
+                <span>結紮</span>
+              </label>
+              <label class="inline-flex items-center gap-2">
+                <input id="editVaccinated" type="checkbox" class="h-4 w-4">
+                <span>預防針</span>
+              </label>
             </div>
           </div>
+
+
           <div>
             <label class="block text-sm font-medium mb-1">簡介</label>
             <textarea id="editDesc" rows="4" class="w-full rounded-xl border border-gray-300 p-2"></textarea>
           </div>
+
           <div>
             <input id="editFiles" type="file" accept="image/*" multiple class="sr-only" />
-            <div class="flex items-center gap-3 mb-2">
-              <button id="btnPickEdit" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
-                新增照片
-              </button>
+            <div class="flex items-center gap-3">
+              <button id="btnPickEdit" type="button"
+                class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增照片</button>
               <span id="editCount" class="text-xs text-gray-500"></span>
               <span class="text-sm text-gray-400">最多 5 張</span>
             </div>
-            <div id="editPreview" class="grid grid-cols-4 gap-2"></div>
+            <!-- 和新增模式一致：三欄縮圖 + 上方間距 -->
+            <div id="editPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
           </div>
         </div>
 
@@ -681,6 +722,8 @@
         age,
         gender,
         desc,
+        neutered: document.getElementById('neutered')?.checked || false,
+        vaccinated: document.getElementById('vaccinated')?.checked || false,
         images: [],
         status: "available",
         showOnHome: false,
@@ -987,6 +1030,15 @@
       const dlgImg = document.getElementById("dlgImg");
       const dlgBg = document.getElementById("dlgBg");
       const dlgThumbs = document.getElementById("dlgThumbs");
+      // 第二排：健康標籤
+      const isNeutered = !!p.neutered;
+      const isVaccinated = !!p.vaccinated;
+
+      document.getElementById('dlgTagNeutered').textContent = isNeutered
+        ? '已結紮' : '未結紮';
+
+      document.getElementById('dlgTagVaccinated').textContent = isVaccinated
+        ? '已注射預防針' : '未注射預防針';
 
       // 主圖與縮圖列（支援 images 陣列或舊欄位 image）
       const imgs = Array.isArray(p.images) && p.images.length > 0 ? p.images : p.image ? [p.image] : [];
@@ -1063,6 +1115,8 @@
 
       document.getElementById("dlgBg").src = first;
       document.getElementById("dlgImg").src = first;
+      document.getElementById("editNeutered").checked = !!p.neutered;
+      document.getElementById("editVaccinated").checked = !!p.vaccinated;
 
       // Lightbox 初始化（lbImages/lbIndex 由 lightbox 區塊使用）
       lbImages = imgs;
@@ -1097,7 +1151,7 @@
       document.getElementById("editAge").value = p.age || "";
       document.getElementById("editGender").value = p.gender || "";
       document.getElementById("editDesc").value = p.desc || "";
-      document.getElementById("editSpecies").value = p.species || "貓";
+      setEditSpecies(p.species || '貓');
       syncEditBreedSelectors();
       if (p.breedType) {
         document.getElementById("editBreedType").value = p.breedType;
@@ -1225,9 +1279,11 @@
         age: document.getElementById("editAge").value.trim(),
         gender: document.getElementById("editGender").value,
         desc: document.getElementById("editDesc").value.trim(),
-        species: document.getElementById("editSpecies").value,
+        species: getEditSpecies(),
         breedType: document.getElementById("editBreedType").value || "",
         breed: document.getElementById("editBreed").value || "",
+        neutered: document.getElementById("editNeutered").checked,
+        vaccinated: document.getElementById("editVaccinated").checked,
       };
 
       // ① 送出前：名字重複 → 先詢問是否仍要儲存（此時不要啟動「儲存中」）
@@ -1310,10 +1366,18 @@
       }
     }
 
+    function getEditSpecies() {
+      return document.querySelector('input[name="editSpecies"]:checked')?.value || '貓';
+    }
+    function setEditSpecies(v) {
+      const t = v === '狗' ? '狗' : '貓';
+      const el = document.querySelector(`input[name="editSpecies"][value="${t}"]`);
+      if (el) el.checked = true;
+    }
+
     // ===============================
     // 編輯模式：品種連動（右側）
     // ===============================
-    const editSpeciesSel = $("#editSpecies");
     const editBreedTypeSel = $("#editBreedType");
     const editBreedSel = $("#editBreed");
     const editBreedLabel = $("#editBreedLabel");
@@ -1327,7 +1391,7 @@
       editBreedSel.innerHTML = '<option value="">請先選擇品種</option>';
     }
     function syncEditBreedSelectors() {
-      const isCat = editSpeciesSel.value === "貓";
+      const isCat = getEditSpecies() === '貓';
       editBreedTypeSel.innerHTML = isCat
         ? '<option value="">請選擇</option><option value="品種貓">品種貓</option><option value="米克斯">米克斯</option>'
         : '<option value="">請選擇</option><option value="品種犬">品種犬</option><option value="米克斯">米克斯</option>';
@@ -1335,18 +1399,16 @@
       updateEditBreedLabel();
     }
     function buildEditBreedOptions() {
-      const list = (BREEDS[editSpeciesSel.value] || {})[editBreedTypeSel.value] || [];
-      if (!editBreedTypeSel.value) {
-        resetEditBreedRight();
-        return;
-      }
+      const list = (BREEDS[getEditSpecies()] || {})[editBreedTypeSel.value] || [];
+      if (!editBreedTypeSel.value) { resetEditBreedRight(); return; }
       editBreedSel.disabled = false;
       editBreedSel.innerHTML = ['<option value="">請選擇</option>']
-        .concat(list.map((b) => `<option value="${b}">${b}</option>`))
-        .join("");
+        .concat(list.map(b => `<option value="${b}">${b}</option>`)).join('');
     }
 
-    editSpeciesSel.addEventListener("change", syncEditBreedSelectors);
+    document.querySelectorAll('input[name="editSpecies"]').forEach(el => {
+      el.addEventListener('change', syncEditBreedSelectors);
+    });
     editBreedTypeSel.addEventListener("change", () => {
       buildEditBreedOptions();
       updateEditBreedLabel();
