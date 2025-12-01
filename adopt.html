@@ -238,7 +238,7 @@
 
       let msg = "📋【認養申請表】\n";
       msg += `認養動物：${na(petName)}\n\n`;
-      msg += `認養資訊連結：${modalUrl}\n\n`;
+      if (modalUrl) msg += `認養資訊連結：${modalUrl}\n\n`;
 
       // 基本資料
       const basic = [
