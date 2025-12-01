@@ -6,6 +6,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>我要認養｜台中簡媽媽狗園</title>
   <link rel="stylesheet" href="assets/tailwind.css">
+  <script>
+(function () {
+  const q = new URLSearchParams(location.search);
+  const name = q.get('pet') || q.get('name');
+  if (name) location.replace(`./index.html?pet=${encodeURIComponent(name)}`);
+})();
+</script>
 </head>
 
 <body class="bg-pageBg text-gray-800 antialiased">
@@ -236,10 +243,9 @@
       window.__adoptMsg = msg;
 
       // 認養動物：帶可點連結（用 ?name= 參數回到本頁，可觸發你的 modal 流程）
-      if (petName) {
-        const url = `${location.origin}/index.html?pet=${encodeURIComponent(petName)}`;
-        msg += `認養動物：${petName}（${url}）\n\n`;
-      }
+      const base = location.origin + (location.pathname.endsWith('/') ? location.pathname : location.pathname.replace(/[^/]*$/, ''));
+const url = `${base}index.html?pet=${encodeURIComponent(petName)}`;
+msg += `認養動物：${petName}（${url}）\n\n`;
 
       // 取得所有欄位值（以實際 name 為準）
       const fm = Object.fromEntries(new FormData(adoptForm).entries());
