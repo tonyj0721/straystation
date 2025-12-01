@@ -235,7 +235,7 @@
 
       // 認養動物：帶可點連結（用 ?name= 參數回到本頁，可觸發你的 modal 流程）
       if (petName) {
-        const url = `${location.origin}${location.pathname}?pet=${encodeURIComponent(petName)}`;
+        const url = `${location.origin}/index.html?pet=${encodeURIComponent(petName)}`;
         msg += `認養動物：${petName}（${url}）\n\n`;
       }
 
@@ -305,40 +305,7 @@
     history.scrollRestoration = "manual";
     window.scrollTo(0, 0);
   </script>
-  <!-- Pet Modal -->
-<div id="petModal" class="fixed inset-0 hidden items-center justify-center bg-black/50 z-[1000]">
-  <div class="bg-white rounded-2xl p-6 w-[90%] max-w-lg relative">
-    <button id="petModalClose" class="absolute right-3 top-3 text-2xl leading-none text-gray-400 hover:text-gray-600">&times;</button>
-    <h3 id="petModalTitle" class="text-xl font-bold mb-4"></h3>
-    <div id="petModalBody" class="text-gray-700"></div>
-  </div>
-</div>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script>
-  function openPetModal(name) {
-    const m = document.getElementById('petModal');
-    if (!m) return;
-    const t = document.getElementById('petModalTitle');
-    const b = document.getElementById('petModalBody');
-    if (t) t.textContent = name || '';
-    if (b) b.textContent = name ? `這裡顯示「${name}」的資訊` : '（無內容）';
-    m.classList.remove('hidden'); m.classList.add('flex');
-    document.body.classList.add('overflow-hidden');
-  }
-  function closePetModal() {
-    const m = document.getElementById('petModal');
-    if (!m) return;
-    m.classList.add('hidden'); m.classList.remove('flex');
-    document.body.classList.remove('overflow-hidden');
-  }
-  // 點遮罩或關閉鈕關掉
-  document.addEventListener('click', e => {
-    if (e.target.id === 'petModal' || e.target.id === 'petModalClose') closePetModal();
-  });
-  // Esc 關閉
-  window.addEventListener('keydown', e => { if (e.key === 'Escape') closePetModal(); });
-</script>
-  
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       const qs = new URLSearchParams(location.search);
