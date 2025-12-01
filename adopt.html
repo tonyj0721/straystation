@@ -240,8 +240,6 @@
       document.getElementById("title").textContent = `我要認養（${petName}）`;
     }
 
-    let encodedMsg = "";
-
     // submit form
     const adoptForm = document.getElementById("adoptForm");
     const popupOverlay = document.getElementById("popupOverlay");
@@ -250,63 +248,63 @@
       e.preventDefault();
 
       // 組裝貼上內容（章節化 + 問句換行 + 指定欄位保留冒號換行 + 全欄位輸出）
-      const EMPTY_PLACEHOLDER = "……(內容)";
-      let msg = "📋【認養申請表】\n";
+const EMPTY_PLACEHOLDER = "……(內容)";
+let msg = "📋【認養申請表】\n";
 
-      // 認養動物：帶可點連結（用 ?name= 參數回到本頁，可觸發你的 modal 流程）
-      if (petName) {
-        const url = `${location.origin}${location.pathname}?name=${encodeURIComponent(petName)}`;
-        msg += `認養動物：${petName}（${url}）\n\n`;
-      }
+// 認養動物：帶可點連結（用 ?name= 參數回到本頁，可觸發你的 modal 流程）
+if (petName) {
+  const url = `${location.origin}${location.pathname}?name=${encodeURIComponent(petName)}`;
+  msg += `認養動物：${petName}（${url}）\n\n`;
+}
 
-      // 取得所有欄位值（以實際 name 為準）
-      const fm = Object.fromEntries(new FormData(adoptForm).entries());
+// 取得所有欄位值（以實際 name 為準）
+const fm = Object.fromEntries(new FormData(adoptForm).entries());
 
-      function valOf(key) {
-        const v = (fm[key] ?? "").toString().trim();
-        return v === "" ? EMPTY_PLACEHOLDER : v;
-      }
+function valOf(key) {
+  const v = (fm[key] ?? "").toString().trim();
+  return v === "" ? EMPTY_PLACEHOLDER : v;
+}
 
-      // 寫入邏輯：問句→換行；「若有，請提供寵物資訊」→保留冒號後換行；其他→同一行
-      function write(label, value) {
-        const v = (value || "").toString().trim() || EMPTY_PLACEHOLDER;
-        if (/[？?]\s*$/.test(label)) {
-          msg += `${label}\n${v}\n\n`;
-        } else if (/^若有，請提供寵物資訊[:：]?$/.test(label)) {
-          msg += `若有，請提供寵物資訊：\n${v}\n\n`;
-        } else {
-          const sep = /[：:]$/.test(label) ? "" : "：";
-          msg += `${label}${sep}${v}\n\n`;
-        }
-      }
+// 寫入邏輯：問句→換行；「若有，請提供寵物資訊」→保留冒號後換行；其他→同一行
+function write(label, value) {
+  const v = (value || "").toString().trim() || EMPTY_PLACEHOLDER;
+  if (/[？?]\s*$/.test(label)) {
+    msg += `${label}\n${v}\n\n`;
+  } else if (/^若有，請提供寵物資訊[:：]?$/.test(label)) {
+    msg += `若有，請提供寵物資訊：\n${v}\n\n`;
+  } else {
+    const sep = /[：:]$/.test(label) ? "" : "：";
+    msg += `${label}${sep}${v}\n\n`;
+  }
+}
 
-      // 1) 基本資料（不顯示章節標題）
-      [
-        "姓名", "年齡", "居住地", "居住環境", "職業", "月收入",
-        "家庭成員", "家庭成員總人數", "現居住狀況", "同居成員"
-      ].forEach(name => write(name + "：", valOf(name)));
+// 1) 基本資料（不顯示章節標題）
+[
+  "姓名","年齡","居住地","居住環境","職業","月收入",
+  "家庭成員","家庭成員總人數","現居住狀況","同居成員"
+].forEach(name => write(name + "：", valOf(name)));
 
-      // 2) 飼養寵物經驗
-      msg += "飼養寵物經驗\n";
-      write("是否曾經飼養過寵物？", valOf("是否曾經飼養過寵物？"));
-      write("若有，飼養過什麼寵物？", valOf("若有，飼養過什麼寵物？"));
+// 2) 飼養寵物經驗
+msg += "飼養寵物經驗\n";
+write("是否曾經飼養過寵物？", valOf("是否曾經飼養過寵物？"));
+write("若有，飼養過什麼寵物？", valOf("若有，飼養過什麼寵物？"));
 
-      // 3) 現有寵物狀況
-      msg += "現有寵物狀況\n";
-      write("目前家中是否有寵物？", valOf("目前家中是否有寵物？"));
-      write("若有，請提供寵物資訊：", valOf("若有，請提供寵物資訊"));
+// 3) 現有寵物狀況
+msg += "現有寵物狀況\n";
+write("目前家中是否有寵物？", valOf("目前家中是否有寵物？"));
+write("若有，請提供寵物資訊：", valOf("若有，請提供寵物資訊"));
 
-      // 4) 認養動機
-      msg += "認養動機\n";
-      write("為什麼想認養這隻毛孩呢？", valOf("為什麼想認養這隻毛孩呢？"));
+// 4) 認養動機
+msg += "認養動機\n";
+write("為什麼想認養這隻毛孩呢？", valOf("為什麼想認養這隻毛孩呢？"));
 
-      // 5) 飼養方式
-      msg += "飼養方式\n";
-      write("您會如何照顧這隻毛孩？", valOf("您會如何照顧這隻毛孩？"));
+// 5) 飼養方式
+msg += "飼養方式\n";
+write("您會如何照顧這隻毛孩？", valOf("您會如何照顧這隻毛孩？"));
 
-      // 6) 飼養花費認知
-      msg += "飼養花費認知\n";
-      write("您認為飼養寵物需要哪些支出？", valOf("您認為飼養寵物需要哪些支出？"));
+// 6) 飼養花費認知
+msg += "飼養花費認知\n";
+write("您認為飼養寵物需要哪些支出？", valOf("您認為飼養寵物需要哪些支出？"));
 
       await navigator.clipboard.writeText(msg);
 
@@ -315,9 +313,8 @@
     });
 
     document.getElementById("continueBtn").addEventListener("click", () => {
-      const messengerUrl = `https://m.me/100070289411620?text=${encodedMsg}`;
-      window.open(messengerUrl, "_blank");
-      document.getElementById("popupOverlay").style.display = "none";
+      window.open("https://m.me/100070289411620", "_blank");
+      popupOverlay.classList.add("hidden");
     });
 
     const y = document.getElementById('year');
