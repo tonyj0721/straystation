@@ -6,13 +6,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>我要認養｜台中簡媽媽狗園</title>
   <link rel="stylesheet" href="assets/tailwind.css">
-  <script>
-(function () {
-  const q = new URLSearchParams(location.search);
-  const name = q.get('pet') || q.get('name');
-  if (name) location.replace(`./index.html?pet=${encodeURIComponent(name)}`);
-})();
-</script>
 </head>
 
 <body class="bg-pageBg text-gray-800 antialiased">
@@ -240,12 +233,11 @@
       const EMPTY_PLACEHOLDER = "未填寫";
       let msg = "📋【認養申請表】\n";
 
-      window.__adoptMsg = msg;
-
       // 認養動物：帶可點連結（用 ?name= 參數回到本頁，可觸發你的 modal 流程）
-      const base = location.origin + (location.pathname.endsWith('/') ? location.pathname : location.pathname.replace(/[^/]*$/, ''));
-const url = `${base}index.html?pet=${encodeURIComponent(petName)}`;
-msg += `認養動物：${petName}（${url}）\n\n`;
+      if (petName) {
+        const url = `${location.origin}/index.html?pet=${encodeURIComponent(petName)}`;
+        msg += `認養動物：${petName}（${url}）\n\n`;
+      }
 
       // 取得所有欄位值（以實際 name 為準）
       const fm = Object.fromEntries(new FormData(adoptForm).entries());
@@ -302,25 +294,34 @@ msg += `認養動物：${petName}（${url}）\n\n`;
       popupOverlay.classList.add("flex");
     });
 
-    document.getElementById("continueBtn").addEventListener("click", async (e) => {
-      e.preventDefault();
-
-      const message = window.__adoptMsg || "";            // ← 取用 submit 存好的訊息
-      try { if (message) await navigator.clipboard.writeText(message); } catch {}
-
-      const PAGE_ID = "100070289411620";
-      const url = `https://m.me/${PAGE_ID}?text=${encodeURIComponent(message)}`;
-
-      window.open(url, "_blank", "noopener");             // 直接帶入預填訊息
-      popupOverlay.classList.add("hidden");
-    });
+    popupOverlay.classList.add("hidden");
+    });//100070289411620
 
     const y = document.getElementById('year');
     if (y) y.textContent = new Date().getFullYear();
 
     history.scrollRestoration = "manual";
     window.scrollTo(0, 0);
-  </script>
+  
+// ---- Ensure message is globally accessible for the continue button ----
+window.__adoptMsg = msg;
+
+// Replace the continueBtn click handler: open Messenger with prefilled text
+(function(){
+  const btn = document.getElementById("continueBtn");
+  if (!btn) return;
+  btn.addEventListener("click", async (e) => {
+    e.preventDefault();
+    const message = window.__adoptMsg || "";
+    try { if (message) await navigator.clipboard.writeText(message); } catch {}
+    const PAGE_ID = "100070289411620";
+    const url = `https://m.me/${PAGE_ID}?text=${encodeURIComponent(message)}`;
+    window.open(url, "_blank", "noopener");
+    const popupOverlay = document.getElementById("popupOverlay");
+    if (popupOverlay) popupOverlay.classList.add("hidden");
+  });
+})();
+</script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
