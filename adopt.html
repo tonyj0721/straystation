@@ -233,6 +233,8 @@
       const EMPTY_PLACEHOLDER = "未填寫";
       let msg = "📋【認養申請表】\n";
 
+      window.__adoptMsg = msg;
+
       // 認養動物：帶可點連結（用 ?name= 參數回到本頁，可觸發你的 modal 流程）
       if (petName) {
         const url = `${location.origin}/index.html?pet=${encodeURIComponent(petName)}`;
@@ -296,12 +298,14 @@
 
     document.getElementById("continueBtn").addEventListener("click", async (e) => {
       e.preventDefault();
-      try { await navigator.clipboard.writeText(msg); } catch {}
 
-      const PAGE_ID = "100070289411620";//100070289411620
-      const url = `https://m.me/${PAGE_ID}?text=${encodeURIComponent(msg)}`;
+      const message = window.__adoptMsg || "";            // ← 取用 submit 存好的訊息
+      try { if (message) await navigator.clipboard.writeText(message); } catch {}
 
-      window.open(url, "_blank", "noopener");
+      const PAGE_ID = "100070289411620";
+      const url = `https://m.me/${PAGE_ID}?text=${encodeURIComponent(message)}`;
+
+      window.open(url, "_blank", "noopener");             // 直接帶入預填訊息
       popupOverlay.classList.add("hidden");
     });
 
