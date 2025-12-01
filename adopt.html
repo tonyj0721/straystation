@@ -50,12 +50,12 @@
 
           <div class="space-y-1">
             <label class="font-medium">姓名</label>
-            <input name="姓名" class="w-full px-4 py-2 border rounded-xl" >
+            <input name="姓名" class="w-full px-4 py-2 border rounded-xl">
           </div>
 
           <div class="space-y-1">
             <label class="font-medium">年齡</label>
-            <input name="年齡" class="w-full px-4 py-2 border rounded-xl" >
+            <input name="年齡" class="w-full px-4 py-2 border rounded-xl">
           </div>
 
           <div class="space-y-1 md:col-span-2">
@@ -235,7 +235,7 @@
 
       // 認養動物：帶可點連結（用 ?name= 參數回到本頁，可觸發你的 modal 流程）
       if (petName) {
-        const url = `${location.origin}${location.pathname}?name=${encodeURIComponent(petName)}`;
+        const url = `${location.origin}${location.pathname}?pet=${encodeURIComponent(petName)}`;
         msg += `認養動物：${petName}（${url}）\n\n`;
       }
 
@@ -306,6 +306,30 @@
     window.scrollTo(0, 0);
   </script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const qs = new URLSearchParams(location.search);
+      let name = qs.get('pet');
+      if (!name && location.hash.startsWith('#pet=')) {
+        name = decodeURIComponent(location.hash.slice(5));
+      }
+      if (!name) return;
+
+      if (typeof openPetModal === 'function') { openPetModal(name); return; }
+      if (typeof openDialog === 'function') { try { openDialog(name); return; } catch (_) { } }
+
+      const el = document.querySelector(`[data-pet-name="${name.replace(/"/g, '\\"')}"]`);
+      if (el && typeof el.click === 'function') { el.click(); return; }
+
+      const slug = name.trim().toLowerCase().replace(/\s+/g, '-');
+      const modal = document.getElementById(`modal-${slug}`) || document.getElementById(`petModal-${slug}`);
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        document.body.classList.add('overflow-hidden');
+      }
+    });
+  </script>
 </body>
 
 </html>
