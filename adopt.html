@@ -218,7 +218,23 @@
     // set title
     const params = new URLSearchParams(location.search);
     const petName = params.get("name") || "";
-    const modalUrl = params.get("modal") || params.get("m") || "";
+    const getModalUrl = () => {
+      const u = new URL(location.href);
+      const keys = ["modal", "m", "url", "link", "u"];
+      for (const k of keys) {
+        const v = u.searchParams.get(k);
+        if (v) return new URL(v, location.origin).toString();
+      }
+      const hash = new URLSearchParams(u.hash.slice(1));
+      for (const k of keys) {
+        const v = hash.get(k);
+        if (v) return new URL(v, location.origin).toString();
+      }
+      const b64 = u.searchParams.get("modal_b64");
+      if (b64) { try { return atob(b64); } catch { } }
+      return "";
+    };
+    const modalUrl = getModalUrl();
     if (petName) {
       document.getElementById("title").textContent = `我要認養（${petName}）`;
     }
