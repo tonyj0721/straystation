@@ -717,57 +717,6 @@
   </script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="assets/shared.js"></script>
-  <script>
-(function () {
-  // 讀取名字（支援 ?pet= 或 #pet=）
-  const qs = new URLSearchParams(location.search);
-  const name = (qs.get('pet') || (location.hash.startsWith('#pet=') ? decodeURIComponent(location.hash.slice(5)) : '') || '').trim();
-  if (!name) return;
-
-  // 優先用你現成的開窗函式
-  if (typeof openDialog === 'function') { openDialog(name); return; }
-  if (typeof openPetModal === 'function') { openPetModal(name); return; }
-
-  // 其次嘗試點擊帶 data-pet-name 的卡片/按鈕（請在觸發元素上加 data-pet-name="名字"）
-  function cssEscape(s){ return s.replace(/["\\]/g,'\\$&'); }
-  const candidates = [
-    `[data-pet-name="${cssEscape(name)}"]`,
-    `[data-name="${cssEscape(name)}"]`,
-    `[data-title="${cssEscape(name)}"]`
-  ];
-  for (const sel of candidates) {
-    const el = document.querySelector(sel);
-    if (el && typeof el.click === 'function') { el.click(); return; }
-  }
-
-  // 最後備援：用 ID 規則直接打開（依你的命名調整）
-  const slug = name.toLowerCase().replace(/\s+/g,'-');
-  const modal = document.getElementById(`modal-${slug}`) || document.getElementById(`petModal-${slug}`);
-  if (modal) {
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');          // 若你用別的顯示方式，改這兩行
-    document.body.classList.add('overflow-hidden');
-    return;
-  }
-
-  // 若內容是動態載入，等到 DOM 出現為止（最長 5 秒）
-  const tryOpen = () => {
-    if (typeof openDialog === 'function') { openDialog(name); return true; }
-    if (typeof openPetModal === 'function') { openPetModal(name); return true; }
-    for (const sel of candidates) {
-      const el = document.querySelector(sel);
-      if (el && typeof el.click === 'function') { el.click(); return true; }
-    }
-    const m = document.getElementById(`modal-${slug}`) || document.getElementById(`petModal-${slug}`);
-    if (m) { m.classList.remove('hidden'); m.classList.add('flex'); document.body.classList.add('overflow-hidden'); return true; }
-    return false;
-  };
-  if (tryOpen()) return;
-  const obs = new MutationObserver(() => { if (tryOpen()) obs.disconnect(); });
-  const timer = setTimeout(() => obs.disconnect(), 5000);
-  obs.observe(document.documentElement, {childList:true, subtree:true});
-})();
-</script>
 </body>
 
 </html>
