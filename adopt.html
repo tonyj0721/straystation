@@ -5,7 +5,25 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>我要認養｜台中簡媽媽狗園</title>
-  <link rel="stylesheet" href="assets/tailwind.css">
+
+  <!-- TailwindCSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: "#3B82F6",       /* 天藍 */
+            primaryDark: "#2563EB",
+            pageBg: "#F3F7FC"
+          },
+          boxShadow: {
+            soft: "0 8px 24px rgba(0,0,0,0.06)"
+          }
+        }
+      }
+    };
+  </script>
 </head>
 
 <body class="bg-pageBg text-gray-800 antialiased">
@@ -50,12 +68,12 @@
 
           <div class="space-y-1">
             <label class="font-medium">姓名</label>
-            <input name="姓名" class="w-full px-4 py-2 border rounded-xl">
+            <input name="姓名" class="w-full px-4 py-2 border rounded-xl" required>
           </div>
 
           <div class="space-y-1">
             <label class="font-medium">年齡</label>
-            <input name="年齡" class="w-full px-4 py-2 border rounded-xl">
+            <input name="年齡" class="w-full px-4 py-2 border rounded-xl" required>
           </div>
 
           <div class="space-y-1 md:col-span-2">
@@ -229,65 +247,15 @@
     adoptForm.addEventListener("submit", async (e) => {
       e.preventDefault();
 
-      // 組裝貼上內容（章節化 + 問句換行 + 指定欄位保留冒號換行 + 全欄位輸出）
-      const EMPTY_PLACEHOLDER = "未填寫";
       let msg = "📋【認養申請表】\n";
+      if (petName) msg += `認養動物：${petName}\n\n`;
 
-      // 認養動物：帶可點連結（用 ?name= 參數回到本頁，可觸發你的 modal 流程）
-      if (petName) {
-        const url = `${location.origin}/index.html?pet=${encodeURIComponent(petName)}`;
-        msg += `認養動物：${petName}（${url}）\n\n`;
+      const data = new FormData(adoptForm);
+      for (const [k, v] of data.entries()) {
+        if (v.trim()) msg += `${k}：${v}\n\n`;
       }
 
-      // 取得所有欄位值（以實際 name 為準）
-      const fm = Object.fromEntries(new FormData(adoptForm).entries());
-
-      function valOf(key) {
-        const v = (fm[key] ?? "").toString().trim();
-        return v === "" ? EMPTY_PLACEHOLDER : v;
-      }
-
-      // 寫入邏輯：問句→換行；「若有，請提供寵物資訊」→保留冒號後換行；其他→同一行
-      function write(label, value) {
-        const v = (value || "").toString().trim() || EMPTY_PLACEHOLDER;
-        if (/[？?]\s*$/.test(label)) {
-          msg += `${label}\n${v}\n\n`;
-        } else if (/^若有，請提供寵物資訊[:：]?$/.test(label)) {
-          msg += `若有，請提供寵物資訊：\n${v}\n\n`;
-        } else {
-          const sep = /[：:]$/.test(label) ? "" : "：";
-          msg += `${label}${sep}${v}\n\n`;
-        }
-      }
-
-      // 1) 基本資料（不顯示章節標題）
-      [
-        "姓名", "年齡", "居住地", "居住環境", "職業", "月收入",
-        "家庭成員", "家庭成員總人數", "現居住狀況", "同居成員"
-      ].forEach(name => write(name + "：", valOf(name)));
-
-      // 2) 飼養寵物經驗
-      msg += "飼養寵物經驗\n";
-      write("是否曾經飼養過寵物？", valOf("是否曾經飼養過寵物？"));
-      write("若有，飼養過什麼寵物？", valOf("若有，飼養過什麼寵物？"));
-
-      // 3) 現有寵物狀況
-      msg += "現有寵物狀況\n";
-      write("目前家中是否有寵物？", valOf("目前家中是否有寵物？"));
-      write("若有，請提供寵物資訊：", valOf("若有，請提供寵物資訊"));
-
-      // 4) 認養動機
-      msg += "認養動機\n";
-      write("為什麼想認養這隻毛孩呢？", valOf("為什麼想認養這隻毛孩呢？"));
-
-      // 5) 飼養方式
-      msg += "飼養方式\n";
-      write("您會如何照顧這隻毛孩？", valOf("您會如何照顧這隻毛孩？"));
-
-      // 6) 飼養花費認知
-      msg += "飼養花費認知\n";
-      write("您認為飼養寵物需要哪些支出？", valOf("您認為飼養寵物需要哪些支出？"));
-
+      window.__adoptMsg = msg;
       await navigator.clipboard.writeText(msg);
 
       popupOverlay.classList.remove("hidden");
@@ -295,7 +263,7 @@
     });
 
     popupOverlay.classList.add("hidden");
-    
+    ;
 
     const y = document.getElementById('year');
     if (y) y.textContent = new Date().getFullYear();
@@ -303,50 +271,23 @@
     history.scrollRestoration = "manual";
     window.scrollTo(0, 0);
   
-// ---- Ensure message is globally accessible for the continue button ----
-window.__adoptMsg = msg;
-
-// Replace the continueBtn click handler: open Messenger with prefilled text
-(function(){
+// Safe Messenger handler: uses global message assembled by submit
+(function() {
   const btn = document.getElementById("continueBtn");
   if (!btn) return;
   btn.addEventListener("click", async (e) => {
     e.preventDefault();
-    const message = window.__adoptMsg || "";
+    const message = (window.__adoptMsg || "").toString();
     try { if (message) await navigator.clipboard.writeText(message); } catch {}
     const PAGE_ID = "100070289411620";
     const url = `https://m.me/${PAGE_ID}?text=${encodeURIComponent(message)}`;
     window.open(url, "_blank", "noopener");
-    const popupOverlay = document.getElementById("popupOverlay");
-    if (popupOverlay) popupOverlay.classList.add("hidden");
+    const overlay = document.getElementById("popupOverlay");
+    if (overlay) overlay.classList.add("hidden");
   });
 })();
 </script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const qs = new URLSearchParams(location.search);
-      let name = qs.get('pet');
-      if (!name && location.hash.startsWith('#pet=')) {
-        name = decodeURIComponent(location.hash.slice(5));
-      }
-      if (!name) return;
-
-      if (typeof openPetModal === 'function') { openPetModal(name); return; }
-      if (typeof openDialog === 'function') { try { openDialog(name); return; } catch (_) { } }
-
-      const el = document.querySelector(`[data-pet-name="${name.replace(/"/g, '\\"')}"]`);
-      if (el && typeof el.click === 'function') { el.click(); return; }
-
-      const slug = name.trim().toLowerCase().replace(/\s+/g, '-');
-      const modal = document.getElementById(`modal-${slug}`) || document.getElementById(`petModal-${slug}`);
-      if (modal) {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-        document.body.classList.add('overflow-hidden');
-      }
-    });
-  </script>
 </body>
 
 </html>
