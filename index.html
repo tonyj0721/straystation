@@ -717,6 +717,24 @@
   </script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="assets/shared.js"></script>
+  <script>
+  (function () {
+    const qs = new URLSearchParams(location.search);
+    const name =
+      qs.get('pet') ||
+      (location.hash.startsWith('#pet=') ? decodeURIComponent(location.hash.slice(5)) : '');
+    if (!name) return;
+
+    // 你的站本來有的開啟函式，優先呼叫
+    if (typeof openDialog === 'function') { openDialog(name); return; }
+    if (typeof openPetModal === 'function') { openPetModal(name); return; }
+
+    // 沒有開啟函式就嘗試點擊卡片（請在卡片上加 data-pet-name="動物名"）
+    const sel = `[data-pet-name="${name.replace(/"/g, '\\"')}"]`;
+    const el = document.querySelector(sel);
+    if (el && typeof el.click === 'function') el.click();
+  })();
+  </script>
 </body>
 
 </html>
