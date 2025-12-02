@@ -663,7 +663,7 @@
     };
 
     // 觸發跳轉的地方改成這樣
-    const u = new URL("/adopt.html", location.href);
+    const u = new URL("adopt.html", location.href);
     const pet = (
       document.getElementById("petName")?.textContent ||
       document.querySelector("[data-pet-name]")?.dataset.petName ||
