@@ -214,90 +214,70 @@
     </div>
   </div>
 
-  <script>
-    // set title
-    const params = new URLSearchParams(location.search);
-    const petName = params.get("name") || "";
-    const modalUrl = params.get("modal") || document.referrer || "";
-    if (petName) {
-      document.getElementById("title").textContent = `我要認養（${petName}）`;
-    }
+  <!-- adopt.html：組訊息（含 modal 連結）→ 複製 → 開 Messenger 帶入文字 -->
+<script>
+(() => {
+  const params = new URLSearchParams(location.search);
+  const petName = (params.get('name') || params.get('pet') || '').trim();
+  const modalUrl = (params.get('modal') || document.referrer || '').trim();
 
-    let encodedMsg = "";
+  const na = (v) => (v && v.trim() ? v.trim() : '未填寫');
 
-    // submit form
-    const adoptForm = document.getElementById("adoptForm");
-    const popupOverlay = document.getElementById("popupOverlay");
+  const form = document.getElementById('adoptForm');
+  const sendBtn = document.getElementById('sendBtn');
 
-    adoptForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
+  function buildGetter(fd){
+    return (k) => {
+      let v = fd.get(k);
+      if (!v || !String(v).trim()) {
+        const alt = k.endsWith('：') ? k.slice(0,-1) : k + '：';
+        v = fd.get(alt) || '';
+      }
+      return String(v).trim();
+    };
+  }
 
-      const get = (name) =>
-        (adoptForm.querySelector(`[name="${name}"]`)?.value || "").trim();
-      const na = (v) => (v ? v : "未填寫");
+  async function handleSend(e){
+    e?.preventDefault?.();
+    const fd = new FormData(form);
+    const get = buildGetter(fd);
 
-      let msg = "📋【認養申請表】\n";
-      msg += `認養動物：${na(petName)}\n\n`;
-      if (modalUrl) msg += `認養資訊連結：${modalUrl}\n\n`;
+    let msg = "📋【認養申請表】\n";
+    msg += `認養動物：${na(petName)}\n\n`;
+    if (modalUrl) msg += `認養資訊連結：${modalUrl}\n\n`;
 
-      // 基本資料
-      const basic = [
-        "姓名",
-        "年齡",
-        "居住地",
-        "居住環境",
-        "職業",
-        "月收入",
-        "家庭成員",
-        "家庭成員總人數",
-        "現居住狀況",
-        "同居成員",
-      ];
-      basic.forEach((key) => {
-        msg += `${key}：${na(get(key))}\n\n`;
-      });
+    ["姓名","年齡","居住地","居住環境","職業","月收入","家庭成員","家庭成員總人數","現居住狀況","同居成員"]
+      .forEach(k => { msg += `${k}：${na(get(k))}\n\n`; });
 
-      // 飼養寵物經驗
-      msg += "飼養寵物經驗：\n";
-      msg += "是否曾經飼養過寵物？\n" + na(get("是否曾經飼養過寵物？")) + "\n\n";
-      msg += "若有，飼養過什麼寵物？\n" + na(get("若有，飼養過什麼寵物？")) + "\n\n";
+    msg += "飼養寵物經驗：\n";
+    msg += "是否曾經飼養過寵物？\n" + na(get("是否曾經飼養過寵物？")) + "\n\n";
+    msg += "若有，飼養過什麼寵物？\n" + na(get("若有，飼養過什麼寵物？")) + "\n\n";
 
-      // 現有寵物狀況
-      msg += "現有寵物狀況：\n";
-      msg += "目前家中是否有寵物？\n" + na(get("目前家中是否有寵物？")) + "\n\n";
-      // 注意：這裡表單 name 若含「：」請對應修改
-      msg += "若有，請提供寵物資訊：\n" + na(get("若有，請提供寵物資訊")) + "\n\n";
+    msg += "現有寵物狀況：\n";
+    msg += "目前家中是否有寵物？\n" + na(get("目前家中是否有寵物？")) + "\n\n";
+    msg += "若有，請提供寵物資訊：\n" + na(get("若有，請提供寵物資訊") || get("若有，請提供寵物資訊：")) + "\n\n";
 
-      // 認養動機
-      msg += "認養動機：\n";
-      msg += "為什麼想認養這隻毛孩呢？\n" + na(get("為什麼想認養這隻毛孩呢？")) + "\n\n";
+    msg += "認養動機：\n";
+    msg += "為什麼想認養這隻毛孩呢？\n" + na(get("為什麼想認養這隻毛孩呢？")) + "\n\n";
 
-      // 飼養方式
-      msg += "飼養方式：\n";
-      msg += "您會如何照顧這隻毛孩？\n" + na(get("您會如何照顧這隻毛孩？")) + "\n\n";
+    msg += "飼養方式：\n";
+    msg += "您會如何照顧這隻毛孩？\n" + na(get("您會如何照顧這隻毛孩？")) + "\n\n";
 
-      // 飼養花費認知
-      msg += "飼養花費認知：\n";
-      msg += "您認為飼養寵物需要哪些支出？\n" + na(get("您認為飼養寵物需要哪些支出？"));
+    msg += "飼養花費認知：\n";
+    msg += "您認為飼養寵物需要哪些支出？\n" + na(get("您認為飼養寵物需要哪些支出？")) + "\n";
 
-      await navigator.clipboard.writeText(msg);
-      encodedMsg = encodeURIComponent(msg);
-      popupOverlay.classList.remove("hidden");
-      popupOverlay.classList.add("flex");
-    });
+    try { await navigator.clipboard.writeText(msg); } catch {}
 
-    document.getElementById("continueBtn").addEventListener("click", () => {
-      const messengerUrl = `https://m.me/61582634772771?text=${encodedMsg}`;//100070289411620
-      window.open(messengerUrl, "_blank");
-      popupOverlay.classList.add("hidden");
-    });
+    const u = new URL("https://m.me/100070289411620");
+    u.searchParams.set("text", msg);
+    window.open(u.toString(), "_blank");
+  }
 
-    const y = document.getElementById('year');
-    if (y) y.textContent = new Date().getFullYear();
+  sendBtn?.addEventListener('click', handleSend);
+  form?.addEventListener('submit', handleSend);
+})();
+</script>
 
-    history.scrollRestoration = "manual";
-    window.scrollTo(0, 0);
-  </script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </body>
 
