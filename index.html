@@ -662,8 +662,6 @@
       });
     };
 
-    
-
     // --- Weekly adopted counter (dynamic, pure index) ---
     function getWeekStartLocal() {
       const now = new Date();
@@ -705,22 +703,6 @@
     loadPets();
     computeWeeklyAdopted();
   </script>
-  <!-- index.html：同資料夾跳轉 adopt.html，帶上 name 與 modal -->
-<script>
-(() => {
-  const dir = location.href.replace(/[#?].*$/, '').replace(/[^/]*$/, '');
-  const pet =
-    (document.getElementById('petName')?.textContent ||
-     document.querySelector('[data-pet-name]')?.dataset.petName ||
-     new URLSearchParams(location.search).get('name') ||
-     '').trim();
-  const u = new URL('adopt.html', dir);
-  if (pet) u.searchParams.set('name', pet);
-  u.searchParams.set('modal', location.href);
-  location.replace(u.toString());
-})();
-</script>
-
 
   <!-- SEO: organization schema -->
   <script type="application/ld+json">
