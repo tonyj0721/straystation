@@ -662,18 +662,11 @@
       });
     };
 
-    // 觸發跳轉的地方改成這樣
-    const u = new URL("adopt.html", location.href);
-    const pet = (
-      document.getElementById("petName")?.textContent ||
-      document.querySelector("[data-pet-name]")?.dataset.petName ||
-      document.getElementById("goAdopt")?.dataset.name ||
-      new URLSearchParams(location.search).get("name") ||
-      ""
-    ).trim();
-    u.searchParams.set("name", pet);
-    u.searchParams.set("modal", location.href);
-    location.href = u.toString();
+    const dir = location.href.replace(/[#?].*$/, '').replace(/[^/]*$/, ''); // e.g. https://user.github.io/repo/path/
+const u = new URL('adopt.html', dir); // -> https://user.github.io/repo/path/adopt.html
+u.searchParams.set('name', /* 你的名字字串 */);
+u.searchParams.set('modal', location.href);
+location.href = u.toString();
 
     // --- Weekly adopted counter (dynamic, pure index) ---
     function getWeekStartLocal() {
