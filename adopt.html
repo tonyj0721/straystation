@@ -216,9 +216,24 @@
 
   <script>
     // set title
-    const params   = new URLSearchParams(location.search);
-  const petName  = (params.get('name') || params.get('pet') || '').trim();
-  const modalUrl = (params.get('modal') || '').trim();
+    (() => {
+  const params  = new URLSearchParams(location.search);
+  const petName = (params.get('name') || params.get('pet') || '').trim();
+
+  // ⇩ 確保一定有連結：優先用 ?modal / ?m → 其次 referrer → 最後用 petName 合成一條能開 modal 的 index 連結
+  const modalUrl = (() => {
+    const direct = (params.get('modal') || params.get('m') || '').trim();
+    if (direct) return direct;
+    if (document.referrer) return document.referrer;
+    if (petName) {
+      const u = new URL('index.html', location.href);
+      u.searchParams.set('name', petName);
+      u.hash = 'modal';
+      return u.toString();
+    }
+    return '';
+  })();
+
   if (petName) document.getElementById("title").textContent = `我要認養（${petName}）`;
 
   let encodedMsg = "";
@@ -236,32 +251,26 @@
     const na = (v) => (v ? v : "未填寫");
 
     let msg = "📋【認養申請表】\n";
-    msg += `認養動物：${petName || "未填寫"}\n\n`;
+    msg += `認養動物：${na(petName)}\n\n`;
     if (modalUrl) msg += `認養資訊連結：${modalUrl}\n\n`;
 
-    // 基本資料
     ["姓名","年齡","居住地","居住環境","職業","月收入","家庭成員","家庭成員總人數","現居住狀況","同居成員"]
       .forEach((key) => { msg += `${key}：${na(get(key))}\n\n`; });
 
-    // 飼養寵物經驗
     msg += "飼養寵物經驗：\n";
     msg += "是否曾經飼養過寵物？\n" + na(get("是否曾經飼養過寵物？")) + "\n\n";
     msg += "若有，飼養過什麼寵物？\n" + na(get("若有，飼養過什麼寵物？")) + "\n\n";
 
-    // 現有寵物狀況
     msg += "現有寵物狀況：\n";
     msg += "目前家中是否有寵物？\n" + na(get("目前家中是否有寵物？")) + "\n\n";
     msg += "若有，請提供寵物資訊：\n" + na(getEither("若有，請提供寵物資訊","若有，請提供寵物資訊：")) + "\n\n";
 
-    // 認養動機
     msg += "認養動機：\n";
     msg += "為什麼想認養這隻毛孩呢？\n" + na(get("為什麼想認養這隻毛孩呢？")) + "\n\n";
 
-    // 飼養方式
     msg += "飼養方式：\n";
     msg += "您會如何照顧這隻毛孩？\n" + na(get("您會如何照顧這隻毛孩？")) + "\n\n";
 
-    // 飼養花費認知
     msg += "飼養花費認知：\n";
     msg += "您認為飼養寵物需要哪些支出？\n" + na(get("您認為飼養寵物需要哪些支出？"));
 
@@ -277,6 +286,7 @@
     window.open(messengerUrl, "_blank");
     popupOverlay.classList.add("hidden");
   });
+})();
 
     const y = document.getElementById('year');
     if (y) y.textContent = new Date().getFullYear();
