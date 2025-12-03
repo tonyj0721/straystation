@@ -223,7 +223,7 @@
       document.getElementById("title").textContent = `我要認養（${petName}）`;
     }
 
-    let rawMsg = "";
+    let encodedMsg = "";
 
     // submit form
     const adoptForm = document.getElementById("adoptForm");
@@ -281,19 +281,16 @@
       msg += "您認為飼養寵物需要哪些支出？\n" + na(get("您認為飼養寵物需要哪些支出？"));
 
       await navigator.clipboard.writeText(msg);
-      rawMsg = msg;
+      encodedMsg = encodeURIComponent("\uFEFF" + msg.replace(/\n/g, "\r\n"));
       popupOverlay.classList.remove("hidden");
       popupOverlay.classList.add("flex");
     });
 
     document.getElementById("continueBtn").addEventListener("click", () => {
-      const isDesktop = !/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  const text = isDesktop ? "\u200B" + rawMsg : rawMsg;  // ← 只在桌機加 ZWSP
-  const u = new URL("https://m.me/61582634772771");     // 你的粉專 ID
-  u.searchParams.set("text", text);                     // 自動正確編碼
-  window.open(u.toString(), "_blank");
-  popupOverlay.classList.add("hidden");
-});
+      const messengerUrl = `https://m.me/873460069178476?text=${encodedMsg}`;//910137399106926
+      window.open(messengerUrl, "_blank");
+      popupOverlay.classList.add("hidden");
+    });
 
     const y = document.getElementById('year');
     if (y) y.textContent = new Date().getFullYear();
