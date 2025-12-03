@@ -218,7 +218,7 @@
     // set title
     const params = new URLSearchParams(location.search);
     const petName = params.get("name") || "";
-    const modalUrl = (params.get('modal') || document.referrer || '').trim();
+    const modalUrl = document.referrer.trim();
     if (petName) {
       document.getElementById("title").textContent = `我要認養（${petName}）`;
     }
