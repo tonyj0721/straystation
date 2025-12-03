@@ -216,7 +216,6 @@
 
   <script>
     // set title
-    (() => {
   const params  = new URLSearchParams(location.search);
   const petName = (params.get('name') || params.get('pet') || '').trim();
 
@@ -284,7 +283,6 @@
     window.open(messengerUrl, "_blank");
     popupOverlay.classList.add("hidden");
   });
-})();
 
     const y = document.getElementById('year');
     if (y) y.textContent = new Date().getFullYear();
