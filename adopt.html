@@ -217,10 +217,13 @@
   <script>
     // set title
     const params = new URLSearchParams(location.search);
-    const petName = params.get("name") || "";
+    const petName = params.get("name");
+    const modalUrl = document.referrer.trim();
     if (petName) {
       document.getElementById("title").textContent = `我要認養（${petName}）`;
     }
+
+    let encodedMsg = "";
 
     // submit form
     const adoptForm = document.getElementById("adoptForm");
@@ -229,22 +232,63 @@
     adoptForm.addEventListener("submit", async (e) => {
       e.preventDefault();
 
-      let msg = "📋【認養申請表】\n";
-      if (petName) msg += `認養動物：${petName}\n\n`;
+      const get = (name) =>
+        (adoptForm.querySelector(`[name="${name}"]`)?.value || "").trim();
+      const na = (v) => (v ? v : "未填寫");
 
-      const data = new FormData(adoptForm);
-      for (const [k, v] of data.entries()) {
-        if (v.trim()) msg += `${k}：${v}\n\n`;
-      }
+      let msg = "📋【認養申請表】\n";
+      msg += `ˇ我要認養：${na(petName)}\n\n`;
+      if (modalUrl) msg += `寵物資訊連結：${modalUrl}\n\n`;
+
+      // 基本資料
+      const basic = [
+        "姓名",
+        "年齡",
+        "居住地",
+        "居住環境",
+        "職業",
+        "月收入",
+        "家庭成員",
+        "家庭成員總人數",
+        "現居住狀況",
+        "同居成員",
+      ];
+      basic.forEach((key) => {
+        msg += `${key}：${na(get(key))}\n\n`;
+      });
+
+      // 飼養寵物經驗
+      msg += "飼養寵物經驗：\n";
+      msg += "是否曾經飼養過寵物？\n" + na(get("是否曾經飼養過寵物？")) + "\n\n";
+      msg += "若有，飼養過什麼寵物？\n" + na(get("若有，飼養過什麼寵物？")) + "\n\n";
+
+      // 現有寵物狀況
+      msg += "現有寵物狀況：\n";
+      msg += "目前家中是否有寵物？\n" + na(get("目前家中是否有寵物？")) + "\n\n";
+      // 注意：這裡表單 name 若含「：」請對應修改
+      msg += "若有，請提供寵物資訊：\n" + na(get("若有，請提供寵物資訊")) + "\n\n";
+
+      // 認養動機
+      msg += "認養動機：\n";
+      msg += "為什麼想認養這隻毛孩呢？\n" + na(get("為什麼想認養這隻毛孩呢？")) + "\n\n";
+
+      // 飼養方式
+      msg += "飼養方式：\n";
+      msg += "您會如何照顧這隻毛孩？\n" + na(get("您會如何照顧這隻毛孩？")) + "\n\n";
+
+      // 飼養花費認知
+      msg += "飼養花費認知：\n";
+      msg += "您認為飼養寵物需要哪些支出？\n" + na(get("您認為飼養寵物需要哪些支出？"));
 
       await navigator.clipboard.writeText(msg);
-
+      encodedMsg = encodeURIComponent(msg);
       popupOverlay.classList.remove("hidden");
       popupOverlay.classList.add("flex");
     });
 
     document.getElementById("continueBtn").addEventListener("click", () => {
-      window.open("https://m.me/61582634772771", "_blank");//100070289411620
+      const messengerUrl = `https://m.me/61582634772771?text=${encodedMsg}`;//100070289411620
+      window.open(messengerUrl, "_blank");
       popupOverlay.classList.add("hidden");
     });
 
