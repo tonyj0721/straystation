@@ -218,13 +218,7 @@
     // set title
   const params  = new URLSearchParams(location.search);
   const petName = (params.get('name') || params.get('pet') || '').trim();
-
-  // ⇩ 確保一定有連結：優先用 ?modal / ?m → 其次 referrer → 最後用 petName 合成一條能開 modal 的 index 連結
-  const modalUrl = (() => {
-    const direct = (params.get('modal') || params.get('m') || '').trim();
-    if (document.referrer) return document.referrer;
-    return '';
-  })();
+  const modalUrl = (params.get('modal') || document.referrer || '').trim();
 
   if (petName) document.getElementById("title").textContent = `我要認養（${petName}）`;
 
