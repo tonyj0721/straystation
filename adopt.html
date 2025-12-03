@@ -215,10 +215,23 @@
   </div>
 
   <script>
-    // set title
+(() => {
   const params  = new URLSearchParams(location.search);
   const petName = (params.get('name') || params.get('pet') || '').trim();
-  const modalUrl = (params.get('modal') || document.referrer || '').trim();
+
+  // ⇩ 確保一定有連結：優先用 ?modal / ?m → 其次 referrer → 最後用 petName 合成一條能開 modal 的 index 連結
+  const modalUrl = (() => {
+    const direct = (params.get('modal') || params.get('m') || '').trim();
+    if (direct) return direct;
+    if (document.referrer) return document.referrer;
+    if (petName) {
+      const u = new URL('index.html', location.href);
+      u.searchParams.set('name', petName);
+      u.hash = 'modal';
+      return u.toString();
+    }
+    return '';
+  })();
 
   if (petName) document.getElementById("title").textContent = `我要認養（${petName}）`;
 
@@ -272,6 +285,7 @@
     window.open(messengerUrl, "_blank");
     popupOverlay.classList.add("hidden");
   });
+})();
 
     const y = document.getElementById('year');
     if (y) y.textContent = new Date().getFullYear();
