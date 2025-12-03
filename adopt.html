@@ -222,12 +222,7 @@
   // ⇩ 確保一定有連結：優先用 ?modal / ?m → 其次 referrer → 最後用 petName 合成一條能開 modal 的 index 連結
   const modalUrl = (() => {
     const direct = (params.get('modal') || params.get('m') || '').trim();
-    if (petName) {
-      const u = new URL('index.html', location.href);
-      u.searchParams.set('name', petName);
-      u.hash = 'modal';
-      return u.toString();
-    }
+    if (direct) return direct;
     return '';
   })();
 
