@@ -281,7 +281,9 @@
       msg += "您認為飼養寵物需要哪些支出？\n" + na(get("您認為飼養寵物需要哪些支出？"));
 
       await navigator.clipboard.writeText(msg);
-      encodedMsg = encodeURIComponent(msg);
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      const msgForUrl = isMobile ? msg : msg.replace("📋", "☑️");
+      encodedMsg = encodeURIComponent(msgForUrl);
       popupOverlay.classList.remove("hidden");
       popupOverlay.classList.add("flex");
     });
