@@ -236,7 +236,7 @@
         (adoptForm.querySelector(`[name="${name}"]`)?.value || "").trim();
       const na = (v) => (v ? v : "未填寫");
 
-      let msg = "\uD83D\uDCCB【認養申請表】\n"; // 📋
+      let msg = "📋【認養申請表】\n";
       msg += `我要認養：${na(petName)}\n\n`;
       if (modalUrl) msg += `寵物資訊連結：${modalUrl}\n\n`;
 
@@ -281,7 +281,7 @@
       msg += "您認為飼養寵物需要哪些支出？\n" + na(get("您認為飼養寵物需要哪些支出？"));
 
       await navigator.clipboard.writeText(msg);
-      encodedMsg = encodeURIComponent("\uFEFF" + msg.replace(/\n/g, "\r\n"));
+      encodedMsg = encodeURIComponent("\u200B" + msg.replace(/\n/g, "\r\n"));
       popupOverlay.classList.remove("hidden");
       popupOverlay.classList.add("flex");
     });
