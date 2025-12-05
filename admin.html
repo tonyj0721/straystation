@@ -641,6 +641,53 @@
 
     btnPick?.addEventListener("click", () => imgFiles.click());
 
+    // 產生帶浮水印的 Blob（細字、無外框、疏一點）
+    async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {}) {
+      const url = URL.createObjectURL(file);
+      try {
+        // 讀圖 & 畫原圖
+        const img = await new Promise((res, rej) => {
+          const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = url;
+        });
+        const W = img.naturalWidth, H = img.naturalHeight;
+        const c = document.createElement("canvas");
+        c.width = W; c.height = H;
+        const g = c.getContext("2d");
+        g.drawImage(img, 0, 0, W, H);
+
+        // === 細字無外框樣式（可調參數） ===
+        const ANG = -33 * Math.PI / 180;   // 斜角
+        const FS = Math.round(Math.max(W, H) * 0.03);  // 字高 ≈ 長邊 6%
+        const OP = 0.25;                                  // 透明度
+        const STEP_X = Math.max(Math.round(FS * 12), 360); // 同斜線間距（倍數越大越疏）
+        const STEP_Y = Math.max(Math.round(FS * 8), 260);  // 斜線與斜線間距
+
+        const diag = Math.hypot(W, H);
+
+        g.save();
+        g.translate(W / 2, H / 2);
+        g.rotate(ANG);
+        g.font = `600 ${FS}px "Noto Sans TC","Microsoft JhengHei",sans-serif`;
+        g.textBaseline = "middle";
+        g.fillStyle = `rgba(255,255,255,${OP})`;
+        // 想更柔和可打開下一行：
+        // g.globalCompositeOperation = "overlay"; // 或 "soft-light"
+
+        // 只填色，不描邊（不要 strokeText/lineWidth/strokeStyle）
+        for (let x = -diag; x <= diag; x += STEP_X) {
+          for (let y = -diag; y <= diag; y += STEP_Y) {
+            g.fillText(text, x, y);
+          }
+        }
+        g.restore();
+
+        const out = await new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
+        return new File([out], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }
+
     // 渲染預覽格子 + 刪除按鈕
     function renderPreviews() {
       fileCount.textContent = `已選 ${selectedFiles.length} / 5 張`;
@@ -762,20 +809,22 @@
         // 1) 新增基本文件
         const docRef = await addDoc(collection(db, "pets"), payload);
 
-        // 2) 逐張上傳到「original/pets/」
-        const origs = [];
+        // 2) 逐張上傳圖片，取得 Storage URL
+        const urls = [];
         for (const f of selectedFiles) {
-          const path = `original/pets/${docRef.id}/${Date.now()}_${f.name}`;
+          const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+          const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
+          const base = f.name.replace(/\.[^.]+$/, '');
+          const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
           const r = sRef(storage, path);
-          await uploadBytes(r, f);
+          await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
+          urls.push(await getDownloadURL(r));
         }
 
-        // 3) 先不要寫 images（那是浮水印輸出的路徑）
-        //    只標記 processing，後端完成後會把 final URLs 寫回 images
-        await updateDoc(doc(db, "pets", docRef.id), {
-          processing: false,
-          images: [],
-        });
+        // 3) 回寫 images 欄位
+        if (urls.length) {
+          await updateDoc(doc(db, "pets", docRef.id), { images: urls });
+        }
 
         // UI 收尾
         stopDots();
@@ -1245,8 +1294,6 @@
         // 刪掉這筆的所有圖片與合照資料夾
         await deleteAllUnder(`pets/${currentDocId}`);
         await deleteAllUnder(`adopted/${currentDocId}`);
-        await deleteAllUnder(`original/pets/${currentDocId}`);
-        await deleteAllUnder(`original/adopted/${currentDocId}`);
         // 最後刪 Firestore 文件
         await deleteDoc(doc(db, "pets", currentDocId));
         await loadPets();
@@ -1322,8 +1369,13 @@
 
         // 上傳新增檔案
         for (const f of add) {
-          const path = `original/pets/${currentDocId}/${Date.now()}_${f.name}`;
-          await uploadBytes(sRef(storage, path), f);
+          const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+          const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
+          const base = f.name.replace(/\.[^.]+$/, '');
+          const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
+          const r = sRef(storage, path);
+          await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
+          newUrls.push(await getDownloadURL(r));
         }
 
         // 刪除移除的檔案（忽略刪失敗）
@@ -1569,15 +1621,18 @@
       const urls = [];
       try {
         for (const f of files) {
-          const path = `original/adopted/${currentDocId}/${Date.now()}_${f.name}`;
-          await uploadBytes(sRef(storage, path), f);
+          const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+          const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
+          const base = f.name.replace(/\.[^.]+$/, '');
+          const path = `adopted/${currentDocId}/${Date.now()}_${base}.${ext}`;
+          const r = sRef(storage, path);
+          await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
+          urls.push(await getDownloadURL(r));
         }
 
         await updateDoc(doc(db, "pets", currentDocId), {
           status: "adopted",
-          adoptedAt: serverTimestamp(),
-          processingAdopted: true,
-          adoptedPhotos: [], // 先留空
+          adoptedPhotos: urls,
           showOnHome: true,
           showOnCats: false,
           showOnDogs: false,
