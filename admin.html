@@ -574,7 +574,7 @@
       },
       狗: {
         品種犬: ["博美", "貴賓", "吉娃娃", "馬爾濟斯", "柯基", "柴犬", "哈士奇", "高山犬", "黃金獵犬"],
-        米克斯: ["黑色", "黑白色", "白色", "白黃色", "黃色", "棕色", "虎斑", "花花"],
+        米克斯: ["黑色", "黑白色", "白色", "白黃色", "黃色", "米色", "黑棕色", "棕色", "虎斑", "花花"],
       },
     };
 
@@ -762,19 +762,20 @@
         // 1) 新增基本文件
         const docRef = await addDoc(collection(db, "pets"), payload);
 
-        // 2) 逐張上傳圖片，取得 Storage URL
-        const urls = [];
+        // 2) 逐張上傳到「original/pets/」
+        const origs = [];
         for (const f of selectedFiles) {
-          const path = `pets/${docRef.id}/${Date.now()}_${f.name}`;
+          const path = `original/pets/${docRef.id}/${Date.now()}_${f.name}`;
           const r = sRef(storage, path);
           await uploadBytes(r, f);
-          urls.push(await getDownloadURL(r));
         }
 
-        // 3) 回寫 images 欄位
-        if (urls.length) {
-          await updateDoc(doc(db, "pets", docRef.id), { images: urls });
-        }
+        // 3) 先不要寫 images（那是浮水印輸出的路徑）
+        //    只標記 processing，後端完成後會把 final URLs 寫回 images
+        await updateDoc(doc(db, "pets", docRef.id), {
+          processing: false,
+          images: [],
+        });
 
         // UI 收尾
         stopDots();
@@ -1244,6 +1245,8 @@
         // 刪掉這筆的所有圖片與合照資料夾
         await deleteAllUnder(`pets/${currentDocId}`);
         await deleteAllUnder(`adopted/${currentDocId}`);
+        await deleteAllUnder(`original/pets/${currentDocId}`);
+        await deleteAllUnder(`original/adopted/${currentDocId}`);
         // 最後刪 Firestore 文件
         await deleteDoc(doc(db, "pets", currentDocId));
         await loadPets();
@@ -1319,10 +1322,8 @@
 
         // 上傳新增檔案
         for (const f of add) {
-          const path = `pets/${currentDocId}/${Date.now()}_${f.name}`;
-          const r = sRef(storage, path);
-          await uploadBytes(r, f);
-          newUrls.push(await getDownloadURL(r));
+          const path = `original/pets/${currentDocId}/${Date.now()}_${f.name}`;
+          await uploadBytes(sRef(storage, path), f);
         }
 
         // 刪除移除的檔案（忽略刪失敗）
@@ -1568,15 +1569,15 @@
       const urls = [];
       try {
         for (const f of files) {
-          const path = `adopted/${currentDocId}/${Date.now()}_${f.name}`;
-          const r = sRef(storage, path);
-          await uploadBytes(r, f);
-          urls.push(await getDownloadURL(r));
+          const path = `original/adopted/${currentDocId}/${Date.now()}_${f.name}`;
+          await uploadBytes(sRef(storage, path), f);
         }
 
         await updateDoc(doc(db, "pets", currentDocId), {
           status: "adopted",
-          adoptedPhotos: urls,
+          adoptedAt: serverTimestamp(),
+          processingAdopted: true,
+          adoptedPhotos: [], // 先留空
           showOnHome: true,
           showOnCats: false,
           showOnDogs: false,
