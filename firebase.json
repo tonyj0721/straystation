@@ -1,5 +1,8 @@
 {
-  "functions": {
-    "source": "functions"
-  }
+  "hosting": {
+    "site": "straystation",     // 你的預設站台 = 專案 ID
+    "public": ".",              // 網站檔案就在根目錄
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
+  },
+  "functions": { "source": "functions" }
 }
