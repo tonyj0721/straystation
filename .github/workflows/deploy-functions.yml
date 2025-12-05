@@ -13,8 +13,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: w9jds/firebase-action@v12
+      - uses: actions/setup-node@v4
         with:
-          args: deploy --only functions --non-interactive --project straystation
+          node-version: 20
+      # 用 npx 執行 firebase-tools，並加重試，避免偶發 5xx
+      - name: Deploy Functions (via npx, retry)
+        run: |
+          for i in 1 2 3; do
+            npx --yes firebase-tools@13.3.2 \
+              deploy --only functions --non-interactive --project straystation && break || sleep 5
+          done
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
