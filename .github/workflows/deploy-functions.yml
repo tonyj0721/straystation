@@ -1,10 +1,13 @@
 name: Deploy Firebase Functions
 on:
   push:
+    branches: [main]
     paths:
       - 'functions/**'
       - 'firebase.json'
       - '.firebaserc'
+  workflow_dispatch:
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
