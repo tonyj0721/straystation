@@ -4,11 +4,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="images/dogpaw-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="images/dogpaw-180.png">
   <title>台中簡媽媽狗園</title>
   <meta name="description" content="浪浪轉運站 X 台中簡媽媽狗園：友善的貓狗送養平台。快速篩選、查看細節，手機與電腦版皆可用。" />
   <meta name="theme-color" content="#fcd34d">
-  <link rel="icon" href="data:,">
-  <link rel="apple-touch-icon" href="data:,">
   <link rel="stylesheet" href="assets/tailwind.css">
   <link rel="stylesheet" href="assets/shared.css">
 </head>
@@ -18,9 +18,9 @@
   <header class="bg-white/80 backdrop-blur border-b border-gray-200">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="h-16 flex items-center justify-between">
-        <a href="index.html" class="flex items-center gap-2 font-semibold text-lg">
-          <img src="浪浪轉運站Logo.png" alt="浪浪轉運站 Logo" class="h-8 w-8 object-contain" />
-          <span>浪浪轉運站 X 台中簡媽媽狗園</span>
+        <a href="index.html" class="flex items-center gap-2 font-semibold text-2xl">
+          <img src="images/dogpaw.png" alt="dogpaw" class="h-8 w-8 object-contain" />
+          <span>台中簡媽媽狗園</span>
         </a>
 
         <!-- 桌機導覽 -->
@@ -288,9 +288,13 @@
   <section id="contact" class="bg-gray-50 border-t border-gray-200">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <h2 class="text-2xl font-bold">聯絡我們</h2>
-      <p class="mt-2 text-gray-600">合作或媒體聯繫：<a href="https://m.me/100070289411620"
+      <p class="mt-2 text-gray-600">合作或媒體聯繫：<a href="https://m.me/910137399106926"
           style="color:#0084FF; font-weight:600;">FB 台中簡媽媽狗園</a></p>
-      <div class="mt-4 text-sm text-gray-500">© <span id="year"></span> 浪浪轉運站 Stray Station. 保留所有權利。</div>
+      <div class="mt-4 text-sm text-gray-500">© <span id="year"></span>
+        <img src="images/浪浪轉運站 Logo.png" alt="浪浪轉運站 Logo"
+          style="display:inline-flex;width:1em;height:1em;vertical-align:-0.15em;margin:0.01em -0.25em 0.01em 0.25em;">
+        浪浪轉運站 Stray Station. 保留所有權利。
+      </div>
     </div>
   </section>
 
@@ -640,10 +644,35 @@
       const petId = (window.currentPetId || (typeof p !== 'undefined' && p.id) || '');
       const goto = `adopt.html?pet=${encodeURIComponent(petId)}&name=${encodeURIComponent(name)}`;
 
+      // ① 先顯示「認養條件與流程」(確認/取消)
+      const precheckHTML = `
+      <div style="text-align:left;max-height:55vh;overflow:auto;padding:4px 2px;">
+        <div style="font-weight:800;margin-bottom:24px;text-align:center;font-size:24px;">認養條件與流程</div>
+        <ol style="line-height:1.7;padding-left:1.25rem;margin:0; list-style: decimal;">
+          <li>需年滿 20 歲，有穩定收入。</li>
+          <li>需先了解認養人住家環境、是否有原養寵物。</li>
+          <li>確認符合條件，小編篩選後，預約園區參訪。</li>
+          <li>確認領養需準備身份證影印本及印章，並簽署認養同意書。</li>
+          <li>需負擔結紮等相關費用。</li>
+          <li>認養人需長期主動更新毛孩近況，並接受不定期居家訪視。</li>
+        </ol>
+      </div>
+    `;
+
       Swal.fire({
-        target: dlg,          // 關鍵：把彈窗掛在 dialog 內
-        backdrop: false,      // 避免雙遮罩（dialog 已有 backdrop）
-        html: `
+        target: dlg,
+        backdrop: false,
+        html: precheckHTML,
+        showCancelButton: true,
+        confirmButtonText: '我符合，繼續',
+        cancelButtonText: '取消',
+      }).then(r => {
+        if (!r.isConfirmed) return;
+
+        Swal.fire({
+          target: dlg,          // 關鍵：把彈窗掛在 dialog 內
+          backdrop: false,      // 避免雙遮罩（dialog 已有 backdrop）
+          html: `
           <div style="display:flex;flex-direction:column;align-items:center;gap:12px;padding:8px 0">
             <div style="font-size:48px;line-height:1">💡</div>
             <div style="text-align:center;color:#374151">
@@ -653,12 +682,13 @@
             </div>
           </div>
         `,
-        confirmButtonText: '繼續',
-        showCloseButton: true,
-        buttonsStyling: false,
-        customClass: { popup: 'rounded-2xl', confirmButton: 'swal2-confirm-btn' }
-      }).then(r => {
-        if (r.isConfirmed) window.location.href = goto;
+          confirmButtonText: '繼續',
+          showCloseButton: true,
+          buttonsStyling: false,
+          customClass: { popup: 'rounded-2xl', confirmButton: 'swal2-confirm-btn' }
+        }).then(r2 => {
+          if (r2.isConfirmed) window.location.href = goto;
+        });
       });
     };
 
