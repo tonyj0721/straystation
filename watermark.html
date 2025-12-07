@@ -123,16 +123,26 @@
 
     input[type="color"] {
       appearance: none;
-      width: 32px;
+      width: 22px;
       height: 22px;
+      /* 調矮一點，看喜歡可以改 18~22 */
       border: none;
       background: transparent;
       cursor: pointer;
+      position: relative;
+      top: 1px;
+      /* 整顆往下推一點點 */
+    }
+
+    input[type="color"]::-webkit-color-swatch-wrapper {
+      padding: 0;
+      /* 把內建 padding 拿掉，不然會看起來偏高 */
     }
 
     input[type="color"]::-webkit-color-swatch {
       border: 1px solid var(--border);
-      border-radius: 6px;
+      border-radius: 999px;
+      /* 變成完整小膠囊 */
     }
 
     .btns {
@@ -195,7 +205,7 @@
     .row-layout .layout-controls {
       display: flex;
       align-items: center;
-      gap: 80px;
+      gap: 40px;
       width: 100%;
     }
 
@@ -208,9 +218,9 @@
       display: flex;
       align-items: center;
       gap: 4px;
-      font-size: 12px;
+      font-size: 13px;
       color: var(--muted);
-      margin-left: 4px;
+      margin-right: -10px;
     }
 
     /* 滑桿列：統一長度 + 數字對齊 */
@@ -279,7 +289,7 @@
                 <option value="center">置中單句</option>
               </select>
               <label class="color-field" for="color">
-                顏色
+                顏色(可點選)
                 <input id="color" type="color" value="#ffffff" />
               </label>
             </div>
