@@ -1,0 +1,705 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>圖片浮水印產生器（合併批次 / 預設儲存）</title>
+<style>
+  :root{
+    --panel:#11161d; --panel-2:#0e1319; --text:#e8eef6; --muted:#9fb0c6;
+    --border:#1f2a37; --gap:16px; --rounded:16px; --range-max:360px;
+  }
+  *{box-sizing:border-box;min-width:0}
+  html,body{height:100%;overflow-x:hidden}
+  body{margin:0;background:linear-gradient(180deg,#0a0e13,#0f1720);color:var(--text);font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif}
+
+  .wrap{display:grid;grid-template-columns:4fr 6fr;gap:var(--gap);align-items:start;min-height:100vh;padding:var(--gap);max-width:100vw}
+  @media (max-width:900px){.wrap{grid-template-columns:1fr}.canvas-wrap{min-height:46vh}}
+  @media (max-width:640px){
+    :root{--gap:12px}
+    .wrap{padding:12px}
+    .panel{padding:12px 10px}
+    .row{grid-template-columns:1fr;gap:6px}
+    input[type="range"]{width:100%}
+    .format,.quality{grid-template-columns:1fr}
+    #fileInfo{display:none}
+  }
+  @media (max-width:420px){.wrap{padding:8px;gap:8px}.panel{padding:10px}}
+
+  .panel{
+    background:radial-gradient(1200px 600px at 20% -10%,#12213466,transparent),
+               radial-gradient(800px 400px at 110% 10%,#1b2a4066,transparent),
+               var(--panel);
+    border:1px solid var(--border);border-radius:var(--rounded);padding:14px 16px;
+    box-shadow:0 10px 30px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.02)
+  }
+  .panel h2{margin:6px 0 12px;font-size:18px;font-weight:700}
+  .ctrl{display:grid;gap:12px}
+  .group{background:var(--panel-2);border:1px solid var(--border);border-radius:12px;padding:12px}
+
+  .row{display:grid;grid-template-columns:120px minmax(0,1fr) auto;align-items:center;gap:10px}
+  .row + .row{margin-top:10px}
+  label{color:var(--muted);font-size:13px}
+
+  input[type="text"],select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:#0c1117;color:var(--text)}
+  input[type="range"]{width:min(100%,var(--range-max))}
+  input[type="color"]{appearance:none;width:36px;height:28px;border:none;background:transparent;cursor:pointer}
+  input[type="color"]::-webkit-color-swatch{border:1px solid var(--border);border-radius:8px}
+  input[disabled]{opacity:.55;cursor:not-allowed}
+
+  .btns{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
+  .btns.compact-row{gap:8px;margin-top:6px}
+  .btns.compact-row button{padding:8px 12px;font-size:13px}
+  button{padding:10px 14px;border-radius:12px;border:1px solid var(--border);background:linear-gradient(180deg,#192334,#0f1725);color:var(--text);cursor:pointer;font-weight:600}
+  button.primary{background:linear-gradient(180deg,#3b82f6,#2563eb);border-color:#1d4ed8}
+  button.ghost{background:#0c1117}
+
+  .drop{border:2px dashed #2a3a52;border-radius:var(--rounded);height:72px;display:grid;place-items:center;color:var(--muted)}
+  .drop.dragover{border-color:#3b82f6;color:var(--text);background:rgba(59,130,246,.08)}
+  @media (max-width:600px){.drop{display:none}}
+
+  .topbar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:10px}
+  .file{display:flex;align-items:center;gap:10px;background:#0c1117;border:1px solid var(--border);border-radius:12px;padding:8px 10px}
+  .file input[type="file"]{width:220px}
+  .value{font-variant-numeric:tabular-nums;color:#cfe0f7;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .muted{color:#9fb0c6;font-size:12px}
+  #clearImage{white-space:nowrap;min-width:64px}
+
+  .format{display:grid;grid-template-columns:1fr;gap:8px}
+  .quality{display:grid;grid-template-columns:46px 1fr auto;align-items:center;gap:8px}
+  .quality .value{overflow:visible;text-overflow:clip}
+
+  /* 這版 inline-range 用 flex，避免小螢幕被擠沒 */
+  .inline-range{display:flex;align-items:center;gap:10px}
+  .inline-range input[type="range"]{flex:1}
+
+  .canvas-wrap{
+    display:grid;place-items:center;min-height:50vh;padding:12px;
+    background:radial-gradient(900px 500px at 30% -10%,#16223666,transparent),
+               radial-gradient(1200px 600px at 100% 0%,#1a284166,transparent),
+               #0c1219;
+    border:1px solid var(--border);border-radius:var(--rounded)
+  }
+  canvas{max-width:100%;height:auto;max-height:55vh;border-radius:12px;background:linear-gradient(180deg,#1f2937,#0f1825)}
+  canvas.draggable{cursor:grab} canvas.dragging{cursor:grabbing}
+
+  .preset-row{display:grid;grid-template-columns:120px minmax(0,1fr);gap:10px;align-items:center}
+
+  /* 白邊描字/陰影 分組卡片 */
+  .subblock{background:#0b1118;border:1px solid var(--border);border-radius:10px;padding:10px}
+  .subblock-header{display:flex;align-items:center;gap:8px;font-weight:600;color:#cfe0f7;margin-bottom:8px}
+  .subgrid{display:grid;grid-template-columns:72px 1fr;gap:10px;align-items:center}
+  .sublabel{color:var(--muted);font-size:12px}
+  .switch{display:flex;align-items:center;gap:6px}
+  @media (max-width:640px){.subgrid{grid-template-columns:60px 1fr}}
+
+  /* 預設隱藏，待 JS 決定再顯示 */
+  #cornerRow,#dragRow,#marginRow{display:none}
+
+  /* 排列：垂直間距 → 按鈕列 → 邊距 的間距調整 */
+  .row + .btns.compact-row{margin-top:8px}
+  .group .btns.compact-row + #marginRow{margin-top:12px !important}
+
+  /* 手機微調 */
+  @media (max-width:600px){
+    .file input[type="file"]{width:166px}
+    .topbar{flex-wrap:wrap;gap:8px}
+    .topbar .value{order:3;flex:1 1 100%}
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <aside class="panel">
+      <h2>控制面板</h2>
+      <div class="ctrl">
+        <div class="group">
+          <div class="row">
+            <label for="text">浮水印文字</label>
+            <input id="text" type="text" value="台中簡媽媽狗園"/>
+            <span></span>
+          </div>
+
+          <div class="row">
+            <label for="layout">排列模式</label>
+            <select id="layout">
+              <option value="tile" selected>平鋪（多重）</option>
+              <option value="tileBrick">磁磚（交錯）</option>
+              <option value="center">置中單句</option>
+              <option value="corners">左上＋右下</option>
+              <option value="corners2">右上＋左下</option>
+              <option value="corner1">角落（單一）</option>
+              <option value="grid9">九宮格（3×3）</option>
+            </select>
+            <span></span>
+          </div>
+
+          <div class="row" id="cornerRow">
+            <label for="cornerPos">角落位置</label>
+            <select id="cornerPos">
+              <option value="lt">左上</option><option value="rt">右上</option>
+              <option value="lb">左下</option><option value="rb">右下</option>
+            </select><span></span>
+          </div>
+
+          <div class="row" id="dragRow">
+            <label for="dragEnable">拖曳移動</label>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <label class="switch"><input id="dragEnable" type="checkbox"/>啟用（單句/單角）</label>
+              <button id="dragReset" type="button">重置位置</button>
+              <span class="muted">在預覽上拖曳</span>
+            </div><span></span>
+          </div>
+
+          <div class="row"><label for="fontSize">字體大小</label><input id="fontSize" type="range" min="12" max="300" step="1" value="48"/><span class="value"><span id="fontSizeVal">48</span> px</span></div>
+          <div class="row"><label for="opacity">透明度</label><input id="opacity" type="range" min="0" max="100" step="1" value="25"/><span class="value"><span id="opacityVal">25</span>%</span></div>
+          <div class="row"><label for="angle">角度</label><input id="angle" type="range" min="-90" max="90" step="1" value="-30"/><span class="value"><span id="angleVal">-30</span>°</span></div>
+
+          <div class="row">
+            <label>顏色 / 混合</label>
+            <div style="display:flex;gap:10px;align-items:center">
+              <input id="color" type="color" value="#ffffff"/>
+              <select id="blend">
+                <option value="normal">一般</option><option value="multiply">加深</option>
+                <option value="screen">變亮</option><option value="overlay" selected>覆蓋</option>
+                <option value="soft-light">柔光</option><option value="hard-light">實光</option>
+              </select>
+            </div><span></span>
+          </div>
+
+          <div class="row"><label for="spaceX">水平間距</label><input id="spaceX" type="range" min="60" max="3000" step="10" value="320"/><span class="value"><span id="spaceXVal">320</span> px</span></div>
+          <div class="row"><label for="spaceY">垂直間距</label><input id="spaceY" type="range" min="60" max="3000" step="10" value="260"/><span class="value"><span id="spaceYVal">260</span> px</span></div>
+
+          <div class="btns compact-row">
+            <button id="noOverlap" type="button">字不重疊</button>
+            <button id="tightPack" type="button">一鍵緊密</button>
+          </div>
+
+          <div class="row" id="marginRow"><label for="margin">邊距</label><input id="margin" type="range" min="0" max="200" step="1" value="24"/><span class="value"><span id="marginVal">24</span> px</span></div>
+
+          <!-- 白邊描字 -->
+          <div class="row">
+            <label>白邊描字</label>
+            <div class="subblock">
+              <div class="subblock-header">
+                <label class="switch"><input id="outline" type="checkbox">啟用</label>
+              </div>
+              <div class="subgrid">
+                <span class="sublabel">顏色</span>
+                <input id="outlineColor" type="color" value="#ffffff" disabled>
+
+                <span class="sublabel">寬度</span>
+                <div class="inline-range">
+                  <input id="outlineWidth" type="range" min="1" max="20" step="1" value="4" disabled>
+                  <span class="value"><span id="outlineWidthVal">4</span> px</span>
+                </div>
+              </div>
+            </div>
+            <span></span>
+          </div>
+
+          <!-- 陰影 -->
+          <div class="row">
+            <label>陰影</label>
+            <div class="subblock">
+              <div class="subblock-header">
+                <label class="switch"><input id="shadow" type="checkbox">啟用</label>
+              </div>
+              <div class="subgrid">
+                <span class="sublabel">顏色</span>
+                <input id="shadowColor" type="color" value="#000000" disabled>
+
+                <span class="sublabel">模糊</span>
+                <input id="shadowBlur" type="range" min="0" max="40" step="1" value="8" disabled>
+
+                <span class="sublabel">位移X</span>
+                <input id="shadowOffsetX" type="range" min="-40" max="40" step="1" value="0" disabled>
+
+                <span class="sublabel">位移Y</span>
+                <input id="shadowOffsetY" type="range" min="-40" max="40" step="1" value="2" disabled>
+              </div>
+            </div>
+            <span></span>
+          </div>
+
+          <div class="row"><label for="weight">粗細</label><select id="weight"><option>300</option><option selected>400</option><option>500</option><option>600</option><option>700</option></select><span></span></div>
+        </div>
+
+        <!-- 常用參數 -->
+        <div class="group">
+          <div class="preset-row">
+            <label for="presetName">常用參數名稱</label>
+            <input id="presetName" type="text" placeholder="例如：社群上傳用 / 官網用"/>
+          </div>
+          <div class="preset-row" style="margin-top:8px">
+            <label>已儲存的參數</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;width:100%">
+              <select id="presetSelect" style="flex:1;min-width:180px"></select>
+              <button id="presetSave" class="primary" type="button">儲存此設定</button>
+              <button id="presetLoad" type="button">載入</button>
+              <button id="presetDelete" class="ghost" type="button">刪除</button>
+            </div>
+          </div>
+          <div class="muted" style="margin-top:6px">（僅儲存在此裝置／此瀏覽器）</div>
+        </div>
+
+        <!-- 檔案選擇 / 拖曳（合併單張與批次） -->
+        <div class="group">
+          <div class="drop" id="drop">拖曳圖片到這裡（可多張），或使用下方「選擇圖片」</div>
+          <div class="topbar">
+            <div class="file">
+              <input type="file" id="fileInput" accept="image/*" multiple/>
+            </div>
+            <div class="value" id="fileInfo">尚未選擇圖片</div>
+            <button id="clearImage" class="ghost" type="button">清除</button>
+          </div>
+        </div>
+
+        <!-- 輸出與操作 -->
+        <div class="group">
+          <div class="row">
+            <label>輸出格式</label>
+            <div class="format">
+              <select id="format">
+                <option value="image/png" selected>PNG（保留透明度）</option>
+                <option value="image/jpeg">JPEG</option>
+                <option value="image/webp">WEBP</option>
+              </select>
+              <div class="quality">
+                <label for="quality">品質</label>
+                <input id="quality" type="range" min="60" max="100" step="1" value="100"/>
+                <span class="value"><span id="qualityVal">100</span>%</span>
+              </div>
+            </div><span></span>
+          </div>
+          <div class="btns">
+            <button id="download" class="primary">下載成品（目前預覽）</button>
+            <button id="runBatch" type="button">批次處理並下載（所有已選）</button>
+            <button id="fitToView" type="button">縮放預覽至視窗</button>
+            <button id="reset" type="button">重設參數</button>
+          </div>
+          <div class="btns" style="margin-top:6px">
+            <label class="muted" style="display:flex;align-items:center;gap:6px">
+              <input id="batchPreview" type="checkbox"> 逐張檢視後下載
+            </label>
+            <button id="nextOne" type="button" class="ghost" style="display:none">下一張</button>
+          </div>
+          <div class="muted" id="batchStatus"></div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="panel">
+      <h2>預覽</h2>
+      <div class="canvas-wrap"><canvas id="canvas"></canvas></div>
+    </main>
+  </div>
+
+<script>
+const el=(id)=>document.getElementById(id);
+
+/* 控制元件 */
+const textEl=el('text'),layoutEl=el('layout');
+const cornerRow=el('cornerRow'),cornerPosEl=el('cornerPos');
+const dragRow=el('dragRow'),dragEnableEl=el('dragEnable'),dragResetBtn=el('dragReset');
+const fontSizeEl=el('fontSize'),fontSizeVal=el('fontSizeVal');
+const opacityEl=el('opacity'),opacityVal=el('opacityVal');
+const angleEl=el('angle'),angleVal=el('angleVal');
+const colorEl=el('color'),blendEl=el('blend');
+const spaceXEl=el('spaceX'),spaceXVal=el('spaceXVal');
+const spaceYEl=el('spaceY'),spaceYVal=el('spaceYVal');
+const noOverlapBtn=el('noOverlap'),tightPackBtn=el('tightPack');
+const marginEl=el('margin'),marginVal=el('marginVal'),marginRow=el('marginRow');
+const outlineEl=el('outline'),outlineColorEl=el('outlineColor');
+const outlineWidthEl=el('outlineWidth'),outlineWidthVal=el('outlineWidthVal');
+const shadowEl=el('shadow'),shadowColorEl=el('shadowColor'),shadowBlurEl=el('shadowBlur'),shadowOffsetXEl=el('shadowOffsetX'),shadowOffsetYEl=el('shadowOffsetY');
+const weightEl=el('weight'),formatEl=el('format'),qualityEl=el('quality'),qualityVal=el('qualityVal');
+const downloadBtn=el('download'),fitBtn=el('fitToView'),resetBtn=el('reset');
+const fileInput=el('fileInput'),fileInfo=el('fileInfo'),drop=el('drop'),clearBtn=el('clearImage');
+const presetNameEl=el('presetName'),presetSelect=el('presetSelect'),presetSave=el('presetSave'),presetLoad=el('presetLoad'),presetDelete=el('presetDelete');
+const runBatchBtn=el('runBatch'),batchStatus=el('batchStatus');
+const batchPreviewEl=el('batchPreview'),nextOneBtn=el('nextOne');
+const canvas=el('canvas'),ctx=canvas.getContext('2d');
+
+/* 狀態 */
+let img=new Image(),imgFileName='image',naturalW=0,naturalH=0,fitPreview=true;
+let canDrag=false,isDragging=false,dragX=0,dragY=0;
+let selectedFiles=[]; let currentIndex=0;
+let previewQueue=[];
+
+/* LocalStorage key */
+const LSK='wm:presets', LSK_LAST='wm:last';
+
+/* 工具 */
+function setDraggable(on){canDrag=on;canvas.classList.toggle('draggable',on);if(!on){isDragging=false;canvas.classList.remove('dragging')}}
+function refreshSpacingMax(){
+  const d = Math.hypot(canvas.width || 0, canvas.height || 0);
+  const target = Math.max(600, Math.ceil(d * 2));
+  spaceXEl.max = Math.max(+spaceXEl.max || 0, target);
+  spaceYEl.max = Math.max(+spaceYEl.max || 0, target);
+}
+function setCanvasSize(w,h){canvas.width=w;canvas.height=h;canvas.style.maxWidth='100%';canvas.style.maxHeight=fitPreview?'55vh':'none'; refreshSpacingMax();}
+function updateFileInfo(){
+  if(!selectedFiles.length){fileInfo.textContent='尚未選擇圖片';return}
+  if(selectedFiles.length===1){fileInfo.textContent=selectedFiles[0].name}
+  else{fileInfo.textContent=`已選 ${selectedFiles.length} 張（目前預覽第 ${currentIndex+1} 張）`}
+}
+
+/* 佔位灰底 */
+function loadPlaceholder(){
+  const w=1280,h=800;
+  const t=document.createElement('canvas');t.width=w;t.height=h;const tc=t.getContext('2d');
+  const g=tc.createLinearGradient(0,0,0,h);g.addColorStop(0,'#1f2937');g.addColorStop(1,'#0b1220');
+  tc.fillStyle=g;tc.fillRect(0,0,w,h);
+  tc.globalAlpha=.18;for(let i=0;i<400;i++){tc.fillStyle=`rgba(255,255,255,${Math.random()*0.08})`;
+    const r=Math.random()*2+.5;tc.beginPath();tc.arc(Math.random()*w,Math.random()*h,r,0,Math.PI*2);tc.fill()}
+  img=new Image();img.onload=()=>{naturalW=w;naturalH=h;setCanvasSize(w,h);resetDragDefault();requestAnimationFrame(draw)};img.src=t.toDataURL('image/png');
+  imgFileName='image'; fileInput.value=''; selectedFiles=[]; currentIndex=0; updateFileInfo();
+}
+
+/* 載入某一張到預覽 */
+function loadPreviewFromSelection(idx=0){
+  if(!selectedFiles.length){loadPlaceholder();return}
+  currentIndex=Math.max(0,Math.min(idx,selectedFiles.length-1));
+  const f=selectedFiles[currentIndex]; imgFileName=(f.name||'image').replace(/\.[^.]+$/,'');
+  const fr=new FileReader();
+  fr.onload=e=>{
+    const im=new Image();
+    im.onload=()=>{img=im; naturalW=im.naturalWidth; naturalH=im.naturalHeight; setCanvasSize(naturalW,naturalH); resetDragDefault(); requestAnimationFrame(draw);}
+    im.onerror=()=>{batchStatus.textContent='圖片載入失敗（檔案損毀或格式不支援）';};
+    im.src=e.target.result;
+  };
+  fr.onerror=()=>{batchStatus.textContent='讀取檔案失敗（權限或檔案已移除）';};
+  fr.readAsDataURL(f);
+  updateFileInfo();
+}
+
+/* 同步拖曳到 input */
+function syncFileInput(files){
+  try{const dt=new DataTransfer();for(const f of files) dt.items.add(f);fileInput.files=dt.files;}catch(e){}
+}
+
+/* DnD / 檔案 */
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('dragover')}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('dragover')}));
+drop.addEventListener('drop',e=>{
+  const files=Array.from(e.dataTransfer.files||[]); if(!files.length) return;
+  selectedFiles=files; syncFileInput(files); loadPreviewFromSelection(0);
+});
+fileInput.addEventListener('change',e=>{
+  selectedFiles=Array.from(e.target.files||[]); loadPreviewFromSelection(0);
+});
+
+/* 清空 */
+clearBtn.addEventListener('click',loadPlaceholder);
+
+/* Range 綁定 */
+function bindRange(range,out){const u=()=>{out.textContent=range.value;draw();refreshSpacingMax()};range.addEventListener('input',u);u()}
+bindRange(fontSizeEl,fontSizeVal);bindRange(opacityEl,opacityVal);bindRange(angleEl,angleVal);
+bindRange(spaceXEl,spaceXVal);bindRange(spaceYEl,spaceYVal);bindRange(qualityEl,qualityVal);
+bindRange(marginEl,marginVal);bindRange(outlineWidthEl,outlineWidthVal);
+[textEl,colorEl,weightEl,blendEl,formatEl,cornerPosEl].forEach(x=>x.addEventListener('input',()=>{draw();refreshSpacingMax()}));
+
+/* UI 顯示切換 */
+layoutEl.addEventListener('input',()=>{updateUI();draw()});
+function updateUI(){
+  const m=layoutEl.value;
+  const useSpacing = (m==='tile' || m==='tileBrick');
+  const showMargin=(m==='corners'||m==='corners2'||m==='grid9'||m==='corner1');
+  const showCorner=(m==='corner1');
+  const dragOK=(m==='center'||m==='corner1');
+
+  spaceXEl.disabled=!useSpacing; spaceYEl.disabled=!useSpacing;
+  noOverlapBtn.disabled=!useSpacing; tightPackBtn.disabled=!useSpacing;
+  marginEl.disabled=!showMargin; marginRow.style.display=showMargin?'':'none';
+  cornerRow.style.display=showCorner?'':'none';
+  dragRow.style.display=dragOK?'':'none';
+  dragEnableEl.disabled=!dragOK; setDraggable(dragOK && dragEnableEl.checked);
+  if(!dragOK) dragEnableEl.checked=false;
+  if(dragOK) resetDragDefault();
+}
+updateUI();
+
+/* 字不重疊 / 一鍵緊密 */
+function computeNoOverlap(){
+  const size=+fontSizeEl.value, weight=weightEl.value, txt=textEl.value||'W';
+  ctx.save(); ctx.font=`${weight} ${size}px system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif`;
+  const tw = ctx.measureText(txt).width || size*2; ctx.restore();
+  const sx = Math.ceil(tw*1.10);
+  const sy = Math.ceil(size*1.60);
+  spaceXEl.max = Math.max(+spaceXEl.max, sx*2, Math.hypot(canvas.width,canvas.height)*2);
+  spaceYEl.max = Math.max(+spaceYEl.max, sy*2, Math.hypot(canvas.width,canvas.height)*2);
+  spaceXEl.value = sx; spaceYEl.value = sy;
+  spaceXVal.textContent = sx; spaceYVal.textContent = sy;
+  draw();
+}
+function computeTight(){
+  const size=+fontSizeEl.value, weight=weightEl.value, txt=textEl.value||'W';
+  ctx.save(); ctx.font=`${weight} ${size}px system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif`;
+  const tw = ctx.measureText(txt).width || size*2; ctx.restore();
+  const sx = Math.max(40, Math.floor(tw*0.70));
+  const sy = Math.max(30, Math.floor(size*1.10));
+  spaceXEl.value = sx; spaceYEl.value = sy;
+  spaceXVal.textContent = sx; spaceYVal.textContent = sy;
+  draw();
+}
+noOverlapBtn.addEventListener('click', computeNoOverlap);
+tightPackBtn.addEventListener('click', computeTight);
+
+/* 描邊/陰影 切換 */
+outlineEl.addEventListener('change',()=>{const on=outlineEl.checked; outlineColorEl.disabled=!on; outlineWidthEl.disabled=!on; draw()});
+outlineColorEl.addEventListener('input',draw);
+shadowEl.addEventListener('change',()=>{const on=shadowEl.checked; [shadowColorEl,shadowBlurEl,shadowOffsetXEl,shadowOffsetYEl].forEach(x=>x.disabled=!on); draw()});
+[shadowColorEl,shadowBlurEl,shadowOffsetXEl,shadowOffsetYEl].forEach(x=>x.addEventListener('input',draw));
+
+/* 拖曳單句 */
+function clientToCanvas(e){const r=canvas.getBoundingClientRect();return {x:(e.clientX-r.left)*(canvas.width/r.width),y:(e.clientY-r.top)*(canvas.height/r.height)}}
+function toRotatedSpace(x,y,a){const cx=canvas.width/2,cy=canvas.height/2,dx=x-cx,dy=y-cy,cs=Math.cos(a),sn=Math.sin(a);return {x:dx*cs+dy*sn+cx,y:-dx*sn+dy*cs+cy}}
+canvas.addEventListener('pointerdown',e=>{if(!canDrag)return;isDragging=true;canvas.setPointerCapture(e.pointerId);canvas.classList.add('dragging');const p=clientToCanvas(e);const q=toRotatedSpace(p.x,p.y,+angleEl.value*Math.PI/180);dragX=q.x;dragY=q.y;draw()});
+canvas.addEventListener('pointermove',e=>{if(!isDragging||!canDrag)return;const p=clientToCanvas(e);const q=toRotatedSpace(p.x,p.y,+angleEl.value*Math.PI/180);dragX=q.x;dragY=q.y;draw()});
+canvas.addEventListener('pointerup',e=>{if(!canDrag)return;isDragging=false;canvas.releasePointerCapture(e.pointerId);canvas.classList.remove('dragging')});
+
+/* 預設拖曳點 */
+function resetDragDefault(){
+  const m=layoutEl.value,w=canvas.width,h=canvas.height,s=+fontSizeEl.value,mg=+marginEl.value;
+  if(m==='center'){dragX=w/2;dragY=h/2}
+  else if(m==='corner1'){
+    ctx.save();
+    ctx.font=`${weightEl.value} ${s}px system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif`;
+    const tw=ctx.measureText(textEl.value||'').width||s; ctx.restore();
+    const th=s;
+    const L=mg+tw/2,R=w-(mg+tw/2),T=mg+th/2,B=h-(mg+th/2);
+    const pos=cornerPosEl.value; const map={lt:[L,T],rt:[R,T],lb:[L,B],rb:[R,B]}; [dragX,dragY]=map[pos];
+  }
+}
+dragEnableEl.addEventListener('change',()=>{setDraggable(dragEnableEl.checked && (layoutEl.value==='center'||layoutEl.value==='corner1'))});
+dragResetBtn.addEventListener('click',()=>{resetDragDefault();draw()});
+
+/* ===== 常用參數（localStorage） ===== */
+function safeGetLS(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function safeSetLS(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+function getSettings(){
+  return {
+    text:textEl.value, layout:layoutEl.value, cornerPos:cornerPosEl.value,
+    dragEnable:dragEnableEl.checked, fontSize:+fontSizeEl.value, opacity:+opacityEl.value,
+    angle:+angleEl.value, color:colorEl.value, blend:blendEl.value,
+    spaceX:+spaceXEl.value, spaceY:+spaceYEl.value, margin:+marginEl.value,
+    outline:outlineEl.checked, outlineColor:outlineColorEl.value, outlineWidth:+outlineWidthEl.value,
+    shadow:shadowEl.checked, shadowColor:shadowColorEl.value, shadowBlur:+shadowBlurEl.value,
+    shadowOffsetX:+shadowOffsetXEl.value, shadowOffsetY:+shadowOffsetYEl.value,
+    weight:weightEl.value, format:formatEl.value, quality:+qualityEl.value
+  };
+}
+function syncOutputs(){
+  fontSizeVal.textContent=fontSizeEl.value; opacityVal.textContent=opacityEl.value;
+  angleVal.textContent=angleEl.value; spaceXVal.textContent=spaceXEl.value; spaceYVal.textContent=spaceYEl.value;
+  marginVal.textContent=marginEl.value; outlineWidthVal.textContent=outlineWidthEl.value; qualityVal.textContent=qualityEl.value;
+}
+function applySettings(s){
+  if(!s) return;
+  textEl.value=s.text??textEl.value;
+  layoutEl.value=s.layout??layoutEl.value; updateUI();
+  cornerPosEl.value=s.cornerPos??cornerPosEl.value;
+  dragEnableEl.checked=!!s.dragEnable; setDraggable(dragEnableEl.checked && (layoutEl.value==='center'||layoutEl.value==='corner1'));
+
+  fontSizeEl.value=s.fontSize??fontSizeEl.value; opacityEl.value=s.opacity??opacityEl.value; angleEl.value=s.angle??angleEl.value;
+  colorEl.value=s.color??colorEl.value; blendEl.value=s.blend??blendEl.value; spaceXEl.value=s.spaceX??spaceXEl.value; spaceYEl.value=s.spaceY??spaceYEl.value;
+  marginEl.value=s.margin??marginEl.value;
+
+  outlineEl.checked=!!s.outline; outlineColorEl.value=s.outlineColor??outlineColorEl.value; outlineColorEl.disabled=!outlineEl.checked;
+  outlineWidthEl.value=s.outlineWidth??outlineWidthEl.value; outlineWidthEl.disabled=!outlineEl.checked;
+
+  shadowEl.checked=!!s.shadow; [shadowColorEl,shadowBlurEl,shadowOffsetXEl,shadowOffsetYEl].forEach(x=>x.disabled=!shadowEl.checked);
+  shadowColorEl.value=s.shadowColor??shadowColorEl.value; shadowBlurEl.value=s.shadowBlur??shadowBlurEl.value;
+  shadowOffsetXEl.value=s.shadowOffsetX??shadowOffsetXEl.value; shadowOffsetYEl.value=s.shadowOffsetY??shadowOffsetYEl.value;
+
+  weightEl.value=s.weight??weightEl.value; formatEl.value=s.format??formatEl.value; qualityEl.value=s.quality??qualityEl.value;
+  syncOutputs(); draw(); refreshSpacingMax();
+}
+function loadPresets(){
+  const raw=safeGetLS(LSK); let map={}; try{map=raw?JSON.parse(raw):{}}catch(e){map={}}
+  presetSelect.innerHTML='';
+  const keys=Object.keys(map);
+  if(!keys.length){const opt=document.createElement('option');opt.value='';opt.textContent='（尚未儲存）';presetSelect.appendChild(opt);return}
+  keys.forEach(k=>{const opt=document.createElement('option');opt.value=k;opt.textContent=k;presetSelect.appendChild(opt)});
+}
+function saveCurrentPreset(){
+  const name=(presetNameEl.value||'我的預設')+'';
+  const raw=safeGetLS(LSK); let map={}; try{map=raw?JSON.parse(raw):{}}catch(e){map={}}
+  map[name]=getSettings();
+  safeSetLS(LSK,JSON.stringify(map));
+  safeSetLS(LSK_LAST,JSON.stringify(map[name]));
+  loadPresets(); presetSelect.value=name;
+}
+function loadSelectedPreset(){
+  const name=presetSelect.value; if(!name) return;
+  let map={}; try{map=JSON.parse(safeGetLS(LSK)||'{}')}catch(e){map={}}
+  applySettings(map[name]);
+}
+function deleteSelectedPreset(){
+  const name=presetSelect.value; if(!name) return;
+  let map={}; try{map=JSON.parse(safeGetLS(LSK)||'{}')}catch(e){map={}}
+  delete map[name]; safeSetLS(LSK,JSON.stringify(map)); loadPresets();
+}
+presetSave.addEventListener('click',saveCurrentPreset);
+presetLoad.addEventListener('click',loadSelectedPreset);
+presetDelete.addEventListener('click',deleteSelectedPreset);
+loadPresets();
+
+/* ===== 批次處理（合併於同一 input） ===== */
+function inferExt(mime){return mime==='image/png'?'png':(mime==='image/jpeg'?'jpg':'webp')}
+async function loadFileToPreview(file){
+  const dataURL=await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=rej;fr.readAsDataURL(file)});
+  const im=await new Promise((res,rej)=>{const t=new Image();t.onload=()=>res(t);t.onerror=rej;t.src=dataURL});
+  img=im; naturalW=im.naturalWidth; naturalH=im.naturalHeight; setCanvasSize(naturalW,naturalH); requestAnimationFrame(draw);
+}
+function updatePreviewStatus(){
+  const total = (selectedFiles || []).length;
+  const remaining = previewQueue.length;        // 不含正在預覽的
+  const current = total - remaining;            // 第幾張（1-based）
+  if (remaining === 0){
+    batchStatus.textContent = `最後一張（目前第 ${current} / 共 ${total} ），請檢視後按「下載成品」，然後按「完成」。`;
+    nextOneBtn.textContent = '完成';
+  } else {
+    batchStatus.textContent = `目前第 ${current} / 共 ${total}（剩餘 ${remaining} ）請檢視後按「下載成品」，然後按「下一張」。`;
+    nextOneBtn.textContent = '下一張';
+  }
+}
+async function runBatch(){
+  if(!selectedFiles.length){batchStatus.textContent='請先選擇 1 張以上圖片'; return;}
+
+  if (batchPreviewEl.checked){
+    previewQueue = selectedFiles.slice();
+    runBatchBtn.disabled = true;
+    nextOneBtn.style.display = 'inline-block';
+    await loadFileToPreview(previewQueue.shift());
+    updatePreviewStatus();
+    return;
+  }
+
+  runBatchBtn.disabled = true;
+  batchStatus.textContent = `準備中…（0/${selectedFiles.length}）`;
+  const mime = formatEl.value; const quality = Math.min(1, Math.max(0.6, Number(qualityEl.value)/100));
+  let done=0;
+
+  for (const f of selectedFiles){
+    await loadFileToPreview(f);
+    await new Promise(r=>requestAnimationFrame(r));
+
+    const out = document.createElement('canvas'); out.width=naturalW; out.height=naturalH;
+    const octx = out.getContext('2d'); render(octx,out.width,out.height);
+    await new Promise(res=>out.toBlob(b=>{
+      const a=document.createElement('a'); const url=URL.createObjectURL(b);
+      const base=(f.name||'image').replace(/\.[^.]+$/,''); const ext=inferExt(mime);
+      a.href=url; a.download=`${base}_watermarked.${ext}`; document.body.appendChild(a);
+      a.click(); a.remove(); URL.revokeObjectURL(url); res();
+    }, mime, quality));
+
+    done++; batchStatus.textContent = `已完成 ${done}/${selectedFiles.length}`;
+  }
+  fileInput.value=''; selectedFiles=[]; currentIndex=0; updateFileInfo(); loadPlaceholder();
+  batchStatus.textContent = ''; // 清提示
+  runBatchBtn.disabled = false; nextOneBtn.style.display='none';
+}
+runBatchBtn.addEventListener('click', runBatch);
+
+// 逐張模式：下一張 / 完成
+nextOneBtn.addEventListener('click', async ()=>{
+  if (!previewQueue.length){
+    runBatchBtn.disabled = false;
+    nextOneBtn.style.display = 'none';
+    loadPlaceholder();            // 清回灰底
+    batchStatus.textContent = ''; // 清提示
+    return;
+  }
+  await loadFileToPreview(previewQueue.shift());
+  updatePreviewStatus();
+});
+
+/* 單張下載 / 其他 */
+fitBtn.addEventListener('click', () => {
+  fitPreview = !fitPreview;
+  const w = naturalW || canvas.width || 1280;
+  const h = naturalH || canvas.height || 800;
+  setCanvasSize(w, h);
+  requestAnimationFrame(draw);
+});
+resetBtn.addEventListener('click',()=>{
+  textEl.value='SAMPLE WATERMARK';layoutEl.value='tile';cornerPosEl.value='lt';
+  dragEnableEl.checked=false;setDraggable(false);resetDragDefault();
+  fontSizeEl.value=48;fontSizeVal.textContent=48;opacityEl.value=18;opacityVal.textContent=18;angleEl.value=-30;angleVal.textContent=-30;
+  colorEl.value='#ffffff';blendEl.value='overlay';spaceXEl.value=320;spaceXVal.textContent=320;spaceYEl.value=260;spaceYVal.textContent=260;
+  marginEl.value=24;marginVal.textContent=24;outlineEl.checked=false;outlineColorEl.value='#ffffff';outlineColorEl.disabled=true;outlineWidthEl.value=4;outlineWidthVal.textContent=4;outlineWidthEl.disabled=true;
+  shadowEl.checked=false;[shadowColorEl,shadowBlurEl,shadowOffsetXEl,shadowOffsetYEl].forEach(x=>x.disabled=true);
+  weightEl.value='400';formatEl.value='image/png';qualityEl.value=92;qualityVal.textContent=92;updateUI();draw();refreshSpacingMax();
+});
+downloadBtn.addEventListener('click',()=>{
+  if(!naturalW||!naturalH)return;
+  const out=document.createElement('canvas');out.width=naturalW;out.height=naturalH;const octx=out.getContext('2d');render(octx,out.width,out.height);
+  const mime=formatEl.value,quality=Math.min(1,Math.max(0.6,Number(qualityEl.value)/100));
+  out.toBlob(b=>{const a=document.createElement('a');const url=URL.createObjectURL(b);a.href=url;const ext=(mime==='image/png'?'png':(mime==='image/jpeg'?'jpg':'webp'));a.download=`${imgFileName}_watermarked.${ext}`;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url)},mime,quality);
+  safeSetLS(LSK_LAST, JSON.stringify(getSettings())); // 寫入上次設定
+});
+
+/* 繪製 */
+function draw(){if(!naturalW||!naturalH){ctx.clearRect(0,0,canvas.width,canvas.height);return;}render(ctx,canvas.width,canvas.height)}
+function drawWord(c,x,y,txt,olOn,olColor,olW){if(olOn){c.lineWidth=olW;c.strokeStyle=olColor;c.strokeText(txt,x,y);}c.fillText(txt,x,y)}
+function applyShadow(c,on){if(!on){c.shadowColor='transparent';c.shadowBlur=0;c.shadowOffsetX=0;c.shadowOffsetY=0;return;}c.shadowColor=shadowColorEl.value;c.shadowBlur=+shadowBlurEl.value;c.shadowOffsetX=+shadowOffsetXEl.value;c.shadowOffsetY=+shadowOffsetYEl.value}
+function render(c,w,h){
+  c.save(); c.clearRect(0,0,w,h); c.drawImage(img,0,0,w,h);
+  const txt=textEl.value||''; if(!txt){c.restore();return}
+  const size=+fontSizeEl.value,alpha=+opacityEl.value/100,color=colorEl.value;
+  const angle=+angleEl.value*Math.PI/180,spaceX=+spaceXEl.value,spaceY=+spaceYEl.value;
+  const margin=+marginEl.value,weight=weightEl.value,blend=blendEl.value,mode=layoutEl.value;
+  const olOn=outlineEl.checked,olColor=outlineColorEl.value,olW=+outlineWidthEl.value,shadowOn=shadowEl.checked;
+
+  c.globalAlpha=alpha; c.globalCompositeOperation=blend;
+  c.fillStyle=color; c.textAlign='center'; c.textBaseline='middle';
+  c.font=`${weight} ${size}px system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif`;
+  applyShadow(c,shadowOn);
+
+  c.translate(w/2,h/2); c.rotate(angle); c.translate(-w/2,-h/2);
+
+  if(mode==='center'){
+    const x=dragEnableEl.checked?dragX:w/2, y=dragEnableEl.checked?dragY:h/2;
+    drawWord(c,x,y,txt,olOn,olColor,olW);
+  }else if(mode==='tile'){
+    const d=Math.hypot(w,h),sx=-d,ex=w+d,sy=-d,ey=h+d;
+    for(let y=sy;y<ey;y+=spaceY){for(let x=sx;x<ex;x+=spaceX){drawWord(c,x,y,txt,olOn,olColor,olW)}}
+  }else if(mode==='tileBrick'){
+    const d = Math.hypot(w,h), sx = -d, ex = w + d, sy = -d, ey = h + d;
+    let row = 0;
+    for (let y = sy; y < ey; y += spaceY, row++){
+      const offset = (row % 2) ? spaceX / 2 : 0; // 奇數列右移半格
+      for (let x = sx - offset; x < ex; x += spaceX){
+        drawWord(c, x, y, txt, olOn, olColor, olW);
+      }
+    }
+  }else if(mode==='corners'||mode==='corners2'||mode==='corner1'){
+    const m=c.measureText(txt),tw=m.width,th=size;
+    const L=margin+tw/2,R=w-(margin+tw/2),T=margin+th/2,B=h-(margin+th/2);
+    let pts=[];
+    if(mode==='corners'){pts=[[L,T],[R,B]]}
+    else if(mode==='corners2'){pts=[[R,T],[L,B]]}
+    else{pts=[dragEnableEl.checked?[dragX,dragY]:({lt:[L,T],rt:[R,T],lb:[L,B],rb:[R,B]}[cornerPosEl.value])]}
+    pts.forEach(([x,y])=>drawWord(c,x,y,txt,olOn,olColor,olW));
+  }else if(mode==='grid9'){
+    const iw=w-2*margin, ih=h-2*margin;
+    const xs=[margin+iw/6, margin+iw/2, margin+iw*5/6];
+    const ys=[margin+ih/6, margin+ih/2, margin+ih*5/6];
+    for(const y of ys){for(const x of xs){drawWord(c,x,y,txt,olOn,olColor,olW)}}
+  }
+  c.restore(); applyShadow(c,false);
+}
+
+/* 啟動 */
+loadPresets();
+// 先套用上次設定（若有）
+const lastRaw = safeGetLS(LSK_LAST);
+if (lastRaw) { try { applySettings(JSON.parse(lastRaw)); } catch(e){} }
+
+loadPlaceholder();
+updateUI();
+</script>
+</body>
+</html>
