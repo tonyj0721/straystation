@@ -274,6 +274,7 @@
           </div>
           <div class="btns">
             <button id="download" class="primary">下載成品（目前預覽）</button>
+            <button id="share" type="button">分享 / 存到相簿</button>
             <button id="runBatch" type="button">批次處理並下載（所有已選）</button>
             <button id="fitToView" type="button">縮放預覽至視窗</button>
             <button id="reset" type="button">重設參數</button>
@@ -314,7 +315,7 @@ const outlineEl=el('outline'),outlineColorEl=el('outlineColor');
 const outlineWidthEl=el('outlineWidth'),outlineWidthVal=el('outlineWidthVal');
 const shadowEl=el('shadow'),shadowColorEl=el('shadowColor'),shadowBlurEl=el('shadowBlur'),shadowOffsetXEl=el('shadowOffsetX'),shadowOffsetYEl=el('shadowOffsetY');
 const weightEl=el('weight'),formatEl=el('format'),qualityEl=el('quality'),qualityVal=el('qualityVal');
-const downloadBtn=el('download'),fitBtn=el('fitToView'),resetBtn=el('reset');
+const downloadBtn=el('download'), shareBtn = el('share'), fitBtn=el('fitToView'), resetBtn=el('reset');
 const fileInput=el('fileInput'),fileInfo=el('fileInfo'),drop=el('drop'),clearBtn=el('clearImage');
 const presetNameEl=el('presetName'),presetSelect=el('presetSelect'),presetSave=el('presetSave'),presetLoad=el('presetLoad'),presetDelete=el('presetDelete');
 const runBatchBtn=el('runBatch'),batchStatus=el('batchStatus');
@@ -641,6 +642,41 @@ downloadBtn.addEventListener('click',()=>{
   out.toBlob(b=>{const a=document.createElement('a');const url=URL.createObjectURL(b);a.href=url;const ext=(mime==='image/png'?'png':(mime==='image/jpeg'?'jpg':'webp'));a.download=`${imgFileName}_watermarked.${ext}`;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url)},mime,quality);
   safeSetLS(LSK_LAST, JSON.stringify(getSettings())); // 寫入上次設定
 });
+
+async function shareToAlbum(){
+  if(!naturalW || !naturalH){ return; }
+
+  // 為了相簿相容性，優先用 PNG / JPEG（WEBP 在部分相簿不一定可直接收）
+  const prefer = (formatEl.value === 'image/jpeg' || formatEl.value === 'image/png') ? formatEl.value : 'image/png';
+  const quality = Math.min(1, Math.max(0.6, Number(qualityEl.value)/100));
+
+  const out = document.createElement('canvas');
+  out.width = naturalW; out.height = naturalH;
+  const octx = out.getContext('2d'); render(octx, out.width, out.height);
+
+  const blob = await new Promise(res => out.toBlob(res, prefer, quality));
+  if(!blob){ alert('產生影像失敗'); return; }
+
+  const ext = (prefer === 'image/png') ? 'png' : 'jpg';
+  const file = new File([blob], `${imgFileName}_watermarked.${ext}`, { type: prefer });
+
+  // 支援 Web Share Level 2（含檔案）
+  if (navigator.canShare && navigator.canShare({ files:[file] }) && navigator.share){
+    try{
+      await navigator.share({ files:[file], title:'浮水印圖片' });
+    }catch(e){
+      // 使用者取消分享就不提示錯誤
+    }
+    return;
+  }
+
+  // 後備：開新分頁 → 手動長按「存到相簿/照片」
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+  setTimeout(()=>URL.revokeObjectURL(url), 30000);
+}
+
+shareBtn.addEventListener('click', shareToAlbum);
 
 /* 繪製 */
 function draw(){if(!naturalW||!naturalH){ctx.clearRect(0,0,canvas.width,canvas.height);return;}render(ctx,canvas.width,canvas.height)}
