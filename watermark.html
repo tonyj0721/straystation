@@ -398,10 +398,11 @@ function bindRange(range,out){const u=()=>{out.textContent=range.value;draw();re
 bindRange(fontSizeEl,fontSizeVal);bindRange(opacityEl,opacityVal);bindRange(angleEl,angleVal);
 bindRange(spaceXEl,spaceXVal);bindRange(spaceYEl,spaceYVal);bindRange(qualityEl,qualityVal);
 bindRange(marginEl,marginVal);bindRange(outlineWidthEl,outlineWidthVal);
-[textEl,colorEl,weightEl,blendEl,formatEl,cornerPosEl].forEach(x=>x.addEventListener('input',()=>{draw();refreshSpacingMax()}));
+[textEl,colorEl,weightEl,blendEl,formatEl].forEach(x=>x.addEventListener('input',()=>{draw();refreshSpacingMax()}));
+cornerPosEl.addEventListener('change',()=>{draw();refreshSpacingMax()});
 
 /* UI 顯示切換 */
-layoutEl.addEventListener('input',()=>{updateUI();draw()});
+layoutEl.addEventListener('change',()=>{updateUI();draw()});
 function updateUI(){
   const m=layoutEl.value;
   const useSpacing = (m==='tile' || m==='tileBrick');
@@ -411,9 +412,9 @@ function updateUI(){
 
   spaceXEl.disabled=!useSpacing; spaceYEl.disabled=!useSpacing;
   noOverlapBtn.disabled=!useSpacing; tightPackBtn.disabled=!useSpacing;
-  marginEl.disabled=!showMargin; marginRow.style.display=showMargin?'':'none';
-  cornerRow.style.display=showCorner?'':'none';
-  dragRow.style.display=dragOK?'':'none';
+  marginEl.disabled=!showMargin; marginRow.style.display=showMargin?'grid':'none';
+  cornerRow.style.display=showCorner?'grid':'none';
+  dragRow.style.display=dragOK?'grid':'none';
   dragEnableEl.disabled=!dragOK; setDraggable(dragOK && dragEnableEl.checked);
   if(!dragOK) dragEnableEl.checked=false;
   if(dragOK) resetDragDefault();
