@@ -1,0 +1,719 @@
+<!doctype html>
+<html lang="zh-Hant">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>圖片浮水印（手機版）</title>
+  <style>
+    :root {
+      --panel: #11161d;
+      --panel-2: #0e1319;
+      --text: #e8eef6;
+      --muted: #9fb0c6;
+      --border: #1f2a37;
+      --gap: 14px;
+      --rounded: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+      min-width: 0
+    }
+
+    html,
+    body {
+      height: 100%;
+      overflow-x: hidden
+    }
+
+    body {
+      margin: 0;
+      background: linear-gradient(180deg, #0a0e13, #0f1720);
+      color: var(--text);
+      font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif
+    }
+
+    .wrap {
+      display: flex;
+      flex-direction: column;
+      gap: var(--gap);
+      padding: var(--gap);
+      max-width: 100vw;
+    }
+
+    @media (max-width:640px) {
+      :root {
+        --gap: 12px
+      }
+
+      .wrap {
+        padding: 10px
+      }
+
+      .panel {
+        padding: 12px 10px
+      }
+    }
+
+    @media (max-width:420px) {
+      .wrap {
+        padding: 8px;
+        gap: 8px
+      }
+
+      .panel {
+        padding: 10px
+      }
+    }
+
+    .panel {
+      background:
+        radial-gradient(900px 500px at 20% -10%, #12213466, transparent),
+        radial-gradient(600px 300px at 110% 0%, #1b2a4066, transparent),
+        var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--rounded);
+      padding: 14px 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .02)
+    }
+
+    .ctrl {
+      display: grid;
+      gap: 12px
+    }
+
+    .group {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px
+    }
+
+    /* 一般 row（文字、檔案那種用 grid） */
+    .row {
+      display: grid;
+      grid-template-columns: 65px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .row+.row {
+      margin-top: 10px
+    }
+
+    label {
+      color: var(--muted);
+      font-size: 13px
+    }
+
+    input[type="text"],
+    select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #0c1117;
+      color: var(--text)
+    }
+
+    input[type="range"] {
+      width: 100%
+    }
+
+    input[type="color"] {
+      appearance: none;
+      width: 32px;
+      height: 22px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    input[type="color"]::-webkit-color-swatch {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+
+    .btns {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+      flex-wrap: wrap
+    }
+
+    button {
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, #192334, #0f1725);
+      color: var(--text);
+      cursor: pointer;
+      font-weight: 600
+    }
+
+    button:disabled {
+      opacity: .5;
+      cursor: not-allowed
+    }
+
+    .value {
+      font-variant-numeric: tabular-nums;
+      color: #cfe0f7;
+      font-size: 12px;
+      white-space: nowrap;
+      text-align: right;
+    }
+
+    .muted {
+      color: #9fb0c6;
+      font-size: 12px
+    }
+
+    .canvas-wrap {
+      display: grid;
+      place-items: center;
+      min-height: 46vh;
+      padding: 8px;
+      background:
+        radial-gradient(800px 400px at 30% -10%, #16223666, transparent),
+        radial-gradient(900px 450px at 100% 0%, #1a284166, transparent),
+        #0c1219;
+      border: 1px solid var(--border);
+      border-radius: var(--rounded)
+    }
+
+    canvas {
+      max-width: 100%;
+      height: auto;
+      max-height: 55vh;
+      border-radius: 12px;
+      background: linear-gradient(180deg, #1f2937, #0f1825)
+    }
+
+    /* 排列模式 + 顏色同一列，下拉吃中間空間 */
+    .row-layout .layout-controls {
+      display: flex;
+      align-items: center;
+      gap: 80px;
+      width: 100%;
+    }
+
+    .row-layout select {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .color-field {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      color: var(--muted);
+      margin-left: 4px;
+    }
+
+    /* 滑桿列：統一長度 + 數字對齊 */
+    .row-slider {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .row-slider label {
+      flex: 0 0 60px;
+      /* 左邊固定寬度 */
+    }
+
+    .row-slider input[type="range"] {
+      flex: 1;
+      /* 中間滑桿吃全部剩下的空間 */
+    }
+
+    .row-slider .value {
+      flex: 0 0 40px;
+      /* 右邊數字固定寬度，直線對齊 */
+    }
+
+    @media (max-width:400px) {
+      .row {
+        grid-template-columns: 64px minmax(0, 1fr) auto
+      }
+
+      .row-slider label {
+        flex-basis: 70px
+      }
+
+      .row-slider .value {
+        flex-basis: 72px
+      }
+    }
+
+    /* 圖片區：每行鬆一點 */
+    .group-image .row {
+      padding-top: 4px;
+      padding-bottom: 4px;
+    }
+
+    .group-image .btns {
+      margin-top: 12px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+
+    <!-- 1. 控制器 -->
+    <aside class="panel">
+      <div class="ctrl">
+        <div class="group">
+
+          <!-- 排列模式 + 顏色 -->
+          <div class="row row-layout">
+            <label for="layout">排列模式</label>
+            <div class="layout-controls">
+              <select id="layout">
+                <option value="tile" selected>平鋪</option>
+                <option value="brick">磁磚</option>
+                <option value="center">置中單句</option>
+              </select>
+              <label class="color-field" for="color">
+                顏色
+                <input id="color" type="color" value="#ffffff" />
+              </label>
+            </div>
+            <span></span>
+          </div>
+
+          <div class="row row-slider">
+            <label for="angle">角度</label>
+            <input id="angle" type="range" min="-90" max="90" step="1" value="-30" />
+            <span class="value"><span id="angleVal">-30</span>°</span>
+          </div>
+
+          <div class="row row-slider">
+            <label for="opacity">透明度</label>
+            <input id="opacity" type="range" min="0" max="100" step="1" value="25" />
+            <span class="value"><span id="opacityVal">25</span>%</span>
+          </div>
+
+          <div class="row row-slider">
+            <label for="fontSize">字體大小</label>
+            <input id="fontSize" type="range" min="12" max="300" step="1" value="48" />
+            <span class="value"><span id="fontSizeVal">48</span> px</span>
+          </div>
+
+          <div class="row row-slider">
+            <label for="spaceX">水平間距</label>
+            <input id="spaceX" type="range" min="60" max="2000" step="10" value="320" />
+            <span class="value"><span id="spaceXVal">320</span> px</span>
+          </div>
+
+          <div class="row row-slider">
+            <label for="spaceY">垂直間距</label>
+            <input id="spaceY" type="range" min="60" max="2000" step="10" value="260" />
+            <span class="value"><span id="spaceYVal">260</span> px</span>
+          </div>
+
+        </div>
+      </div>
+    </aside>
+
+    <!-- 2. 預覽 -->
+    <main class="panel">
+      <div class="canvas-wrap">
+        <canvas id="canvas"></canvas>
+      </div>
+    </main>
+
+    <!-- 3. 浮水印文字 + 圖片 + 按鈕們 -->
+    <section class="panel">
+      <div class="group group-image">
+        <div class="row">
+          <label for="text">浮水印文字</label>
+          <input id="text" type="text" value="台中簡媽媽狗園" />
+          <span></span>
+        </div>
+
+        <div class="btns" style="margin-top:6px">
+          <button id="savePreset" type="button">儲存目前設定</button>
+          <button id="applyPreset" type="button">套用已儲存設定</button>
+        </div>
+
+        <div class="row" style="margin-top:10px">
+          <label for="fileInput">圖片</label>
+          <input type="file" id="fileInput" accept="image/*" />
+          <span></span>
+        </div>
+
+        <div class="btns">
+          <button id="share" type="button">分享 / 存到相簿</button>
+          <button id="clearImage" type="button">清空照片</button>
+        </div>
+        <div class="muted" style="margin-top:4px">
+          建議：先輸入浮水印文字、選圖片 → 上面調效果 → 再按分享，清空可重新換圖。
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    if (window.matchMedia && window.matchMedia('(min-width: 900px)').matches) {
+      window.location.href = 'watermarkpro.html';
+    }
+
+    const el = (id) => document.getElementById(id);
+
+    const textEl = el('text');
+    const layoutEl = el('layout');
+    const fontSizeEl = el('fontSize');
+    const fontSizeVal = el('fontSizeVal');
+    const opacityEl = el('opacity');
+    const opacityVal = el('opacityVal');
+    const angleEl = el('angle');
+    const angleVal = el('angleVal');
+    const colorEl = el('color');
+    const spaceXEl = el('spaceX');
+    const spaceXVal = el('spaceXVal');
+    const spaceYEl = el('spaceY');
+    const spaceYVal = el('spaceYVal');
+    const fileInput = el('fileInput');
+    const shareBtn = el('share');
+    const clearBtn = el('clearImage');
+    const savePresetBtn = el('savePreset');
+    const applyPresetBtn = el('applyPreset');
+
+    const canvas = el('canvas');
+    const ctx = canvas.getContext('2d');
+
+    const PRESET_KEY = 'wmMobilePreset';
+
+    let img = null;
+    let hasImage = false;
+    let naturalW = 0;
+    let naturalH = 0;
+    let imgFileName = 'image';
+
+    // 單句置中：拖曳用的偏移量
+    let singleOffsetX = 0;
+    let singleOffsetY = 0;
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let baseOffsetX = 0;
+    let baseOffsetY = 0;
+
+    function setCanvasSize(w, h) {
+      canvas.width = w;
+      canvas.height = h;
+      canvas.style.maxWidth = '100%';
+      canvas.style.maxHeight = '55vh';
+    }
+
+    function renderToContext(targetCtx, w, h) {
+      targetCtx.clearRect(0, 0, w, h);
+
+      // 背景：有圖片就畫圖片，沒有就畫漸層灰底
+      targetCtx.save();
+      if (hasImage && img) {
+        targetCtx.drawImage(img, 0, 0, w, h);
+      } else {
+        const g = targetCtx.createLinearGradient(0, 0, 0, h);
+        g.addColorStop(0, '#1f2937');
+        g.addColorStop(1, '#0b1220');
+        targetCtx.fillStyle = g;
+        targetCtx.fillRect(0, 0, w, h);
+      }
+      targetCtx.restore();
+
+      const text = (textEl.value || '').trim();
+      if (!text) return;
+
+      const layout = layoutEl.value;
+      const fontSize = Number(fontSizeEl.value) || 48;
+      const opacity = (Number(opacityEl.value) || 25) / 100;
+      const angleDeg = Number(angleEl.value) || 0;
+      const angleRad = angleDeg * Math.PI / 180;
+      const color = colorEl.value || '#ffffff';
+      const spaceX = Number(spaceXEl.value) || 320;
+      const spaceY = Number(spaceYEl.value) || 260;
+
+      targetCtx.save();
+      targetCtx.font = `${fontSize}px system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif`;
+      targetCtx.textAlign = 'center';
+      targetCtx.textBaseline = 'middle';
+      targetCtx.fillStyle = color;
+      targetCtx.globalAlpha = opacity;
+
+      if (layout === 'center') {
+        // 單句置中：以畫布中心再加上拖曳偏移
+        const originX = w / 2 + singleOffsetX;
+        const originY = h / 2 + singleOffsetY;
+        targetCtx.translate(originX, originY);
+        targetCtx.rotate(angleRad);
+        targetCtx.fillText(text, 0, 0);
+      } else {
+        // 平鋪 / 磁磚
+        targetCtx.translate(w / 2, h / 2);
+        targetCtx.rotate(angleRad);
+
+        const diag = Math.sqrt(w * w + h * h);
+        const stepX = Math.max(20, spaceX);
+        const stepY = Math.max(20, spaceY);
+        const brick = (layout === 'brick');
+
+        let rowIndex = 0;
+        for (let y = -diag; y <= diag; y += stepY, rowIndex++) {
+          const offsetX = brick && (rowIndex % 2 === 1) ? stepX / 2 : 0;
+          for (let x = -diag; x <= diag; x += stepX) {
+            targetCtx.fillText(text, x + offsetX, y);
+          }
+        }
+      }
+
+      targetCtx.restore();
+    }
+
+    function draw() {
+      renderToContext(ctx, canvas.width, canvas.height);
+    }
+
+    function loadPlaceholder() {
+      hasImage = false;
+      img = null;
+      naturalW = 1280;
+      naturalH = 800;
+      singleOffsetX = 0;
+      singleOffsetY = 0;
+      setCanvasSize(naturalW, naturalH);
+      draw();
+      if (fileInput) fileInput.value = '';
+      imgFileName = 'image';
+    }
+
+    function handleFile(file) {
+      if (!file) {
+        loadPlaceholder();
+        return;
+      }
+      const fr = new FileReader();
+      fr.onload = (e) => {
+        const im = new Image();
+        im.onload = () => {
+          img = im;
+          hasImage = true;
+          naturalW = im.naturalWidth || 1280;
+          naturalH = im.naturalHeight || 800;
+          imgFileName = (file.name || 'image').replace(/\.[^.]+$/, '');
+          singleOffsetX = 0;   // 新圖預設回正中
+          singleOffsetY = 0;
+          setCanvasSize(naturalW, naturalH);
+          draw();
+        };
+        im.onerror = () => {
+          hasImage = false;
+          loadPlaceholder();
+        };
+        im.src = e.target.result;
+      };
+      fr.onerror = () => {
+        hasImage = false;
+        loadPlaceholder();
+      };
+      fr.readAsDataURL(file);
+    }
+
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      handleFile(file);
+    });
+
+    function bindRange(rangeEl, valueEl) {
+      const update = () => {
+        valueEl.textContent = rangeEl.value;
+        draw();
+      };
+      rangeEl.addEventListener('input', update);
+      update();
+    }
+
+    bindRange(fontSizeEl, fontSizeVal);
+    bindRange(opacityEl, opacityVal);
+    bindRange(angleEl, angleVal);
+    bindRange(spaceXEl, spaceXVal);
+    bindRange(spaceYEl, spaceYVal);
+
+    [textEl, layoutEl, colorEl].forEach(ctrl => {
+      ctrl.addEventListener('input', draw);
+    });
+
+    // 取得畫布座標（把螢幕座標換成 canvas 內部座標）
+    function getCanvasCoords(evt) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const x = (evt.clientX - rect.left) * scaleX;
+      const y = (evt.clientY - rect.top) * scaleY;
+      return { x, y };
+    }
+
+    function startDrag(e) {
+      if (layoutEl.value !== 'center') return;
+      const text = (textEl.value || '').trim();
+      if (!text) return;
+
+      isDragging = true;
+      const pos = getCanvasCoords(e);
+      dragStartX = pos.x;
+      dragStartY = pos.y;
+      baseOffsetX = singleOffsetX;
+      baseOffsetY = singleOffsetY;
+
+      try { canvas.setPointerCapture(e.pointerId); } catch (_) { }
+    }
+
+    function moveDrag(e) {
+      if (!isDragging) return;
+      const pos = getCanvasCoords(e);
+      singleOffsetX = baseOffsetX + (pos.x - dragStartX);
+      singleOffsetY = baseOffsetY + (pos.y - dragStartY);
+      draw();
+    }
+
+    function endDrag(e) {
+      if (!isDragging) return;
+      isDragging = false;
+      try { canvas.releasePointerCapture(e.pointerId); } catch (_) { }
+    }
+
+    // 啟用拖曳（手機上避免捲動畫面）
+    canvas.style.touchAction = 'none';
+    canvas.addEventListener('pointerdown', startDrag);
+    canvas.addEventListener('pointermove', moveDrag);
+    canvas.addEventListener('pointerup', endDrag);
+    canvas.addEventListener('pointercancel', endDrag);
+
+    function exportBlob(callback) {
+      if (!hasImage) return;
+
+      const out = document.createElement('canvas');
+      out.width = naturalW;
+      out.height = naturalH;
+      const octx = out.getContext('2d');
+
+      renderToContext(octx, out.width, out.height);
+
+      const mime = 'image/jpeg';
+      const quality = 0.9;
+
+      out.toBlob((blob) => {
+        if (!blob) return;
+        callback(blob, mime);
+      }, mime, quality);
+    }
+
+    shareBtn.addEventListener('click', () => {
+      exportBlob(async (blob, mime) => {
+        const ext = 'jpg';
+        const file = new File([blob], `${imgFileName || 'image'}_watermarked.${ext}`, { type: mime });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+              files: [file],
+              title: '浮水印圖片'
+            });
+          } catch (e) {
+            // 使用者取消就忽略
+          }
+        } else {
+          const url = URL.createObjectURL(blob);
+          window.open(url, '_blank');
+          setTimeout(() => URL.revokeObjectURL(url), 20000);
+        }
+      });
+    });
+
+    clearBtn.addEventListener('click', () => {
+      loadPlaceholder();
+    });
+
+    savePresetBtn.addEventListener('click', () => {
+      const preset = {
+        text: textEl.value || '',
+        layout: layoutEl.value,
+        fontSize: fontSizeEl.value,
+        opacity: opacityEl.value,
+        angle: angleEl.value,
+        color: colorEl.value,
+        spaceX: spaceXEl.value,
+        spaceY: spaceYEl.value
+      };
+      try {
+        localStorage.setItem(PRESET_KEY, JSON.stringify(preset));
+        alert('已儲存目前設定');
+      } catch (e) {
+        alert('儲存設定失敗（可能瀏覽器不支援或空間不足）');
+      }
+    });
+
+    applyPresetBtn.addEventListener('click', () => {
+      let raw = null;
+      try {
+        raw = localStorage.getItem(PRESET_KEY);
+      } catch (e) {
+        alert('無法讀取儲存設定');
+        return;
+      }
+      if (!raw) {
+        alert('目前沒有已儲存的設定');
+        return;
+      }
+      let preset = null;
+      try {
+        preset = JSON.parse(raw);
+      } catch (e) {
+        alert('儲存的設定已損壞，請重新儲存一次');
+        return;
+      }
+
+      if (!preset || typeof preset !== 'object') {
+        alert('儲存的設定格式錯誤，請重新儲存一次');
+        return;
+      }
+
+      if ('text' in preset) textEl.value = preset.text;
+      if ('layout' in preset) layoutEl.value = preset.layout;
+      if ('fontSize' in preset) {
+        fontSizeEl.value = preset.fontSize;
+        fontSizeVal.textContent = preset.fontSize;
+      }
+      if ('opacity' in preset) {
+        opacityEl.value = preset.opacity;
+        opacityVal.textContent = preset.opacity;
+      }
+      if ('angle' in preset) {
+        angleEl.value = preset.angle;
+        angleVal.textContent = preset.angle;
+      }
+      if ('color' in preset) colorEl.value = preset.color;
+      if ('spaceX' in preset) {
+        spaceXEl.value = preset.spaceX;
+        spaceXVal.textContent = preset.spaceX;
+      }
+      if ('spaceY' in preset) {
+        spaceYEl.value = preset.spaceY;
+        spaceYVal.textContent = preset.spaceY;
+      }
+
+      draw();
+      alert('已套用儲存的設定');
+    });
+
+    // 初始化
+    loadPlaceholder();
+  </script>
+</body>
+
+</html>
