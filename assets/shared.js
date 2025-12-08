@@ -9,33 +9,9 @@ const lb = document.getElementById("lightbox");
 const lbImg = document.getElementById("lbImg");
 const lbPrev = document.getElementById("lbPrev");
 const lbNext = document.getElementById("lbNext");
+const lbClose = document.getElementById("lbClose");
 
 let lbImages = [];
-const LB_HINT_KEY = 'lbHintDontShow';
-
-async function showLightboxHintIfNeeded() {
-  try {
-    if (typeof Swal === 'undefined') return;
-    if (localStorage.getItem(LB_HINT_KEY) === '1') return;
-    const targetEl = document.getElementById('lightbox') || document.body;
-    const ret = await Swal.fire({
-      title: '小提醒',
-      text: '點擊空白處即可關閉',
-      input: 'checkbox',
-      inputPlaceholder: '下次不再顯示',
-      confirmButtonText: '知道了',
-      allowOutsideClick: true,
-      allowEscapeKey: true,
-      target: targetEl,
-      didOpen: (popup) => {
-        const container = popup && popup.parentElement;
-        if (container) container.style.zIndex = '2147483647';
-      }
-    });
-    if (ret && ret.value === 1) localStorage.setItem(LB_HINT_KEY, '1');
-  } catch (err) { console.warn('showLightboxHintIfNeeded failed:', err); }
-}
-
 let lbIndex = 0;
 // 用來記住原本 scroll 狀態
 let oldHtmlOverflow = "";
@@ -106,7 +82,6 @@ function openLightbox(images, index = 0) {
   // ❸ 顯示 Lightbox
   lb.classList.remove("hidden");
   lb.classList.add("flex");
-  showLightboxHintIfNeeded();
 }
 
 // 🔥 關閉 Lightbox：恢復背景 + 回到 dialog
@@ -142,6 +117,11 @@ lbPrev.addEventListener('click', (e) => {
 lbNext.addEventListener('click', (e) => {
   e.stopPropagation();
   lbShow(1);
+});
+
+lbClose.addEventListener('click', (e) => {
+  e.stopPropagation();
+  closeLightbox();
 });
 
 // 🔥 點黑幕關閉
