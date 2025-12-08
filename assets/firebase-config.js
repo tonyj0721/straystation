@@ -1,5 +1,5 @@
 // assets/firebase-config.js
-export const firebaseConfig = {
+window.firebaseConfig = {
   apiKey: "AIzaSyC4NT2KOm_Cw2OEdaaOimxI0ruoNv_u_9g",
   authDomain: "straystation.firebaseapp.com",
   projectId: "straystation",
