@@ -3,6 +3,18 @@
 
 <head>
   <meta charset="utf-8" />
+
+  <!-- GA4 -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-YBC0MQBC2F"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+
+    // 若在本機開發，開啟 DebugView；正式站不會開
+    gtag('config', 'G-YBC0MQBC2F', { debug_mode: location.hostname.includes('localhost') });
+  </script>
+
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="icon" href="images/dogpaw-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="images/dogpaw-180.png">
