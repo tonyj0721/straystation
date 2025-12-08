@@ -377,21 +377,15 @@
   </div>
 
   <script type="module">
-    const firebaseConfig = {
-      apiKey: "AIzaSyC4NT2KOm_Cw2OEdaaOimxI0ruoNv_u_9g",
-      authDomain: "straystation.firebaseapp.com",
-      projectId: "straystation",
-      storageBucket: "straystation.firebasestorage.app",
-      messagingSenderId: "611366379195",
-      appId: "1:611366379195:web:ef5a632e88d8bba1d6139e"
-    };
-
+    import { firebaseConfig } from "./assets/firebase-config.js";
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-    import { getFirestore, collection, getDocs, query, orderBy, where, getCountFromServer, Timestamp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+    import {
+      getFirestore, collection, getDocs, query, orderBy, where,
+      getCountFromServer, Timestamp
+    } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-
 
     // 可調：統計起始基數（會加到真實數字上）
     const STATS_BASE = { placed: 1021, cats: 89, dogs: 743 };

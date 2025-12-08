@@ -1,183 +1,390 @@
 <!doctype html>
-<html lang="zh-Hant">
+<html lang="zh-Hant-TW">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="color-scheme" content="light dark" />
-  <title>網站建置中｜Under Construction</title>
-  <meta name="description" content="這個頁面正在建置中，很快就會與您見面。" />
+  <link rel="icon" href="images/dogpaw-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="images/dogpaw-180.png">
+  <title>已領養牆｜台中簡媽媽狗園</title>
+  <meta content="曾被認養的毛孩故事與合照。" name="description" />
+  <meta name="theme-color" content="#fcd34d">
+  <link rel="stylesheet" href="assets/tailwind.css">
+  <link rel="stylesheet" href="assets/shared.css">
   <style>
-    :root {
-      --bg-1: #f7fafc;
-      --bg-2: #eef2f7;
-      --text: #0f172a;
-      --muted: #475569;
-      --accent: #2563eb;
-      --card: #ffffffcc;
-      --border: #e5e7eb80;
-      --shadow: 0 10px 30px rgba(2,6,23,.08);
+    .mosaic-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-auto-rows: 96px;
+      gap: 10px;
     }
 
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg-1: #0b1220;
-        --bg-2: #111827;
-        --text: #e5e7eb;
-        --muted: #94a3b8;
-        --accent: #60a5fa;
-        --card: #0b1220cc;
-        --border: #1f293780;
-        --shadow: 0 10px 30px rgba(0,0,0,.5);
+    .mosaic-grid {
+      display: block;
+      column-count: 2;
+      column-gap: 12px;
+      grid-template-columns: initial;
+      grid-auto-rows: initial;
+    }
+
+    @media (min-width:768px) {
+      .mosaic-grid {
+        grid-auto-rows: 120px;
+        gap: 12px;
       }
     }
 
-    * { box-sizing: border-box; }
-    html, body { height: 100%; }
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans TC", "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", sans-serif;
-      color: var(--text);
-      background: radial-gradient(1200px 600px at 10% -10%, var(--bg-2), transparent),
-                  radial-gradient(1000px 500px at 110% 10%, var(--bg-2), transparent),
-                  linear-gradient(180deg, var(--bg-1), var(--bg-2));
-      display: grid;
-      place-items: center;
-      min-height: 100svh;
+    @media (min-width:768px) {
+      .mosaic-grid {
+        column-count: 3;
+      }
     }
 
-    .card {
-      width: min(680px, 92vw);
-      background: var(--card);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      box-shadow: var(--shadow);
-      padding: clamp(24px, 4vw, 36px);
-      text-align: center;
+    @media (min-width: 1024px) {
+      .mosaic-grid {
+        grid-auto-rows: 140px;
+      }
     }
 
-    .icon {
-      width: 88px;
-      height: 88px;
-      margin-inline: auto;
-      display: block;
-      animation: float 3.5s ease-in-out infinite;
+    @media (min-width:1024px) {
+      .mosaic-grid {
+        column-count: 4;
+      }
     }
 
-    @keyframes float {
-      0%,100% { transform: translateY(0); }
-      50% { transform: translateY(-6px); }
-    }
-
-    h1 {
-      font-size: clamp(24px, 4vw, 36px);
-      line-height: 1.15;
-      margin: 16px 0 8px;
-    }
-
-    p.lead {
-      font-size: clamp(14px, 2.4vw, 18px);
-      color: var(--muted);
-      margin: 0 0 18px;
-    }
-
-    .progress {
-      height: 10px;
-      width: 100%;
-      border-radius: 999px;
-      background: color-mix(in oklab, var(--accent) 15%, transparent);
+    .mosaic-grid .itm {
       position: relative;
       overflow: hidden;
-      border: 1px solid var(--border);
-      margin: 14px auto 6px;
+      border-radius: 14px;
     }
 
-    .progress::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      transform: translateX(-100%);
-      background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--accent) 40%, white), transparent);
-      animation: shimmer 1.4s linear infinite;
+    .mosaic-grid .itm {
+      display: block;
+      break-inside: avoid;
+      margin-bottom: 12px;
+      border-radius: 14px;
+      overflow: hidden;
+      background: #fff;
+      transform: none;
     }
 
-    @keyframes shimmer {
-      100% { transform: translateX(100%); }
+    .mosaic-grid img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
     }
 
-    .actions {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      justify-content: center;
-      margin-top: 18px;
+    .mosaic-grid img {
+      display: block;
+      width: 100%;
+      height: auto;
+      object-fit: contain;
     }
 
-    a.button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 10px 16px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      text-decoration: none;
-      color: var(--text);
-      line-height: 1;
+    .mosaic-grid .itm:nth-child(2n) {
+      transform: translateY(3px);
     }
 
-    a.button.primary {
-      background: var(--accent);
-      color: white;
-      border-color: transparent;
+    .mosaic-grid .itm:nth-child(3n) {
+      transform: translateY(-3px);
     }
 
-    .small {
-      margin-top: 12px;
-      font-size: 12px;
-      color: var(--muted);
+    /* 低動效偏好 */
+    @media (prefers-reduced-motion: reduce) {
+
+      .animate-fade-in,
+      .animate-bounce-slow {
+        animation: none;
+      }
     }
 
-    footer {
-      margin-top: 14px;
-      font-size: 12px;
-      color: var(--muted);
+    .w-60 {
+      width: 15rem;
+    }
+
+    @media (min-width: 768px) {
+      .hero-text {
+        margin-left: 150px;
+        /* 想多一點就改大，例如 60px、80px */
+      }
+
+      .hero-photo {
+        margin-right: 150px;
+        /* 自己調整 */
+      }
     }
   </style>
 </head>
-<body>
-  <main class="card" role="main" aria-labelledby="headline">
-    <svg class="icon" viewBox="0 0 64 64" aria-hidden="true">
-      <!-- Simple construction cone -->
-      <defs>
-        <linearGradient id="g" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0" stop-color="#f59e0b"/>
-          <stop offset="1" stop-color="#d97706"/>
-        </linearGradient>
-      </defs>
-      <path d="M6 56h52a2 2 0 0 1 0 4H6a2 2 0 0 1 0-4z" fill="#94a3b8" opacity=".35"/>
-      <path d="M15 48h34L36 12h-8L15 48z" fill="url(#g)"/>
-      <rect x="22" y="20" width="20" height="4" rx="2" fill="#fef3c7"/>
-      <rect x="19" y="32" width="26" height="4" rx="2" fill="#fef3c7"/>
-    </svg>
 
-    <h1 id="headline">網頁建構中</h1>
-    <p class="lead">我們正在努力完成內容，敬請期待。</p>
+<body class="text-gray-800 bg-gradient-to-br from-brand-50 to-white">
+  <!-- Navbar -->
+  <header class="bg-white/80 backdrop-blur border-b border-gray-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="h-16 flex items-center justify-between">
+        <a href="index.html" class="flex items-center gap-2 font-semibold text-2xl">
+          <img src="images/dogpaw.png" alt="dogpaw" class="h-8 w-8 object-contain" />
+          <span>台中簡媽媽狗園</span>
+        </a>
 
-    <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuetext="建置中"></div>
-    
+        <!-- 桌機導覽 -->
+        <nav class="hidden md:flex items-center gap-6 ml-auto">
+          <a href="index.html" class="hover:text-brand-600">首 頁</a>
+          <a href="cats.html" class="hover:text-brand-600">我想養貓咪</a>
+          <a href="dogs.html" class="hover:text-brand-600">我想養狗狗</a>
+          <a href="about.html" class="hover:text-brand-600">關於簡媽媽</a>
+          <a href="admin.html" class="hover:text-brand-600">管理員登入</a>
+        </nav>
 
-    <div class="actions">
-      <a class="button primary" href="index.html">回到首頁</a>
+        <!-- 手機漢堡鈕 -->
+        <div class="flex items-center gap-2">
+          <button id="menuBtn"
+            class="md:hidden p-2 rounded-lg border border-[#AEDDEF] bg-white/80 hover:bg-[#AEDDEF]/10" aria-label="開啟選單"
+            aria-haspopup="menu" aria-expanded="false" aria-controls="menuOverlay">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z" />
+            </svg>
+          </button>
+        </div>
+      </div>
     </div>
+  </header>
+  <!-- 透明覆蓋層：專門接「點外面關閉」 -->
+  <div id="menuOverlay" class="fixed inset-0 z-50 hidden" role="dialog" aria-modal="true">
+    <div id="overlayClickArea" class="absolute inset-0"></div>
 
-    <footer>© <span id="year"></span> 浪浪轉運站 Stray Station</footer>
+    <!-- 右上角彈出選單：固定位置，不推版，覆蓋 hero -->
+    <nav id="menuPanel" class="fixed opacity-0 scale-y-0 origin-top-right rounded-2xl shadow-xl
+            bg-[#AEDDEF] w-fit max-w-[90vw] p-3 transition duration-150 ease-out">
+      <!-- 小箭頭（同面板色） -->
+      <div class="absolute -top-2 right-5 w-3 h-3 rotate-45 bg-[#AEDDEF]"></div>
+
+      <!-- 按鈕群：保留 space-y-2、字體 18px -->
+      <ul class="space-y-2 py-1 text-[18px]" role="menu" aria-orientation="vertical" tabindex="-1">
+        <li>
+          <a href="index.html" role="menuitem" tabindex="-1" class="flex w-full items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+            text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+            focus:outline-none focus:ring-2 focus:ring-white/70">
+            <span aria-hidden="true" class="grid size-8 place-items-center rounded-lg bg-white shadow text-xl">🧭</span>
+            <span class="flex-1 text-center">首&emsp;&emsp;頁</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="cats.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+                text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+                focus:outline-none focus:ring-2 focus:ring-white/70">
+            <span aria-hidden="true" class="text-xl leading-none">🐱</span>
+            <span>我想養貓咪</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="dogs.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+                text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+                focus:outline-none focus:ring-2 focus:ring-white/70">
+            <span aria-hidden="true" class="text-xl leading-none">🐶</span>
+            <span>我想養狗狗</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="about.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+                text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+                focus:outline-none focus:ring-2 focus:ring-white/70">
+            <span aria-hidden="true" class="text-xl leading-none">ℹ️</span>
+            <span>關於簡媽媽</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="admin.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+                text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+                focus:outline-none focus:ring-2 focus:ring-white/70">
+            <span aria-hidden="true" class="text-xl leading-none">🔒</span>
+            <span>管理員登入</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+  </div>
+  <script>
+    const menuBtn = document.getElementById('menuBtn');
+    const overlay = document.getElementById('menuOverlay');
+    const clickArea = document.getElementById('overlayClickArea');
+    const panel = document.getElementById('menuPanel');
+
+    function positionPanel() {
+      const r = menuBtn.getBoundingClientRect();
+      const gap = 8;
+      panel.style.top = '-1000px';
+      panel.style.left = '-1000px';
+      const w = panel.offsetWidth;
+      let left = r.right - w;
+      left = Math.max(8, Math.min(left, window.innerWidth - w - 8));
+      panel.style.top = (r.bottom + gap) + 'px';
+      panel.style.left = left + 'px';
+    }
+    function openMenu() {
+      overlay.classList.remove('hidden');
+      positionPanel();
+      requestAnimationFrame(() => {
+        panel.classList.remove('opacity-0', 'scale-y-0');
+        panel.classList.add('scale-y-100');
+      });
+      document.addEventListener('keydown', onEsc);
+      menuBtn.setAttribute('aria-expanded', 'true');
+      const firstItem = panel.querySelector('[role="menuitem"]');
+      if (firstItem) firstItem.focus();
+    }
+    function closeMenu() {
+      panel.classList.add('opacity-0');
+      panel.classList.remove('scale-y-100');
+      panel.classList.add('scale-y-0');
+      menuBtn.setAttribute('aria-expanded', 'false');
+      document.removeEventListener('keydown', onEsc);
+      setTimeout(() => overlay.classList.add('hidden'), 150);
+      menuBtn.focus();
+    }
+    function onEsc(e) { if (e.key === 'Escape') closeMenu(); }
+
+    menuBtn.addEventListener('click', () => {
+      const expanded = menuBtn.getAttribute('aria-expanded') === 'true';
+      expanded ? closeMenu() : openMenu();
+    });
+    clickArea.addEventListener('click', (e) => {
+      if (!panel.contains(e.target) && e.target !== menuBtn) closeMenu();
+    });
+    panel.addEventListener('keydown', (e) => {
+      const items = Array.from(panel.querySelectorAll('[role="menuitem"]'));
+      const i = items.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown') { e.preventDefault(); items[(i + 1 + items.length) % items.length].focus(); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
+      if (e.key === 'Home') { e.preventDefault(); items[0].focus(); }
+      if (e.key === 'End') { e.preventDefault(); items[items.length - 1].focus(); }
+    });
+    window.addEventListener('resize', () => {
+      if (!overlay.classList.contains('hidden')) positionPanel();
+    });
+    // 點任何選單項目後就關閉（避免停留）
+    panel.querySelectorAll('[role="menuitem"]').forEach(el => {
+      el.addEventListener('click', () => { try { closeMenu(); } catch (_) { } });
+    });
+  </script>
+
+  <!-- Title + Filters + Cards -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <header class="mb-10 md:mb-14 grid grid-cols-1 md:grid-cols-2 items-center gap-8">
+      <div class="text-center hero-text">
+        <h1 class="text-4xl md:text-5xl font-bold flex justify-center items-center gap-2 mb-4">
+          <span aria-hidden="true" class="text-5xl">🏡</span>
+          <span
+            class="bg-gradient-to-r from-amber-500 to-pink-500 bg-clip-text text-transparent drop-shadow-sm">幸福的歸宿</span>
+          <span aria-hidden="true" class="text-5xl">🏡</span>
+        </h1>
+
+        <div class="mt-5 flex flex-wrap items-center justify-center gap-3">
+          <span
+            class="px-3 py-1 rounded-full bg-white/70 ring-1 ring-gray-200 text-sm text-gray-600 inline-block mt-3 mb-3">
+            目前已有 <b class="text-gray-900" id="adoptedCount">0</b> 位毛孩找到家
+          </span>
+        </div>
+
+        <ul class="space-y-3 text-gray-700 leading-relaxed hero-copy mt-3">
+          <li class="flex items-start justify-center gap-3">
+            <span aria-hidden="true" class="shrink-0 rounded-full bg-emerald-100 px-2 py-1">🐾</span>
+            <span class="text-gray-700">就算曾經流浪，也能擁有溫暖的懷抱。</span>
+          </li>
+          <li class="flex items-start justify-center gap-3">
+            <span aria-hidden="true" class="shrink-0 rounded-full bg-sky-100 px-2 py-1">🌈</span>
+            <span class="text-gray-700">讓下一個幸福的故事，由你寫下～</span>
+          </li>
+        </ul>
+      </div>
+      <!-- 右側 Hero 圖（手機隱藏） -->
+      <div class="hidden md:flex justify-center hero-photo">
+        <div class="w-60 rounded-2xl shadow-sm overflow-hidden">
+          <img src="images/catwithdog.png" alt="貓跟狗" class="block w-full h-auto">
+        </div>
+      </div>
+    </header>
+    <section class="mb-10">
+      <div class="mosaic-grid" id="heroMosaic"></div>
+    </section>
   </main>
 
-  <script>
-  // 動態年份
-  var yEl = document.getElementById('year');
-  if (yEl) yEl.textContent = new Date().getFullYear();
-</script>
+  <!-- Footer -->
+  <footer class="bg-gray-50 border-t border-gray-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-sm text-gray-500">© <span id="year"></span>
+      <img src="images/浪浪轉運站 Logo.png" alt="浪浪轉運站 Logo"
+        style="display:inline-flex;width:1em;height:1em;vertical-align:-0.15em;margin:0.01em -0.25em 0.01em 0.25em;">
+      浪浪轉運站 Stray Station. 保留所有權利。
+    </div>
+  </footer>
+
+  <script type="module">
+    import { firebaseConfig } from "./assets/firebase-config.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+    import {
+      getFirestore, collection, getDocs, query, orderBy, where,
+
+    } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js';
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const grid = document.getElementById('grid');
+
+    function buildMosaic(pets) {
+      const box = document.getElementById('heroMosaic');
+      if (!box) return;
+
+      // 從已領養清單蒐集圖片：新合照優先，再補原圖
+      let imgs = [];
+      for (const p of pets) {
+        const newPhotos = Array.isArray(p.adoptedPhotos) ? p.adoptedPhotos.slice(0, 2) : [];
+        /*const origPhotos = Array.isArray(p.images) ? p.images.slice(0, 1) : [];*/
+        imgs.push(...newPhotos/*, ...origPhotos*/);
+        if (imgs.length >= 9) break; // 9 格剛好
+      }
+      imgs = imgs.filter(Boolean).slice(0, 9);
+
+      // 若沒有圖片，放幾張漸層占位
+      if (imgs.length === 0) {
+        box.innerHTML = Array.from({ length: 9 }).map((_, i) => (
+          `<div class="itm" style="background:linear-gradient(135deg,#fde68a,#fecaca);"></div>`
+        )).join('');
+        return;
+      }
+
+      // 產生拼貼 HTML（第 1、5 格加高）
+      box.innerHTML = imgs.map((src, i) => {
+        const tall = (i === 0 || i === 4) ? ' style="grid-row: span 2 / span 2;"' : '';
+        return `<div class="itm"${tall}><img src="${src}" alt="adopted photo" loading="lazy"></div>`;
+      }).join('');
+    }
+
+    async function loadPets() {
+      const qRef = query(collection(db, 'pets'), where('status', '==', 'adopted'), orderBy('createdAt', 'desc'));
+      const snap = await getDocs(qRef);
+      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      const list = all;
+      if (grid) grid.innerHTML = list.map(cardHTML).join('');
+
+      // 顯示已領養數量
+      const countEl = document.getElementById('adoptedCount');
+      if (countEl) countEl.textContent = String(list.length);
+
+      // 建立右側相片拼貼
+      buildMosaic(list);
+    }
+
+    loadPets();
+
+    const y = document.getElementById('year');
+    if (y) y.textContent = new Date().getFullYear();
+  </script>
 </body>
+
 </html>

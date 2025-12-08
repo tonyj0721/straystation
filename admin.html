@@ -179,11 +179,11 @@
         </p>
         <form id="petForm" class="space-y-4">
           <div>
-            <label class="block text-sm font-medium mb-1">名字 <span class="text-red-500">*</span></label>
-            <input id="name" class="w-full rounded-xl border border-gray-300 p-2" required />
+            <label class="block text-sm font-medium mb-1">名字 </label>
+            <input id="name" class="w-full rounded-xl border border-gray-300 p-2" placeholder="留空將以「未取名」代替" />
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1">類別 <span class="text-red-500">*</span></label>
+            <label class="block text-sm font-medium mb-1">類別 </label>
             <div class="flex gap-3">
               <label class="inline-flex items-center gap-2"><input type="radio" name="species" value="貓"
                   class="accent-brand-600" checked /><span>貓</span></label>
@@ -520,40 +520,13 @@
     // ===============================
     // Firebase 設定與初始化
     // ===============================
-    const firebaseConfig = {
-      apiKey: "AIzaSyC4NT2KOm_Cw2OEdaaOimxI0ruoNv_u_9g",
-      authDomain: "straystation.firebaseapp.com",
-      projectId: "straystation",
-      storageBucket: "straystation.firebasestorage.app",
-      messagingSenderId: "611366379195",
-      appId: "1:611366379195:web:ef5a632e88d8bba1d6139e",
-    };
-
-    // 以 ES Module 方式載入 Firebase SDK（v11）
+    import { firebaseConfig } from "./assets/firebase-config.js";
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
     import {
-      getFirestore,
-      collection,
-      addDoc,
-      getDocs,
-      getDoc,
-      query,
-      orderBy,
-      serverTimestamp,
-      deleteDoc,
-      doc,
-      updateDoc,
-      limit as fbLimit,
-      where,
+      getFirestore, collection, getDocs, query, orderBy, where,
+      doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp, limit as fbLimit,
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
-    import {
-      getStorage,
-      ref as sRef,
-      uploadBytes,
-      getDownloadURL,
-      deleteObject,
-      listAll,
-    } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
+    import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject, listAll, } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
@@ -571,12 +544,12 @@
     // ===============================
     const BREEDS = {
       貓: {
-        品種貓: ["美短", "英短", "藍貓", "暹羅貓", "波斯貓", "布偶貓", "曼赤肯"],
-        米克斯: ["橘貓", "黑貓", "虎斑貓", "白底虎斑貓", "三花貓", "賓士貓", "玳瑁貓", "白貓"],
+        品種貓: ["美國短毛貓", "英國短毛貓", "藍貓", "暹羅貓", "波斯貓", "布偶貓", "緬因貓", "曼赤肯", "金漸層曼赤肯"],
+        米克斯: ["橘貓", "橘白貓", "黑貓", "賓士貓", "虎斑貓", "白底虎斑貓", "三花貓", "玳瑁貓", "白貓"],
       },
       狗: {
-        品種犬: ["博美", "貴賓", "吉娃娃", "馬爾濟斯", "柯基", "柴犬", "哈士奇", "高山犬", "黃金獵犬"],
-        米克斯: ["黑色", "黑白色", "白色", "白黃色", "黃色", "米色", "黑棕色", "棕色", "虎斑", "花花"],
+        品種犬: ["博美", "貴賓", "梗犬", "吉娃娃", "臘腸犬", "馬爾濟斯", "柯基", "柴犬", "狐狸犬", "哈士奇", "高山犬", "黃金獵犬", "邊境牧羊犬"],
+        米克斯: ["黑色", "白色", "黑白色", "黃色", "白黃色", "米色", "棕色", "黑棕色", "虎斑", "花花"],
       },
     };
 
@@ -750,16 +723,11 @@
       e.preventDefault();
 
       // 讀值
-      const name = ($("#name")?.value || "").trim();
+      const rawName = ($("#name")?.value || "").trim();
+      const name = rawName || "未取名";
       const age = ($("#age")?.value || "").trim();
       const gender = $("#gender")?.value || "";
       const desc = ($("#desc")?.value || "").trim();
-
-      // 必填檢查：名字
-      if (!name) {
-        await Swal.fire({ icon: "error", title: "請填名字" });
-        return;
-      }
 
       // 新增的基本 payload（圖片先空陣列，稍後補）
       const payload = {
@@ -783,22 +751,24 @@
       };
 
       // 先檢查是否有同名（可選擇仍然新增）
-      try {
-        const dupQ = query(collection(db, "pets"), where("name", "==", name));
-        const dupSnap = await getDocs(dupQ);
-        if (!dupSnap.empty) {
-          const r = await Swal.fire({
-            icon: "question",
-            title: `名字「${name}」已存在`,
-            text: "確定繼續登錄？",
-            showCancelButton: true,
-            confirmButtonText: "確定",
-            cancelButtonText: "取消",
-          });
-          if (!r.isConfirmed) return;
+      if (name !== "未取名") {
+        try {
+          const dupQ = query(collection(db, "pets"), where("name", "==", name));
+          const dupSnap = await getDocs(dupQ);
+          if (!dupSnap.empty) {
+            const r = await Swal.fire({
+              icon: "question",
+              title: `名字「${name}」已存在`,
+              text: "確定繼續登錄？",
+              showCancelButton: true,
+              confirmButtonText: "確定",
+              cancelButtonText: "取消",
+            });
+            if (!r.isConfirmed) return;
+          }
+        } catch (err) {
+          console.error("重複檢查錯誤：", err);
         }
-      } catch (err) {
-        console.error("重複檢查錯誤：", err);
       }
 
       // 按鈕進度狀態
@@ -1007,7 +977,7 @@
         .map(
           (p) => `
       <tr class="border-t hover:bg-gray-50 cursor-pointer" data-id="${p.id}">
-        <td class="py-2 pr-2 font-medium">${p.name || "—"}</td>
+        <td class="py-2 pr-2 font-medium">${p.name || "未取名"}</td>
         <td class="py-2 pr-2">${p.species || "—"}</td>
         <td class="py-2 pr-2">${displayBreed(p)}</td>
         <td class="py-2 pr-2">${p.gender || "—"}</td>
@@ -1036,7 +1006,7 @@
              data-id="${p.id}">
           <img src="${img}" class="w-16 h-16 object-cover rounded-lg bg-gray-100">
           <div class="min-w-0 flex-1">
-            <div class="font-semibold truncate">${p.name || "未命名"}</div>
+            <div class="font-semibold truncate">${p.name || "未取名"}</div>
             <div class="text-xs text-gray-600 mt-1 truncate">
               ${p.species || "—"}・${displayBreed(p)}・${p.gender || "—"}
             </div>
@@ -1117,7 +1087,7 @@
       });
 
       // 基本欄位
-      document.getElementById("dlgName").textContent = p.name || "未命名";
+      document.getElementById("dlgName").textContent = p.name || "未取名";
       document.getElementById("dlgDesc").textContent = p.desc || "";
 
       currentPetId = p.id;
@@ -1175,7 +1145,7 @@
       lbIndex = 0;
 
       // 標題與標籤
-      document.getElementById("dlgName").textContent = p.name || "未命名";
+      document.getElementById("dlgName").textContent = p.name || "未取名";
       document.getElementById("dlgSpeciesPill").textContent = /(狗|犬)/.test(String(p.species || "")) ? "狗狗" : "貓咪";
       document.getElementById("dlgTagBreed").textContent = displayBreed(p);
       document.getElementById("dlgTagAge").textContent = p.age && p.age.trim() !== "" ? p.age : "年齡不詳";
@@ -1338,9 +1308,14 @@
         vaccinated: document.getElementById("editVaccinated").checked,
       };
 
+      if (!newData.name) {
+        newData.name = "未取名";
+        newData.nameLower = "未取名".toLowerCase();
+      }
+
       // ① 送出前：名字重複 → 先詢問是否仍要儲存（此時不要啟動「儲存中」）
       const newName = newData.name;
-      if (newName) {
+      if (newName && newName !== "未取名") {
         const taken = await isNameTaken(newName, currentDocId);
         if (taken) {
           const { isConfirmed } = await (typeof swalInDialog === "function" ? swalInDialog : Swal.fire)({
