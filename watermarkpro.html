@@ -297,6 +297,9 @@
   </div>
 
 <script>
+  if (window.matchMedia && window.matchMedia('(max-width: 900px)').matches) {
+      window.location.href = 'watermark.html';
+    }
 const el=(id)=>document.getElementById(id);
 
 /* 控制元件 */
