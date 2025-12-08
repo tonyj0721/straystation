@@ -297,19 +297,6 @@
           <div class="md:hidden mt-4 grid gap-3" id="rowsMobile"></div>
         </div>
       </section>
-
-      <!-- GA4 流量儀表板 -->
-      <section class="mt-10">
-        <h2 class="text-xl sm:text-2xl font-bold mb-4">網站流量統計</h2>
-        <div class="bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-4">
-          <iframe width="100%" height="600"
-            src="https://lookerstudio.google.com/embed/reporting/c4ccb675-aa44-4e5b-aeb3-951f8ebda116/page/VODiF"
-            frameborder="0" style="border:0;" allowfullscreen
-            sandbox="allow-storage-access-by-user-activation allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox">
-          </iframe>
-        </div>
-      </section>
-
     </div>
   </main>
 
@@ -348,12 +335,8 @@
       <div class="p-5 space-y-4">
         <div class="flex items-start justify-between gap-3">
           <div>
-            <!-- 標題 + 右上角物種圓角標籤 -->
-            <div class="flex items-end justify-between gap-2">
+            <!-- 標題 -->
               <h3 id="dlgName" class="text-2xl font-semibold leading-snug">—</h3>
-              <span id="dlgSpeciesPill"
-                class="shrink-0 rounded-full text-xs px-2 py-1 bg-emerald-50 text-emerald-700">貓咪</span>
-            </div>
 
             <!-- 三個圓角標籤：不換行、可水平捲動 -->
             <div id="dlgTags" class="mt-1 flex flex-nowrap gap-2 text-sm">
@@ -1085,48 +1068,48 @@
       document.getElementById('dlgTagVaccinated').textContent = isVaccinated
         ? '已注射預防針' : '未注射預防針';
 
-      // 主圖與縮圖列（支援 images 陣列或舊欄位 image）
-      const imgs = Array.isArray(p.images) && p.images.length > 0 ? p.images : p.image ? [p.image] : [];
+      // 取所有圖片（images 是陣列；後台 upload 時必定有）
+      const imgs = Array.isArray(p.images) && p.images.length > 0
+      ? p.images
+      : p.image ? [p.image] : [];
+
+      // 設定主圖
       dlgImg.src = imgs[0] || "";
       if (dlgBg) dlgBg.src = dlgImg.src;
+      dlgImg.onclick = () => openLightbox(imgs, 0);  // 讓主圖可進入 Lightbox
 
-      // 點主圖 → Lightbox
-      dlgImg.onclick = () => openLightbox(imgs, 0);
-
-      // 生成縮圖列，點擊可切換主圖
+      // 生成縮圖列
       dlgThumbs.innerHTML = "";
       imgs.forEach((url, i) => {
         const thumb = document.createElement("img");
         thumb.src = url;
         thumb.className = "dlg-thumb" + (i === 0 ? " active" : "");
         thumb.dataset.index = i;
+
+        // 點縮圖 → 切換主圖 + 啟動對應的 Lightbox 頁面
         thumb.addEventListener("click", () => {
           dlgImg.src = url;
           if (dlgBg) dlgBg.src = url;
+
+          // 更新 active 樣式
           document.querySelectorAll(".dlg-thumb").forEach((el) => el.classList.remove("active"));
           thumb.classList.add("active");
         });
+
         dlgThumbs.appendChild(thumb);
       });
 
-      // 基本欄位
-      document.getElementById("dlgName").textContent = p.name || "未取名";
-      document.getElementById("dlgDesc").textContent = p.desc || "";
+      // 基本資料（原本的）
+      document.getElementById('dlgName').textContent = p.name || '未取名';
+      document.getElementById('dlgDesc').textContent = p.desc || '';
 
       currentPetId = p.id;
-      history.replaceState(null, "", `?pet=${encodeURIComponent(p.id)}`);
+      history.replaceState(null, '', `?pet=${encodeURIComponent(p.id)}`);
 
-      // 類別圓角標籤（貓咪/狗狗）
-      const speciesPill = document.getElementById("dlgSpeciesPill");
-      const isDog = /(狗|犬)/.test(String(p.species || ""));
-      speciesPill.textContent = isDog ? "狗狗" : "貓咪";
-      speciesPill.className = `shrink-0 rounded-full text-sm px-3 py-1 ${isDog ? "bg-sky-100 text-sky-700" : "bg-emerald-100 text-emerald-700"
-        }`;
-
-      // 三個標籤
-      document.getElementById("dlgTagBreed").textContent = formatBreed(p) || "—";
-      document.getElementById("dlgTagAge").textContent = formatAge(p) || "—";
-      document.getElementById("dlgTagGender").textContent = p.gender || "—";
+      // 三個圓角標籤（不換行，超出可橫向捲動）
+      document.getElementById('dlgTagBreed').textContent = formatBreed(p) || '—';
+      document.getElementById('dlgTagAge').textContent = formatAge(p) || '—';
+      document.getElementById('dlgTagGender').textContent = p.gender || '—';
 
       currentDoc = p;
       currentDocId = p.id;
@@ -1134,7 +1117,7 @@
       // 渲染視圖與綁定動作
       renderDialogView(p);
 
-      // 開啟前鎖捲動（lockScroll/oldHtmlOverflow/dlg 由 shared.js 提供）
+      // 開啟前鎖住背景捲動
       lockScroll();
       dlg.showModal();
     }

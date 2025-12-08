@@ -270,12 +270,8 @@
       <div class="p-5 space-y-4">
         <div class="flex items-start justify-between gap-3">
           <div>
-            <!-- 標題 + 右上角物種圓角標籤 -->
-            <div class="flex items-end justify-between gap-2">
+            <!-- 標題 -->
               <h3 id="dlgName" class="text-2xl font-semibold leading-snug">—</h3>
-              <span id="dlgSpeciesPill"
-                class="shrink-0 rounded-full text-xs px-2 py-1 bg-emerald-50 text-emerald-700">貓咪</span>
-            </div>
 
             <!-- 三個圓角標籤：不換行、可水平捲動 -->
             <div id="dlgTags" class="mt-1 flex flex-nowrap gap-2 text-sm">
@@ -604,13 +600,6 @@
 
       currentPetId = id;
       history.replaceState(null, '', `?pet=${encodeURIComponent(id)}`);
-
-      // 右上角物種圓角標籤（貓咪/狗狗 + 顏色）
-      const speciesPill = document.getElementById('dlgSpeciesPill');
-      const isDog = /(狗|犬)/.test(String(p.species || ''));
-      speciesPill.textContent = isDog ? '狗狗' : '貓咪';
-      speciesPill.className = `shrink-0 rounded-full text-sm px-3 py-1 ${isDog ? 'bg-sky-100 text-sky-700' : 'bg-emerald-100 text-emerald-700'
-        }`;
 
       // 三個圓角標籤（不換行，超出可橫向捲動）
       document.getElementById('dlgTagBreed').textContent = formatBreed(p) || '—';
