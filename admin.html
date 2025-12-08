@@ -501,6 +501,7 @@
     <button id="lbNext" class="absolute right-3 md:right-10 text-white text-4xl select-none">❯</button>
   </div>
 
+  <script src="./assets/firebase-config.js"></script>
   <script type="module">
     // 如果 withStableSearchRender 沒定義，就退成「直接渲染」
     const renderStable = (typeof withStableSearchRender === 'function')
@@ -520,7 +521,6 @@
     // ===============================
     // Firebase 設定與初始化
     // ===============================
-    import { firebaseConfig } from "./assets/firebase-config.js";
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
     import {
       getFirestore, collection, getDocs, query, orderBy, where,
@@ -528,7 +528,7 @@
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
     import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject, listAll, } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
 
-    const app = initializeApp(firebaseConfig);
+    const app = initializeApp(window.firebaseConfig);
     const db = getFirestore(app);
     const storage = getStorage(app);
 

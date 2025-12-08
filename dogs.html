@@ -310,15 +310,15 @@
     <button id="lbNext" class="absolute right-3 md:right-10 text-white text-4xl select-none">❯</button>
   </div>
 
+  <script src="./assets/firebase-config.js"></script>
   <script type="module">
-    import { firebaseConfig } from "./assets/firebase-config.js";
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
     import {
       getFirestore, collection, getDocs, query, orderBy, where,
 
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 
-    const app = initializeApp(firebaseConfig);
+    const app = initializeApp(window.firebaseConfig);
     const db = getFirestore(app);
 
     const SPECIES = "狗";
