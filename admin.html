@@ -1104,7 +1104,7 @@
       document.getElementById('dlgDesc').textContent = p.desc || '';
 
       currentPetId = p.id;
-      history.replaceState(null, '', `?pet=${encodeURIComponent(p.id)}`);
+      history.replaceState(null, "", `?pet=${encodeURIComponent(p.id)}`);
 
       // 三個圓角標籤（不換行，超出可橫向捲動）
       document.getElementById('dlgTagBreed').textContent = formatBreed(p) || '—';
@@ -1152,7 +1152,6 @@
 
       // 標題與標籤
       document.getElementById("dlgName").textContent = p.name || "未取名";
-      document.getElementById("dlgSpeciesPill").textContent = /(狗|犬)/.test(String(p.species || "")) ? "狗狗" : "貓咪";
       document.getElementById("dlgTagBreed").textContent = displayBreed(p);
       document.getElementById("dlgTagAge").textContent = p.age && p.age.trim() !== "" ? p.age : "年齡不詳";
       document.getElementById("dlgTagGender").textContent = p.gender || "—";
