@@ -336,7 +336,7 @@
         <div class="flex items-start justify-between gap-3">
           <div>
             <!-- 標題 -->
-              <h3 id="dlgName" class="text-2xl font-semibold leading-snug">—</h3>
+            <h3 id="dlgName" class="text-2xl font-semibold leading-snug">—</h3>
 
             <!-- 三個圓角標籤：不換行、可水平捲動 -->
             <div id="dlgTags" class="mt-1 flex flex-nowrap gap-2 text-sm">
@@ -729,19 +729,30 @@
       e.preventDefault();
 
       // 讀值
-      const rawName = ($("#name")?.value || "").trim();
-      const name = rawName || "未取名";
-      const age = ($("#age")?.value || "").trim();
-      const gender = $("#gender")?.value || "";
-      const desc = ($("#desc")?.value || "").trim();
+      const name = ($("#name")?.value || "").trim() || "未取名";
+
+      const rawBreedType = breedTypeSel.value || "";
+      const rawBreed = breedSel.value || "";
+      let breed = "";
+      if (!rawBreedType) {
+        breed = "品種不詳";
+      } else if (rawBreedType === "米克斯") {
+        breed = rawBreed ? `米克斯/${rawBreed}` : "米克斯";
+      } else {
+        breed = rawBreed || "品種不詳";
+      }
+
+      const age = ($("#age")?.value || "").trim() || "年齡不詳";
+      const gender = $("#gender")?.value || "性別不詳";
+      const desc = ($("#desc")?.value || "").trim() || "無備註";
 
       // 新增的基本 payload（圖片先空陣列，稍後補）
       const payload = {
         species: getSpecies(),
         name,
         nameLower: name.toLowerCase(),
-        breedType: breedTypeSel.value || "",
-        breed: breedSel.value || "",
+        breedType: rawBreedType,
+        breed,
         age,
         gender,
         desc,
@@ -967,13 +978,6 @@
       }
     }
 
-    // 顯示品種的規則（品種犬/貓 → 直接顯示品種；米克斯 → 顯示「米克斯/毛色」）
-    const displayBreed = (p) => {
-      if ((p.breedType === "品種犬" || p.breedType === "品種貓") && p.breed) return p.breed;
-      if (p.breedType === "米克斯") return p.breed ? `米克斯/${p.breed}` : "米克斯";
-      return p.breed || "—";
-    };
-
     // 桌機表格
     function renderRows(list) {
       const tb = document.getElementById("rows");
@@ -983,10 +987,10 @@
         .map(
           (p) => `
       <tr class="border-t hover:bg-gray-50 cursor-pointer" data-id="${p.id}">
-        <td class="py-2 pr-2 font-medium">${p.name || "未取名"}</td>
-        <td class="py-2 pr-2">${p.species || "—"}</td>
-        <td class="py-2 pr-2">${displayBreed(p)}</td>
-        <td class="py-2 pr-2">${p.gender || "—"}</td>
+        <td class="py-2 pr-2 font-medium">${p.name}</td>
+        <td class="py-2 pr-2">${p.species}</td>
+        <td class="py-2 pr-2">${p.breed}</td>
+        <td class="py-2 pr-2">${p.gender}</td>
       </tr>`
         )
         .join("");
@@ -1012,9 +1016,9 @@
              data-id="${p.id}">
           <img src="${img}" class="w-16 h-16 object-cover rounded-lg bg-gray-100">
           <div class="min-w-0 flex-1">
-            <div class="font-semibold truncate">${p.name || "未取名"}</div>
+            <div class="font-semibold truncate">${p.name}</div>
             <div class="text-xs text-gray-600 mt-1 truncate">
-              ${p.species || "—"}・${displayBreed(p)}・${p.gender || "—"}
+              ${p.species}・${p.breed}・${p.gender}
             </div>
           </div>
         </div>`;
@@ -1070,8 +1074,8 @@
 
       // 取所有圖片（images 是陣列；後台 upload 時必定有）
       const imgs = Array.isArray(p.images) && p.images.length > 0
-      ? p.images
-      : p.image ? [p.image] : [];
+        ? p.images
+        : p.image ? [p.image] : [];
 
       // 設定主圖
       dlgImg.src = imgs[0] || "";
@@ -1100,16 +1104,16 @@
       });
 
       // 基本資料（原本的）
-      document.getElementById('dlgName').textContent = p.name || '未取名';
-      document.getElementById('dlgDesc').textContent = p.desc || '';
+      document.getElementById('dlgName').textContent = p.name;
+      document.getElementById('dlgDesc').textContent = p.desc;
 
       currentPetId = p.id;
       history.replaceState(null, "", `?pet=${encodeURIComponent(p.id)}`);
 
       // 三個圓角標籤（不換行，超出可橫向捲動）
-      document.getElementById('dlgTagBreed').textContent = formatBreed(p) || '—';
-      document.getElementById('dlgTagAge').textContent = formatAge(p) || '—';
-      document.getElementById('dlgTagGender').textContent = p.gender || '—';
+      document.getElementById('dlgTagBreed').textContent = p.breed;
+      document.getElementById('dlgTagAge').textContent = p.age;
+      document.getElementById('dlgTagGender').textContent = p.gender;
 
       currentDoc = p;
       currentDocId = p.id;
@@ -1120,20 +1124,6 @@
       // 開啟前鎖住背景捲動
       lockScroll();
       dlg.showModal();
-    }
-
-    // 顯示用的小格式化
-    function formatBreed(p) {
-      if (!p.breed || p.breed.trim() === "" || p.breed === "—") return "品種不詳";
-      return p.breed;
-    }
-    function formatAge(p) {
-      if (!p.age || p.age.trim() === "" || p.age === "—") return "年齡不詳";
-      return p.age;
-    }
-    function formatGender(p) {
-      if (!p.gender || p.gender.trim() === "" || p.gender === "—") return "性別不詳";
-      return p.gender;
     }
 
     // 以資料物件渲染 Dialog（含縮圖、編輯欄位預填）
@@ -1151,11 +1141,11 @@
       lbIndex = 0;
 
       // 標題與標籤
-      document.getElementById("dlgName").textContent = p.name || "未取名";
-      document.getElementById("dlgTagBreed").textContent = displayBreed(p);
-      document.getElementById("dlgTagAge").textContent = p.age && p.age.trim() !== "" ? p.age : "年齡不詳";
-      document.getElementById("dlgTagGender").textContent = p.gender || "—";
-      document.getElementById("dlgDesc").textContent = p.desc || p.description || "";
+      document.getElementById("dlgName").textContent = p.name;
+      document.getElementById("dlgTagBreed").textContent = p.breed;
+      document.getElementById("dlgTagAge").textContent = p.age;
+      document.getElementById("dlgTagGender").textContent = p.gender;
+      document.getElementById("dlgDesc").textContent = p.desc;
 
       // 重新繪製縮圖（含 active）
       const thumbs = document.getElementById("dlgThumbs");
@@ -1174,10 +1164,10 @@
       });
 
       // 編輯區預填
-      document.getElementById("editName").value = p.name || "";
-      document.getElementById("editAge").value = p.age || "";
-      document.getElementById("editGender").value = p.gender || "";
-      document.getElementById("editDesc").value = p.desc || "";
+      document.getElementById("editName").value = p.name;
+      document.getElementById("editAge").value = p.age;
+      document.getElementById("editGender").value = p.gender;
+      document.getElementById("editDesc").value = p.desc;
       setEditSpecies(p.species || '貓');
       syncEditBreedSelectors();
       if (p.breedType) {
@@ -1300,23 +1290,35 @@
       const dlg = document.getElementById("petDialog");
 
       // 蒐集欄位
+      const name = (document.getElementById("editName").value || "").trim() || "未取名";
+
+      const rawBreedType = document.getElementById("editBreedType").value || "";
+      const rawBreed = document.getElementById("editBreed").value || "";
+      let breed = "";
+      if (!rawBreedType) {
+        breed = "品種不詳";
+      } else if (rawBreedType === "米克斯") {
+        breed = rawBreed ? `米克斯/${rawBreed}` : "米克斯";
+      } else {
+        breed = rawBreed || "品種不詳";
+      }
+
+      const age = (document.getElementById("editAge").value || "").trim() || "年齡不詳";
+      const gender = document.getElementById("editGender").value || "性別不詳";
+      const desc = (document.getElementById("editDesc").value || "").trim() || "無備註";
+
       const newData = {
-        name: document.getElementById("editName").value.trim(),
-        nameLower: document.getElementById("editName").value.trim().toLowerCase(),
-        age: document.getElementById("editAge").value.trim(),
-        gender: document.getElementById("editGender").value,
-        desc: document.getElementById("editDesc").value.trim(),
         species: getEditSpecies(),
-        breedType: document.getElementById("editBreedType").value || "",
-        breed: document.getElementById("editBreed").value || "",
+        name,
+        nameLower: name.toLowerCase(),
+        breedType: rawBreedType,
+        breed,
+        age,
+        gender,
+        desc,
         neutered: document.getElementById("editNeutered").checked,
         vaccinated: document.getElementById("editVaccinated").checked,
       };
-
-      if (!newData.name) {
-        newData.name = "未取名";
-        newData.nameLower = "未取名".toLowerCase();
-      }
 
       // ① 送出前：名字重複 → 先詢問是否仍要儲存（此時不要啟動「儲存中」）
       const newName = newData.name;

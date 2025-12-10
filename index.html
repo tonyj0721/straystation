@@ -190,7 +190,7 @@
         <dl class="mt-8 grid grid-cols-3 gap-4 text-center">
           <div class="p-4 rounded-xl bg-white/70 border border-gray-200">
             <dt class="text-sm text-gray-500">已成功送養</dt>
-            <dd class="text-xl font-semibold" id="statPlaced">0</dd>
+            <dd class="text-xl font-semibold" id="statAdopted">0</dd>
           </div>
           <div class="p-4 rounded-xl bg-white/70 border border-gray-200">
             <dt class="text-sm text-gray-500">待領養貓咪</dt>
@@ -394,33 +394,15 @@
     const app = initializeApp(window.firebaseConfig);
     const db = getFirestore(app);
 
-    // 可調：統計起始基數（會加到真實數字上）
-    const STATS_BASE = { placed: 1021, cats: 89, dogs: 743 };
+    // 統計起始基數（已成功送養、待領養貓咪、待領養狗狗）
+    const STATS_BASE = { adopted: 1021, cats: 89, dogs: 743 };
     let pets = [];
     let currentPetId = null;
 
     const $ = (q) => document.querySelector(q);
     const $$ = (q) => document.querySelectorAll(q);
 
-    function formatBreed(p) {
-      return p.breedType === "米克斯"
-        ? `米克斯/${p.breed || ""}`.replace(/\/$/, "")
-        : (p.breed || "—");
-    }
-
-    function formatAge(p) {
-      if (!p.age || p.age.trim() === "" || p.age === "—") return "年齡不詳";
-      return p.age;
-    }
-
-    function getCreatedAtMs(p) {
-      if (!p.createdAt) return 0;
-      if (typeof p.createdAt.toDate === "function") {
-        return p.createdAt.toDate().getTime();
-      }
-      return new Date(p.createdAt).getTime() || 0;
-    }
-
+    // 已成功送養、待領養貓咪、待領養狗狗
     function applyStats() {
       (async () => {
         try {
@@ -430,14 +412,14 @@
             getCountFromServer(query(coll, where("status", "==", "available"), where("species", "==", "貓"))),
             getCountFromServer(query(coll, where("status", "==", "available"), where("species", "==", "狗")))
           ]);
-          const placed = (STATS_BASE.placed || 0) + (adoptedSnap.data().count || 0);
+          const adopted = (STATS_BASE.adopted || 0) + (adoptedSnap.data().count || 0);
           const cats = (STATS_BASE.cats || 0) + (catsSnap.data().count || 0);
           const dogs = (STATS_BASE.dogs || 0) + (dogsSnap.data().count || 0);
 
-          const elPlaced = document.getElementById('statPlaced');
+          const eladopted = document.getElementById('statAdopted');
           const elCats = document.getElementById('statCats');
           const elDogs = document.getElementById('statDogs');
-          if (elPlaced) elPlaced.textContent = placed.toLocaleString();
+          if (eladopted) eladopted.textContent = adopted.toLocaleString();
           if (elCats) elCats.textContent = cats.toLocaleString();
           if (elDogs) elDogs.textContent = dogs.toLocaleString();
         } catch (err) {
@@ -464,12 +446,12 @@
       return `
         <article class="group rounded-2xl overflow-hidden ring-1 ring-gray-200 bg-white hover:shadow-soft transition-shadow snap-start">
           <div class="blur-fit rounded-t-2xl aspect-[4/3]" style="--bg: url('${img}')">
-            <img src="${img}" alt="${p.name || '動物照片'}">
+            <img src="${img}" alt="${p.name}">
           </div>
           <div class="p-4 flex-1 flex flex-col">
             <!-- 第一行：左邊名字、右上角圓角標籤 -->
             <div class="flex items-start justify-between gap-2">
-              <h3 class="font-semibold text-lg leading-snug line-clamp-1">${p.name || '未命名'}</h3>
+              <h3 class="font-semibold text-lg leading-snug line-clamp-1">${p.name}</h3>
               <span class="shrink-0 rounded-full text-xs px-2 py-1
                 ${/(狗|犬)/.test(String(p.species || '')) ? 'bg-sky-50 text-sky-700' : 'bg-emerald-50 text-emerald-700'}">
                 ${/(狗|犬)/.test(String(p.species || '')) ? '狗狗' : '貓咪'}
@@ -479,13 +461,13 @@
             <!-- 明細三行 -->
             <div class="mt-2 mb-3 flex flex-col gap-2 text-xs">
               <span class="self-start inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-2.5 py-1 whitespace-nowrap max-w-full truncate">
-                ${formatBreed(p)}
+                ${p.breed}
               </span>
               <span class="self-start inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-2.5 py-1 whitespace-nowrap max-w-full truncate">
-                ${formatAge(p) || '—'}
+                ${p.age}
               </span>
               <span class="self-start inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-2.5 py-1 whitespace-nowrap max-w-full truncate">
-                ${p.gender || '—'}
+                ${p.gender}
               </span>
             </div>
 
@@ -589,16 +571,16 @@
       });
 
       // 基本資料（原本的）
-      document.getElementById('dlgName').textContent = p.name || '未命名';
-      document.getElementById('dlgDesc').textContent = p.desc || '';
+      document.getElementById('dlgName').textContent = p.name;
+      document.getElementById('dlgDesc').textContent = p.desc;
 
       currentPetId = id;
       history.replaceState(null, '', `?pet=${encodeURIComponent(id)}`);
 
       // 三個圓角標籤（不換行，超出可橫向捲動）
-      document.getElementById('dlgTagBreed').textContent = formatBreed(p) || '—';
-      document.getElementById('dlgTagAge').textContent = formatAge(p) || '—';
-      document.getElementById('dlgTagGender').textContent = p.gender || '—';
+      document.getElementById('dlgTagBreed').textContent = p.breed;
+      document.getElementById('dlgTagAge').textContent = p.age;
+      document.getElementById('dlgTagGender').textContent = p.gender;
 
       // 開啟前鎖住背景捲動
       lockScroll();
