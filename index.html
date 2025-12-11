@@ -106,7 +106,7 @@
         <li>
           <a href="home.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
             text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
-            focus:outline-none focus:ring-2 focus:ring-white/70 nav-admin-link hidden">
+            focus:outline-none focus:ring-2 focus:ring-white/70">
             <span aria-hidden="true" class="text-xl leading-none">🏠</span>
             <span>幸福的歸宿</span>
           </a>
@@ -377,9 +377,140 @@
         <div class="bg-orange-50 rounded-xl p-4 leading-7">
           <p id="dlgDesc" class="text-gray-700 text-sm whitespace-pre-line break-words"></p>
         </div>
+        <!-- 訪客用 -->
         <div class="flex justify-end gap-3 pt-2">
-          <button id="dlgAdopt" class="px-4 py-2 rounded-xl bg-brand-600 text-white text-sm">我要認養</button>
-          <button id="dlgShare" class="px-4 py-2 rounded-xl text-white shadow-sm" style="background:#06C755">分享</button>
+          <button id="dlgAdopt" class="btn-user-only px-4 py-2 rounded-xl bg-brand-600 text-white text-sm">我要認養</button>
+          <button id="dlgShare" class="btn-user-only px-4 py-2 rounded-xl text-white shadow-sm"
+            style="background:#06C755">分享</button>
+        </div>
+        <!-- 內嵌編輯區 -->
+        <div id="editArea" class="hidden space-y-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">名字 <span class="text-red-500">*</span></label>
+            <input id="editName" class="w-full rounded-xl border border-gray-300 p-2" />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-1">類別 <span class="text-red-500">*</span></label>
+            <div class="flex gap-3">
+              <label class="inline-flex items-center gap-2">
+                <input type="radio" name="editSpecies" value="貓" class="accent-brand-600" />
+                <span>貓</span>
+              </label>
+              <label class="inline-flex items-center gap-2">
+                <input type="radio" name="editSpecies" value="狗" class="accent-brand-600" />
+                <span>狗</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium mb-1">品種</label>
+              <select id="editBreedType" class="w-full rounded-xl border border-gray-300 p-2">
+                <option value="">請選擇</option>
+              </select>
+            </div>
+            <div>
+              <label id="editBreedLabel" class="block text-sm font-medium mb-1">品種/毛色</label>
+              <select id="editBreed" class="w-full rounded-xl border border-gray-300 p-2" disabled>
+                <option value="">請先選擇品種</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium mb-1">年齡</label>
+              <input id="editAge" class="w-full rounded-xl border border-gray-300 p-2" placeholder="例：2 歲 或 8 個月" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1">性別</label>
+              <select id="editGender" class="w-full rounded-xl border border-gray-300 p-2">
+                <option value="">未設定</option>
+                <option value="男生">男生</option>
+                <option value="女生">女生</option>
+              </select>
+            </div>
+          </div>
+          <!-- 健康（編輯用） -->
+          <div>
+            <label class="block text-sm font-medium mb-1">健康</label>
+            <div class="flex items-center gap-6">
+              <label class="inline-flex items-center gap-2">
+                <input id="editNeutered" type="checkbox" class="h-4 w-4">
+                <span>結紮</span>
+              </label>
+              <label class="inline-flex items-center gap-2">
+                <input id="editVaccinated" type="checkbox" class="h-4 w-4">
+                <span>預防針</span>
+              </label>
+            </div>
+          </div>
+
+
+          <div>
+            <label class="block text-sm font-medium mb-1">簡介</label>
+            <textarea id="editDesc" rows="4" class="w-full rounded-xl border border-gray-300 p-2"></textarea>
+          </div>
+
+          <div>
+            <input id="editFiles" type="file" accept="image/*" multiple class="sr-only" />
+            <div class="flex items-center gap-3">
+              <button id="btnPickEdit" type="button"
+                class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增照片</button>
+              <span id="editCount" class="text-xs text-gray-500"></span>
+              <span class="text-sm text-gray-400">最多 5 張</span>
+            </div>
+            <!-- 和新增模式一致：三欄縮圖 + 上方間距 -->
+            <div id="editPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
+          </div>
+        </div>
+
+        <!-- 動作列 -->
+        <div id="actionBar" class="pt-2 grid grid-cols-1 sm:grid-cols-4 gap-3">
+          <button id="btnEdit" class="btn-admin-only w-full px-4 py-3 rounded-xl border border-gray-300 text-sm">
+            編輯
+          </button>
+          <button id="btnAdopted" class="btn-admin-only w-full px-4 py-3 rounded-xl bg-emerald-600 text-white text-sm">
+            已送養
+          </button>
+          <button id="btnUnadopt"
+            class="btn-admin-only w-full px-4 py-3 rounded-xl border border-amber-300 text-amber-700 text-sm hidden">
+            退養
+          </button>
+          <button id="btnDelete"
+            class="btn-admin-only w-full px-4 py-3 rounded-xl border border-red-300 text-red-600 text-sm">
+            刪除
+          </button>
+        </div>
+        <div id="editActionBar" class="hidden pt-2 grid grid-cols-2 gap-3">
+          <button id="btnSave"
+            class="w-full px-4 py-3 rounded-xl bg-gray-900 text-white text-sm flex items-center justify-center gap-2">
+            <span id="saveText">儲存</span>
+          </button>
+          <button id="btnCancel" class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm">
+            取消
+          </button>
+        </div>
+
+        <!-- 已領養合照上傳 -->
+        <div id="adoptedUpload" class="hidden">
+          <input id="adoptedFiles" type="file" accept="image/*" multiple class="sr-only" />
+          <div class="flex items-center gap-3 mb-2">
+            <button id="btnPickAdopted" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
+              選擇合照
+            </button>
+            <span id="adoptedCount" class="text-xs text-gray-500"></span>
+            <span class="text-sm text-gray-400">最多 5 張</span>
+          </div>
+          <div id="adoptedPreview" class="mt-1 grid grid-cols-3 gap-2"></div>
+          <button id="btnConfirmAdopted" class="mt-3 px-4 py-2 rounded-xl bg-gray-900 text-white text-sm">
+            儲存領養資訊
+          </button>
+          <button id="btnCancel" type="button" class="px-3 py-2 rounded-lg bg-gray-200 text-gray-900 hover:bg-gray-300">
+            取消
+          </button>
         </div>
       </div>
     </div>
@@ -441,6 +572,16 @@
       logoutBtns.forEach((el) => {
         el.classList.toggle("hidden", !isLogin);
       });
+
+      document.querySelectorAll(".btn-admin-only")
+        .forEach(el => el.classList.toggle("hidden", !isLogin));
+      document.querySelectorAll(".btn-user-only")
+        .forEach(el => el.classList.toggle("hidden", isLogin));
+
+      // 只有登入管理員時才綁定 admin 按鈕（避免沒登入還能點）
+      if (isLogin) {
+        bindDialogActions();
+      }
     });
 
     // 點狗掌 → Google 登入（未登入時）
@@ -485,6 +626,17 @@
 
     const $ = (q) => document.querySelector(q);
     const $$ = (q) => document.querySelectorAll(q);
+
+    const BREEDS = {
+      貓: {
+        品種貓: ["美國短毛貓", "英國短毛貓", "藍貓", "暹羅貓", "波斯貓", "布偶貓", "緬因貓", "曼赤肯", "金漸層曼赤肯"],
+        米克斯: ["橘貓", "橘白貓", "黑貓", "賓士貓", "虎斑貓", "白底虎斑貓", "三花貓", "玳瑁貓", "白貓"],
+      },
+      狗: {
+        品種犬: ["博美", "貴賓", "梗犬", "吉娃娃", "臘腸犬", "馬爾濟斯", "柯基", "柴犬", "狐狸犬", "哈士奇", "高山犬", "黃金獵犬", "邊境牧羊犬"],
+        米克斯: ["黑色", "白色", "黑白色", "黃色", "白黃色", "米色", "棕色", "黑棕色", "虎斑", "花花"],
+      },
+    };
 
     // 已成功送養、待領養貓咪、待領養狗狗
     function applyStats() {
@@ -606,69 +758,545 @@
         .forEach(btn => btn.addEventListener('click', (e) => openDialog(e.currentTarget.dataset.id)));
     }
 
-    function openDialog(id) {
-      const p = pets.find(x => x.id === id);
-      if (!p) return;
+    // ===============================
+    // 編輯模式：圖片管理（預覽 + 增刪）
+    // ===============================
+    const editFiles = $("#editFiles");
+    const btnPickEdit = $("#btnPickEdit");
+    const editPreview = $("#editPreview");
+    const editCount = $("#editCount");
 
-      const dlgImg = document.getElementById("dlgImg");
-      const dlgBg = document.getElementById("dlgBg");
-      const dlgThumbs = document.getElementById("dlgThumbs");
-      // 第二排：健康標籤
+    // 狀態：現存保留 keep、新增 add、要刪 remove
+    let editImagesState = { keep: [], add: [], remove: [] };
+
+    btnPickEdit.addEventListener("click", () => editFiles.click());
+
+    // 初始化編輯圖片列表
+    function renderEditImages(urls) {
+      editImagesState.keep = [...urls];
+      editImagesState.add = [];
+      editImagesState.remove = [];
+      paintEditPreview();
+    }
+
+    // 依狀態重新畫縮圖
+    function paintEditPreview() {
+      const total = editImagesState.keep.length + editImagesState.add.length;
+      editCount.textContent = `已選 ${total} / 5 張`;
+
+      const current = [
+        ...editImagesState.keep.map((u, i) => ({ type: "keep", url: u, idx: i })),
+        ...editImagesState.add.map((f, i) => ({ type: "add", file: f, idx: i })),
+      ];
+
+      editPreview.innerHTML = current
+        .map((item) => {
+          const src = item.type === "keep" ? item.url : URL.createObjectURL(item.file);
+          const data = item.type === "keep" ? `data-keep="${item.idx}"` : `data-add="${item.idx}"`;
+          return `
+        <div class="relative">
+          <img class="w-full aspect-square object-cover rounded-lg" src="${src}"/>
+          <button ${data} class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button>
+        </div>`;
+        })
+        .join("");
+
+      // 移除 keep → 放入 remove
+      editPreview.querySelectorAll("button[data-keep]").forEach((btn) =>
+        btn.addEventListener("click", () => {
+          const i = +btn.getAttribute("data-keep");
+          editImagesState.remove.push(editImagesState.keep[i]);
+          editImagesState.keep.splice(i, 1);
+          paintEditPreview();
+        })
+      );
+
+      // 移除 add → 直接從 add 陣列刪除
+      editPreview.querySelectorAll("button[data-add]").forEach((btn) =>
+        btn.addEventListener("click", () => {
+          const i = +btn.getAttribute("data-add");
+          editImagesState.add.splice(i, 1);
+          paintEditPreview();
+        })
+      );
+    }
+
+    // 新增圖片（尊守上限 5）
+    editFiles.addEventListener("change", () => {
+      const incoming = Array.from(editFiles.files || []);
+      const total = editImagesState.keep.length + editImagesState.add.length + incoming.length;
+      if (total > 5) {
+        swalInDialog({ icon: "warning", title: "最多 5 張照片" });
+      }
+      const room = 5 - (editImagesState.keep.length + editImagesState.add.length);
+      editImagesState.add = editImagesState.add.concat(incoming.slice(0, Math.max(0, room)));
+      paintEditPreview();
+      editFiles.value = "";
+    });
+
+    let currentDoc = null;
+    let currentDocId = null;
+
+    async function openDialog(id) {
+      // 1. 先拿資料：先從 pets 找，沒有就去 Firestore 抓一次
+      let p = pets.find((x) => x.id === id);
+      if (!p) {
+        try {
+          const snap = await getDoc(doc(db, "pets", id));
+          if (!snap.exists()) {
+            if (typeof swalInDialog === "function") {
+              await swalInDialog({ icon: "error", title: "找不到這筆資料" });
+            }
+            return;
+          }
+          p = { id: snap.id, ...snap.data() };
+        } catch (e) {
+          if (typeof swalInDialog === "function") {
+            await swalInDialog({ icon: "error", title: "讀取資料失敗", text: String(e) });
+          }
+          return;
+        }
+      }
+
+      // 2. 共用狀態 + URL
+      currentDoc = p;
+      currentDocId = p.id;
+      currentPetId = p.id;
+      history.replaceState(null, '', `?pet=${encodeURIComponent(p.id)}`);
+
+      // 3. 健康標籤（第二排）
       const isNeutered = !!p.neutered;
       const isVaccinated = !!p.vaccinated;
-
       document.getElementById('dlgTagNeutered').textContent = isNeutered
         ? '已結紮' : '未結紮';
 
       document.getElementById('dlgTagVaccinated').textContent = isVaccinated
         ? '已注射預防針' : '未注射預防針';
 
-      // 取所有圖片（images 是陣列；後台 upload 時必定有）
+      // 4. 圖片 + Lightbox（搭配 shared.js）
+      const dlgImg = document.getElementById("dlgImg");
+      const dlgBg = document.getElementById("dlgBg");
+      const dlgThumbs = document.getElementById("dlgThumbs");
+
       const imgs = Array.isArray(p.images) && p.images.length > 0
         ? p.images
         : (p.image ? [p.image] : []);
 
-      // 設定主圖
-      dlgImg.src = imgs[0] || "";
-      if (dlgBg) dlgBg.src = dlgImg.src;
-      dlgImg.onclick = () => openLightbox(imgs, 0);  // 讓主圖可進入 Lightbox
+      let currentIndex = 0;
 
-      // 生成縮圖列
+      dlgImg.src = imgs[currentIndex] || "";
+      if (dlgBg) dlgBg.src = dlgImg.src;
+      dlgImg.onclick = () => openLightbox(imgs, currentIndex);
+
       dlgThumbs.innerHTML = "";
       imgs.forEach((url, i) => {
         const thumb = document.createElement("img");
         thumb.src = url;
         thumb.className = "dlg-thumb" + (i === 0 ? " active" : "");
-        thumb.dataset.index = i;
 
-        // 點縮圖 → 切換主圖 + 啟動對應的 Lightbox 頁面
         thumb.addEventListener("click", () => {
+          currentIndex = i;
+
           dlgImg.src = url;
           if (dlgBg) dlgBg.src = url;
 
-          // 更新 active 樣式
-          document.querySelectorAll(".dlg-thumb").forEach(el => el.classList.remove("active"));
+          dlgThumbs.querySelectorAll(".dlg-thumb")
+            .forEach(el => el.classList.remove("active"));
           thumb.classList.add("active");
         });
 
         dlgThumbs.appendChild(thumb);
       });
 
-      // 基本資料（原本的）
+
+      // 5. 顯示用文字
       document.getElementById('dlgName').textContent = p.name;
       document.getElementById('dlgDesc').textContent = p.desc;
-
-      currentPetId = id;
-      history.replaceState(null, '', `?pet=${encodeURIComponent(id)}`);
-
-      // 三個圓角標籤（不換行，超出可橫向捲動）
       document.getElementById('dlgTagBreed').textContent = p.breed;
       document.getElementById('dlgTagAge').textContent = p.age;
       document.getElementById('dlgTagGender').textContent = p.gender;
 
-      // 開啟前鎖住背景捲動
-      lockScroll();
-      dlg.showModal();
+      // 6. 編輯區預填
+      document.getElementById("editNeutered").checked = !!p.neutered;
+      document.getElementById("editVaccinated").checked = !!p.vaccinated;
+      document.getElementById("editName").value = p.name;
+      document.getElementById("editAge").value = p.age;
+      document.getElementById("editGender").value = p.gender;
+      document.getElementById("editDesc").value = p.desc;
+
+      setEditSpecies(p.species || '貓');
+      syncEditBreedSelectors();
+
+      if (p.breedType) {
+        document.getElementById("editBreedType").value = p.breedType;
+        buildEditBreedOptions();
+        updateEditBreedLabel();
+
+        if (p.breed) {
+          document.getElementById("editBreed").disabled = false;
+          document.getElementById("editBreed").value = p.breed;
+        }
+      }
+
+      renderEditImages(imgs);
+
+      // 7. 模式 / 按鈕 / 已送養相關
+      setEditMode(false);      // 一開始都是「瀏覽模式」
+      bindDialogActions();     // 綁定「編輯 / 刪除 / 已送養」等按鈕
+
+      const isAdopted = p.status === "adopted";
+      const btnAdopted = document.getElementById("btnAdopted");
+      const btnUnadopt = document.getElementById("btnUnadopt");
+
+      btnAdopted.classList.toggle("hidden", isAdopted);
+      btnUnadopt.classList.toggle("hidden", !isAdopted);
+      btnUnadopt.onclick = onUnadopt;
+
+      document.getElementById("adoptedUpload").classList.add("hidden");
+
+      // 8. 打開 Dialog（shared.js 裡的 dlg / lockScroll）
+      if (!dlg.open) {
+        lockScroll();
+        dlg.showModal();
+      }
+    }
+
+    // 切換編輯模式
+    function setEditMode(on) {
+      document.getElementById("editArea").classList.toggle("hidden", !on);
+      document.getElementById("actionBar").classList.toggle("hidden", on);
+      document.getElementById("editActionBar").classList.toggle("hidden", !on);
+      if (on) {
+        document.getElementById("adoptedUpload").classList.add("hidden");
+      }
+    }
+
+    function getEditSpecies() {
+      return document.querySelector('input[name="editSpecies"]:checked')?.value || '貓';
+    }
+    function setEditSpecies(v) {
+      const t = v === '狗' ? '狗' : '貓';
+      const el = document.querySelector(`input[name="editSpecies"][value="${t}"]`);
+      if (el) el.checked = true;
+    }
+
+    // ===============================
+    // 編輯模式：品種連動（右側）
+    // ===============================
+    const editBreedTypeSel = $("#editBreedType");
+    const editBreedSel = $("#editBreed");
+    const editBreedLabel = $("#editBreedLabel");
+
+    function resetEditBreedRight() {
+      editBreedSel.disabled = true;
+      editBreedSel.innerHTML = '<option value="">請先選擇品種</option>';
+    }
+
+    function syncEditBreedSelectors() {
+      const isCat = getEditSpecies() === '貓';
+      editBreedTypeSel.innerHTML = isCat
+        ? '<option value="">請選擇</option><option value="品種貓">品種貓</option><option value="米克斯">米克斯</option>'
+        : '<option value="">請選擇</option><option value="品種犬">品種犬</option><option value="米克斯">米克斯</option>';
+      resetEditBreedRight();
+      updateEditBreedLabel();
+    }
+
+    function buildEditBreedOptions() {
+      const list = (BREEDS[getEditSpecies()] || {})[editBreedTypeSel.value] || [];
+      if (!editBreedTypeSel.value) { resetEditBreedRight(); return; }
+      editBreedSel.disabled = false;
+      editBreedSel.innerHTML = ['<option value="">請選擇</option>']
+        .concat(list.map(b => `<option value="${b}">${b}</option>`)).join('');
+    }
+
+    function updateEditBreedLabel() {
+      const t = editBreedTypeSel.value;
+      editBreedLabel.textContent = !t ? "品種/毛色" : t === "米克斯" ? "毛色" : "品種";
+    }
+
+    document.querySelectorAll('input[name="editSpecies"]').forEach(el => {
+      el.addEventListener('change', syncEditBreedSelectors);
+    });
+    editBreedTypeSel.addEventListener("change", () => {
+      buildEditBreedOptions();
+      updateEditBreedLabel();
+    });
+
+    // 綁定 Dialog 內各種按鈕行為
+    function bindDialogActions() {
+      document.getElementById("btnDelete").onclick = onDelete;
+      document.getElementById("btnEdit").onclick = () => setEditMode(true);
+
+      document.getElementById("btnAdopted").onclick = () => {
+        const up = document.getElementById("adoptedUpload");
+        up.classList.remove("hidden");
+        document.getElementById("btnPickAdopted")?.focus();
+        up.scrollIntoView({ behavior: "smooth", block: "start" });
+      };
+
+      document.getElementById("btnPickAdopted").onclick = () =>
+        document.getElementById("adoptedFiles").click();
+
+      document.getElementById("btnConfirmAdopted").onclick = onConfirmAdopted;
+      document.getElementById("btnSave").onclick = saveEdit;
+
+      document.getElementById("btnCancel").onclick = () => {
+        // 取消編輯 → 回復顯示最新資料
+        openDialog(currentDocId);
+        resetAdoptedSelection();
+      };
+    }
+
+    // 退養 → 還原狀態與顯示頁面選項
+    async function onUnadopt() {
+      const wasOpen = dlg.open;
+      if (wasOpen) dlg.close();
+
+      // 先確認是否撤回
+      const { isConfirmed } = await Swal.fire({
+        icon: "warning",
+        title: "確定要退養嗎？",
+        showCancelButton: true,
+        confirmButtonText: "確定",
+        cancelButtonText: "取消",
+      });
+
+      if (!isConfirmed) {
+        if (wasOpen) dlg.showModal();
+        return;
+      }
+
+      try {
+        await deleteAllUnder(`adopted/${currentDocId}`); // 清掉合照
+        await updateDoc(doc(db, "pets", currentDocId), {
+          status: "available",
+          adoptedPhotos: [],
+          showOnHome: false,
+          showOnCats: true,
+          showOnDogs: true,
+          showOnIndex: true,
+        });
+
+        await loadPets();
+        await Swal.fire({ icon: "success", title: "已撤回「已送養」標記", showConfirmButton: false, timer: 1500, });
+      } catch (err) {
+        await Swal.fire({ icon: "error", title: "撤回失敗", text: err.message });
+      } finally {
+        if (wasOpen) dlg.showModal();
+        // 重新渲染讓按鈕狀態即時切換
+        const p = pets.find((x) => x.id === currentDocId);
+        if (p) await openDialog(p.id);
+      }
+    }
+
+    // 刪除目前這筆
+    async function onDelete() {
+      const wasOpen = dlg.open;
+      if (wasOpen) dlg.close();
+
+      const ok = await Swal.fire({
+        icon: "warning",
+        title: "確定刪除此筆動物資料？",
+        showCancelButton: true,
+        confirmButtonText: "確定",
+        cancelButtonText: "取消",
+      });
+      if (!ok.isConfirmed) {
+        if (wasOpen) dlg.showModal();
+        return;
+      }
+
+      try {
+        // 刪掉這筆的所有圖片與合照資料夾
+        await deleteAllUnder(`pets/${currentDocId}`);
+        await deleteAllUnder(`adopted/${currentDocId}`);
+        // 最後刪 Firestore 文件
+        await deleteDoc(doc(db, "pets", currentDocId));
+        await loadPets();
+        await Swal.fire({ icon: "success", title: "刪除成功", showConfirmButton: false, timer: 1500, });
+      } catch (err) {
+        await Swal.fire({ icon: "error", title: "刪除失敗", text: err.message });
+        if (wasOpen) dlg.showModal();
+      }
+    }
+
+    // ===============================
+    // 編輯模式：儲存資料與圖片同步（增/刪/保留）
+    // ===============================
+    async function saveEdit() {
+      const btn = document.getElementById("btnSave");
+      const txt = document.getElementById("saveText");
+      const dlg = document.getElementById("petDialog");
+
+      // 蒐集欄位
+      const name = (document.getElementById("editName").value || "").trim() || "未取名";
+
+      const rawBreedType = document.getElementById("editBreedType").value || "";
+      const rawBreed = document.getElementById("editBreed").value || "";
+      let breed = "";
+      if (!rawBreedType) {
+        breed = "品種不詳";
+      } else if (rawBreedType === "米克斯") {
+        breed = rawBreed ? `米克斯/${rawBreed}` : "米克斯";
+      } else {
+        breed = rawBreed || "品種不詳";
+      }
+
+      const age = (document.getElementById("editAge").value || "").trim() || "年齡不詳";
+      const gender = document.getElementById("editGender").value || "性別不詳";
+      const desc = (document.getElementById("editDesc").value || "").trim() || "無備註";
+
+      const newData = {
+        species: getEditSpecies(),
+        name,
+        nameLower: name.toLowerCase(),
+        breedType: rawBreedType,
+        breed,
+        age,
+        gender,
+        desc,
+        neutered: document.getElementById("editNeutered").checked,
+        vaccinated: document.getElementById("editVaccinated").checked,
+      };
+
+      // ① 送出前：名字重複 → 先詢問是否仍要儲存（此時不要啟動「儲存中」）
+      const newName = newData.name;
+      if (newName && newName !== "未取名") {
+        const taken = await isNameTaken(newName, currentDocId);
+        if (taken) {
+          const { isConfirmed } = await (typeof swalInDialog === "function" ? swalInDialog : Swal.fire)({
+            icon: "warning",
+            title: `「${newName}」已存在`,
+            text: "確定繼續儲存？",
+            showCancelButton: true,
+            confirmButtonText: "確定",
+            cancelButtonText: "取消",
+          });
+          if (!isConfirmed) {
+            // 使用者取消 → 直接結束，按鈕維持可按、文字維持「儲存」
+            return;
+          }
+        }
+        // 同步小寫欄位，避免之後搜尋不到
+        newData.nameLower = newName.toLowerCase();
+      }
+
+      // ② 確認後才開始「儲存中…」與鎖定按鈕
+      btn.disabled = true;
+      const stopDots = startDots(txt, "儲存中");
+
+      try {
+        // 依照狀態計算出最終 images：先保留 keep，再把 add 上傳，最後刪掉 remove 的 Storage 物件
+        const { keep, add, remove } = editImagesState;
+        const newUrls = [...keep];
+
+        // 上傳新增檔案
+        for (const f of add) {
+          const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+          const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
+          const base = f.name.replace(/\.[^.]+$/, '');
+          const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
+          const r = sRef(storage, path);
+          await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
+          newUrls.push(await getDownloadURL(r));
+        }
+
+        // 刪除移除的檔案（忽略刪失敗）
+        for (const url of remove) {
+          try {
+            const path = url.split("/o/")[1].split("?")[0];
+            await deleteObject(sRef(storage, decodeURIComponent(path)));
+          } catch (e) {
+            // 靜默忽略
+          }
+        }
+
+        newData.images = newUrls;
+
+        // ③ 寫回 Firestore
+        await updateDoc(doc(db, "pets", currentDocId), newData);
+
+        // ④ 重載列表並同步當前物件
+        await loadPets();
+        currentDoc = { ...currentDoc, ...newData };
+
+        // ⑤ UI 收尾（無論彈窗狀態，成功提示一下）
+        stopDots();
+        btn.disabled = false;
+        txt.textContent = "儲存";
+
+        const wasOpen = dlg.open;
+        if (wasOpen) dlg.close();
+        await Swal.fire({ icon: "success", title: "已儲存", showConfirmButton: false, timer: 1500 });
+        if (wasOpen) dlg.showModal();
+
+        setEditMode(false);
+        await openDialog(currentDocId);
+
+      } catch (err) {
+        // 失敗也要確保 UI 復原
+        stopDots();
+        btn.disabled = false;
+        txt.textContent = "儲存";
+        await Swal.fire({ icon: "error", title: "更新失敗", text: err.message });
+      }
+    }
+
+    // 確認標記為已領養：上傳合照到 Storage，更新狀態與顯示頁面選項
+    async function onConfirmAdopted() {
+      const btn = document.getElementById("btnConfirmAdopted");
+
+      // 動態點點（沿用你檔案內的 startDots）
+      btn.disabled = true;
+      btn.setAttribute("aria-busy", "true");
+      const stopDots = startDots(btn, "儲存中");
+
+      const files = adoptedSelected.slice(0, 5);
+      const urls = [];
+      try {
+        for (const f of files) {
+          const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+          const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
+          const base = f.name.replace(/\.[^.]+$/, '');
+          const path = `adopted/${currentDocId}/${Date.now()}_${base}.${ext}`;
+          const r = sRef(storage, path);
+          await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
+          urls.push(await getDownloadURL(r));
+        }
+
+        await updateDoc(doc(db, "pets", currentDocId), {
+          status: "adopted",
+          adoptedPhotos: urls,
+          showOnHome: true,
+          showOnCats: false,
+          showOnDogs: false,
+          showOnIndex: false,
+        });
+
+        await loadPets();
+
+        // 先關閉 modal
+        const dlg = document.getElementById("petDialog");
+        if (dlg?.open) dlg.close();
+
+        // 用全域 Swal（不在 dialog 裡），所以關掉 modal 也看得到
+        await Swal.fire({
+          icon: "success",
+          title: "已標記為「已送養」",
+          showConfirmButton: false,
+          timer: 1500,
+        });
+
+        // 清空已領養選取（保險起見，關閉時通常也會清）
+        resetAdoptedSelection();
+      } catch (err) {
+        await swalInDialog({ icon: "error", title: "已送養標記失敗", text: err.message });
+      } finally {
+        stopDots();
+        btn.disabled = false;
+        btn.removeAttribute("aria-busy");
+        btn.textContent = "儲存領養資訊";
+      }
     }
 
     async function loadPets() {
