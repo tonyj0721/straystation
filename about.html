@@ -31,8 +31,11 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="h-16 flex items-center justify-between">
         <a href="index.html" class="flex items-center gap-2 font-semibold text-2xl">
-          <img src="images/dogpaw.png" alt="dogpaw" class="h-8 w-8 object-contain" />
-          <span>台中簡媽媽狗園</span>
+          <img src="images/dogpaw.png" alt="dogpaw" id="btnGoogleLogin" class="h-8 w-8 object-contain" />
+          <span class="flex items-baseline gap-1">
+            <span>台中簡媽媽狗園</span>
+            <span id="adminLabel" class="text-xs text-gray-600 hidden">管理員</span>
+          </span>
         </a>
 
         <!-- 桌機導覽 -->
@@ -41,7 +44,11 @@
           <a href="cats.html" class="hover:text-brand-600">我想養貓咪</a>
           <a href="dogs.html" class="hover:text-brand-600">我想養狗狗</a>
           <a href="home.html" class="hover:text-brand-600">幸福的歸宿</a>
-          <a href="admin.html" class="hover:text-brand-600">管理員登入</a>
+          <a href="admin.html" class="hover:text-brand-600 nav-admin-link hidden">後台管理</a>
+          <button type="button" id="btnLogoutDesktop"
+            class="text-sm text-gray-600 hover:text-brand-600 nav-logout-btn hidden">
+            登出
+          </button>
         </nav>
 
         <!-- 手機漢堡鈕 -->
@@ -108,10 +115,20 @@
         <li>
           <a href="admin.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
                 text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
-                focus:outline-none focus:ring-2 focus:ring-white/70">
+                focus:outline-none focus:ring-2 focus:ring-white/70 nav-admin-link hidden">
             <span aria-hidden="true" class="text-xl leading-none">🔒</span>
-            <span>管理員登入</span>
+            <span>後台管理</span>
           </a>
+        </li>
+
+        <li>
+          <button type="button" id="btnLogoutMobile" class="w-full flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+                 text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+                 focus:outline-none focus:ring-2 focus:ring-white/70
+                 nav-logout-btn hidden" role="menuitem" tabindex="-1">
+            <span aria-hidden="true" class="text-xl leading-none">🚪</span>
+            <span>登出</span>
+          </button>
         </li>
       </ul>
     </nav>
@@ -240,7 +257,79 @@
     </div>
   </footer>
 
-  <script>
+  <script src="./assets/firebase-config.js"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+    import {
+      getAuth,
+      GoogleAuthProvider,
+      signInWithPopup,
+      signOut,
+      onAuthStateChanged,
+    } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
+
+    const app = initializeApp(window.firebaseConfig);
+
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+
+    const dogpawBtn = document.getElementById("btnGoogleLogin");
+    const adminLabel = document.getElementById("adminLabel");
+    const adminLinks = document.querySelectorAll(".nav-admin-link");
+    const logoutBtns = document.querySelectorAll(".nav-logout-btn");
+
+    // 依登入狀態更新 header / 導覽
+    onAuthStateChanged(auth, (user) => {
+      const isLogin = !!user;
+
+      if (adminLabel) {
+        adminLabel.classList.toggle("hidden", !isLogin);
+      }
+
+      adminLinks.forEach((el) => {
+        el.classList.toggle("hidden", !isLogin);
+      });
+
+      logoutBtns.forEach((el) => {
+        el.classList.toggle("hidden", !isLogin);
+      });
+    });
+
+    // 點狗掌 → Google 登入（未登入時）
+    if (dogpawBtn) {
+      dogpawBtn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (auth.currentUser) return;   // 已登入就不重複登入
+
+        try {
+          await signInWithPopup(auth, provider);
+          // 登入後會觸發 onAuthStateChanged，所以不用另外改畫面
+        } catch (err) {
+          console.error("Google 登入失敗", err);
+          alert("Google 登入失敗，請稍後再試。");
+        }
+      });
+    }
+
+    // 桌機 + 手機「登出」按鈕
+    logoutBtns.forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          await signOut(auth);
+
+          // 如果手機選單有開，把它關掉
+          const overlay = document.getElementById("menuOverlay");
+          if (overlay) overlay.classList.add("hidden");
+        } catch (err) {
+          console.error("登出失敗", err);
+          alert("登出失敗，請稍後再試。");
+        }
+      });
+    });
+
     const y = document.getElementById('year');
     if (y) y.textContent = new Date().getFullYear();
 
