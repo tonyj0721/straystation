@@ -31,7 +31,9 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="h-16 flex items-center justify-between">
         <a href="index.html" class="flex items-center gap-2 font-semibold text-2xl">
-          <img src="images/dogpaw.png" alt="dogpaw" class="h-8 w-8 object-contain" />
+          <img src="images/dogpaw.png" alt="dogpaw"
+          id="btnGoogleLogin"
+          class="h-8 w-8 object-contain" />
           <span>台中簡媽媽狗園</span>
         </a>
 
@@ -41,7 +43,7 @@
           <a href="dogs.html" class="hover:text-brand-600">我想養狗狗</a>
           <a href="about.html" class="hover:text-brand-600">關於簡媽媽</a>
           <a href="home.html" class="hover:text-brand-600">幸福的歸宿</a>
-          <a href="admin.html" class="hover:text-brand-600">管理員登入</a>
+          <a href="admin.html" class="hover:text-brand-600 nav-admin-link hidden">後台管理</a>
         </nav>
 
         <!-- 手機漢堡鈕 -->
@@ -108,9 +110,9 @@
         <li>
           <a href="admin.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
                 text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
-                focus:outline-none focus:ring-2 focus:ring-white/70">
+                focus:outline-none focus:ring-2 focus:ring-white/70 nav-admin-link hidden">
             <span aria-hidden="true" class="text-xl leading-none">🔒</span>
-            <span>管理員登入</span>
+            <span>後台管理</span>
           </a>
         </li>
       </ul>
@@ -390,9 +392,57 @@
       getFirestore, collection, getDocs, query, orderBy, where,
       getCountFromServer, Timestamp
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+    import {
+    getAuth,
+    GoogleAuthProvider,
+    signInWithPopup,
+    onAuthStateChanged,
+  } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
 
     const app = initializeApp(window.firebaseConfig);
     const db = getFirestore(app);
+
+    const auth = getAuth(app);
+  const provider = new GoogleAuthProvider();
+
+  const adminLinks = document.querySelectorAll('.nav-admin-link');
+  const dogpawBtn = document.getElementById('btnGoogleLogin');
+
+  // 依登入狀態顯示 / 隱藏「後台管理」
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      adminLinks.forEach(el => el.classList.remove('hidden'));
+      if (dogpawBtn) {
+        dogpawBtn.title = (user.displayName || user.email || '') + ' 已登入';
+      }
+    } else {
+      adminLinks.forEach(el => el.classList.add('hidden'));
+      if (dogpawBtn) {
+        dogpawBtn.title = '點狗掌使用 Google 登入';
+      }
+    }
+  });
+
+  // 點左上狗掌 → Google 登入
+  if (dogpawBtn) {
+    dogpawBtn.addEventListener('click', async (e) => {
+      // 不要跳回首頁
+      e.preventDefault();
+      e.stopPropagation();
+
+      // 已登入就不再彈視窗（也可以改成這裡 signOut 登出）
+      if (auth.currentUser) return;
+
+      try {
+        await signInWithPopup(auth, provider);
+        // 登入後 onAuthStateChanged 會自動顯示「後台管理」
+        // 也不會換頁，停留在原頁面
+      } catch (err) {
+        console.error('Google 登入失敗', err);
+        alert('Google 登入失敗，請稍後再試。');
+      }
+    });
+  }
 
     // 統計起始基數（已成功送養、待領養貓咪、待領養狗狗）
     const STATS_BASE = { adopted: 1021, cats: 89, dogs: 743 };
