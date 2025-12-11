@@ -304,7 +304,6 @@
 
   <!-- Lightbox -->
   <div id="lightbox" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[9999]">
-    <button id="lbPrev" class="absolute left-3 md:left-10 text-white text-4xl select-none">❮</button>
     <div id="lbWrap" class="relative inline-block">
       <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg" />
       <button id="lbClose" class="absolute top-1 right-1 z-10 bg-black/60 hover:bg-black/70 text-white rounded-full p-2
@@ -314,7 +313,8 @@
       class="absolute bottom-20 left-0 w-full flex justify-center px-4 py-2 pb-[env(safe-area-inset-bottom)]">
       <div id="lbThumbsInner" class="flex gap-3"></div>
     </div>
-    <button id="lbNext" class="absolute right-3 md:right-10 text-white text-4xl select-none">❯</button>
+    <button id="lbPrev" class="absolute text-white text-4xl select-none">❮</button>
+    <button id="lbNext" class="absolute text-white text-4xl select-none">❯</button>
   </div>
 
   <script src="./assets/firebase-config.js"></script>
