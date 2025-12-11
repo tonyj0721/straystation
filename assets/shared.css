@@ -105,3 +105,21 @@ dialog::backdrop {
   font-weight: 600;
   border: none;
 }
+
+#lbPrev {
+  left: 0rem;
+}
+
+#lbNext {
+  right: 0rem;
+}
+
+@media (min-width:768px) {
+  #lbPrev {
+    left: 2.5rem;
+  }
+
+  #lbNext {
+    right: 2.5rem;
+  }
+}
