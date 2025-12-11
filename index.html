@@ -472,7 +472,8 @@
           <button id="btnEdit" class="btn-admin-only w-full px-4 py-3 rounded-xl border border-gray-300 text-sm hidden">
             編輯
           </button>
-          <button id="btnAdopted" class="btn-admin-only w-full px-4 py-3 rounded-xl bg-emerald-600 text-white text-sm hidden">
+          <button id="btnAdopted"
+            class="btn-admin-only w-full px-4 py-3 rounded-xl bg-emerald-600 text-white text-sm hidden">
             已送養
           </button>
           <button id="btnUnadopt"
@@ -536,7 +537,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
     import {
       getFirestore, collection, getDocs, query, orderBy, where,
-      getCountFromServer, Timestamp
+      getCountFromServer, Timestamp, limit as fbLimit
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
     import {
       getAuth,
@@ -627,6 +628,9 @@
     const $ = (q) => document.querySelector(q);
     const $$ = (q) => document.querySelectorAll(q);
 
+    // ===============================
+    // 品種資料與「品種/毛色」連動邏輯
+    // ===============================
     const BREEDS = {
       貓: {
         品種貓: ["美國短毛貓", "英國短毛貓", "藍貓", "暹羅貓", "波斯貓", "布偶貓", "緬因貓", "曼赤肯", "金漸層曼赤肯"],
@@ -1118,6 +1122,30 @@
         await Swal.fire({ icon: "error", title: "刪除失敗", text: err.message });
         if (wasOpen) dlg.showModal();
       }
+    }
+
+    // 用 nameLower / name 檢查是否重複；exceptId 表示忽略自己（編輯時用）
+    async function isNameTaken(name, exceptId = null) {
+      const kw = (name || "").trim().toLowerCase();
+      if (!kw) return false;
+
+      // 1) 以 nameLower 精準查，取最多 2 筆，避免只有自己時誤判為無重複
+      let snap = await getDocs(query(
+        collection(db, "pets"),
+        where("nameLower", "==", kw),
+        fbLimit(2)
+      ));
+      if (!snap.empty && snap.docs.some((d) => d.id !== exceptId)) return true;
+
+      // 2) 舊資料沒 nameLower，再用 name 精準查一次，同樣取 2 筆
+      snap = await getDocs(query(
+        collection(db, "pets"),
+        where("name", "==", name),
+        fbLimit(2)
+      ));
+      if (!snap.empty && snap.docs.some((d) => d.id !== exceptId)) return true;
+
+      return false;
     }
 
     // ===============================
