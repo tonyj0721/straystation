@@ -34,7 +34,7 @@
           <img src="images/dogpaw.png" alt="dogpaw" id="btnGoogleLogin" class="h-8 w-8 object-contain" />
           <span class="flex items-baseline gap-1">
             <span>台中簡媽媽狗園</span>
-            <span id="adminLabel" class="text-xs text-gray-600 hidden">我是小編</span>
+            <span id="adminLabel" class="text-xs text-gray-600 hidden">管理員</span>
           </span>
         </a>
 
@@ -311,7 +311,7 @@
         <div class="bg-orange-50 rounded-xl p-4 leading-7">
           <p id="dlgDesc" class="text-gray-700 text-sm whitespace-pre-line break-words"></p>
         </div>
-        <div class="flex justify-end gap-3 pt-2">
+        <div id="guestActionBar" class="flex justify-end gap-3 pt-2">
           <button id="dlgAdopt" class="px-4 py-2 rounded-xl bg-brand-600 text-white text-sm">我要認養</button>
           <button id="dlgShare" class="px-4 py-2 rounded-xl text-white shadow-sm" style="background:#06C755">分享</button>
         </div>
@@ -401,7 +401,7 @@
         </div>
 
         <!-- 動作列 -->
-        <div id="actionBar" class="pt-2 grid grid-cols-1 sm:grid-cols-3 gap-3 hidden">
+        <div id="actionBar" class="pt-2 grid grid-cols-1 sm:grid-cols-4 gap-3 hidden">
           <button id="btnEdit" class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm">
             編輯
           </button>
@@ -498,21 +498,9 @@
     const adminLabel = document.getElementById("adminLabel");
     const adminLinks = document.querySelectorAll(".nav-admin-link");
     const logoutBtns = document.querySelectorAll(".nav-logout-btn");
-    // ======= modal 相關按鈕 =======
-    const dlgAdopt = document.getElementById("dlgAdopt");   // 我要認養
-    const dlgShare = document.getElementById("dlgShare");   // 分享
-    const publicActionWrap = dlgAdopt ? dlgAdopt.parentElement : null; // 兩顆按鈕外面的那個 <div>
-
-    const actionBar = document.getElementById("actionBar");         // 編輯 / 已送養 / 刪除 那一整排
-    const editArea = document.getElementById("editArea");
-    const editActionBar = document.getElementById("editActionBar");
-    const adoptedUpload = document.getElementById("adoptedUpload");
-
-    // 先當作「未登入」：藏起管理員區
-    if (actionBar) actionBar.classList.add("hidden");
-    if (editArea) editArea.classList.add("hidden");
-    if (editActionBar) editActionBar.classList.add("hidden");
-    if (adoptedUpload) adoptedUpload.classList.add("hidden");
+    // ⬇ 新增：modal 裡兩組按鈕
+    const guestActionBar = document.getElementById("guestActionBar");
+    const adminActionBar = document.getElementById("actionBar");
 
     // 依登入狀態更新 header / 導覽
     onAuthStateChanged(auth, (user) => {
@@ -530,24 +518,14 @@
         el.classList.toggle("hidden", !isLogin);
       });
 
-      // ---- modal：訪客 / 管理員 切換 ----
-      // 訪客用：我要認養 / 分享
-      if (publicActionWrap) {
-        publicActionWrap.classList.toggle("hidden", isLogin); // 登入後藏起來
+      // ⬇ 新增：切換 modal 的按鈕
+      if (guestActionBar) {
+        // 登入後就隱藏「我要認養 / 分享」
+        guestActionBar.classList.toggle("hidden", isLogin);
       }
-
-      // 管理員用：編輯 / 已送養 / 刪除 + 編輯區
-      if (actionBar) {
-        actionBar.classList.toggle("hidden", !isLogin);       // 未登入藏起來
-      }
-      if (editArea) {
-        editArea.classList.toggle("hidden", !isLogin);
-      }
-      if (editActionBar) {
-        editActionBar.classList.toggle("hidden", !isLogin);
-      }
-      if (adoptedUpload) {
-        adoptedUpload.classList.toggle("hidden", !isLogin);
+      if (adminActionBar) {
+        // 未登入時隱藏管理員按鈕，登入才顯示
+        adminActionBar.classList.toggle("hidden", !isLogin);
       }
     });
 
