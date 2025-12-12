@@ -518,14 +518,17 @@
         el.classList.toggle("hidden", !isLogin);
       });
 
-      // ⬇ 新增：切換 modal 的按鈕
+      // modal：訪客（我要認養/分享） vs 管理員（編輯/已送養/刪除）
       if (guestActionBar) {
-        // 登入後就隱藏「我要認養 / 分享」
+        // class 保險，順便用 display 強制
         guestActionBar.classList.toggle("hidden", isLogin);
+        guestActionBar.style.display = isLogin ? "none" : "flex";
       }
+
       if (adminActionBar) {
-        // 未登入時隱藏管理員按鈕，登入才顯示
         adminActionBar.classList.toggle("hidden", !isLogin);
+        // 管理員那排本來是 grid
+        adminActionBar.style.display = isLogin ? "grid" : "none";
       }
     });
 
