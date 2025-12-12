@@ -311,6 +311,10 @@
         <div class="bg-orange-50 rounded-xl p-4 leading-7">
           <p id="dlgDesc" class="text-gray-700 text-sm whitespace-pre-line break-words"></p>
         </div>
+        <div class="flex justify-end gap-3 pt-2">
+          <button id="dlgAdopt" class="px-4 py-2 rounded-xl bg-brand-600 text-white text-sm">我要認養</button>
+          <button id="dlgShare" class="px-4 py-2 rounded-xl text-white shadow-sm" style="background:#06C755">分享</button>
+        </div>
 
         <!-- 內嵌編輯區 -->
         <div id="editArea" class="hidden space-y-4">
@@ -397,7 +401,7 @@
         </div>
 
         <!-- 動作列 -->
-        <div id="actionBar" class="pt-2 grid grid-cols-1 sm:grid-cols-4 gap-3">
+        <div id="actionBar" class="pt-2 grid grid-cols-1 sm:grid-cols-4 gap-3 hidden">
           <button id="btnEdit" class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm">
             編輯
           </button>
@@ -494,6 +498,21 @@
     const adminLabel = document.getElementById("adminLabel");
     const adminLinks = document.querySelectorAll(".nav-admin-link");
     const logoutBtns = document.querySelectorAll(".nav-logout-btn");
+    // ======= modal 相關按鈕 =======
+    const dlgAdopt = document.getElementById("dlgAdopt");   // 我要認養
+    const dlgShare = document.getElementById("dlgShare");   // 分享
+    const publicActionWrap = dlgAdopt ? dlgAdopt.parentElement : null; // 兩顆按鈕外面的那個 <div>
+
+    const actionBar = document.getElementById("actionBar");         // 編輯 / 已送養 / 刪除 那一整排
+    const editArea = document.getElementById("editArea");
+    const editActionBar = document.getElementById("editActionBar");
+    const adoptedUpload = document.getElementById("adoptedUpload");
+
+    // 先當作「未登入」：藏起管理員區
+    if (actionBar) actionBar.classList.add("hidden");
+    if (editArea) editArea.classList.add("hidden");
+    if (editActionBar) editActionBar.classList.add("hidden");
+    if (adoptedUpload) adoptedUpload.classList.add("hidden");
 
     // 依登入狀態更新 header / 導覽
     onAuthStateChanged(auth, (user) => {
@@ -510,6 +529,26 @@
       logoutBtns.forEach((el) => {
         el.classList.toggle("hidden", !isLogin);
       });
+
+      // ---- modal：訪客 / 管理員 切換 ----
+      // 訪客用：我要認養 / 分享
+      if (publicActionWrap) {
+        publicActionWrap.classList.toggle("hidden", isLogin); // 登入後藏起來
+      }
+
+      // 管理員用：編輯 / 已送養 / 刪除 + 編輯區
+      if (actionBar) {
+        actionBar.classList.toggle("hidden", !isLogin);       // 未登入藏起來
+      }
+      if (editArea) {
+        editArea.classList.toggle("hidden", !isLogin);
+      }
+      if (editActionBar) {
+        editActionBar.classList.toggle("hidden", !isLogin);
+      }
+      if (adoptedUpload) {
+        adoptedUpload.classList.toggle("hidden", !isLogin);
+      }
     });
 
     // 點狗掌 → Google 登入（未登入時）
@@ -600,130 +639,6 @@
       const hit = pets.find(p => p.id === id);
       if (hit) openDialog(hit.id);
     }
-    // --- Modal 來賓 / 管理員 顯示切換 ---
-    const actionBar = document.getElementById("actionBar");          // 編輯 / 已送養 / 刪除
-    const editArea = document.getElementById("editArea");
-    const editActionBar = document.getElementById("editActionBar");
-    const adoptedUpload = document.getElementById("adoptedUpload");
-
-    let publicActions = null; // 「我要認養 / 分享」那一排按鈕
-
-    // 先把管理員用的 actionBar 收起來，避免還沒判斷登入前先閃一下
-    if (actionBar) actionBar.classList.add("hidden");
-
-    function ensurePublicActions() {
-      if (publicActions) return publicActions;
-      if (!editArea) return null;
-
-      const wrap = document.createElement("div");
-      wrap.id = "publicActions";
-      wrap.className = "flex justify-end gap-3 pt-2";
-
-      wrap.innerHTML = `
-        <button id="dlgAdopt" class="px-4 py-2 rounded-xl bg-brand-600 text-white text-sm">
-          我要認養
-        </button>
-        <button id="dlgShare" class="px-4 py-2 rounded-xl text-white shadow-sm" style="background:#06C755">
-          分享
-        </button>
-      `;
-
-      // 插在描述區塊後、editArea 前（這樣未登入時整個底部看起來就跟 cats.html 一樣）
-      editArea.parentNode.insertBefore(wrap, editArea);
-
-      // 分享按鈕：跟 cats.html 一樣，用 LINE 分享目前這隻
-      const shareBtn = wrap.querySelector("#dlgShare");
-      shareBtn?.addEventListener("click", () => {
-        if (!window.currentPetId) return;
-        const name = document.getElementById("dlgName").textContent.trim();
-        const url = makePetUrl(window.currentPetId);
-        const text = `一起幫 ${name} 找到家！`;
-        window.open(
-          `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`,
-          "_blank",
-          "noopener"
-        );
-      });
-
-      // 我要認養：流程跟 cats.html / index.html 相同
-      const adoptBtn = wrap.querySelector("#dlgAdopt");
-      adoptBtn?.addEventListener("click", () => {
-        const dlg = document.getElementById("petDialog");
-        const name = document.getElementById("dlgName").textContent.trim();
-        const petId = (window.currentPetId || "");
-        const goto = `adopt.html?pet=${encodeURIComponent(petId)}&name=${encodeURIComponent(name)}`;
-
-        const precheckHTML = `
-          <div style="text-align:left;max-height:55vh;overflow:auto;padding:4px 2px;">
-            <div style="font-weight:800;margin-bottom:24px;text-align:center;font-size:24px;">認養條件與流程</div>
-            <ol style="line-height:1.7;padding-left:1.25rem;margin:0; list-style: decimal;">
-              <li>需年滿 20 歲，有穩定收入。</li>
-              <li>需先了解認養人住家環境、是否有原養寵物。</li>
-              <li>確認符合條件，小編篩選後，預約園區參訪。</li>
-              <li>確認領養需準備身份證影印本及印章，並簽署認養同意書。</li>
-              <li>需負擔結紮等相關費用。</li>
-              <li>認養人需長期主動更新毛孩近況，並接受不定期居家訪視。</li>
-            </ol>
-          </div>
-        `;
-
-        Swal.fire({
-          target: dlg,
-          backdrop: false,
-          html: precheckHTML,
-          showCancelButton: true,
-          confirmButtonText: "我符合，繼續",
-          cancelButtonText: "取消",
-        }).then((r) => {
-          if (!r.isConfirmed) return;
-
-          Swal.fire({
-            target: dlg,
-            backdrop: false,
-            html: `
-              <div style="display:flex;flex-direction:column;align-items:center;gap:12px;padding:8px 0">
-                <div style="font-size:48px;line-height:1">💡</div>
-                <div style="text-align:center;color:#374151">
-                  填寫完表單後，按下<br>
-                  <strong>「📋 複製表單並聯絡小編」</strong><br><br>
-                  系統會自動複製填寫訊息<br>並開啟 Messenger貼上
-                </div>
-              </div>
-            `,
-            confirmButtonText: "繼續",
-            showCloseButton: true,
-            buttonsStyling: false,
-            customClass: { popup: "rounded-2xl", confirmButton: "swal2-confirm-btn" },
-          }).then((r2) => {
-            if (r2.isConfirmed) window.location.href = goto;
-          });
-        });
-      });
-
-      publicActions = wrap;
-      return wrap;
-    }
-
-    // 第二個 onAuthStateChanged：控制 modal 底部按鈕
-    onAuthStateChanged(auth, (user) => {
-      const isLogin = !!user;
-
-      if (!isLogin) {
-        // 未登入：顯示「我要認養 / 分享」，隱藏管理員按鈕
-        const pub = ensurePublicActions();
-        if (pub) pub.classList.remove("hidden");
-
-        if (actionBar) actionBar.classList.add("hidden");
-        if (editActionBar) editActionBar.classList.add("hidden");
-        if (adoptedUpload) adoptedUpload.classList.add("hidden");
-        if (editArea) editArea.classList.add("hidden");
-      } else {
-        // 已登入（管理員）：顯示「編輯 / 已送養 / 刪除」，隱藏認養按鈕
-        if (publicActions) publicActions.classList.add("hidden");
-        if (actionBar) actionBar.classList.remove("hidden");
-        // editArea / editActionBar / adoptedUpload 照原本「按編輯」那套流程控制就好
-      }
-    });
 
     function render(list) {
       filteredPets = list || [];
