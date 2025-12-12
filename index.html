@@ -34,7 +34,7 @@
           <img src="images/dogpaw.png" alt="dogpaw" id="btnGoogleLogin" class="h-8 w-8 object-contain" />
           <span class="flex items-baseline gap-1">
             <span>台中簡媽媽狗園</span>
-            <span id="adminLabel" class="text-xs" style="color: #2563EB hidden">我是小編</span>
+            <span id="adminLabel" class="text-xs text-red-500 hidden">我是小編</span>
           </span>
         </a>
 
@@ -236,7 +236,7 @@
   </section>
 
   <!-- Filters + Pets -->
-  <main id="pets" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+  <main id="petsstation" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
     <!-- 手機：左右兩欄，左=貓、右=狗；直向捲動 -->
     <section class="sm:hidden">
       <div class="grid grid-cols-2 gap-4">
@@ -377,9 +377,138 @@
         <div class="bg-orange-50 rounded-xl p-4 leading-7">
           <p id="dlgDesc" class="text-gray-700 text-sm whitespace-pre-line break-words"></p>
         </div>
-        <div class="flex justify-end gap-3 pt-2">
+        <div id="guestActionBar" class="flex justify-end gap-3 pt-2">
           <button id="dlgAdopt" class="px-4 py-2 rounded-xl bg-brand-600 text-white text-sm">我要認養</button>
           <button id="dlgShare" class="px-4 py-2 rounded-xl text-white shadow-sm" style="background:#06C755">分享</button>
+        </div>
+
+        <!-- 內嵌編輯區 -->
+        <div id="editArea" class="hidden space-y-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">名字 <span class="text-red-500">*</span></label>
+            <input id="editName" class="w-full rounded-xl border border-gray-300 p-2" />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-1">類別 <span class="text-red-500">*</span></label>
+            <div class="flex gap-3">
+              <label class="inline-flex items-center gap-2">
+                <input type="radio" name="editSpecies" value="貓" class="accent-brand-600" />
+                <span>貓</span>
+              </label>
+              <label class="inline-flex items-center gap-2">
+                <input type="radio" name="editSpecies" value="狗" class="accent-brand-600" />
+                <span>狗</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium mb-1">品種</label>
+              <select id="editBreedType" class="w-full rounded-xl border border-gray-300 p-2">
+                <option value="">請選擇</option>
+              </select>
+            </div>
+            <div>
+              <label id="editBreedLabel" class="block text-sm font-medium mb-1">品種/毛色</label>
+              <select id="editBreed" class="w-full rounded-xl border border-gray-300 p-2" disabled>
+                <option value="">請先選擇品種</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium mb-1">年齡</label>
+              <input id="editAge" class="w-full rounded-xl border border-gray-300 p-2" placeholder="例：2 歲 或 8 個月" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1">性別</label>
+              <select id="editGender" class="w-full rounded-xl border border-gray-300 p-2">
+                <option value="">未設定</option>
+                <option value="男生">男生</option>
+                <option value="女生">女生</option>
+              </select>
+            </div>
+          </div>
+          <!-- 健康（編輯用） -->
+          <div>
+            <label class="block text-sm font-medium mb-1">健康</label>
+            <div class="flex items-center gap-6">
+              <label class="inline-flex items-center gap-2">
+                <input id="editNeutered" type="checkbox" class="h-4 w-4">
+                <span>結紮</span>
+              </label>
+              <label class="inline-flex items-center gap-2">
+                <input id="editVaccinated" type="checkbox" class="h-4 w-4">
+                <span>預防針</span>
+              </label>
+            </div>
+          </div>
+
+
+          <div>
+            <label class="block text-sm font-medium mb-1">簡介</label>
+            <textarea id="editDesc" rows="4" class="w-full rounded-xl border border-gray-300 p-2"></textarea>
+          </div>
+
+          <div>
+            <input id="editFiles" type="file" accept="image/*" multiple class="sr-only" />
+            <div class="flex items-center gap-3">
+              <button id="btnPickEdit" type="button"
+                class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增照片</button>
+              <span id="editCount" class="text-xs text-gray-500"></span>
+              <span class="text-sm text-gray-400">最多 5 張</span>
+            </div>
+            <!-- 和新增模式一致：三欄縮圖 + 上方間距 -->
+            <div id="editPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
+          </div>
+        </div>
+
+        <!-- 動作列 -->
+        <div id="actionBar" class="pt-2 flex flex-col sm:flex-row gap-3 hidden">
+          <button id="btnEdit" class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm">
+            編輯
+          </button>
+          <button id="btnAdopted" class="w-full px-4 py-3 rounded-xl bg-emerald-600 text-white text-sm">
+            已送養
+          </button>
+          <button id="btnUnadopt"
+            class="w-full px-4 py-3 rounded-xl border border-amber-300 text-amber-700 text-sm hidden">
+            退養
+          </button>
+          <button id="btnDelete" class="w-full px-4 py-3 rounded-xl border border-red-300 text-red-600 text-sm">
+            刪除
+          </button>
+        </div>
+        <div id="editActionBar" class="hidden pt-2 grid grid-cols-2 gap-3">
+          <button id="btnSave"
+            class="w-full px-4 py-3 rounded-xl bg-gray-900 text-white text-sm flex items-center justify-center gap-2">
+            <span id="saveText">儲存</span>
+          </button>
+          <button id="btnCancel" class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm">
+            取消
+          </button>
+        </div>
+
+        <!-- 已領養合照上傳 -->
+        <div id="adoptedUpload" class="hidden">
+          <input id="adoptedFiles" type="file" accept="image/*" multiple class="sr-only" />
+          <div class="flex items-center gap-3 mb-2">
+            <button id="btnPickAdopted" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
+              選擇合照
+            </button>
+            <span id="adoptedCount" class="text-xs text-gray-500"></span>
+            <span class="text-sm text-gray-400">最多 5 張</span>
+          </div>
+          <div id="adoptedPreview" class="mt-1 grid grid-cols-3 gap-2"></div>
+          <button id="btnConfirmAdopted" class="mt-3 px-4 py-2 rounded-xl bg-gray-900 text-white text-sm">
+            儲存領養資訊
+          </button>
+          <button id="btnCancel" type="button" class="px-3 py-2 rounded-lg bg-gray-200 text-gray-900 hover:bg-gray-300">
+            取消
+          </button>
         </div>
       </div>
     </div>
@@ -405,8 +534,10 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
     import {
       getFirestore, collection, getDocs, query, orderBy, where,
+      doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp, limit as fbLimit,
       getCountFromServer, Timestamp
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+    import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject, listAll, } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
     import {
       getAuth,
       GoogleAuthProvider,
@@ -417,6 +548,15 @@
 
     const app = initializeApp(window.firebaseConfig);
     const db = getFirestore(app);
+    const storage = getStorage(app);
+
+    // 讓 dialog（petDialog.fixed.js / shared.js）能在「非 module」腳本中使用 Firebase 與狀態
+    Object.assign(window, {
+      db, storage,
+      collection, getDocs, query, orderBy, where,
+      doc, getDoc, updateDoc, deleteDoc, serverTimestamp, fbLimit,
+      sRef, uploadBytes, getDownloadURL, deleteObject, listAll,
+    });
 
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
@@ -425,6 +565,9 @@
     const adminLabel = document.getElementById("adminLabel");
     const adminLinks = document.querySelectorAll(".nav-admin-link");
     const logoutBtns = document.querySelectorAll(".nav-logout-btn");
+    // ⬇ 新增：modal 裡兩組按鈕
+    const guestActionBar = document.getElementById("guestActionBar");
+    const adminActionBar = document.getElementById("actionBar");
 
     // 依登入狀態更新 header / 導覽
     onAuthStateChanged(auth, (user) => {
@@ -441,6 +584,19 @@
       logoutBtns.forEach((el) => {
         el.classList.toggle("hidden", !isLogin);
       });
+
+      // modal：訪客（我要認養/分享） vs 管理員（編輯/已送養/刪除）
+      if (guestActionBar) {
+        // class 保險，順便用 display 強制
+        guestActionBar.classList.toggle("hidden", isLogin);
+        guestActionBar.style.display = isLogin ? "none" : "flex";
+      }
+
+      if (adminActionBar) {
+        adminActionBar.classList.toggle("hidden", !isLogin);
+        // 管理員那排本來是 grid
+        adminActionBar.style.display = isLogin ? "grid" : "none";
+      }
     });
 
     // 點狗掌 → Google 登入（未登入時）
@@ -456,7 +612,7 @@
           // 登入後會觸發 onAuthStateChanged，所以不用另外改畫面
         } catch (err) {
           console.error("Google 登入失敗", err);
-          alert("Google 登入失敗，請稍後再試。");
+          window.location.replace("index.html");
         }
       });
     }
@@ -480,7 +636,7 @@
 
     // 統計起始基數（已成功送養、待領養貓咪、待領養狗狗）
     const STATS_BASE = { adopted: 1021, cats: 89, dogs: 743 };
-    let pets = [];
+    const pets = (window.pets ||= []);
     let currentPetId = null;
 
     const $ = (q) => document.querySelector(q);
@@ -606,70 +762,7 @@
         .forEach(btn => btn.addEventListener('click', (e) => openDialog(e.currentTarget.dataset.id)));
     }
 
-    function openDialog(id) {
-      const p = pets.find(x => x.id === id);
-      if (!p) return;
 
-      const dlgImg = document.getElementById("dlgImg");
-      const dlgBg = document.getElementById("dlgBg");
-      const dlgThumbs = document.getElementById("dlgThumbs");
-      // 第二排：健康標籤
-      const isNeutered = !!p.neutered;
-      const isVaccinated = !!p.vaccinated;
-
-      document.getElementById('dlgTagNeutered').textContent = isNeutered
-        ? '已結紮' : '未結紮';
-
-      document.getElementById('dlgTagVaccinated').textContent = isVaccinated
-        ? '已注射預防針' : '未注射預防針';
-
-      // 取所有圖片（images 是陣列；後台 upload 時必定有）
-      const imgs = Array.isArray(p.images) && p.images.length > 0
-        ? p.images
-        : (p.image ? [p.image] : []);
-
-      // 設定主圖
-      dlgImg.src = imgs[0] || "";
-      if (dlgBg) dlgBg.src = dlgImg.src;
-      dlgImg.onclick = () => openLightbox(imgs, 0);  // 讓主圖可進入 Lightbox
-
-      // 生成縮圖列
-      dlgThumbs.innerHTML = "";
-      imgs.forEach((url, i) => {
-        const thumb = document.createElement("img");
-        thumb.src = url;
-        thumb.className = "dlg-thumb" + (i === 0 ? " active" : "");
-        thumb.dataset.index = i;
-
-        // 點縮圖 → 切換主圖 + 啟動對應的 Lightbox 頁面
-        thumb.addEventListener("click", () => {
-          dlgImg.src = url;
-          if (dlgBg) dlgBg.src = url;
-
-          // 更新 active 樣式
-          document.querySelectorAll(".dlg-thumb").forEach(el => el.classList.remove("active"));
-          thumb.classList.add("active");
-        });
-
-        dlgThumbs.appendChild(thumb);
-      });
-
-      // 基本資料（原本的）
-      document.getElementById('dlgName').textContent = p.name;
-      document.getElementById('dlgDesc').textContent = p.desc;
-
-      currentPetId = id;
-      history.replaceState(null, '', `?pet=${encodeURIComponent(id)}`);
-
-      // 三個圓角標籤（不換行，超出可橫向捲動）
-      document.getElementById('dlgTagBreed').textContent = p.breed;
-      document.getElementById('dlgTagAge').textContent = p.age;
-      document.getElementById('dlgTagGender').textContent = p.gender;
-
-      // 開啟前鎖住背景捲動
-      lockScroll();
-      dlg.showModal();
-    }
 
     async function loadPets() {
       const qRef = query(collection(db, "pets"), where("status", "==", "available"), orderBy("createdAt", "desc"));
@@ -679,7 +772,8 @@
       const cats = all.filter(p => p.species === "貓").slice(0, 6);
       const dogs = all.filter(p => p.species === "狗").slice(0, 6);
 
-      pets = [...cats, ...dogs];          // 供 modal 使用
+      pets.length = 0;
+      pets.push(...[...cats, ...dogs]);
       applyStats();
 
       // 桌機版：3 排（每排 4 張）
@@ -790,6 +884,7 @@
       const el = document.getElementById("statWeeklyAdopted");
       if (el) el.textContent = n.toLocaleString();
     }
+    window.loadPets = loadPets;
     loadPets();
     computeWeeklyAdopted();
   </script>
@@ -806,7 +901,8 @@
   }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script src="assets/shared.js"></script>
+  <script src="assets/Modal.js"></script>
+  <script src="assets/Lightbox.js"></script>
 </body>
 
 </html>

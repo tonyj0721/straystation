@@ -401,7 +401,7 @@
         </div>
 
         <!-- 動作列 -->
-        <div id="actionBar" class="pt-2 grid grid-cols-1 sm:grid-cols-4 gap-3 hidden">
+        <div id="actionBar" class="pt-2 flex flex-col sm:flex-row gap-3 hidden">
           <button id="btnEdit" class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm">
             編輯
           </button>
@@ -545,7 +545,7 @@
           // 登入後會觸發 onAuthStateChanged，所以不用另外改畫面
         } catch (err) {
           console.error("Google 登入失敗", err);
-          alert("Google 登入失敗，請稍後再試。");
+          window.location.replace("index.html");
         }
       });
     }
@@ -788,14 +788,6 @@
       $('#fGender').addEventListener('change', applyFilters);
     }
 
-    (async () => {
-      try {
-        await loadPets();
-      } catch (e) {
-        console.error("loadPets failed", e);
-      }
-    })();
-
     $('#dlgShare').addEventListener('click', () => {
       if (!currentPetId) return;
       const name = document.getElementById('dlgName').textContent.trim();
@@ -893,8 +885,8 @@
     loadPets();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script src="assets/shared.js"></script>
-  <script src="assets/petDialog.js"></script>
+  <script src="assets/Modal.js"></script>
+  <script src="assets/Lightbox.js"></script>
 </body>
 
 </html>
