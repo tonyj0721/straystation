@@ -572,6 +572,7 @@
     // 依登入狀態更新 header / 導覽
     onAuthStateChanged(auth, (user) => {
       const isLogin = !!user;
+      window.__isLogin = isLogin;  // ← 加這行
 
       if (adminLabel) {
         adminLabel.classList.toggle("hidden", !isLogin);
@@ -597,6 +598,10 @@
         // 管理員那排本來是 grid
         adminActionBar.style.display = isLogin ? "grid" : "none";
       }
+
+      // 如果 dialog 已開著，順便把 actionBar 狀態同步一次
+      const inEdit = !document.getElementById("editArea")?.classList.contains("hidden");
+      if (typeof window.setEditMode === "function") window.setEditMode(inEdit); // ← 加這行
     });
 
     // 點狗掌 → Google 登入（未登入時）

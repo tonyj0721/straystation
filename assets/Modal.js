@@ -293,12 +293,14 @@ async function onDelete() {
 
 // 切換編輯模式
 function setEditMode(on) {
+  const isLogin = !!window.__isLogin;
+  // 沒登入：不允許進入編輯模式
+  if (!isLogin) on = false;
+
   document.getElementById("editArea").classList.toggle("hidden", !on);
-  document.getElementById("actionBar").classList.toggle("hidden", on);
-  document.getElementById("editActionBar").classList.toggle("hidden", !on);
-  if (on) {
-    document.getElementById("adoptedUpload").classList.add("hidden");
-  }
+  document.getElementById("actionBar").classList.toggle("hidden", on || !isLogin); // ← 關鍵
+  document.getElementById("editActionBar").classList.toggle("hidden", !on || !isLogin);
+  if (on) document.getElementById("adoptedUpload").classList.add("hidden");
 }
 
 // ===============================
