@@ -21,6 +21,9 @@
   <title>已領養牆｜台中簡媽媽狗園</title>
   <meta content="曾被認養的毛孩故事與合照。" name="description" />
   <meta name="theme-color" content="#fcd34d">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="stylesheet" href="assets/tailwind.css">
   <link rel="stylesheet" href="assets/shared.css">
   <style>
@@ -495,6 +498,13 @@
 
     const y = document.getElementById('year');
     if (y) y.textContent = new Date().getFullYear();
+  </script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js");
+      });
+    }
   </script>
 </body>
 

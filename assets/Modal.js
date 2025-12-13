@@ -235,6 +235,14 @@ document.getElementById("dlgClose").addEventListener("click", () => {
   document.documentElement.style.overflow = oldHtmlOverflow;
 });
 
+function scrollDialogTop() {
+  const dlg = document.getElementById("petDialog");
+  requestAnimationFrame(() => {
+    dlg?.scrollTo?.({ top: 0, behavior: "smooth" });
+    if (dlg) dlg.scrollTop = 0; // 後援
+  });
+}
+
 // 綁定 Dialog 內各種按鈕行為
 function bindDialogActions() {
   document.getElementById("btnDelete").onclick = onDelete;
@@ -251,17 +259,23 @@ function bindDialogActions() {
     document.getElementById("adoptedFiles").click();
 
   document.getElementById("btnConfirmAdopted").onclick = onConfirmAdopted;
-  document.getElementById("btnCancelAdopted")?.addEventListener("click", (e) => {
-    e.preventDefault();
-    resetAdoptedSelection();
-    document.getElementById("adoptedUpload")?.classList.add("hidden");
-  });
+  const btnCancelAdopted = document.getElementById("btnCancelAdopted");
+  if (btnCancelAdopted) {
+    btnCancelAdopted.onclick = (e) => {
+      e.preventDefault();
+      resetAdoptedSelection();
+      document.getElementById("adoptedUpload")?.classList.add("hidden");
+      scrollDialogTop();
+    };
+  }
   document.getElementById("btnSave").onclick = saveEdit;
 
-  document.getElementById("btnCancel").onclick = () => {
-    // 取消編輯 → 回復顯示最新資料
-    openDialog(currentDocId);
+  // 取消編輯：回到瀏覽模式內容 + 回頂端
+  document.getElementById("btnCancel").onclick = async (e) => {
+    e.preventDefault();
+    await openDialog(currentDocId);   // 一定要 await，等內容重畫完
     resetAdoptedSelection();
+    scrollDialogTop();
   };
 }
 
