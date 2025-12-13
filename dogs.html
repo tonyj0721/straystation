@@ -793,8 +793,15 @@
       if (!petId) return;
       const name = document.getElementById('dlgName').textContent.trim();
       const url = makePetUrl(petId);
-      const msg = `一起幫『 ${name} 』找到家！ ${url}`;
-      window.open(`https://line.me/R/msg/text/?${encodeURIComponent(msg)}`, '_blank', 'noopener');
+      const msg = `一起幫『 ${name} 』找到家！\n${url}`;
+
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+      const shareUrl = isMobile
+        ? `https://line.me/R/share?text=${encodeURIComponent(msg)}`
+        : `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}&text=${encodeURIComponent(`一起幫 ${name} 找到家！`)}`;
+
+      window.open(shareUrl, '_blank', 'noopener,noreferrer');
     });
 
     document.getElementById('dlgAdopt').onclick = () => {
