@@ -590,16 +590,23 @@
       if (guestActionBar) {
         // class 保險，順便用 display 強制
         guestActionBar.classList.toggle("hidden", isLogin);
-        guestActionBar.style.display = isLogin ? "none" : "flex";
+        guestActionBar.style.removeProperty("display"); // 保險：清掉舊的 inline display
       }
 
       if (adminActionBar) {
         adminActionBar.classList.toggle("hidden", !isLogin);
-        // 管理員那排本來是 grid
-        adminActionBar.style.display = isLogin ? "grid" : "none";
+        adminActionBar.style.removeProperty("display"); // 保險
       }
 
-      // 如果 dialog 已開著，順便把 actionBar 狀態同步一次
+      // 登出：強制收掉編輯狀態，且不要再 setEditMode（避免把 actionBar 又打開）
+      if (!isLogin) {
+        document.getElementById("editArea")?.classList.add("hidden");
+        document.getElementById("editActionBar")?.classList.add("hidden");
+        document.getElementById("adoptedUpload")?.classList.add("hidden");
+        return;
+      }
+
+      // 只有登入時，才同步一次目前是否在 edit mode
       const inEdit = !document.getElementById("editArea")?.classList.contains("hidden");
       if (typeof window.setEditMode === "function") window.setEditMode(inEdit); // ← 加這行
     });
