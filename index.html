@@ -788,7 +788,7 @@
       const petId = window.currentPetId;   // ✅ 用全域
       if (!petId) return;
       const name = document.getElementById('dlgName').textContent.trim();
-      const url = makePetUrl(currentPetId);
+      const url = makePetUrl(petId);
       const text = `一起幫 ${name} 找到家！`;
       window.open(`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`, '_blank', 'noopener');
     });
