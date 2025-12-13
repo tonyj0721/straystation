@@ -578,9 +578,6 @@
 
       // 登出按鈕：有登入才顯示
       logoutBtns.forEach(btn => btn.classList.toggle("hidden", !isLogin));
-
-      // 如果 dialog 正開著，順便把編輯狀態收起來（保險）
-      if (typeof window.setEditMode === "function") window.setEditMode(false);
     });
 
     // ✅ 桌機＋手機「登出」
