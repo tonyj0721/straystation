@@ -294,7 +294,9 @@ async function onDelete() {
 // 切換編輯模式
 function setEditMode(on) {
   document.getElementById("editArea").classList.toggle("hidden", !on);
-  document.getElementById("actionBar").classList.toggle("hidden", on);
+  const ab = document.getElementById("actionBar");
+  ab.classList.toggle("hidden", on);
+  ab.style.display = on ? "none" : ""; // ← 關鍵
   document.getElementById("editActionBar").classList.toggle("hidden", !on);
   if (on) {
     document.getElementById("adoptedUpload").classList.add("hidden");
