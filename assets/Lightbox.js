@@ -34,14 +34,14 @@ $('#dlgClose').addEventListener('click', () => {
   dlg.close();
   unlockScroll();
   history.replaceState(null, '', location.pathname);
-  currentPetId = null;
+  window.currentPetId = null;
 });
 
 // 防止使用者按 ESC 或點 backdrop 關掉時，背景卡死
 dlg.addEventListener('close', () => {
   // 若是因 Lightbox 開啟而關掉 dialog → 不要清除 currentPetId
   if (!lb.classList.contains("flex")) {
-    currentPetId = null;
+    window.currentPetId = null;
     history.replaceState(null, '', location.pathname);
   }
   unlockScroll();

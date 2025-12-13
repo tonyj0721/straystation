@@ -129,7 +129,7 @@ async function openDialog(id) {
   // 2. 共用狀態 + URL
   currentDoc = p;
   currentDocId = p.id;
-  currentPetId = p.id;
+  window.currentPetId = p.id;
   history.replaceState(null, '', `?pet=${encodeURIComponent(p.id)}`);
 
   // 3. 健康標籤（第二排）

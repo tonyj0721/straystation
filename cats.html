@@ -789,7 +789,8 @@
     }
 
     $('#dlgShare').addEventListener('click', () => {
-      if (!currentPetId) return;
+      const petId = window.currentPetId;   // ✅ 用全域
+      if (!petId) return;
       const name = document.getElementById('dlgName').textContent.trim();
       const url = makePetUrl(currentPetId);
       const text = `一起幫 ${name} 找到家！`;
