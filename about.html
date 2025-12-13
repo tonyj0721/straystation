@@ -19,7 +19,7 @@
   <link rel="icon" href="images/dogpaw-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="images/dogpaw-180.png">
   <title>關於簡媽媽｜台中簡媽媽狗園</title>
-  <meta name="description" content="瀏覽待認養貓咪清單，支援品種、毛色、年齡、性別篩選，快速找到適合你的毛孩。">
+  <meta name="description" content="關於台中簡媽媽狗園：救援與照護浪浪、協助送養，讓每個孩子找到安全溫暖的家。">
   <meta name="theme-color" content="#fcd34d">
   <link rel="manifest" href="./manifest.webmanifest">
   <meta name="mobile-web-app-capable" content="yes">
@@ -276,6 +276,15 @@
 
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
+    const EDITOR_EMAILS = new Set([
+      "aaa@gmail.com",
+      "bbb@gmail.com",
+    ].map(s => s.toLowerCase()));
+
+    function isEditorUser(user) {
+      const email = (user?.email || "").toLowerCase();
+      return !!email && EDITOR_EMAILS.has(email);
+    }
 
     const dogpawBtn = document.getElementById("btnGoogleLogin");
     const adminLabel = document.getElementById("adminLabel");
@@ -283,20 +292,20 @@
     const logoutBtns = document.querySelectorAll(".nav-logout-btn");
 
     // 依登入狀態更新 header / 導覽
-    onAuthStateChanged(auth, (user) => {
-      const isLogin = !!user;
+    onAuthStateChanged(auth, async (user) => {
+      const isEditor = isEditorUser(user);
 
-      if (adminLabel) {
-        adminLabel.classList.toggle("hidden", !isLogin);
+      // ✅ 登入成功但不在白名單：立刻踢出
+      if (user && !isEditor) {
+        await signOut(auth);
+        location.replace("index.html");
+        return;
       }
 
-      adminLinks.forEach((el) => {
-        el.classList.toggle("hidden", !isLogin);
-      });
-
-      logoutBtns.forEach((el) => {
-        el.classList.toggle("hidden", !isLogin);
-      });
+      // 以下 UI 全部改看 isEditor
+      if (adminLabel) adminLabel.classList.toggle("hidden", !isEditor);
+      adminLinks.forEach(el => el.classList.toggle("hidden", !isEditor));
+      logoutBtns.forEach(el => el.classList.toggle("hidden", !isEditor));
     });
 
     // 點狗掌 → Google 登入（未登入時）
@@ -308,11 +317,15 @@
         if (auth.currentUser) return;   // 已登入就不重複登入
 
         try {
-          await signInWithPopup(auth, provider);
-          // 登入後會觸發 onAuthStateChanged，所以不用另外改畫面
+          const result = await signInWithPopup(auth, provider);
+
+          if (!isEditorUser(result.user)) {
+            await signOut(auth);
+            location.replace("index.html"); // 不想跳轉就刪掉
+            return;
+          }
         } catch (err) {
-          console.error("Google 登入失敗", err);
-          window.location.replace("index.html");
+          location.replace("index.html");
         }
       });
     }

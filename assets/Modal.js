@@ -292,7 +292,7 @@ async function onDelete() {
     cancelButtonText: "取消",
   });
   if (!ok.isConfirmed) {
-    if (wasOpen) dlg.showModal();
+    if (wasOpen) { lockScroll(); dlg.showModal(); }
     return;
   }
 
@@ -306,7 +306,7 @@ async function onDelete() {
     await Swal.fire({ icon: "success", title: "刪除成功", showConfirmButton: false, timer: 1500, });
   } catch (err) {
     await Swal.fire({ icon: "error", title: "刪除失敗", text: err.message });
-    if (wasOpen) dlg.showModal();
+    if (wasOpen) { lockScroll(); dlg.showModal(); }
   }
 }
 
@@ -430,7 +430,7 @@ async function saveEdit() {
     const wasOpen = dlg.open;
     if (wasOpen) dlg.close();
     await Swal.fire({ icon: "success", title: "已儲存", showConfirmButton: false, timer: 1500 });
-    if (wasOpen) dlg.showModal();
+    if (wasOpen) { lockScroll(); dlg.showModal(); }
 
     setEditMode(false);
     await openDialog(currentDocId);
@@ -710,7 +710,7 @@ async function onUnadopt() {
   });
 
   if (!isConfirmed) {
-    if (wasOpen) dlg.showModal();
+    if (wasOpen) { lockScroll(); dlg.showModal(); }
     return;
   }
 
@@ -730,7 +730,7 @@ async function onUnadopt() {
   } catch (err) {
     await Swal.fire({ icon: "error", title: "撤回失敗", text: err.message });
   } finally {
-    if (wasOpen) dlg.showModal();
+    if (wasOpen) { lockScroll(); dlg.showModal(); }
     // 重新渲染讓按鈕狀態即時切換
     const p = pets.find((x) => x.id === currentDocId);
     if (p) await openDialog(p.id);
