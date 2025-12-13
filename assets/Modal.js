@@ -251,6 +251,11 @@ function bindDialogActions() {
     document.getElementById("adoptedFiles").click();
 
   document.getElementById("btnConfirmAdopted").onclick = onConfirmAdopted;
+  document.getElementById("btnCancelAdopted")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    resetAdoptedSelection();
+    document.getElementById("adoptedUpload")?.classList.add("hidden");
+  });
   document.getElementById("btnSave").onclick = saveEdit;
 
   document.getElementById("btnCancel").onclick = () => {
@@ -788,7 +793,7 @@ function swalInDialog(opts) {
 })();
 
 // === 取消：事件委派，避免動態重繪導致沒綁到 ===
-document.addEventListener("click", (e) => {
+/*document.addEventListener("click", (e) => {
   const cancelBtn = e.target.closest?.("#btnCancel");
   if (!cancelBtn) return;
 
@@ -817,7 +822,7 @@ document.addEventListener("click", (e) => {
     // dlg?.removeAttribute?.("open");
     // dlg?.setAttribute?.("aria-hidden", "true");
   } catch { }
-});
+});*/
 
 async function deleteAllUnder(path) {
   const folderRef = sRef(storage, path);
