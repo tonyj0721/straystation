@@ -789,7 +789,7 @@
       if (!petId) return;
       const name = document.getElementById('dlgName').textContent.trim();
       const url = makePetUrl(petId);
-      const msg = `一起幫 ${name} 找到家！\n${url}`;
+      const msg = `一起幫『 ${name} 』找到家！\n${url}`;
       const lineShare = `https://line.me/R/share?text=${encodeURIComponent(msg)}`;
       window.open(lineShare, '_blank', 'noopener,noreferrer');
     });
