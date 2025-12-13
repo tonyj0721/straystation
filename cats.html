@@ -522,13 +522,13 @@
       if (guestActionBar) {
         // class 保險，順便用 display 強制
         guestActionBar.classList.toggle("hidden", isLogin);
-        guestActionBar.style.removeProperty("display");
+        guestActionBar.style.display = isLogin ? "none" : "flex";
       }
 
       if (adminActionBar) {
         adminActionBar.classList.toggle("hidden", !isLogin);
         // 管理員那排本來是 grid
-        adminActionBar.style.removeProperty("display");
+        adminActionBar.style.display = isLogin ? "grid" : "none";
       }
     });
 
@@ -793,9 +793,8 @@
       if (!petId) return;
       const name = document.getElementById('dlgName').textContent.trim();
       const url = makePetUrl(petId);
-      const msg = `一起幫『 ${name} 』找到家！\n${url}`;
-      const lineShare = `https://line.me/R/share?text=${encodeURIComponent(msg)}`;
-      window.open(lineShare, '_blank', 'noopener,noreferrer');
+      const msg = `一起幫『 ${name} 』找到家！ ${url}`;
+      window.open(`https://line.me/R/msg/text/?${encodeURIComponent(msg)}`, '_blank', 'noopener');
     });
 
     document.getElementById('dlgAdopt').onclick = () => {
