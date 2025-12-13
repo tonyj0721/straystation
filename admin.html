@@ -570,14 +570,17 @@
 
     // ✅ 只有登入者才能進這頁
     onAuthStateChanged(auth, (user) => {
-      /*if (!user) {
-        // 沒登入就導回首頁（或你要的頁面）
-        window.location.replace("index.html");
-        return;
-      }*/
+      const isLogin = !!user;
+      window.__isLogin = isLogin;  // ← 加這行
 
-      // 已登入：顯示登出按鈕
-      logoutBtns.forEach((btn) => btn.classList.remove("hidden"));
+      // 沒登入就踢回首頁
+      // if (!isLogin) { window.location.replace("index.html"); return; }
+
+      // 登出按鈕：有登入才顯示
+      logoutBtns.forEach(btn => btn.classList.toggle("hidden", !isLogin));
+
+      // 如果 dialog 正開著，順便把編輯狀態收起來（保險）
+      if (typeof window.setEditMode === "function") window.setEditMode(false);
     });
 
     // ✅ 桌機＋手機「登出」
