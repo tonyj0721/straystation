@@ -620,19 +620,28 @@
 
     // 點狗掌 → 連點 5 下才 Google 登入（未登入時）
     if (dogpawBtn) {
-      const TAP_TARGET = 5;        // 連點幾下才觸發登入
-      const TAP_WINDOW_MS = 3000;  // 必須在幾毫秒內完成
+      const TAP_TARGET = 5;        // 連點幾下才登入
+      const TAP_WINDOW_MS = 2000;  // 需在這時間內完成
+      const NAV_DELAY_MS = 280;    // 單點導頁延遲（避免你其實要連點）
 
       let tapCount = 0;
-      let tapTimer = null;
+      let windowTimer = null;
+      let navTimer = null;
+
+      function reset() {
+        tapCount = 0;
+        if (windowTimer) clearTimeout(windowTimer);
+        if (navTimer) clearTimeout(navTimer);
+        windowTimer = null;
+        navTimer = null;
+      }
 
       async function doLogin() {
-        if (auth.currentUser) return; // 已登入就不重複登入
+        if (auth.currentUser) return;   // 已登入就不重複登入
 
         try {
           const result = await signInWithPopup(auth, provider);
 
-          // 白名單：不符合就無聲踢掉（你原本的邏輯照用）
           if (!isEditorUser(result.user)) {
             await signOut(auth);
             location.replace("index.html");
@@ -644,29 +653,42 @@
       }
 
       dogpawBtn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+        const a = dogpawBtn.closest("a");
+        const href = a?.getAttribute("href");
 
-        // 已登入就不計數、不觸發
-        if (auth.currentUser) return;
+        // 未登入才啟用「隱藏連點登入」
+        if (!auth.currentUser) {
+          e.preventDefault();
+          e.stopPropagation();
 
-        tapCount++;
+          tapCount++;
 
-        // 第一下開始計時窗
-        if (!tapTimer) {
-          tapTimer = setTimeout(() => {
-            tapCount = 0;
-            tapTimer = null;
-          }, TAP_WINDOW_MS);
+          // 第一下：先排一個「單點導頁」
+          if (tapCount === 1 && href) {
+            navTimer = setTimeout(() => {
+              reset();
+              location.assign(href); // 等同點連結
+            }, NAV_DELAY_MS);
+          } else {
+            // 有第2下就代表在連點：取消單點導頁
+            if (navTimer) { clearTimeout(navTimer); navTimer = null; }
+          }
+
+          // 開啟連點時間窗
+          if (!windowTimer) {
+            windowTimer = setTimeout(() => reset(), TAP_WINDOW_MS);
+          }
+
+          // 達標：登入
+          if (tapCount >= TAP_TARGET) {
+            reset();
+            void doLogin();
+          }
+
+          return;
         }
 
-        // 達標：觸發登入，並重置計數
-        if (tapCount >= TAP_TARGET) {
-          tapCount = 0;
-          clearTimeout(tapTimer);
-          tapTimer = null;
-          void doLogin();
-        }
+        // 已登入：就讓它當一般連結（不用擋）
       });
     }
 
