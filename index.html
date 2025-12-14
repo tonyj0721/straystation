@@ -42,22 +42,25 @@
             </span>
             </a>
 
-            <!-- 隱藏登入熱區（長按觸發） -->
-            <span id="btnHiddenLogin" aria-label="hidden login" style="
-                    position:absolute;
-                    left:calc(100% + 6px);
-                    top:50%;
-                    transform:translateY(-50%);
-                    width:28px;
-                    height:28px;
-                    opacity: 0.35;
-background: rgba(255,0,0,0.35);
-outline: 2px solid red;
-                    -webkit-touch-callout:none;
-                    user-select:none;
-                    touch-action:manipulation;
-                    cursor: default;
-                  "></span>
+            <!-- ✅ 獨立熱區：不在 a 裡面 -->
+  <span id="btnHiddenLogin" aria-label="hidden login"
+        style="
+          position:absolute;
+          right:-10px;            /* 往右移：避免蓋到文字 */
+          top:50%;
+          transform:translateY(-50%);
+          width:28px;
+          height:28px;
+
+          opacity:0;              /* 要找位置先改成 0.35 並加背景/框 */
+          cursor:default;
+          user-select:none;
+          -webkit-user-select:none;
+          -webkit-touch-callout:none;
+          -webkit-tap-highlight-color:transparent;
+          touch-action:manipulation;
+        "></span>
+        </div>
           
         
 
