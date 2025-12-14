@@ -618,24 +618,54 @@
       if (typeof window.setEditMode === "function") window.setEditMode(inEdit);
     });
 
-    // 點狗掌 → Google 登入（未登入時）
+    // 點狗掌 → 連點 5 下才 Google 登入（未登入時）
     if (dogpawBtn) {
-      dogpawBtn.addEventListener("click", async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+      const TAP_TARGET = 5;        // 連點幾下才觸發登入
+      const TAP_WINDOW_MS = 3000;  // 必須在幾毫秒內完成
 
-        if (auth.currentUser) return;   // 已登入就不重複登入
+      let tapCount = 0;
+      let tapTimer = null;
+
+      async function doLogin() {
+        if (auth.currentUser) return; // 已登入就不重複登入
 
         try {
           const result = await signInWithPopup(auth, provider);
 
+          // 白名單：不符合就無聲踢掉（你原本的邏輯照用）
           if (!isEditorUser(result.user)) {
             await signOut(auth);
-            location.replace("index.html"); // 不想跳轉就刪掉
+            location.replace("index.html");
             return;
           }
         } catch (err) {
           location.replace("index.html");
+        }
+      }
+
+      dogpawBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // 已登入就不計數、不觸發
+        if (auth.currentUser) return;
+
+        tapCount++;
+
+        // 第一下開始計時窗
+        if (!tapTimer) {
+          tapTimer = setTimeout(() => {
+            tapCount = 0;
+            tapTimer = null;
+          }, TAP_WINDOW_MS);
+        }
+
+        // 達標：觸發登入，並重置計數
+        if (tapCount >= TAP_TARGET) {
+          tapCount = 0;
+          clearTimeout(tapTimer);
+          tapTimer = null;
+          void doLogin();
         }
       });
     }
