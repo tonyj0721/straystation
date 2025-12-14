@@ -34,13 +34,20 @@
   <header class="bg-white/80 backdrop-blur border-b border-gray-200">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="h-16 flex items-center justify-between">
-        <a href="index.html" class="flex items-center gap-2 font-semibold text-2xl">
-          <img src="images/dogpaw.png" alt="dogpaw" id="btnGoogleLogin" class="h-8 w-8 object-contain" />
-          <span class="flex items-baseline gap-1">
-            <span>台中簡媽媽狗園</span>
-            <span id="adminLabel" class="text-xs text-red-500 hidden">我是小編</span>
-          </span>
-        </a>
+        <div class="relative inline-flex items-center">
+          <a href="index.html" class="flex items-center gap-2 font-semibold text-2xl">
+            <img src="images/dogpaw.png" alt="dogpaw" class="h-8 w-8 object-contain" />
+            <span class="flex items-baseline gap-1">
+              <span>台中簡媽媽狗園</span>
+              <span id="adminLabel" class="text-xs text-red-500 hidden">我是小編</span>
+            </span>
+          </a>
+
+          <!-- 小塊固定位置（右邊空白處） -->
+          <button id="btnHiddenLogin" type="button" aria-label="hidden login"
+            class="absolute left-full ml-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-red-500 border border-red-500"
+            style="-webkit-touch-callout:none;"></button>
+        </div>
 
         <!-- 桌機導覽 -->
         <nav class="hidden md:flex items-center gap-6 ml-auto">
@@ -571,7 +578,6 @@
       return !!email && EDITOR_EMAILS.has(email);
     }
 
-    const dogpawBtn = document.getElementById("btnGoogleLogin");
     const adminLabel = document.getElementById("adminLabel");
     const adminLinks = document.querySelectorAll(".nav-admin-link");
     const logoutBtns = document.querySelectorAll(".nav-logout-btn");
@@ -586,16 +592,15 @@
 
       // ✅ 登入成功但不在白名單：立刻踢出
       if (user && !isEditor) {
-        await signOut(auth);
-        location.replace("index.html");
+        try { await signOut(auth); } catch (_) { }
         return;
       }
 
-      // 以下 UI 全部改看 isEditor
       if (adminLabel) adminLabel.classList.toggle("hidden", !isEditor);
       adminLinks.forEach(el => el.classList.toggle("hidden", !isEditor));
       logoutBtns.forEach(el => el.classList.toggle("hidden", !isEditor));
 
+      // modal：訪客（我要認養/分享） vs 小編（編輯/已送養/刪除）
       if (guestActionBar) {
         guestActionBar.classList.toggle("hidden", isEditor);
         guestActionBar.style.removeProperty("display");
@@ -618,78 +623,66 @@
       if (typeof window.setEditMode === "function") window.setEditMode(inEdit);
     });
 
-    // 點狗掌 → 連點 5 下才 Google 登入（未登入時）
-    if (dogpawBtn) {
-      const TAP_TARGET = 5;        // 連點幾下才登入
-      const TAP_WINDOW_MS = 2000;  // 需在這時間內完成
-      const NAV_DELAY_MS = 280;    // 單點導頁延遲（避免你其實要連點）
+    // 隱藏登入（長按觸發）
+    const hiddenLoginBtn = document.getElementById("btnHiddenLogin");
+    const LONG_PRESS_MS = 1200; // 長按多久才觸發登入（毫秒）
+    let pressTimer = null;
 
-      let tapCount = 0;
-      let windowTimer = null;
-      let navTimer = null;
+    async function tryEditorLogin() {
+      if (auth.currentUser) return;
 
-      function reset() {
-        tapCount = 0;
-        if (windowTimer) clearTimeout(windowTimer);
-        if (navTimer) clearTimeout(navTimer);
-        windowTimer = null;
-        navTimer = null;
+      try {
+        const result = await signInWithPopup(auth, provider);
+
+        // 登入成功但不在白名單：立刻登出（保持無聲）
+        if (!isEditorUser(result.user)) {
+          try { await signOut(auth); } catch (_) { }
+        }
+      } catch (_) {
+        // 登入流程取消/失敗：保持無聲
+      }
+    }
+
+    function startPress(e) {
+      if (auth.currentUser) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (pressTimer) clearTimeout(pressTimer);
+      pressTimer = setTimeout(() => {
+        pressTimer = null;
+        tryEditorLogin();
+      }, LONG_PRESS_MS);
+    }
+
+    function cancelPress() {
+      if (!pressTimer) return;
+      clearTimeout(pressTimer);
+      pressTimer = null;
+    }
+
+    if (hiddenLoginBtn) {
+      // 優先用 PointerEvent；不支援才退回 touch/mouse
+      if ("PointerEvent" in window) {
+        hiddenLoginBtn.addEventListener("pointerdown", startPress, { passive: false });
+        hiddenLoginBtn.addEventListener("pointerup", cancelPress);
+        hiddenLoginBtn.addEventListener("pointercancel", cancelPress);
+        hiddenLoginBtn.addEventListener("pointerleave", cancelPress);
+      } else {
+        hiddenLoginBtn.addEventListener("touchstart", startPress, { passive: false });
+        hiddenLoginBtn.addEventListener("touchend", cancelPress);
+        hiddenLoginBtn.addEventListener("touchcancel", cancelPress);
+        hiddenLoginBtn.addEventListener("mousedown", startPress);
+        hiddenLoginBtn.addEventListener("mouseup", cancelPress);
+        hiddenLoginBtn.addEventListener("mouseleave", cancelPress);
       }
 
-      async function doLogin() {
-        if (auth.currentUser) return;   // 已登入就不重複登入
+      // 防止長按跳出選單/拖曳
+      hiddenLoginBtn.addEventListener("contextmenu", (e) => e.preventDefault());
+      hiddenLoginBtn.addEventListener("dragstart", (e) => e.preventDefault());
 
-        try {
-          const result = await signInWithPopup(auth, provider);
-
-          if (!isEditorUser(result.user)) {
-            await signOut(auth);
-            location.replace("index.html");
-            return;
-          }
-        } catch (err) {
-          location.replace("index.html");
-        }
-      }
-
-      dogpawBtn.addEventListener("click", (e) => {
-        const a = dogpawBtn.closest("a");
-        const href = a?.getAttribute("href");
-
-        // 未登入才啟用「隱藏連點登入」
-        if (!auth.currentUser) {
-          e.preventDefault();
-          e.stopPropagation();
-
-          tapCount++;
-
-          // 第一下：先排一個「單點導頁」
-          if (tapCount === 1 && href) {
-            navTimer = setTimeout(() => {
-              reset();
-              location.assign(href); // 等同點連結
-            }, NAV_DELAY_MS);
-          } else {
-            // 有第2下就代表在連點：取消單點導頁
-            if (navTimer) { clearTimeout(navTimer); navTimer = null; }
-          }
-
-          // 開啟連點時間窗
-          if (!windowTimer) {
-            windowTimer = setTimeout(() => reset(), TAP_WINDOW_MS);
-          }
-
-          // 達標：登入
-          if (tapCount >= TAP_TARGET) {
-            reset();
-            void doLogin();
-          }
-
-          return;
-        }
-
-        // 已登入：就讓它當一般連結（不用擋）
-      });
+      // 只點一下不做事（也不要穿透到下面）
+      hiddenLoginBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); });
     }
 
     // 桌機 + 手機「登出」按鈕
