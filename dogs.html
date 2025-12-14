@@ -35,12 +35,15 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="h-16 flex items-center justify-between">
         <a href="index.html" class="flex items-center gap-2 font-semibold text-2xl">
-          <img src="images/dogpaw.png" alt="dogpaw" id="btnGoogleLogin" class="h-8 w-8 object-contain" />
+          <img src="images/dogpaw.png" alt="dogpaw" class="h-8 w-8 object-contain" />
           <span class="flex items-baseline gap-1">
             <span>台中簡媽媽狗園</span>
             <span id="adminLabel" class="text-xs text-red-500 hidden">我是小編</span>
           </span>
         </a>
+        <div class="flex-1">
+          <span id="btnGoogleLogin" type="button" class="login-button opacity-0">登入</span>
+        </div>
 
         <!-- 桌機導覽 -->
         <nav class="hidden md:flex items-center gap-6 ml-auto">
@@ -498,15 +501,6 @@
 
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
-    const EDITOR_EMAILS = new Set([
-      "aaa@gmail.com",
-      "bbb@gmail.com",
-    ].map(s => s.toLowerCase()));
-
-    function isEditorUser(user) {
-      const email = (user?.email || "").toLowerCase();
-      return !!email && EDITOR_EMAILS.has(email);
-    }
 
     const dogpawBtn = document.getElementById("btnGoogleLogin");
     const adminLabel = document.getElementById("adminLabel");
@@ -517,42 +511,45 @@
     const adminActionBar = document.getElementById("actionBar");
 
     // 依登入狀態更新 header / 導覽
-    onAuthStateChanged(auth, async (user) => {
-      const isEditor = isEditorUser(user);
-      window.__isLogin = isEditor; // 你原本用來給其他腳本判斷用的
+    onAuthStateChanged(auth, (user) => {
+      const isLogin = !!user;
+      window.__isLogin = isLogin;  // ← 加這行
 
-      // ✅ 登入成功但不在白名單：立刻踢出
-      if (user && !isEditor) {
-        await signOut(auth);
-        location.replace("index.html");
-        return;
+      if (adminLabel) {
+        adminLabel.classList.toggle("hidden", !isLogin);
       }
 
-      // 以下 UI 全部改看 isEditor
-      if (adminLabel) adminLabel.classList.toggle("hidden", !isEditor);
-      adminLinks.forEach(el => el.classList.toggle("hidden", !isEditor));
-      logoutBtns.forEach(el => el.classList.toggle("hidden", !isEditor));
+      adminLinks.forEach((el) => {
+        el.classList.toggle("hidden", !isLogin);
+      });
 
+      logoutBtns.forEach((el) => {
+        el.classList.toggle("hidden", !isLogin);
+      });
+
+      // modal：訪客（我要認養/分享） vs 管理員（編輯/已送養/刪除）
       if (guestActionBar) {
-        guestActionBar.classList.toggle("hidden", isEditor);
-        guestActionBar.style.removeProperty("display");
-      }
-      if (adminActionBar) {
-        adminActionBar.classList.toggle("hidden", !isEditor);
-        adminActionBar.style.removeProperty("display");
+        // class 保險，順便用 display 強制
+        guestActionBar.classList.toggle("hidden", isLogin);
+        guestActionBar.style.removeProperty("display"); // 保險：清掉舊的 inline display
       }
 
-      // 登出/非小編：收掉編輯狀態
-      if (!isEditor) {
+      if (adminActionBar) {
+        adminActionBar.classList.toggle("hidden", !isLogin);
+        adminActionBar.style.removeProperty("display"); // 保險
+      }
+
+      // 登出：強制收掉編輯狀態，且不要再 setEditMode（避免把 actionBar 又打開）
+      if (!isLogin) {
         document.getElementById("editArea")?.classList.add("hidden");
         document.getElementById("editActionBar")?.classList.add("hidden");
         document.getElementById("adoptedUpload")?.classList.add("hidden");
         return;
       }
 
-      // 只有小編才同步 edit mode
+      // 只有登入時，才同步一次目前是否在 edit mode
       const inEdit = !document.getElementById("editArea")?.classList.contains("hidden");
-      if (typeof window.setEditMode === "function") window.setEditMode(inEdit);
+      if (typeof window.setEditMode === "function") window.setEditMode(inEdit); // ← 加這行
     });
 
     // 點狗掌 → Google 登入（未登入時）
@@ -564,15 +561,11 @@
         if (auth.currentUser) return;   // 已登入就不重複登入
 
         try {
-          const result = await signInWithPopup(auth, provider);
-
-          if (!isEditorUser(result.user)) {
-            await signOut(auth);
-            location.replace("index.html"); // 不想跳轉就刪掉
-            return;
-          }
+          await signInWithPopup(auth, provider);
+          // 登入後會觸發 onAuthStateChanged，所以不用另外改畫面
         } catch (err) {
-          location.replace("index.html");
+          console.error("Google 登入失敗", err);
+          window.location.replace("index.html");
         }
       });
     }

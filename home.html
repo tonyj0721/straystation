@@ -26,7 +26,6 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="stylesheet" href="assets/tailwind.css">
-  <link rel="stylesheet" href="assets/shared.css">
   <style>
     .mosaic-grid {
       display: block;
@@ -107,8 +106,12 @@
 
       .hero-photo {
         margin-right: 150px;
-        /* 自己調整 */
+        /* 想多一點就改大，例如 60px、80px */
       }
+    }
+
+    .login-button {
+      margin-left: 1px;
     }
   </style>
 </head>
@@ -119,12 +122,15 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="h-16 flex items-center justify-between">
         <a href="index.html" class="flex items-center gap-2 font-semibold text-2xl">
-          <img src="images/dogpaw.png" alt="dogpaw" id="btnGoogleLogin" class="h-8 w-8 object-contain" />
+          <img src="images/dogpaw.png" alt="dogpaw" class="h-8 w-8 object-contain" />
           <span class="flex items-baseline gap-1">
             <span>台中簡媽媽狗園</span>
             <span id="adminLabel" class="text-xs text-red-500 hidden">我是小編</span>
           </span>
         </a>
+        <div class="flex-1">
+          <span id="btnGoogleLogin" type="button" class="login-button opacity-0">登入</span>
+        </div>
 
         <!-- 桌機導覽 -->
         <nav class="hidden md:flex items-center gap-6 ml-auto">
@@ -355,15 +361,6 @@
 
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
-    const EDITOR_EMAILS = new Set([
-      "aaa@gmail.com",
-      "bbb@gmail.com",
-    ].map(s => s.toLowerCase()));
-
-    function isEditorUser(user) {
-      const email = (user?.email || "").toLowerCase();
-      return !!email && EDITOR_EMAILS.has(email);
-    }
 
     const dogpawBtn = document.getElementById("btnGoogleLogin");
     const adminLabel = document.getElementById("adminLabel");
@@ -371,20 +368,20 @@
     const logoutBtns = document.querySelectorAll(".nav-logout-btn");
 
     // 依登入狀態更新 header / 導覽
-    onAuthStateChanged(auth, async (user) => {
-      const isEditor = isEditorUser(user);
+    onAuthStateChanged(auth, (user) => {
+      const isLogin = !!user;
 
-      // ✅ 登入成功但不在白名單：立刻踢出
-      if (user && !isEditor) {
-        await signOut(auth);
-        location.replace("index.html");
-        return;
+      if (adminLabel) {
+        adminLabel.classList.toggle("hidden", !isLogin);
       }
 
-      // 以下 UI 全部改看 isEditor
-      if (adminLabel) adminLabel.classList.toggle("hidden", !isEditor);
-      adminLinks.forEach(el => el.classList.toggle("hidden", !isEditor));
-      logoutBtns.forEach(el => el.classList.toggle("hidden", !isEditor));
+      adminLinks.forEach((el) => {
+        el.classList.toggle("hidden", !isLogin);
+      });
+
+      logoutBtns.forEach((el) => {
+        el.classList.toggle("hidden", !isLogin);
+      });
     });
 
     // 點狗掌 → Google 登入（未登入時）
@@ -396,15 +393,11 @@
         if (auth.currentUser) return;   // 已登入就不重複登入
 
         try {
-          const result = await signInWithPopup(auth, provider);
-
-          if (!isEditorUser(result.user)) {
-            await signOut(auth);
-            location.replace("index.html"); // 不想跳轉就刪掉
-            return;
-          }
+          await signInWithPopup(auth, provider);
+          // 登入後會觸發 onAuthStateChanged，所以不用另外改畫面
         } catch (err) {
-          location.replace("index.html");
+          console.error("Google 登入失敗", err);
+          alert("Google 登入失敗，請稍後再試。");
         }
       });
     }

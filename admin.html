@@ -463,7 +463,7 @@
         </div>
 
         <!-- 動作列 -->
-        <div id="actionBar" class="pt-2 flex flex-col sm:flex-row gap-3 ">
+        <div id="actionBar" class="pt-2 flex flex-col sm:flex-row gap-3 hidden">
           <button id="btnEdit" class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm">
             編輯
           </button>
@@ -572,34 +572,20 @@
 
     const auth = getAuth(app);
     const logoutBtns = document.querySelectorAll(".nav-logout-btn");
-    const EDITOR_EMAILS = new Set([
-      "aaa@gmail.com",
-      "bbb@gmail.com",
-    ].map(s => s.toLowerCase()));
-
-    function isEditorUser(user) {
-      const email = (user?.email || "").toLowerCase();
-      return !!email && EDITOR_EMAILS.has(email);
-    }
-
 
     // ✅ 只有登入者才能進這頁
-    onAuthStateChanged(auth, async (user) => {
-      const isEditor = isEditorUser(user);
-      window.__isLogin = isEditor; // 你原本用來給其他腳本判斷用的
+    onAuthStateChanged(auth, (user) => {
+      const isLogin = !!user;
+      window.__isLogin = isLogin;  // ← 加這行
 
-      // 沒登入 or 非白名單：直接踢走
-      if (!isEditor) {
-        if (user) await signOut(auth); // 已登入但不在白名單：先登出
-        window.location.replace("index.html");
-        return;
-      }
+      // 沒登入就踢回首頁
+      // if (!isLogin) { window.location.replace("index.html"); return; }
 
-      // 登出按鈕：只有白名單顯示
-      logoutBtns.forEach(btn => btn.classList.toggle("hidden", !isEditor));
+      // 登出按鈕：有登入才顯示
+      logoutBtns.forEach(btn => btn.classList.toggle("hidden", !isLogin));
     });
 
-    // 桌機 + 手機「登出」按鈕
+    // ✅ 桌機＋手機「登出」
     logoutBtns.forEach((btn) => {
       btn.addEventListener("click", async (e) => {
         e.preventDefault();

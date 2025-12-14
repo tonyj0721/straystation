@@ -33,35 +33,17 @@
   <!-- Navbar -->
   <header class="bg-white/80 backdrop-blur border-b border-gray-200">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="relative inline-flex items-center">
-  <a href="index.html" class="flex items-center gap-2">
-    <img src="images/dogpaw.png" alt="dogpaw" class="h-8 w-8 object-contain" />
-    <span class="flex items-baseline gap-1">
-      <span>台中簡媽媽狗園</span>
-      <span id="adminLabel" class="text-xs text-red-500 hidden">我是小編</span>
-    </span>
-  </a>
-
-  <!-- ✅ 獨立熱區：不在 a 裡面 -->
-  <span id="btnHiddenLogin" aria-label="hidden login"
-        style="
-          position:absolute;
-          right:-10px;            /* 往右移：避免蓋到文字 */
-          top:50%;
-          transform:translateY(-50%);
-          width:28px;
-          height:28px;
-
-          opacity:0.35; background:rgba(255,0,0,.35); outline:2px solid red;
-          cursor:default;
-          user-select:none;
-          -webkit-user-select:none;
-          -webkit-touch-callout:none;
-          -webkit-tap-highlight-color:transparent;
-          touch-action:manipulation;
-        "></span>
-</div>
-        
+      <div class="h-16 flex items-center justify-between">
+        <a href="index.html" class="flex items-center gap-2 font-semibold text-2xl">
+          <img src="images/dogpaw.png" alt="dogpaw" class="h-8 w-8 object-contain" />
+          <span class="flex items-baseline gap-1">
+            <span>台中簡媽媽狗園</span>
+            <span id="adminLabel" class="text-xs text-red-500 hidden">我是小編</span>
+          </span>
+        </a>
+        <div class="flex-1">
+          <span id="btnGoogleLogin" type="button" class="login-button opacity-0">登入</span>
+        </div>
 
         <!-- 桌機導覽 -->
         <nav class="hidden md:flex items-center gap-6 ml-auto">
@@ -582,16 +564,8 @@
 
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
-    const EDITOR_EMAILS = new Set([
-      "tonyj0721@gmail.com",
-      "bbb@gmail.com",
-    ].map(s => s.toLowerCase()));
 
-    function isEditorUser(user) {
-      const email = (user?.email || "").toLowerCase();
-      return !!email && EDITOR_EMAILS.has(email);
-    }
-
+    const dogpawBtn = document.getElementById("btnGoogleLogin");
     const adminLabel = document.getElementById("adminLabel");
     const adminLinks = document.querySelectorAll(".nav-admin-link");
     const logoutBtns = document.querySelectorAll(".nav-logout-btn");
@@ -600,103 +574,63 @@
     const adminActionBar = document.getElementById("actionBar");
 
     // 依登入狀態更新 header / 導覽
-    onAuthStateChanged(auth, async (user) => {
-      const isEditor = isEditorUser(user);
-      window.__isLogin = isEditor; // 你原本用來給其他腳本判斷用的
+    onAuthStateChanged(auth, (user) => {
+      const isLogin = !!user;
+      window.__isLogin = isLogin;  // ← 加這行
 
-      // ✅ 登入成功但不在白名單：立刻踢出
-      if (user && !isEditor) {
-        try { await signOut(auth); } catch (_) { }
-        return;
+      if (adminLabel) {
+        adminLabel.classList.toggle("hidden", !isLogin);
       }
 
-      if (adminLabel) adminLabel.classList.toggle("hidden", !isEditor);
-      adminLinks.forEach(el => el.classList.toggle("hidden", !isEditor));
-      logoutBtns.forEach(el => el.classList.toggle("hidden", !isEditor));
+      adminLinks.forEach((el) => {
+        el.classList.toggle("hidden", !isLogin);
+      });
 
-      // modal：訪客（我要認養/分享） vs 小編（編輯/已送養/刪除）
+      logoutBtns.forEach((el) => {
+        el.classList.toggle("hidden", !isLogin);
+      });
+
+      // modal：訪客（我要認養/分享） vs 管理員（編輯/已送養/刪除）
       if (guestActionBar) {
-        guestActionBar.classList.toggle("hidden", isEditor);
-        guestActionBar.style.removeProperty("display");
-      }
-      if (adminActionBar) {
-        adminActionBar.classList.toggle("hidden", !isEditor);
-        adminActionBar.style.removeProperty("display");
+        // class 保險，順便用 display 強制
+        guestActionBar.classList.toggle("hidden", isLogin);
+        guestActionBar.style.removeProperty("display"); // 保險：清掉舊的 inline display
       }
 
-      // 登出/非小編：收掉編輯狀態
-      if (!isEditor) {
+      if (adminActionBar) {
+        adminActionBar.classList.toggle("hidden", !isLogin);
+        adminActionBar.style.removeProperty("display"); // 保險
+      }
+
+      // 登出：強制收掉編輯狀態，且不要再 setEditMode（避免把 actionBar 又打開）
+      if (!isLogin) {
         document.getElementById("editArea")?.classList.add("hidden");
         document.getElementById("editActionBar")?.classList.add("hidden");
         document.getElementById("adoptedUpload")?.classList.add("hidden");
         return;
       }
 
-      // 只有小編才同步 edit mode
+      // 只有登入時，才同步一次目前是否在 edit mode
       const inEdit = !document.getElementById("editArea")?.classList.contains("hidden");
-      if (typeof window.setEditMode === "function") window.setEditMode(inEdit);
+      if (typeof window.setEditMode === "function") window.setEditMode(inEdit); // ← 加這行
     });
 
-    // 隱藏登入（長按觸發）
-    const hiddenLoginBtn = document.getElementById("btnHiddenLogin");
-    const LONG_PRESS_MS = 1200; // 長按多久才觸發登入（毫秒）
-    let pressTimer = null;
+    // 點狗掌 → Google 登入（未登入時）
+    if (dogpawBtn) {
+      dogpawBtn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
 
-    async function tryEditorLogin() {
-      if (auth.currentUser) return;
+        if (auth.currentUser) return;   // 已登入就不重複登入
 
-      try {
-        const result = await signInWithPopup(auth, provider);
-
-        // 登入成功但不在白名單：立刻登出（保持無聲）
-        if (!isEditorUser(result.user)) {
-          try { await signOut(auth); } catch (_) { }
+        try {
+          await signInWithPopup(auth, provider);
+          // 登入後會觸發 onAuthStateChanged，所以不用另外改畫面
+        } catch (err) {
+          console.error("Google 登入失敗", err);
+          window.location.replace("index.html");
         }
-      } catch (_) {
-        // 登入流程取消/失敗：保持無聲
-      }
-    }
-
-    function startPress(e) {
-      if (auth.currentUser) return;
-      e.preventDefault();
-      e.stopPropagation();
-
-      if (pressTimer) clearTimeout(pressTimer);
-      pressTimer = setTimeout(() => {
-        pressTimer = null;
-        tryEditorLogin();
-      }, LONG_PRESS_MS);
-    }
-
-    function cancelPress() {
-      if (!pressTimer) return;
-      clearTimeout(pressTimer);
-      pressTimer = null;
-    }
-
-    if (hiddenLoginBtn) {
-      // 優先用 PointerEvent；不支援才退回 touch/mouse
-      if ("PointerEvent" in window) {
-        hiddenLoginBtn.addEventListener("pointerdown", startPress, { passive: false });
-        hiddenLoginBtn.addEventListener("pointerup", cancelPress);
-        hiddenLoginBtn.addEventListener("pointercancel", cancelPress);
-        hiddenLoginBtn.addEventListener("pointerleave", cancelPress);
-      } else {
-        hiddenLoginBtn.addEventListener("touchstart", startPress, { passive: false });
-        hiddenLoginBtn.addEventListener("touchend", cancelPress);
-        hiddenLoginBtn.addEventListener("touchcancel", cancelPress);
-        hiddenLoginBtn.addEventListener("mousedown", startPress);
-        hiddenLoginBtn.addEventListener("mouseup", cancelPress);
-        hiddenLoginBtn.addEventListener("mouseleave", cancelPress);
-      }
-
-      // 防止長按跳出選單/拖曳
-      hiddenLoginBtn.addEventListener("contextmenu", (e) => e.preventDefault());
-      hiddenLoginBtn.addEventListener("dragstart", (e) => e.preventDefault());
-
-      // 只點一下不做事（也不要穿透到下面）
-      hiddenLoginBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); });
+      });
     }
 
     // 桌機 + 手機「登出」按鈕
