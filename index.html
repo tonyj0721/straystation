@@ -34,20 +34,27 @@
   <header class="bg-white/80 backdrop-blur border-b border-gray-200">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="h-16 flex items-center justify-between">
-        <div class="relative inline-flex items-center">
-          <a href="index.html" class="flex items-center gap-2 font-semibold text-2xl">
-            <img src="images/dogpaw.png" alt="dogpaw" class="h-8 w-8 object-contain" />
-            <span class="flex items-baseline gap-1">
-              <span>台中簡媽媽狗園</span>
-              <span id="adminLabel" class="text-xs text-red-500 hidden">我是小編</span>
-            </span>
-          </a>
+        <a href="index.html" class="flex items-center gap-2 font-semibold text-2xl">
+          <img src="images/dogpaw.png" alt="dogpaw" class="h-8 w-8 object-contain" />
+          <span class="relative flex items-baseline gap-1">
+            <span>台中簡媽媽狗園</span>
+            <span id="adminLabel" class="text-xs text-red-500 hidden">我是小編</span>
 
-          <!-- 小塊固定位置（右邊空白處） -->
-          <button id="btnHiddenLogin" type="button" aria-label="hidden login"
-            class="absolute left-full ml-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-red-500 border border-red-500"
-            style="-webkit-touch-callout:none;"></button>
-        </div>
+            <!-- 隱藏登入熱區（長按觸發） -->
+            <span id="btnHiddenLogin" aria-label="hidden login" style="
+                    position:absolute;
+                    left:calc(100% + 6px);
+                    top:50%;
+                    transform:translateY(-50%);
+                    width:28px;
+                    height:28px;
+                    opacity: 0;
+                    -webkit-touch-callout:none;
+                    user-select:none;
+                    touch-action:manipulation;
+                  "></span>
+          </span>
+        </a>
 
         <!-- 桌機導覽 -->
         <nav class="hidden md:flex items-center gap-6 ml-auto">
