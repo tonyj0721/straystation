@@ -53,7 +53,7 @@
           <a href="home.html" class="hover:text-brand-600">幸福的歸宿</a>
           <a href="admin.html" class="hover:text-brand-600 nav-admin-link hidden">後台管理</a>
           <button type="button" id="btnLogoutDesktop"
-            class="text-sm text-gray-600 hover:text-brand-600 nav-logout-btn hidden">
+            class="text-sm text-red-500 hover:text-brand-600 nav-logout-btn hidden">
             登出
           </button>
         </nav>
@@ -578,9 +578,9 @@
       const isLogin = !!user;
       window.__isLogin = isLogin;  // ← 加這行
 
-      if (adminLabel) {
-        adminLabel.classList.toggle("hidden", !isLogin);
-      }
+      dogpawBtn?.classList.toggle("hidden", isLogin);
+
+      adminLabel?.classList.toggle("hidden", !isLogin);
 
       adminLinks.forEach((el) => {
         el.classList.toggle("hidden", !isLogin);
