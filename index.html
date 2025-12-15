@@ -546,6 +546,7 @@
       getAuth,
       GoogleAuthProvider,
       signInWithPopup,
+      signInWithRedirect,
       signOut,
       onAuthStateChanged,
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
@@ -618,46 +619,58 @@
     // Google 長按登入（未登入時）
     if (LoginBtn) {
       const LONG_PRESS_MS = 1000; // 長按 1 秒
-
       let pressStart = 0;
       let pressing = false;
 
+      // 粗略判斷 iPhone / iPad
+      const isIOS = /iP(hone|od|ad)/i.test(window.navigator.userAgent);
+
       async function doLogin() {
         if (auth.currentUser) return; // 已登入就不重複登入
+
         try {
-          await signInWithPopup(auth, provider);
-          // 成功後會觸發 onAuthStateChanged，自動更新畫面
+          if (isIOS) {
+            // iPhone / iPad：用 redirect，比 popup 穩定
+            await signInWithRedirect(auth, provider);
+          } else {
+            // 其他裝置：維持 popup
+            await signInWithPopup(auth, provider);
+          }
+          // 回來之後會觸發 onAuthStateChanged，自動更新畫面
         } catch (err) {
           console.error("Google 登入失敗", err);
-          alert("登入失敗，請再試一次（若一直失敗，請改用電腦或更新瀏覽器）");
-          // ❌ 不要 redirect，不然你只會看到「被導回首頁」卻不知道錯在哪
-          // window.location.replace("index.html");
+          alert(
+            "登入失敗，請再試一次。\n" +
+            "錯誤代碼：" + (err.code || "（無）") + "\n" +
+            "錯誤訊息：" + (err.message || err)
+          );
+          // ⚠️ 不要再 redirect 回 index.html，不然只會覺得「被跳回首頁」
         }
       }
 
       function handlePressStart(e) {
         if (auth.currentUser) return;
-        // iOS 上有時候不需要 preventDefault，如果遇到捲動問題再加
-        e.preventDefault();
-        e.stopPropagation();
 
         pressStart = Date.now();
         pressing = true;
         LoginBtn.classList.add("pressing");
+
+        if (e.cancelable) e.preventDefault();
+        e.stopPropagation();
       }
 
       function handlePressEnd(e) {
         if (!pressing) return;
-        e.preventDefault();
-        e.stopPropagation();
 
-        const delta = Date.now() - pressStart;
+        const duration = Date.now() - pressStart;
         pressing = false;
         LoginBtn.classList.remove("pressing");
 
-        if (delta >= LONG_PRESS_MS) {
-          // ★ 這裡是「同一個 user event handler」裡直接呼叫登入，
-          //   iPhone 就不會把彈窗當成惡意跳出。
+        if (e && e.cancelable) e.preventDefault();
+        e.stopPropagation();
+
+        if (duration >= LONG_PRESS_MS) {
+          // 長按滿 1 秒才登入
           doLogin();
         }
       }
@@ -668,7 +681,7 @@
         LoginBtn.classList.remove("pressing");
       }
 
-      // 滑鼠
+      // 滑鼠（桌機）
       LoginBtn.addEventListener("mousedown", handlePressStart);
       LoginBtn.addEventListener("mouseup", handlePressEnd);
       LoginBtn.addEventListener("mouseleave", handlePressCancel);
