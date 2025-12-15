@@ -616,7 +616,7 @@
     });
 
     // 長按 Google 登入（未登入時）
-    if (dogpawBtn) {
+    if (LoginBtn) {
       const LONG_PRESS_MS = 800; // 長按多久才算登入
       let pressStart = 0;
       let isPressing = false;
@@ -656,10 +656,10 @@
         isPressing = false;
       };
 
-      dogpawBtn.addEventListener("pointerdown", onPointerDown);
-      dogpawBtn.addEventListener("pointerup", onPointerUp);
-      dogpawBtn.addEventListener("pointercancel", onPointerCancel);
-      dogpawBtn.addEventListener("pointerleave", onPointerCancel);
+      LoginBtn.addEventListener("pointerdown", onPointerDown);
+      LoginBtn.addEventListener("pointerup", onPointerUp);
+      LoginBtn.addEventListener("pointercancel", onPointerCancel);
+      LoginBtn.addEventListener("pointerleave", onPointerCancel);
     }
 
     // 桌機 + 手機「登出」按鈕
