@@ -35,12 +35,15 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="h-16 flex items-center justify-between">
         <a href="index.html" class="flex items-center gap-2 font-semibold text-2xl">
-          <img src="images/dogpaw.png" alt="dogpaw" id="btnGoogleLogin" class="h-8 w-8 object-contain" />
+          <img src="images/dogpaw.png" alt="dogpaw" class="h-8 w-8 object-contain" />
           <span class="flex items-baseline gap-1">
             <span>台中簡媽媽狗園</span>
             <span id="adminLabel" class="text-xs text-red-500 hidden">我是小編</span>
           </span>
         </a>
+        <div class="flex-1">
+          <span id="btnGoogleLogin" type="button" class="login-button opacity-0" style="cursor: default">登入</span>
+        </div>
 
         <!-- 桌機導覽 -->
         <nav class="hidden md:flex items-center gap-6 ml-auto">
@@ -50,7 +53,7 @@
           <a href="home.html" class="hover:text-brand-600">幸福的歸宿</a>
           <a href="admin.html" class="hover:text-brand-600 nav-admin-link hidden">後台管理</a>
           <button type="button" id="btnLogoutDesktop"
-            class="text-sm text-gray-600 hover:text-brand-600 nav-logout-btn hidden">
+            class="text-sm text-red-500 hover:text-brand-600 nav-logout-btn hidden">
             登出
           </button>
         </nav>
@@ -543,6 +546,7 @@
       getAuth,
       GoogleAuthProvider,
       signInWithPopup,
+      signInWithRedirect,
       signOut,
       onAuthStateChanged,
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
@@ -562,7 +566,7 @@
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
 
-    const dogpawBtn = document.getElementById("btnGoogleLogin");
+    const LoginBtn = document.getElementById("btnGoogleLogin");
     const adminLabel = document.getElementById("adminLabel");
     const adminLinks = document.querySelectorAll(".nav-admin-link");
     const logoutBtns = document.querySelectorAll(".nav-logout-btn");
@@ -575,9 +579,9 @@
       const isLogin = !!user;
       window.__isLogin = isLogin;  // ← 加這行
 
-      if (adminLabel) {
-        adminLabel.classList.toggle("hidden", !isLogin);
-      }
+      LoginBtn?.classList.toggle("hidden", isLogin);
+
+      adminLabel?.classList.toggle("hidden", !isLogin);
 
       adminLinks.forEach((el) => {
         el.classList.toggle("hidden", !isLogin);
@@ -612,22 +616,71 @@
       if (typeof window.setEditMode === "function") window.setEditMode(inEdit); // ← 加這行
     });
 
-    // 點狗掌 → Google 登入（未登入時）
+    // ==== 長按登入（桌機：popup，iOS Safari：redirect）====
     if (dogpawBtn) {
-      dogpawBtn.addEventListener("click", async (e) => {
+      const LONG_PRESS_MS = 800; // 長按多久才算登入
+      let pressTimer = null;
+
+      // 判斷是不是 iOS Safari（這種環境 popup 最常出問題）
+      const ua = navigator.userAgent;
+      const isIOS = /iPhone|iPad|iPod/i.test(ua);
+      const isSafari = /^((?!chrome|android).)*safari/i.test(ua);
+      const useRedirect = isIOS && isSafari;
+
+      const loginWithGoogle = async () => {
+        if (auth.currentUser) return;
+
+        try {
+          if (useRedirect) {
+            // 手機 / Safari：走 redirect，比較穩
+            await signInWithRedirect(auth, provider);
+          } else {
+            // 其它環境：popup
+            await signInWithPopup(auth, provider);
+          }
+        } catch (err) {
+          console.error("Google 登入失敗", err);
+
+          // 如果是 popup 被擋 / 不支援，就再試一次 redirect
+          if (
+            !useRedirect &&
+            (err.code === "auth/popup-blocked" ||
+              err.code === "auth/operation-not-supported-in-this-environment")
+          ) {
+            await signInWithRedirect(auth, provider);
+            return;
+          }
+
+          alert("登入失敗，請稍後再試。\n\n錯誤代碼：" + (err.code || "unknown"));
+        }
+      };
+
+      const startPress = (e) => {
         e.preventDefault();
         e.stopPropagation();
 
-        if (auth.currentUser) return;   // 已登入就不重複登入
+        if (auth.currentUser || pressTimer) return;
 
-        try {
-          await signInWithPopup(auth, provider);
-          // 登入後會觸發 onAuthStateChanged，所以不用另外改畫面
-        } catch (err) {
-          console.error("Google 登入失敗", err);
-          window.location.replace("index.html");
+        // 開始長按計時
+        pressTimer = setTimeout(() => {
+          pressTimer = null;
+          // 🔔 到時間就直接登入，不用放開
+          loginWithGoogle();
+        }, LONG_PRESS_MS);
+      };
+
+      const cancelPress = () => {
+        if (pressTimer) {
+          clearTimeout(pressTimer);
+          pressTimer = null;
         }
-      });
+      };
+
+      // 用 pointer 事件，桌機 + 手機都吃
+      dogpawBtn.addEventListener("pointerdown", startPress);
+      dogpawBtn.addEventListener("pointerup", cancelPress);
+      dogpawBtn.addEventListener("pointerleave", cancelPress);
+      dogpawBtn.addEventListener("pointercancel", cancelPress);
     }
 
     // 桌機 + 手機「登出」按鈕
