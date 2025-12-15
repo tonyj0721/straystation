@@ -35,12 +35,15 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="h-16 flex items-center justify-between">
         <a href="index.html" class="flex items-center gap-2 font-semibold text-2xl">
-          <img src="images/dogpaw.png" alt="dogpaw" id="btnGoogleLogin" class="h-8 w-8 object-contain" />
+          <img src="images/dogpaw.png" alt="dogpaw" class="h-8 w-8 object-contain" />
           <span class="flex items-baseline gap-1">
             <span>台中簡媽媽狗園</span>
             <span id="adminLabel" class="text-xs text-red-500 hidden">我是小編</span>
           </span>
         </a>
+        <div class="flex-1">
+          <button id="btnGoogleLogin" type="button" class="login-button opacity-50" style="cursor: default">登入</button>
+        </div>
 
         <!-- 桌機導覽 -->
         <nav class="hidden md:flex items-center gap-6 ml-auto">
@@ -50,7 +53,7 @@
           <a href="home.html" class="hover:text-brand-600">幸福的歸宿</a>
           <a href="admin.html" class="hover:text-brand-600 nav-admin-link hidden">後台管理</a>
           <button type="button" id="btnLogoutDesktop"
-            class="text-sm text-gray-600 hover:text-brand-600 nav-logout-btn hidden">
+            class="text-sm text-red-500 hover:text-brand-600 nav-logout-btn hidden">
             登出
           </button>
         </nav>
@@ -562,7 +565,7 @@
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
 
-    const dogpawBtn = document.getElementById("btnGoogleLogin");
+    const LoginBtn = document.getElementById("btnGoogleLogin");
     const adminLabel = document.getElementById("adminLabel");
     const adminLinks = document.querySelectorAll(".nav-admin-link");
     const logoutBtns = document.querySelectorAll(".nav-logout-btn");
@@ -575,9 +578,9 @@
       const isLogin = !!user;
       window.__isLogin = isLogin;  // ← 加這行
 
-      if (adminLabel) {
-        adminLabel.classList.toggle("hidden", !isLogin);
-      }
+      LoginBtn?.classList.toggle("hidden", isLogin);
+
+      adminLabel?.classList.toggle("hidden", !isLogin);
 
       adminLinks.forEach((el) => {
         el.classList.toggle("hidden", !isLogin);
@@ -612,22 +615,51 @@
       if (typeof window.setEditMode === "function") window.setEditMode(inEdit); // ← 加這行
     });
 
-    // 點狗掌 → Google 登入（未登入時）
+    // 長按 Google 登入（未登入時）
     if (dogpawBtn) {
-      dogpawBtn.addEventListener("click", async (e) => {
+      const LONG_PRESS_MS = 800; // 長按多久才算登入
+      let pressStart = 0;
+      let isPressing = false;
+
+      const onPointerDown = (e) => {
         e.preventDefault();
         e.stopPropagation();
 
-        if (auth.currentUser) return;   // 已登入就不重複登入
+        if (auth.currentUser) return; // 已登入就不用再登入
+
+        isPressing = true;
+        pressStart = Date.now();
+      };
+
+      const onPointerUp = async (e) => {
+        if (!isPressing) return;
+        e.preventDefault();
+        e.stopPropagation();
+        isPressing = false;
+
+        const duration = Date.now() - pressStart;
+        if (duration < LONG_PRESS_MS) {
+          // 太短就當作誤觸，不登入
+          return;
+        }
 
         try {
           await signInWithPopup(auth, provider);
-          // 登入後會觸發 onAuthStateChanged，所以不用另外改畫面
+          // 登入後畫面更新交給 onAuthStateChanged
         } catch (err) {
           console.error("Google 登入失敗", err);
           window.location.replace("index.html");
         }
-      });
+      };
+
+      const onPointerCancel = () => {
+        isPressing = false;
+      };
+
+      dogpawBtn.addEventListener("pointerdown", onPointerDown);
+      dogpawBtn.addEventListener("pointerup", onPointerUp);
+      dogpawBtn.addEventListener("pointercancel", onPointerCancel);
+      dogpawBtn.addEventListener("pointerleave", onPointerCancel);
     }
 
     // 桌機 + 手機「登出」按鈕
