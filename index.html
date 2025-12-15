@@ -617,7 +617,7 @@
     });
 
     // ==== 長按登入（桌機：popup，iOS Safari：redirect）====
-    if (dogpawBtn) {
+    if (LoginBtn) {
       const LONG_PRESS_MS = 800; // 長按多久才算登入
       let pressTimer = null;
 
@@ -677,10 +677,10 @@
       };
 
       // 用 pointer 事件，桌機 + 手機都吃
-      dogpawBtn.addEventListener("pointerdown", startPress);
-      dogpawBtn.addEventListener("pointerup", cancelPress);
-      dogpawBtn.addEventListener("pointerleave", cancelPress);
-      dogpawBtn.addEventListener("pointercancel", cancelPress);
+      LoginBtn.addEventListener("pointerdown", startPress);
+      LoginBtn.addEventListener("pointerup", cancelPress);
+      LoginBtn.addEventListener("pointerleave", cancelPress);
+      LoginBtn.addEventListener("pointercancel", cancelPress);
     }
 
     // 桌機 + 手機「登出」按鈕
