@@ -546,7 +546,6 @@
       getAuth,
       GoogleAuthProvider,
       signInWithPopup,
-      signInWithRedirect,
       signOut,
       onAuthStateChanged,
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
@@ -616,43 +615,41 @@
       if (typeof window.setEditMode === "function") window.setEditMode(inEdit); // ← 加這行
     });
 
-    // Google 長按登入（未登入時）
+    // Google 長按登入（未登入時）─ 全平台都用 popup
     if (LoginBtn) {
       const LONG_PRESS_MS = 1000; // 長按 1 秒
       let pressStart = 0;
       let pressing = false;
 
-      // 粗略判斷 iPhone / iPad
-      const isIOS = /iP(hone|od|ad)/i.test(window.navigator.userAgent);
-
       async function doLogin() {
         if (auth.currentUser) return; // 已登入就不重複登入
 
         try {
-          if (isIOS) {
-            // iPhone / iPad：用 redirect，比 popup 穩定
-            await signInWithRedirect(auth, provider);
-          } else {
-            // 其他裝置：維持 popup
-            await signInWithPopup(auth, provider);
-          }
-          // 回來之後會觸發 onAuthStateChanged，自動更新畫面
+          const result = await signInWithPopup(auth, provider);
+          // 成功登入後，onAuthStateChanged 會自動更新畫面
+          console.log("Google 登入成功", result?.user);
         } catch (err) {
           console.error("Google 登入失敗", err);
+
+          const code = err.code || err.errorCode || "（無錯誤代碼）";
+          const msg =
+            err.message ||
+            (typeof err === "string" ? err : JSON.stringify(err));
+
           alert(
-            "登入失敗，請再試一次。\n" +
-            "錯誤代碼：" + (err.code || "（無）") + "\n" +
-            "錯誤訊息：" + (err.message || err)
+            "登入失敗，請再試一次。\n\n" +
+            "錯誤代碼：" + code + "\n" +
+            "錯誤訊息：" + msg + "\n\n" +
+            "可以把上面這段錯誤內容截圖 / 貼給開發者。"
           );
-          // ⚠️ 不要再 redirect 回 index.html，不然只會覺得「被跳回首頁」
         }
       }
 
       function handlePressStart(e) {
         if (auth.currentUser) return;
 
-        pressStart = Date.now();
         pressing = true;
+        pressStart = Date.now();
         LoginBtn.classList.add("pressing");
 
         if (e.cancelable) e.preventDefault();
@@ -670,7 +667,7 @@
         e.stopPropagation();
 
         if (duration >= LONG_PRESS_MS) {
-          // 長按滿 1 秒才登入
+          // 長按滿 1 秒才真正登入
           doLogin();
         }
       }
@@ -681,13 +678,13 @@
         LoginBtn.classList.remove("pressing");
       }
 
-      // 滑鼠（桌機）
+      // 桌機：滑鼠事件
       LoginBtn.addEventListener("mousedown", handlePressStart);
       LoginBtn.addEventListener("mouseup", handlePressEnd);
       LoginBtn.addEventListener("mouseleave", handlePressCancel);
 
-      // 觸控（手機）
-      LoginBtn.addEventListener("touchstart", handlePressStart);
+      // 手機：觸控事件
+      LoginBtn.addEventListener("touchstart", handlePressStart, { passive: false });
       LoginBtn.addEventListener("touchend", handlePressEnd);
       LoginBtn.addEventListener("touchcancel", handlePressCancel);
     }
