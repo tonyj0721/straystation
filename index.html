@@ -617,57 +617,66 @@
 
     // Google 長按登入（未登入時）
     if (LoginBtn) {
-      const LONG_PRESS_MS = 1000; // 長按 1 秒才登入
-      let pressTimer = null;
-      let isPressing = false;
+      const LONG_PRESS_MS = 1000; // 長按 1 秒
+
+      let pressStart = 0;
+      let pressing = false;
 
       async function doLogin() {
         if (auth.currentUser) return; // 已登入就不重複登入
         try {
           await signInWithPopup(auth, provider);
-          // 登入後會觸發 onAuthStateChanged，所以不用另外改畫面
+          // 成功後會觸發 onAuthStateChanged，自動更新畫面
         } catch (err) {
           console.error("Google 登入失敗", err);
-          window.location.replace("index.html");
+          alert("登入失敗，請再試一次（若一直失敗，請改用電腦或更新瀏覽器）");
+          // ❌ 不要 redirect，不然你只會看到「被導回首頁」卻不知道錯在哪
+          // window.location.replace("index.html");
         }
       }
 
-      function startPress(e) {
+      function handlePressStart(e) {
+        if (auth.currentUser) return;
+        // iOS 上有時候不需要 preventDefault，如果遇到捲動問題再加
         e.preventDefault();
         e.stopPropagation();
 
-        if (pressTimer || auth.currentUser) return;
-
-        isPressing = true;
-        LoginBtn.classList.add("pressing"); // 給個視覺效果（下面有 CSS 建議）
-
-        pressTimer = setTimeout(() => {
-          pressTimer = null;
-          isPressing = false;
-          LoginBtn.classList.remove("pressing");
-          doLogin();
-        }, LONG_PRESS_MS);
+        pressStart = Date.now();
+        pressing = true;
+        LoginBtn.classList.add("pressing");
       }
 
-      function cancelPress() {
-        if (!pressTimer && !isPressing) return;
-        if (pressTimer) {
-          clearTimeout(pressTimer);
-          pressTimer = null;
+      function handlePressEnd(e) {
+        if (!pressing) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        const delta = Date.now() - pressStart;
+        pressing = false;
+        LoginBtn.classList.remove("pressing");
+
+        if (delta >= LONG_PRESS_MS) {
+          // ★ 這裡是「同一個 user event handler」裡直接呼叫登入，
+          //   iPhone 就不會把彈窗當成惡意跳出。
+          doLogin();
         }
-        isPressing = false;
+      }
+
+      function handlePressCancel() {
+        if (!pressing) return;
+        pressing = false;
         LoginBtn.classList.remove("pressing");
       }
 
       // 滑鼠
-      LoginBtn.addEventListener("mousedown", startPress);
-      LoginBtn.addEventListener("mouseup", cancelPress);
-      LoginBtn.addEventListener("mouseleave", cancelPress);
+      LoginBtn.addEventListener("mousedown", handlePressStart);
+      LoginBtn.addEventListener("mouseup", handlePressEnd);
+      LoginBtn.addEventListener("mouseleave", handlePressCancel);
 
-      // 觸控
-      LoginBtn.addEventListener("touchstart", startPress);
-      LoginBtn.addEventListener("touchend", cancelPress);
-      LoginBtn.addEventListener("touchcancel", cancelPress);
+      // 觸控（手機）
+      LoginBtn.addEventListener("touchstart", handlePressStart);
+      LoginBtn.addEventListener("touchend", handlePressEnd);
+      LoginBtn.addEventListener("touchcancel", handlePressCancel);
     }
 
     // 桌機 + 手機「登出」按鈕
