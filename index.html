@@ -41,9 +41,6 @@
             <span id="adminLabel" class="text-xs text-red-500 hidden">我是小編</span>
           </span>
         </a>
-        <div class="flex-1">
-          <span id="btnGoogleLogin" type="button" class="login-button opacity-50" style="cursor: default">長按登入</span>
-        </div>
 
         <!-- 桌機導覽 -->
         <nav class="hidden md:flex items-center gap-6 ml-auto">
@@ -51,6 +48,9 @@
           <a href="dogs.html" class="hover:text-brand-600">我想養狗狗</a>
           <a href="about.html" class="hover:text-brand-600">關於簡媽媽</a>
           <a href="home.html" class="hover:text-brand-600">幸福的歸宿</a>
+          <button type="button" class="text-sm text-red-500 hover:text-brand-600 btnGoogleLogin">
+            小編登入
+          </button>
           <a href="admin.html" class="hover:text-brand-600 nav-admin-link hidden">後台管理</a>
           <button type="button" id="btnLogoutDesktop"
             class="text-sm text-red-500 hover:text-brand-600 nav-logout-btn hidden">
@@ -117,6 +117,15 @@
             <span aria-hidden="true" class="text-xl leading-none">🏠</span>
             <span>幸福的歸宿</span>
           </a>
+        </li>
+
+        <li>
+          <button type="button" class="w-full flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+                 text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+                 focus:outline-none focus:ring-2 focus:ring-white/70 btnGoogleLogin" role="menuitem" tabindex="-1">
+            <span aria-hidden="true" class="text-xl leading-none">🔒</span>
+            <span>小編登入</span>
+          </button>
         </li>
 
         <li>
@@ -544,13 +553,10 @@
     import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject, listAll, } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
     import {
       getAuth,
-GoogleAuthProvider,
-signInWithPopup,
-setPersistence,
-browserLocalPersistence,
-browserSessionPersistence,
-signOut,
-onAuthStateChanged,
+      GoogleAuthProvider,
+      signInWithPopup,
+      signOut,
+      onAuthStateChanged,
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
 
     const app = initializeApp(window.firebaseConfig);
@@ -568,7 +574,7 @@ onAuthStateChanged,
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
 
-    const LoginBtn = document.getElementById("btnGoogleLogin");
+    const LoginBtn = document.querySelectorAll(".btnGoogleLogin");
     const adminLabel = document.getElementById("adminLabel");
     const adminLinks = document.querySelectorAll(".nav-admin-link");
     const logoutBtns = document.querySelectorAll(".nav-logout-btn");
@@ -581,7 +587,9 @@ onAuthStateChanged,
       const isLogin = !!user;
       window.__isLogin = isLogin;  // ← 加這行
 
-      LoginBtn?.classList.toggle("hidden", isLogin);
+      LoginBtn.forEach((el) => {
+        el.classList.toggle("hidden", isLogin);
+      });
 
       adminLabel?.classList.toggle("hidden", !isLogin);
 
@@ -618,188 +626,24 @@ onAuthStateChanged,
       if (typeof window.setEditMode === "function") window.setEditMode(inEdit); // ← 加這行
     });
 
-    // Google 登入（未登入時）— iOS 友善：長按（按住）才會觸發
-// 說明：iOS/Safari 對 popup 以及「非同步觸發」比較嚴格；因此我們在「放開手指」那一刻才真正呼叫登入，
-// 並在 popup 被擋時自動改用 redirect，且用旗標偵測「redirect 回來但狀態遺失」的情況（常見於私密/內建瀏覽器）。
-const LONG_PRESS_MS = 650;
+    // Google 登入（未登入時）
+    if (LoginBtn) {
+      LoginBtn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
 
-// iOS / 內建瀏覽器偵測（避免 ReferenceError）
-const __ua = navigator.userAgent || navigator.vendor || window.opera || "";
-const __isIOS = /iPad|iPhone|iPod/i.test(__ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-// 常見內建瀏覽器：LINE / Facebook / Instagram / Google App (GSA) / WeChat...（可再加）
-const __isInApp = /Line|FBAN|FBAV|Instagram|GSA|MicroMessenger|WeChat|Twitter|DuckDuckGo|KAKAOTALK|Snapchat/i.test(__ua);
+        if (auth.currentUser) return;   // 已登入就不重複登入
 
-
-// (iOS) 取消 redirect 流程：在部分內建瀏覽器/私密模式會遺失狀態
-
-// ---- 登入提示（底部黑條）----
-let __authHintEl = null;
-function showAuthHint(msg) {
-  try {
-    if (!msg) return;
-    if (!__authHintEl) {
-      __authHintEl = document.createElement("div");
-      __authHintEl.id = "authHint";
-      __authHintEl.style.position = "fixed";
-      __authHintEl.style.left = "12px";
-      __authHintEl.style.right = "12px";
-      __authHintEl.style.bottom = "calc(12px + env(safe-area-inset-bottom))";
-      __authHintEl.style.zIndex = "99999";
-      __authHintEl.style.background = "rgba(17, 24, 39, 0.92)";
-      __authHintEl.style.color = "#fff";
-      __authHintEl.style.padding = "12px 14px";
-      __authHintEl.style.borderRadius = "14px";
-      __authHintEl.style.fontSize = "14px";
-      __authHintEl.style.lineHeight = "1.4";
-      __authHintEl.style.boxShadow = "0 8px 22px rgba(0,0,0,0.25)";
-      __authHintEl.style.backdropFilter = "blur(8px)";
-      __authHintEl.style.webkitBackdropFilter = "blur(8px)";
-      __authHintEl.style.cursor = "pointer";
-      __authHintEl.addEventListener("click", () => {
-        try { __authHintEl.remove(); } catch (_) {}
-        __authHintEl = null;
+        try {
+          await signInWithPopup(auth, provider);
+          // 登入後會觸發 onAuthStateChanged，所以不用另外改畫面
+        } catch (err) {
+          console.error("Google 登入失敗", err);
+          window.location.replace("index.html");
+        }
       });
-      document.body.appendChild(__authHintEl);
     }
-    __authHintEl.textContent = msg + "（點一下可關閉）";
-  } catch (e) {
-    console.warn("showAuthHint failed", e);
-  }
-}
 
-// ---- Firebase Auth persistence（避免 iOS/Safari 狀態遺失）----
-let __persistenceState = null;
-async function ensurePersistence() {
-  if (__persistenceState && __persistenceState !== "pending") return __persistenceState;
-  __persistenceState = "pending";
-  try {
-    await setPersistence(auth, browserLocalPersistence);
-    __persistenceState = "local";
-    return __persistenceState;
-  } catch (_) {}
-  try {
-    await setPersistence(auth, browserSessionPersistence);
-    __persistenceState = "session";
-    return __persistenceState;
-  } catch (_) {}
-  __persistenceState = "none";
-  return __persistenceState;
-}
-
-
-async function startGoogleLogin() {
-  if (auth.currentUser) return;
-
-  // iOS 內建瀏覽器（例如：Google/LINE/FB 的內建瀏覽器）常會擋 popup，redirect 又容易遺失狀態
-  if (__isIOS && __isInApp) {
-    showAuthHint("你目前在內建瀏覽器，可能無法保存 Google 登入狀態；若登入後仍未登入，請改用 Safari 正常模式再試。");
-  }
-
-  const persistence = await ensurePersistence();
-  if (persistence === "none") {
-    showAuthHint("目前瀏覽器可能無法保存登入狀態；若登入後仍未登入，請改用 Safari 正常模式（不要私密/不要內建瀏覽器）再試。");
-  }
-
-  // 可選：每次都強制跳出選帳號
-  try { provider.setCustomParameters({ prompt: "select_account" }); } catch (_) { }
-
-  try {
-    await signInWithPopup(auth, provider);
-    // 成功後會觸發 onAuthStateChanged，所以不用另外改畫面
-  } catch (err) {
-    const code = err?.code || "";
-    const maybePopupBlocked =
-      code.includes("popup") ||
-      code === "auth/operation-not-supported-in-this-environment" ||
-      code === "auth/web-storage-unsupported";
-
-    if (maybePopupBlocked) {
-      showAuthHint("此瀏覽器阻擋彈出視窗，無法完成 Google 登入。請允許彈出視窗或改用 Safari 正常模式。");
-    } else {
-      showAuthHint("Google 登入失敗：" + (err?.code || err?.message || "unknown"));
-    }
-    throw err;
-  }
-}
-
-// 長按互動：按住到時間 → 放開才真正呼叫登入（避免 iOS 把 setTimeout 當成非手勢）
-if (LoginBtn) {
-  // iOS 長按會出現文字選取/選單，這裡順手關掉
-  try {
-    LoginBtn.style.webkitTouchCallout = "none";
-    LoginBtn.style.webkitUserSelect = "none";
-    LoginBtn.style.userSelect = "none";
-  } catch (_) { }
-
-  let pressTimer = null;
-  let armed = false;
-
-  const reset = () => {
-    if (pressTimer) {
-      clearTimeout(pressTimer);
-      pressTimer = null;
-    }
-    armed = false;
-    LoginBtn.textContent = "長按登入";
-    LoginBtn.classList.remove("opacity-70");
-  };
-
-  const onDown = (e) => {
-    if (auth.currentUser) return;
-    // 防止長按時頁面被捲動/觸發其他點擊
-    try { e.preventDefault(); } catch (_) { }
-    armed = false;
-    LoginBtn.classList.add("opacity-70");
-    LoginBtn.textContent = "按住中…";
-
-    pressTimer = setTimeout(() => {
-      armed = true;
-      LoginBtn.textContent = "放開以登入";
-    }, LONG_PRESS_MS);
-  };
-
-  const onUp = async (e) => {
-    try { e.preventDefault(); } catch (_) { }
-    if (pressTimer) {
-      clearTimeout(pressTimer);
-      pressTimer = null;
-    }
-    if (!armed) {
-      reset();
-      return;
-    }
-    reset();
-    try {
-      await startGoogleLogin();
-      // 登入後會觸發 onAuthStateChanged，所以不用另外改畫面
-    } catch (err) {
-      console.error("Google 登入失敗", err);
-    }
-  };
-
-  const supportsPointer = "PointerEvent" in window;
-
-  if (supportsPointer) {
-    LoginBtn.addEventListener("pointerdown", onDown, { passive: false });
-    LoginBtn.addEventListener("pointerup", onUp, { passive: false });
-    LoginBtn.addEventListener("pointercancel", reset, { passive: true });
-    LoginBtn.addEventListener("pointerleave", reset, { passive: true });
-  } else {
-    // 老 iOS fallback
-    LoginBtn.addEventListener("touchstart", onDown, { passive: false });
-    LoginBtn.addEventListener("touchend", onUp, { passive: false });
-    LoginBtn.addEventListener("touchcancel", reset, { passive: true });
-    LoginBtn.addEventListener("mousedown", onDown);
-    LoginBtn.addEventListener("mouseup", onUp);
-    LoginBtn.addEventListener("mouseleave", reset);
-  }
-
-  // 阻止一般 click（避免變回點一下就登入）
-  LoginBtn.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-  });
-}
     // 桌機 + 手機「登出」按鈕
     logoutBtns.forEach((btn) => {
       btn.addEventListener("click", async (e) => {
