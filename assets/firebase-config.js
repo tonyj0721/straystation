@@ -1,7 +1,7 @@
 // assets/firebase-config.js
 window.firebaseConfig = {
   apiKey: "AIzaSyCT9U9WETVOFb1rfIkjjjBVteS65Q-Xg1A",
-  authDomain: "straystation.firebaseapp.com",
+  authDomain: "straystation.web.app",
   projectId: "straystation",
   storageBucket: "straystation.firebasestorage.app",
   messagingSenderId: "611366379195",
