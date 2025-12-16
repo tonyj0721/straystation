@@ -570,27 +570,74 @@
 
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
+
+// ---- iOS / in-app 環境偵測（用來決定 popup/redirect、以及提示使用者） ----
+const __ua = navigator.userAgent || "";
+const __isIOS = /iPad|iPhone|iPod/.test(__ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const __isInApp = /(Line\/|FBAN|FBAV|Instagram|Twitter|MicroMessenger|WhatsApp)/i.test(__ua);
+
+// 小提示條（只在需要時顯示）
+function showAuthHint(msg) {
+  try {
+    let el = document.getElementById("authHintBar");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "authHintBar";
+      el.style.cssText =
+        "position:fixed;left:12px;right:12px;bottom:12px;z-index:99999;" +
+        "padding:10px 12px;border-radius:12px;" +
+        "background:rgba(17,24,39,.92);color:#fff;" +
+        "font-size:13px;line-height:1.4;" +
+        "box-shadow:0 8px 30px rgba(0,0,0,.25);";
+      el.addEventListener("click", () => el.remove());
+      document.body.appendChild(el);
+    }
+    el.textContent = msg + "（點一下可關閉）";
+  } catch (_) { }
+}
+
 // iOS/Safari：先設定 persistence，避免 redirect 回來後狀態不見
+let __persistence = "unknown";
 const persistenceReady = (async () => {
   try {
     await setPersistence(auth, browserLocalPersistence);
+    __persistence = "local";
+    return;
   } catch (e1) {
     try {
       await setPersistence(auth, browserSessionPersistence);
+      __persistence = "session";
+      return;
     } catch (e2) {
-      // 最後退回 memory（但 redirect 可能無法保持登入）
-      try { await setPersistence(auth, inMemoryPersistence); } catch (_) { }
+      try {
+        await setPersistence(auth, inMemoryPersistence);
+        __persistence = "memory";
+      } catch (_) {
+        __persistence = "failed";
+      }
     }
   }
 })();
 
 // 若是 redirect 回來，讀取結果才能完成登入（某些 iOS/Safari 需要）
 (async () => {
+  await persistenceReady;
+
+  // 這兩種情況，redirect 回來通常會「看起來沒登入」（因為狀態無法保存）
+  if (__persistence === "memory" || __persistence === "failed") {
+    showAuthHint("目前瀏覽器無法保存登入狀態（常見：Safari 私密瀏覽／LINE/FB 內建瀏覽器／封鎖 Cookie）。請改用 Safari 正常模式開啟再登入。");
+  }
+
   try {
-    await persistenceReady;
-    await getRedirectResult(auth);
+    const res = await getRedirectResult(auth);
+    // res 可能是 null；onAuthStateChanged 仍會接到狀態
+    if (res?.user) {
+      // 成功提示（如不想打擾可留著註解）
+      // showAuthHint("登入成功");
+    }
   } catch (e) {
     console.warn("getRedirectResult 失敗", e);
+    showAuthHint("Google 登入回來但未完成，錯誤：" + (e?.code || e?.message || "unknown"));
   }
 })();
 
@@ -703,7 +750,21 @@ if (LoginBtn) {
 
     try {
       await persistenceReady;
+
+      // 這兩種情況：即使跳轉回來，也常常「看起來沒登入」（狀態無法保存）
+      if (__persistence === "memory" || __persistence === "failed") {
+        showAuthHint("目前瀏覽器無法保存登入狀態，Google 登入回來會變成未登入。請改用 Safari 正常模式或允許 Cookie 後再試。");
+        return;
+      }
+
+      // iPhone / 內建瀏覽器：直接用 redirect（比 popup 更穩）
+      if (__isIOS || __isInApp) {
+        await signInWithRedirect(auth, provider);
+        return;
+      }
+
       await signInWithPopup(auth, provider);
+      return;
     } catch (err) {
       const code = err?.code || "";
       if (
@@ -717,9 +778,11 @@ if (LoginBtn) {
           return;
         } catch (e2) {
           console.error("Google redirect 登入失敗", e2);
+          showAuthHint("Google redirect 登入失敗：" + (e2?.code || e2?.message || "unknown"));
         }
       }
       console.error("Google 登入失敗", err);
+      showAuthHint("Google 登入失敗：" + (err?.code || err?.message || "unknown"));
       window.location.replace("index.html");
     }
   };
