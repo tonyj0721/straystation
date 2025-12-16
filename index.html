@@ -547,6 +547,8 @@
       getAuth,
       GoogleAuthProvider,
       signInWithPopup,
+      signInWithRedirect,
+      getRedirectResult,
       signOut,
       onAuthStateChanged,
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
@@ -565,6 +567,17 @@
 
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
+
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result && result.user) {
+          console.log("redirect 登入成功", result.user);
+        }
+      })
+      .catch((err) => {
+        if (err) console.error("redirect 登入失敗", err);
+      });
+
 
     const LoginBtn = document.getElementById("btnGoogleLogin");
     const adminLabel = document.getElementById("adminLabel");
@@ -623,17 +636,42 @@
       let pressing = false;
       let isLoggingIn = false;
 
+      const isIOS = /iP(hone|od|ad)/i.test(window.navigator.userAgent);
+
       async function doLogin() {
-        if (auth.currentUser || isLoggingIn) return; // 已登入或登入中就不要重複開 popup
+        if (auth.currentUser || isLoggingIn) return; // 已登入或登入中就不要重複開
         isLoggingIn = true;
 
         try {
+          if (isIOS) {
+            // 📱 iOS：用 redirect，避免 auth/popup-blocked
+            await signInWithRedirect(auth, provider);
+            return; // 之後整頁跳去 Google，再跳回來
+          }
+
+          // 其他裝置：先試 popup
           const result = await signInWithPopup(auth, provider);
           console.log("Google 登入成功", result?.user);
           // 成功後 onAuthStateChanged 會自動更新畫面
         } catch (err) {
-          // 使用者自己關掉視窗，就當沒事
-          if (err && (err.code === "auth/popup-closed-by-user" || err.errorCode === "auth/popup-closed-by-user")) {
+          // 非 iOS，如果 popup 被擋，改用 redirect 當備案
+          if (
+            !isIOS &&
+            err &&
+            (err.code === "auth/popup-blocked" ||
+              err.errorCode === "auth/popup-blocked")
+          ) {
+            console.warn("popup 被擋，改用 redirect");
+            await signInWithRedirect(auth, provider);
+            return;
+          }
+
+          // 使用者自己關掉 popup，就當沒事
+          if (
+            err &&
+            (err.code === "auth/popup-closed-by-user" ||
+              err.errorCode === "auth/popup-closed-by-user")
+          ) {
             console.warn("登入視窗被關閉");
             return;
           }
@@ -645,8 +683,11 @@
             (typeof err === "string" ? err : JSON.stringify(err));
           alert(
             "登入失敗，請再試一次。\n\n" +
-            "錯誤代碼：" + code + "\n" +
-            "錯誤訊息：" + msg
+            "錯誤代碼：" +
+            code +
+            "\n" +
+            "錯誤訊息：" +
+            msg
           );
         } finally {
           isLoggingIn = false;
@@ -692,17 +733,14 @@
       }
 
       if (window.PointerEvent) {
-        // 新瀏覽器（含 iOS Safari）走這條
         LoginBtn.addEventListener("pointerdown", handlePressStart);
         LoginBtn.addEventListener("pointerup", handlePressEnd);
         LoginBtn.addEventListener("pointercancel", handlePressCancel);
         LoginBtn.addEventListener("pointerleave", handlePressCancel);
       } else {
-        // 舊瀏覽器備援
         LoginBtn.addEventListener("mousedown", handlePressStart);
         LoginBtn.addEventListener("mouseup", handlePressEnd);
         LoginBtn.addEventListener("mouseleave", handlePressCancel);
-
         LoginBtn.addEventListener("touchstart", handlePressStart, { passive: false });
         LoginBtn.addEventListener("touchend", handlePressEnd);
         LoginBtn.addEventListener("touchcancel", handlePressCancel);
