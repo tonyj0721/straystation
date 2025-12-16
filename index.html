@@ -27,6 +27,18 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="stylesheet" href="assets/tailwind.css">
   <link rel="stylesheet" href="assets/shared.css">
+
+  <style>
+    /* 避免 iOS 長按選字/跳出選單 */
+    #btnGoogleLogin {
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+  </style>
+
 </head>
 
 <body class="bg-white text-gray-800">
@@ -41,6 +53,9 @@
             <span id="adminLabel" class="text-xs text-red-500 hidden">我是小編</span>
           </span>
         </a>
+        <div class="flex-1">
+          <span id="btnGoogleLogin" type="button" class="login-button opacity-50" style="cursor: default">長按登入</span>
+        </div>
 
         <!-- 桌機導覽 -->
         <nav class="hidden md:flex items-center gap-6 ml-auto">
@@ -48,9 +63,6 @@
           <a href="dogs.html" class="hover:text-brand-600">我想養狗狗</a>
           <a href="about.html" class="hover:text-brand-600">關於簡媽媽</a>
           <a href="home.html" class="hover:text-brand-600">幸福的歸宿</a>
-          <button type="button" class="btnGoogleLogin hover:text-brand-600">
-            小編登入
-          </button>
           <a href="admin.html" class="hover:text-brand-600 nav-admin-link hidden">後台管理</a>
           <button type="button" id="btnLogoutDesktop"
             class="text-sm text-red-500 hover:text-brand-600 nav-logout-btn hidden">
@@ -117,16 +129,6 @@
             <span aria-hidden="true" class="text-xl leading-none">🏠</span>
             <span>幸福的歸宿</span>
           </a>
-        </li>
-
-        <li>
-          <button type="button" class="btnGoogleLogin w-full flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
-                 text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
-                 focus:outline-none focus:ring-2 focus:ring-white/70"
-                 role="menuitem" tabindex="-1">
-            <span aria-hidden="true" class="text-xl leading-none">🔒</span>
-            <span class="flex-1 text-center">小編登入</span>
-          </button>
         </li>
 
         <li>
@@ -553,11 +555,20 @@
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
     import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject, listAll, } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
     import {
+      
       getAuth,
       GoogleAuthProvider,
       signInWithPopup,
+      signInWithRedirect,
+      getRedirectResult,
+      setPersistence,
+      indexedDBLocalPersistence,
+      browserLocalPersistence,
+      browserSessionPersistence,
+      inMemoryPersistence,
       signOut,
       onAuthStateChanged,
+    
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
 
     const app = initializeApp(window.firebaseConfig);
@@ -574,8 +585,49 @@
 
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
+    // ---- iOS / Safari：先設定持久化 & 接回 redirect 結果 ----
+    const __ua = navigator.userAgent || "";
+    const __isIOS =
+      /iPad|iPhone|iPod/.test(__ua) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
-    const LoginBtns = document.querySelectorAll(".btnGoogleLogin");
+    async function ensurePersistence() {
+      // iOS 上 IndexedDB 通常比 local/session 穩
+      try { await setPersistence(auth, indexedDBLocalPersistence); return; } catch {}
+      try { await setPersistence(auth, browserLocalPersistence); return; } catch {}
+      try { await setPersistence(auth, browserSessionPersistence); return; } catch {}
+      try { await setPersistence(auth, inMemoryPersistence); } catch {}
+    }
+
+    function showAuthHint(msg) {
+      // 小提示（不影響原本 UI）：點一下可關閉
+      const id = "__authHint";
+      let el = document.getElementById(id);
+      if (!el) {
+        el = document.createElement("div");
+        el.id = id;
+        el.style.cssText =
+          "position:fixed;left:12px;right:12px;bottom:12px;z-index:9999;" +
+          "padding:12px 14px;border-radius:14px;background:rgba(0,0,0,.75);" +
+          "color:#fff;font-size:14px;line-height:1.4;";
+        el.addEventListener("click", () => el.remove());
+        document.body.appendChild(el);
+      }
+      el.textContent = msg + "（點一下可關閉）";
+    }
+
+    (async () => {
+      try {
+        await ensurePersistence();
+        // 若使用 redirect，回來後需要讀一次結果（iOS 常見）
+        await getRedirectResult(auth);
+      } catch (err) {
+        console.warn("redirectResult 讀取失敗", err);
+      }
+    })();
+
+
+    const LoginBtn = document.getElementById("btnGoogleLogin");
     const adminLabel = document.getElementById("adminLabel");
     const adminLinks = document.querySelectorAll(".nav-admin-link");
     const logoutBtns = document.querySelectorAll(".nav-logout-btn");
@@ -588,9 +640,7 @@
       const isLogin = !!user;
       window.__isLogin = isLogin;  // ← 加這行
 
-      LoginBtns.forEach((el) => {
-        el.classList.toggle("hidden", isLogin);
-      });
+      LoginBtn?.classList.toggle("hidden", isLogin);
 
       adminLabel?.classList.toggle("hidden", !isLogin);
 
@@ -628,22 +678,87 @@
     });
 
     // Google 登入（未登入時）
-    LoginBtns.forEach((btn) => {
-      btn.addEventListener("click", async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+    if (LoginBtn) {
 
-        if (auth.currentUser) return;   // 已登入就不重複登入
+      // 長按登入（避免誤觸）
+      const LONG_PRESS_MS = 650;
+
+      async function startGoogleLogin() {
+        if (auth.currentUser) return;
+
+        await ensurePersistence();
 
         try {
+          // 先試 popup（Safari 正常模式通常可用）
           await signInWithPopup(auth, provider);
-          // 登入後會觸發 onAuthStateChanged，所以不用另外改畫面
         } catch (err) {
+          const code = err?.code || "";
+          // popup 被擋 / 環境不支援時，再 fallback redirect
+          if (
+            code === "auth/popup-blocked" ||
+            code === "auth/popup-closed-by-user" ||
+            code === "auth/operation-not-supported-in-this-environment" ||
+            __isIOS
+          ) {
+            try {
+              await signInWithRedirect(auth, provider);
+              return;
+            } catch (err2) {
+              console.error("Google 登入失敗(redirect)", err2);
+              showAuthHint("Google 登入失敗（redirect）。若看到 400 redirect_uri_mismatch，請到 Google Cloud OAuth 設定補上 /__/auth/handler。");
+              return;
+            }
+          }
+
           console.error("Google 登入失敗", err);
-          window.location.replace("index.html");
+          showAuthHint("Google 登入失敗：" + (code || "unknown"));
         }
-      });
-    });
+      }
+
+      // 長按：按住達標後「放開」才觸發（保持 user gesture，iOS 比較不會擋）
+      let pressTimer = null;
+      let armed = false;
+
+      const cancelPress = () => {
+        armed = false;
+        if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+      };
+
+      const onDown = (e) => {
+        // iOS 長按會觸發選字/呼叫選單；在這裡阻止預設行為
+        if (e) {
+          try { e.preventDefault(); } catch (_) {}
+          try { e.stopPropagation(); } catch (_) {}
+        }
+        cancelPress();
+        pressTimer = setTimeout(() => { armed = true; }, LONG_PRESS_MS);
+      };
+
+      const onUp = async (e) => {
+        const ok = armed;
+        cancelPress();
+        if (!ok) return;
+        e.preventDefault();
+        e.stopPropagation();
+        await startGoogleLogin();
+      };
+
+      // iOS/Safari 用 pointer 事件較穩；沒有 pointer 再退回 touch
+      if ("PointerEvent" in window) {
+        LoginBtn.addEventListener("pointerdown", onDown, { passive: false });
+        LoginBtn.addEventListener("pointerup", onUp, { passive: false });
+        LoginBtn.addEventListener("pointercancel", cancelPress, { passive: true });
+        LoginBtn.addEventListener("pointerleave", cancelPress, { passive: true });
+      } else {
+        LoginBtn.addEventListener("touchstart", onDown, { passive: false });
+        LoginBtn.addEventListener("touchend", onUp, { passive: false });
+        LoginBtn.addEventListener("touchcancel", cancelPress, { passive: true });
+      }
+
+      // 避免長按跳出選單（iOS 的「拷貝/開新頁」）
+      LoginBtn.addEventListener("contextmenu", (e) => e.preventDefault());
+
+    }
 
     // 桌機 + 手機「登出」按鈕
     logoutBtns.forEach((btn) => {
