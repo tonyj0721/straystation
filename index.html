@@ -544,18 +544,24 @@
     import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject, listAll, } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
     import {
       getAuth,
-GoogleAuthProvider,
-signInWithPopup,
-signInWithRedirect,
-getRedirectResult,
-setPersistence,
-browserLocalPersistence,
-browserSessionPersistence,
-signOut,
-onAuthStateChanged,
+      GoogleAuthProvider,
+      signInWithPopup,
+      signInWithRedirect,
+      getRedirectResult,
+      setPersistence,
+      indexedDBLocalPersistence,
+      browserLocalPersistence,
+      browserSessionPersistence,
+      inMemoryPersistence,
+      signOut,
+      onAuthStateChanged,
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
-
-    const app = initializeApp(window.firebaseConfig);
+    // 讓 Auth handler 盡量走同網域（iOS/Safari 對跨網域狀態較敏感）
+    const __cfg = { ...(window.firebaseConfig || {}) };
+    if (!/^(localhost|127\.0\.0\.1)$/i.test(location.hostname)) {
+      __cfg.authDomain = location.hostname;
+    }
+    const app = initializeApp(__cfg);
     const db = getFirestore(app);
     const storage = getStorage(app);
 
@@ -669,39 +675,73 @@ function showAuthHint(msg) {
   }
 }
 
+
+
+// ---- redirect 狀態標記（用來判斷「有跳轉回來但沒拿到登入狀態」）----
+const __REDIRECT_MARK_KEY = "__authRedirectMark";
+function markRedirectStart() {
+  try { sessionStorage.setItem(__REDIRECT_MARK_KEY, "1"); } catch (_) { }
+  try { localStorage.setItem(__REDIRECT_MARK_KEY, "1"); } catch (_) { }
+}
+function clearRedirectMark() {
+  try { sessionStorage.removeItem(__REDIRECT_MARK_KEY); } catch (_) { }
+  try { localStorage.removeItem(__REDIRECT_MARK_KEY); } catch (_) { }
+}
+function hasRedirectMark() {
+  try { if (sessionStorage.getItem(__REDIRECT_MARK_KEY)) return true; } catch (_) { }
+  try { if (localStorage.getItem(__REDIRECT_MARK_KEY)) return true; } catch (_) { }
+  return false;
+}
 // ---- Firebase Auth persistence（避免 iOS/Safari 狀態遺失）----
 let __persistenceState = null;
 async function ensurePersistence() {
   if (__persistenceState && __persistenceState !== "pending") return __persistenceState;
   __persistenceState = "pending";
-  try {
-    await setPersistence(auth, browserLocalPersistence);
-    __persistenceState = "local";
-    return __persistenceState;
-  } catch (_) {}
-  try {
-    await setPersistence(auth, browserSessionPersistence);
-    __persistenceState = "session";
-    return __persistenceState;
-  } catch (_) {}
+
+  const tries = [
+    ["idb", indexedDBLocalPersistence],
+    ["local", browserLocalPersistence],
+    ["session", browserSessionPersistence],
+    ["memory", inMemoryPersistence],
+  ];
+
+  for (const [name, persistence] of tries) {
+    try {
+      await setPersistence(auth, persistence);
+      __persistenceState = name;
+      return __persistenceState;
+    } catch (_) { }
+  }
+
   __persistenceState = "none";
   return __persistenceState;
 }
 
 (async () => {
   // 讀取 redirect 回來的登入結果（iPhone 常用）
+  const hadMark = hasRedirectMark();
   try {
     await ensurePersistence();
     const result = await getRedirectResult(auth);
     if (result && result.user) {
-      // 成功登入後會觸發 onAuthStateChanged
+      clearRedirectMark();
+      return; // 成功登入後會觸發 onAuthStateChanged
     }
   } catch (err) {
     console.error("getRedirectResult error", err);
     showAuthHint("Google 登入跳轉回來失敗：" + (err?.code || err?.message || "unknown"));
   }
-})();
 
+  // 若曾嘗試 redirect，但回來後仍沒有 user，多半是瀏覽器沒有保存狀態
+  if (hadMark) {
+    clearRedirectMark();
+    setTimeout(() => {
+      if (!auth.currentUser) {
+        showAuthHint("Google 已跳轉回來，但仍未登入。請用 Safari 正常模式（非私密/非內建瀏覽器）再試，並確認 Firebase Auth 已授權此網域：" + location.hostname);
+      }
+    }, 800);
+  }
+})();
 
 async function startGoogleLogin() {
   if (auth.currentUser) return;
@@ -712,7 +752,7 @@ async function startGoogleLogin() {
   }
 
   const persistence = await ensurePersistence();
-  if (persistence === "none") {
+  if (persistence === "none" || persistence === "memory") {
     showAuthHint("目前瀏覽器可能無法保存登入狀態；若登入後仍未登入，請改用 Safari 正常模式（不要私密/不要內建瀏覽器）再試。");
   }
 
@@ -722,6 +762,7 @@ async function startGoogleLogin() {
   // iPhone / iPad：優先用 redirect（較不容易被 Safari 的彈窗阻擋）
   if (__isIOS) {
     showAuthHint("iPhone 將使用跳轉登入（Google 選帳號後會回到本頁）。若回來仍未登入，請改用 Safari 正常模式（不要私密/不要內建瀏覽器）。");
+    markRedirectStart();
     await signInWithRedirect(auth, provider);
     return;
   }
@@ -739,7 +780,8 @@ async function startGoogleLogin() {
     if (maybePopupBlocked) {
       showAuthHint("此瀏覽器阻擋彈出視窗，改用跳轉登入中…（若回來仍未登入，請用 Safari 正常模式）");
       try {
-        await signInWithRedirect(auth, provider);
+        markRedirectStart();
+    await signInWithRedirect(auth, provider);
         return;
       } catch (e2) {
         console.error("signInWithRedirect failed", e2);
@@ -760,6 +802,11 @@ if (LoginBtn) {
     LoginBtn.style.userSelect = "none";
   } catch (_) { }
 
+
+  // 讓按鈕看起來可互動
+  LoginBtn.textContent = "長按登入";
+  LoginBtn.classList.remove("opacity-50");
+  LoginBtn.style.cursor = "pointer";
   let pressTimer = null;
   let armed = false;
 
