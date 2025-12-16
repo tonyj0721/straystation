@@ -42,8 +42,7 @@
           </span>
         </a>
         <div class="flex-1">
-          <span id="btnGoogleLogin" type="button" class="login-button opacity-0"
-            style="cursor: pointer; user-select: none; -webkit-user-select: none;">登入</span>
+          <span id="btnGoogleLogin" role="button" tabindex="0" class="login-button" style="cursor:pointer">長按登入</span>
         </div>
 
         <!-- 桌機導覽 -->
@@ -547,8 +546,6 @@
       getAuth,
       GoogleAuthProvider,
       signInWithPopup,
-      signInWithRedirect,
-      getRedirectResult,
       signOut,
       onAuthStateChanged,
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
@@ -567,18 +564,6 @@
 
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
-
-    getRedirectResult(auth)
-      .then((result) => {
-        if (result && result.user) {
-          alert("redirect 登入成功：" + (result.user.email || result.user.uid));
-        } else {
-          alert("redirect 沒有 user（不是從登入頁回來？）");
-        }
-      })
-      .catch((err) => {
-        alert("redirect 失敗：" + (err.code || "") + "\n" + (err.message || err));
-      });
 
     const LoginBtn = document.getElementById("btnGoogleLogin");
     const adminLabel = document.getElementById("adminLabel");
@@ -630,125 +615,73 @@
       if (typeof window.setEditMode === "function") window.setEditMode(inEdit); // ← 加這行
     });
 
-    // Google 長按登入（未登入時）─ pointer 事件版，手機 / 桌機共用
+    // Google 登入（未登入時）：改成「長按」才會登入
     if (LoginBtn) {
-      const LONG_PRESS_MS = 1000; // 長按 1 秒
-      let pressStart = 0;
-      let pressing = false;
-      let isLoggingIn = false;
+      const LONG_PRESS_MS = 650;
+      let pressTimer = null;
+      let didLongPress = false;
 
-      const isIOS = /iP(hone|od|ad)/i.test(window.navigator.userAgent);
+      // 避免長按跳出瀏覽器選單/文字選取
+      LoginBtn.addEventListener("contextmenu", (e) => e.preventDefault());
 
-      async function doLogin() {
-        if (auth.currentUser || isLoggingIn) return; // 已登入或登入中就不要重複開
-        isLoggingIn = true;
+      const startPress = (e) => {
+        if (auth.currentUser) return;   // 已登入就不重複登入
+        didLongPress = false;
 
-        try {
-          if (isIOS) {
-            // 📱 iOS：用 redirect，避免 auth/popup-blocked
-            await signInWithRedirect(auth, provider);
-            return; // 之後整頁跳去 Google，再跳回來
-          }
-
-          // 其他裝置：先試 popup
-          const result = await signInWithPopup(auth, provider);
-          console.log("Google 登入成功", result?.user);
-          // 成功後 onAuthStateChanged 會自動更新畫面
-        } catch (err) {
-          // 非 iOS，如果 popup 被擋，改用 redirect 當備案
-          if (
-            !isIOS &&
-            err &&
-            (err.code === "auth/popup-blocked" ||
-              err.errorCode === "auth/popup-blocked")
-          ) {
-            console.warn("popup 被擋，改用 redirect");
-            await signInWithRedirect(auth, provider);
-            return;
-          }
-
-          // 使用者自己關掉 popup，就當沒事
-          if (
-            err &&
-            (err.code === "auth/popup-closed-by-user" ||
-              err.errorCode === "auth/popup-closed-by-user")
-          ) {
-            console.warn("登入視窗被關閉");
-            return;
-          }
-
-          console.error("Google 登入失敗", err);
-          const code = err.code || err.errorCode || "（無錯誤代碼）";
-          const msg =
-            err.message ||
-            (typeof err === "string" ? err : JSON.stringify(err));
-          alert(
-            "登入失敗，請再試一次。\n\n" +
-            "錯誤代碼：" +
-            code +
-            "\n" +
-            "錯誤訊息：" +
-            msg
-          );
-        } finally {
-          isLoggingIn = false;
-        }
-      }
-
-      function handlePressStart(e) {
-        if (auth.currentUser) return;
-        // 只吃左鍵
-        if (e.button !== undefined && e.button !== 0) return;
-
-        pressing = true;
-        pressStart = Date.now();
-        LoginBtn.classList.add("pressing");
-
-        if (e.cancelable) e.preventDefault();
-        e.stopPropagation();
-      }
-
-      function handlePressEnd(e) {
-        if (!pressing) return;
-
-        const duration = Date.now() - pressStart;
-        pressing = false;
-        pressStart = 0;
-        LoginBtn.classList.remove("pressing");
-
-        if (e.cancelable) e.preventDefault();
+        e.preventDefault();
         e.stopPropagation();
 
-        if (duration >= LONG_PRESS_MS) {
-          doLogin(); // 這裡直接開 popup，還在同一個使用者事件鏈中，不會被 Safari 擋
-        } else {
-          alert("請長按「登入」約 1 秒再放開。");
+        // 防呆：避免重複計時
+        if (pressTimer) clearTimeout(pressTimer);
+
+        pressTimer = window.setTimeout(async () => {
+          didLongPress = true;
+          pressTimer = null;
+
+          try {
+            await signInWithPopup(auth, provider);
+            // 登入後會觸發 onAuthStateChanged，所以不用另外改畫面
+          } catch (err) {
+            console.error("Google 登入失敗", err);
+            window.location.replace("index.html");
+          }
+        }, LONG_PRESS_MS);
+      };
+
+      const cancelPress = () => {
+        if (pressTimer) {
+          clearTimeout(pressTimer);
+          pressTimer = null;
         }
-      }
+      };
 
-      function handlePressCancel() {
-        if (!pressing) return;
-        pressing = false;
-        pressStart = 0;
-        LoginBtn.classList.remove("pressing");
-      }
+      // 觸控 + 桌機都支援
+      LoginBtn.addEventListener("pointerdown", startPress, { passive: false });
+      LoginBtn.addEventListener("pointerup", cancelPress);
+      LoginBtn.addEventListener("pointerleave", cancelPress);
+      LoginBtn.addEventListener("pointercancel", cancelPress);
 
-      if (window.PointerEvent) {
-        LoginBtn.addEventListener("pointerdown", handlePressStart);
-        LoginBtn.addEventListener("pointerup", handlePressEnd);
-        LoginBtn.addEventListener("pointercancel", handlePressCancel);
-        LoginBtn.addEventListener("pointerleave", handlePressCancel);
-      } else {
-        LoginBtn.addEventListener("mousedown", handlePressStart);
-        LoginBtn.addEventListener("mouseup", handlePressEnd);
-        LoginBtn.addEventListener("mouseleave", handlePressCancel);
-        LoginBtn.addEventListener("touchstart", handlePressStart, { passive: false });
-        LoginBtn.addEventListener("touchend", handlePressEnd);
-        LoginBtn.addEventListener("touchcancel", handlePressCancel);
-      }
+      // 短按/點一下：不做登入（可選：提示）
+      LoginBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!didLongPress) {
+          // 想要提示可以打開這行
+          // alert("請長按登入");
+        }
+      }, true);
+
+      // 鍵盤：長按 Space / Enter 也可登入
+      LoginBtn.addEventListener("keydown", (e) => {
+        if (e.key === " " || e.key === "Enter") startPress(e);
+      });
+      LoginBtn.addEventListener("keyup", (e) => {
+        if (e.key === " " || e.key === "Enter") cancelPress();
+      });
     }
 
-    // 桌機 + 手機「登出」按鈕
+
+// 桌機 + 手機「登出」按鈕
     logoutBtns.forEach((btn) => {
       btn.addEventListener("click", async (e) => {
         e.preventDefault();
