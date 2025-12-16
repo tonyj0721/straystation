@@ -27,6 +27,13 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="stylesheet" href="assets/tailwind.css">
   <link rel="stylesheet" href="assets/shared.css">
+  <style>
+    .login-button {
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+  </style>
 </head>
 
 <body class="bg-white text-gray-800">
@@ -681,7 +688,7 @@
     }
 
 
-// 桌機 + 手機「登出」按鈕
+    // 桌機 + 手機「登出」按鈕
     logoutBtns.forEach((btn) => {
       btn.addEventListener("click", async (e) => {
         e.preventDefault();
