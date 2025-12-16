@@ -565,7 +565,7 @@
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
 
-    /*const LoginBtn = document.getElementById("btnGoogleLogin");*/
+    const LoginBtn = document.getElementById("btnGoogleLogin");
     const adminLabel = document.getElementById("adminLabel");
     const adminLinks = document.querySelectorAll(".nav-admin-link");
     const logoutBtns = document.querySelectorAll(".nav-logout-btn");
@@ -618,9 +618,8 @@
     // Google 登入（未登入時）
     // 範例邏輯
 let timer;
-const loginBtn = document.getElementById('btnGoogleLogin');
 
-loginBtn.addEventListener('touchstart', (e) => {
+LoginBtn.addEventListener('touchstart', (e) => {
     e.preventDefault(); // 阻止系統預設反應
     timer = setTimeout(() => {
         // 執行 Google 登入邏輯
@@ -628,7 +627,7 @@ loginBtn.addEventListener('touchstart', (e) => {
     }, 1000); 
 });
 
-loginBtn.addEventListener('touchend', () => clearTimeout(timer));
+LoginBtn.addEventListener('touchend', () => clearTimeout(timer));
 
     // 桌機 + 手機「登出」按鈕
     logoutBtns.forEach((btn) => {
