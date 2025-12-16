@@ -589,7 +589,7 @@
       window.__isLogin = isLogin;  // ← 加這行
 
       LoginBtns.forEach((el) => {
-        el.classList.toggle("hidden", !isLogin);
+        el.classList.toggle("hidden", isLogin);
       });
 
       adminLabel?.classList.toggle("hidden", !isLogin);
