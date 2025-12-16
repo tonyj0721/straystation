@@ -574,7 +574,7 @@
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
 
-    const LoginBtn = document.querySelectorAll(".btnGoogleLogin");
+    const LoginBtns = document.querySelectorAll(".btnGoogleLogin");
     const adminLabel = document.getElementById("adminLabel");
     const adminLinks = document.querySelectorAll(".nav-admin-link");
     const logoutBtns = document.querySelectorAll(".nav-logout-btn");
@@ -587,7 +587,7 @@
       const isLogin = !!user;
       window.__isLogin = isLogin;  // ← 加這行
 
-      LoginBtn.forEach((el) => {
+      LoginBtns.forEach((el) => {
         el.classList.toggle("hidden", isLogin);
       });
 
@@ -627,8 +627,8 @@
     });
 
     // Google 登入（未登入時）
-    if (LoginBtn) {
-      LoginBtn.addEventListener("click", async (e) => {
+    LoginBtns.forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
         e.preventDefault();
         e.stopPropagation();
 
@@ -642,7 +642,7 @@
           window.location.replace("index.html");
         }
       });
-    }
+    });
 
     // 桌機 + 手機「登出」按鈕
     logoutBtns.forEach((btn) => {
