@@ -571,13 +571,14 @@
     getRedirectResult(auth)
       .then((result) => {
         if (result && result.user) {
-          console.log("redirect 登入成功", result.user);
+          alert("redirect 登入成功：" + (result.user.email || result.user.uid));
+        } else {
+          alert("redirect 沒有 user（不是從登入頁回來？）");
         }
       })
       .catch((err) => {
-        if (err) console.error("redirect 登入失敗", err);
+        alert("redirect 失敗：" + (err.code || "") + "\n" + (err.message || err));
       });
-
 
     const LoginBtn = document.getElementById("btnGoogleLogin");
     const adminLabel = document.getElementById("adminLabel");
