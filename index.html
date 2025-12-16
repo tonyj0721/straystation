@@ -617,17 +617,26 @@
 
     // Google 登入（未登入時）
     // 範例邏輯
-let timer;
+    let timer;
 
-LoginBtn.addEventListener('touchstart', (e) => {
-    e.preventDefault(); // 阻止系統預設反應
-    timer = setTimeout(() => {
+    async function handleGoogleLogin() {
+      try {
+        await signInWithPopup(auth, provider);
+      } catch (err) {
+        console.error("登入失敗", err);
+        alert("登入失敗，請稍後再試。");
+      }
+    }
+
+    LoginBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault(); // 阻止系統預設反應
+      timer = setTimeout(() => {
         // 執行 Google 登入邏輯
-        handleGoogleLogin(); 
-    }, 1000); 
-});
+        handleGoogleLogin();
+      }, 1000);
+    });
 
-LoginBtn.addEventListener('touchend', () => clearTimeout(timer));
+    LoginBtn.addEventListener('touchend', () => clearTimeout(timer));
 
     // 桌機 + 手機「登出」按鈕
     logoutBtns.forEach((btn) => {
