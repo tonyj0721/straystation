@@ -27,6 +27,20 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="stylesheet" href="assets/tailwind.css">
   <link rel="stylesheet" href="assets/shared.css">
+  <style>
+    /* 狗掌：單點回首頁、長按登入（避免 iOS 長按選字/呼叫選單） */
+    #GoogleLogin {
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+
+    #GoogleLogin img {
+      pointer-events: none;
+    }
+  </style>
 </head>
 
 <body class="text-gray-800 bg-gradient-to-br from-brand-50 to-white">
@@ -35,10 +49,10 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="h-16 flex items-center justify-between">
         <a href="index.html" class="flex items-center gap-2 font-semibold text-2xl">
-          <img src="images/dogpaw.png" alt="dogpaw" id="btnGoogleLogin" class="h-8 w-8 object-contain" />
+          <img src="images/dogpaw.png" alt="dogpaw" id="GoogleLogin" class="h-8 w-8 object-contain" />
           <span class="flex items-baseline gap-1">
             <span>台中簡媽媽狗園</span>
-            <span id="adminLabel" class="text-xs text-red-500 hidden">我是小編</span>
+            <span id="adminLabel" class="text-sm text-red-500 hidden">我是小編</span>
           </span>
         </a>
 
@@ -49,8 +63,7 @@
           <a href="dogs.html" class="hover:text-brand-600">我想養狗狗</a>
           <a href="home.html" class="hover:text-brand-600">幸福的歸宿</a>
           <a href="admin.html" class="hover:text-brand-600 nav-admin-link hidden">後台管理</a>
-          <button type="button" id="btnLogoutDesktop"
-            class="text-sm text-gray-600 hover:text-brand-600 nav-logout-btn hidden">
+          <button type="button" id="btnLogoutDesktop" class="text-red-500 hover:text-brand-600 nav-logout-btn hidden">
             登出
           </button>
         </nav>
@@ -267,17 +280,101 @@
     import {
       getAuth,
       GoogleAuthProvider,
-      signInWithPopup,
+      signInWithRedirect,
+      getRedirectResult,
+      setPersistence,
+      indexedDBLocalPersistence,
+      browserLocalPersistence,
+      browserSessionPersistence,
+      inMemoryPersistence,
       signOut,
       onAuthStateChanged,
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
 
-    const app = initializeApp(window.firebaseConfig);
+    // Firebase Hosting on web.app/custom domain + Safari/Firefox 的 storage partitioning：
+    // authDomain 盡量用「目前正在服務的網域」，redirect 會比較穩。
+    const __cfg = (window.firebaseConfig ? { ...window.firebaseConfig } : {});
+    try {
+      const host = window.location.hostname;
+      const isLocal =
+        host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "";
+      if (!isLocal && host) __cfg.authDomain = host;
+    } catch (_) { }
+    const app = initializeApp(__cfg);
 
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
 
-    const dogpawBtn = document.getElementById("btnGoogleLogin");
+    const LoginBtn = document.getElementById("GoogleLogin");
+
+    async function ensurePersistence() {
+      try { await setPersistence(auth, indexedDBLocalPersistence); return; } catch (_) { }
+      try { await setPersistence(auth, browserLocalPersistence); return; } catch (_) { }
+      try { await setPersistence(auth, browserSessionPersistence); return; } catch (_) { }
+      try { await setPersistence(auth, inMemoryPersistence); } catch (_) { }
+    }
+
+    // 先設定持久化、再接回 redirect 結果（不輸出任何提示）
+    (async () => {
+      try { await ensurePersistence(); } catch (_) { }
+      try { await getRedirectResult(auth); } catch (_) { }
+    })();
+
+    async function startGoogleLogin() {
+      if (auth.currentUser) return; // 已登入就不重複登入
+      try { await ensurePersistence(); } catch (_) { }
+      try { sessionStorage.setItem("__pendingGoogleLogin", "1"); } catch (_) { }
+      try { await signInWithRedirect(auth, provider); } catch (_) { }
+    }
+
+    // 狗掌：單點回 index.html；長按 >= 650ms 觸發登入（不用放開）
+    if (LoginBtn) {
+      const LONG_PRESS_MS = 650;
+      let pressTimer = null;
+      let suppressNextClick = false;
+
+      const clearTimer = () => {
+        if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+      };
+
+      const onDown = (e) => {
+        suppressNextClick = false;
+        clearTimer();
+        pressTimer = setTimeout(() => {
+          suppressNextClick = true;
+          clearTimer();
+          startGoogleLogin();
+        }, LONG_PRESS_MS);
+      };
+
+      const onUp = () => { clearTimer(); };
+      const onCancel = () => { clearTimer(); };
+
+      if ("PointerEvent" in window) {
+        LoginBtn.addEventListener("pointerdown", onDown, { passive: false });
+        LoginBtn.addEventListener("pointerup", onUp, { passive: true });
+        LoginBtn.addEventListener("pointercancel", onCancel, { passive: true });
+        LoginBtn.addEventListener("pointerleave", onCancel, { passive: true });
+      } else {
+        LoginBtn.addEventListener("touchstart", onDown, { passive: false });
+        LoginBtn.addEventListener("touchend", onUp, { passive: true });
+        LoginBtn.addEventListener("touchcancel", onCancel, { passive: true });
+      }
+
+      LoginBtn.addEventListener("click", (e) => {
+        if (suppressNextClick) {
+          try { e.preventDefault(); } catch (_) { }
+          try { e.stopPropagation(); } catch (_) { }
+          suppressNextClick = false;
+          return;
+        }
+        window.location.href = "index.html";
+      });
+
+      // 避免 iOS 長按跳出選單（拷貝/開新頁）
+      LoginBtn.addEventListener("contextmenu", (e) => { try { e.preventDefault(); } catch (_) { } });
+    }
+
     const adminLabel = document.getElementById("adminLabel");
     const adminLinks = document.querySelectorAll(".nav-admin-link");
     const logoutBtns = document.querySelectorAll(".nav-logout-btn");
@@ -285,10 +382,11 @@
     // 依登入狀態更新 header / 導覽
     onAuthStateChanged(auth, (user) => {
       const isLogin = !!user;
+      window.__isLogin = isLogin;  // ← 加這行
 
-      if (adminLabel) {
-        adminLabel.classList.toggle("hidden", !isLogin);
-      }
+      try { if (isLogin) sessionStorage.removeItem("__pendingGoogleLogin"); } catch (_) { }
+
+      adminLabel?.classList.toggle("hidden", !isLogin);
 
       adminLinks.forEach((el) => {
         el.classList.toggle("hidden", !isLogin);
@@ -298,24 +396,6 @@
         el.classList.toggle("hidden", !isLogin);
       });
     });
-
-    // 點狗掌 → Google 登入（未登入時）
-    if (dogpawBtn) {
-      dogpawBtn.addEventListener("click", async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (auth.currentUser) return;   // 已登入就不重複登入
-
-        try {
-          await signInWithPopup(auth, provider);
-          // 登入後會觸發 onAuthStateChanged，所以不用另外改畫面
-        } catch (err) {
-          console.error("Google 登入失敗", err);
-          window.location.replace("index.html");
-        }
-      });
-    }
 
     // 桌機 + 手機「登出」按鈕
     logoutBtns.forEach((btn) => {

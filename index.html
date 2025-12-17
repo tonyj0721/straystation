@@ -27,7 +27,6 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="stylesheet" href="assets/tailwind.css">
   <link rel="stylesheet" href="assets/shared.css">
-
   <style>
     /* 狗掌：單點回首頁、長按登入（避免 iOS 長按選字/呼叫選單） */
     #GoogleLogin {
@@ -42,7 +41,6 @@
       pointer-events: none;
     }
   </style>
-
 </head>
 
 <body class="bg-white text-gray-800">
@@ -54,7 +52,7 @@
           <img src="images/dogpaw.png" alt="dogpaw" id="GoogleLogin" class="h-8 w-8 object-contain" />
           <span class="flex items-baseline gap-1">
             <span>台中簡媽媽狗園</span>
-            <span id="adminLabel" class="text-xs text-red-500 hidden">我是小編</span>
+            <span id="adminLabel" class="text-sm text-red-500 hidden">我是小編</span>
           </span>
         </a>
 
@@ -65,8 +63,7 @@
           <a href="about.html" class="hover:text-brand-600">關於簡媽媽</a>
           <a href="home.html" class="hover:text-brand-600">幸福的歸宿</a>
           <a href="admin.html" class="hover:text-brand-600 nav-admin-link hidden">後台管理</a>
-          <button type="button" id="btnLogoutDesktop"
-            class="text-sm text-red-500 hover:text-brand-600 nav-logout-btn hidden">
+          <button type="button" id="btnLogoutDesktop" class="text-red-500 hover:text-brand-600 nav-logout-btn hidden">
             登出
           </button>
         </nav>

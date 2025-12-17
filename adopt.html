@@ -312,6 +312,9 @@
       const messengerUrl = `https://m.me/873460069178476?text=${encodedMsg}`;//910137399106926
       window.open(messengerUrl, "_blank");
       popupOverlay.classList.add("hidden");
+      setTimeout(() => {
+        history.back();
+      }, 50);
     });
 
     const y = document.getElementById('year');
