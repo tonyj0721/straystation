@@ -209,10 +209,7 @@
       <!-- 左：登錄表單 -->
       <section class="lg:col-span-1 bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
         <h2 class="text-lg font-semibold">登錄表單</h2>
-        <p class="text-sm text-gray-500 mb-4">
-          ＊建議先登入並在 Firestore 規則限制寫入權限。
-        </p>
-        <form id="petForm" class="space-y-4">
+<form id="petForm" class="space-y-4">
           <div>
             <label class="block text-sm font-medium mb-1">名字 </label>
             <input id="name" class="w-full rounded-xl border border-gray-300 p-2" placeholder="留空將以「未取名」代替" />
@@ -318,6 +315,18 @@
             </table>
           </div>
           <div class="md:hidden mt-4 grid gap-3" id="rowsMobile"></div>
+          <div id="pager" class="mt-4 flex items-center justify-between gap-3">
+            <button id="pagerPrev" type="button"
+              class="px-3 py-2 rounded-lg border border-gray-300 text-sm disabled:opacity-40 disabled:cursor-not-allowed">
+              上一頁
+            </button>
+            <div id="pagerInfo" class="text-xs text-gray-500 text-center flex-1"></div>
+            <button id="pagerNext" type="button"
+              class="px-3 py-2 rounded-lg border border-gray-300 text-sm disabled:opacity-40 disabled:cursor-not-allowed">
+              下一頁
+            </button>
+          </div>
+
         </div>
       </section>
     </div>
@@ -606,7 +615,7 @@
     });
 
     // 全域狀態
-    const pets = (window.pets ||= []);            // 目前載入的動物列表（最多 15 筆）
+    const pets = (window.pets ||= []);            // 目前載入的動物列表（不限制筆數；畫面每頁顯示 15 筆）
     window.pets = pets;
     let currentPetId = null;  // 目前在 Dialog 中的動物 id（編輯/領養用）
 
@@ -853,24 +862,92 @@
     // 列表載入 + 搜尋 + 渲染（桌機/手機）
     // ===============================
     async function loadPets() {
-      const q = query(collection(db, "pets"), orderBy("createdAt", "desc"), fbLimit(15));
-      const snap = await getDocs(q);
-      pets.length = 0;
-      pets.push(...snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-      applyFilterAndRender();
-    }
+  // 不限制筆數：全部抓回來，再用「每頁 15 筆」做分頁顯示
+  let snap;
+  try {
+    snap = await getDocs(query(collection(db, "pets"), orderBy("createdAt", "desc")));
+  } catch (e) {
+    console.warn("orderBy(createdAt) failed, fallback to nameLower:", e);
+    snap = await getDocs(query(collection(db, "pets"), orderBy("nameLower")));
+  }
+  pets.length = 0;
+  pets.push(...snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+  applyFilterAndRender();
+}
 
     const searchInput = $("#searchName");
+
+// ===============================
+// 分頁（每頁 15 筆）
+// ===============================
+const PAGE_SIZE = 15;
+let currentPage = 1;
+let currentList = []; // 目前（已搜尋/已過濾後）的清單
+
+const pagerPrev = document.getElementById("pagerPrev");
+const pagerNext = document.getElementById("pagerNext");
+const pagerInfo = document.getElementById("pagerInfo");
+
+const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+
+function setCurrentList(list) {
+  currentList = Array.isArray(list) ? list : [];
+  currentPage = 1;
+  renderCurrentPage();
+}
+
+function updatePager(total, totalPages, startIdx, count) {
+  if (!pagerInfo) return;
+
+  if (!total) {
+    pagerInfo.textContent = "沒有資料";
+  } else {
+    const from = startIdx + 1;
+    const to = startIdx + count;
+    pagerInfo.textContent = `顯示 ${from}-${to} / ${total}（第 ${currentPage} / ${totalPages} 頁）`;
+  }
+
+  if (pagerPrev) pagerPrev.disabled = (currentPage <= 1);
+  if (pagerNext) pagerNext.disabled = (currentPage >= totalPages);
+}
+
+function renderCurrentPage() {
+  const total = currentList.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  currentPage = clamp(currentPage, 1, totalPages);
+
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const pageItems = currentList.slice(start, start + PAGE_SIZE);
+
+  renderRows(pageItems);
+  renderRowsMobile(pageItems);
+  updatePager(total, totalPages, start, pageItems.length);
+}
+
+pagerPrev?.addEventListener("click", () => {
+  if (currentPage > 1) {
+    currentPage -= 1;
+    renderCurrentPage();
+  }
+});
+
+pagerNext?.addEventListener("click", () => {
+  const totalPages = Math.max(1, Math.ceil(currentList.length / PAGE_SIZE));
+  if (currentPage < totalPages) {
+    currentPage += 1;
+    renderCurrentPage();
+  }
+});
     searchInput.addEventListener("input", onSearchByName);
 
     function applyFilterAndRender() {
-      const kw = searchInput.value.trim().toLowerCase();
-      const list = kw
-        ? pets.filter((p) => String(p.name || "").toLowerCase().includes(kw))
-        : pets;
-      renderRows(list);
-      renderRowsMobile(list);
-    }
+  const kw = searchInput.value.trim().toLowerCase();
+  const list = kw
+    ? pets.filter((p) => String(p.name || "").toLowerCase().includes(kw))
+    : pets;
+
+  setCurrentList(list);
+}
 
     // 後端依名字（前綴）查詢：有關鍵字→打 Firestore；空字串→回到預設清單
     async function onSearchByName() {
@@ -935,16 +1012,14 @@
         });
 
         renderStable(() => {
-          renderRows(list);
-          renderRowsMobile(list);
+          setCurrentList(list);
         });
       } catch (err) {
         console.error("search error", err);
         // 後備：用目前記憶中的清單做包含搜尋
         const list = pets.filter(p => String(p.name || "").toLowerCase().includes(kw));
         renderStable(() => {
-          renderRows(list);
-          renderRowsMobile(list);
+          setCurrentList(list);
         });
       }
     }
