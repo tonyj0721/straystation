@@ -40,6 +40,19 @@
     #GoogleLogin img {
       pointer-events: none;
     }
+
+    .menu-emoji {
+      display: inline-flex;
+      width: 2em;
+      /* 固定 icon 欄寬 */
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+
+    .menu-text {
+      white-space: nowrap;
+    }
   </style>
 </head>
 
@@ -98,40 +111,38 @@
             text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
             focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-white/70
             ">
-              <span aria-hidden="true" class="menu-emoji text-xl leading-none">🧭</span>
-              <span class="w-full text-center">首&emsp;&emsp;頁</span>
+            <span aria-hidden="true" class="menu-emoji text-xl leading-none">🧭</span>
+            <span class="w-full text-center">首&emsp;&emsp;頁</span>
           </a>
         </li>
 
         <li>
-          <a href="cats.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 rounded-xl bg-white px-4 py-2
-            text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
-            focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-white/70
-            ">
-            <a class="menu-item">
-              <span aria-hidden="true" class="menu-emoji text-xl leading-none">🐱</span>
-              <span class="menu-text">我想養貓咪</span>
-            </a>
+          <a href="about.html" role="menuitem" tabindex="-1" class="grid grid-cols-[2em_1fr] items-center gap-x-3 whitespace-nowrap
+            rounded-xl bg-white px-4 py-2 text-slate-700 shadow
+            hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+            focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
+            <span aria-hidden="true" class="menu-emoji">🐱</span>
+            <span class="menu-text">我想養貓咪</span>
           </a>
         </li>
 
         <li>
-          <a href="about.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 rounded-xl bg-white px-4 py-2
-            text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
-            focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-white/70
-            ">
-            <span aria-hidden="true" class="menu-emoji text-xl leading-none">ℹ️</span>
+          <a href="about.html" role="menuitem" tabindex="-1" class="grid grid-cols-[2em_1fr] items-center gap-x-3 whitespace-nowrap
+            rounded-xl bg-white px-4 py-2 text-slate-700 shadow
+            hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+            focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
+            <span aria-hidden="true" class="menu-emoji">ℹ️</span>
             <span class="menu-text">關於簡媽媽</span>
           </a>
         </li>
 
         <li>
-          <a href="home.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 rounded-xl bg-white px-4 py-2
-            text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
-            focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-white/70
-            ">
-              <span aria-hidden="true" class="menu-emoji text-xl leading-none">🏠</span>
-              <span class="menu-text">幸福的歸宿</span>
+          <a href="about.html" role="menuitem" tabindex="-1" class="grid grid-cols-[2em_1fr] items-center gap-x-3 whitespace-nowrap
+            rounded-xl bg-white px-4 py-2 text-slate-700 shadow
+            hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+            focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
+            <span aria-hidden="true" class="menu-emoji">🏠</span>
+            <span class="menu-text">幸福的歸宿</span>
           </a>
         </li>
 
@@ -140,8 +151,8 @@
             text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
             focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-white/70
             nav-admin-link hidden">
-              <span aria-hidden="true" class="menu-emoji text-xl leading-none">🔒</span>
-              <span class="w-full text-center">後&thinsp;台&thinsp;管&thinsp;理</span>
+            <span aria-hidden="true" class="menu-emoji text-xl leading-none">🔒</span>
+            <span class="w-full text-center">後&thinsp;台&thinsp;管&thinsp;理</span>
           </a>
         </li>
 
@@ -150,8 +161,8 @@
             text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
             focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-white/70
             logouttext nav-logout-btn hidden" id="btnLogoutMobile">
-              <span aria-hidden="true" class="menu-emoji text-xl leading-none">🚪</span>
-              <span class="w-full text-center">登&emsp;&emsp;出</span>
+            <span aria-hidden="true" class="menu-emoji text-xl leading-none">🚪</span>
+            <span class="w-full text-center">登&emsp;&emsp;出</span>
           </a>
         </li>
       </ul>
