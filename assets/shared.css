@@ -137,14 +137,6 @@ dialog::backdrop {
   /* 約等於 text-xl */
 }
 
-.menu-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-  /* ✅讓省略號在 flex 裡能生效 */
-}
-
 .menu-emoji {
   width: 1.8em;
   display: inline-flex;
@@ -155,12 +147,6 @@ dialog::backdrop {
 }
 
 .menu-text {
-  flex: 1;
   min-width: 0;
-  /* ✅同上 */
   white-space: nowrap;
-  /* ✅不換行 */
-  overflow: hidden;
-  text-overflow: ellipsis;
-  /* ✅超出變 ... */
 }
