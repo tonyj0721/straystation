@@ -124,12 +124,43 @@ dialog::backdrop {
   }
 }
 
-.menu-emoji{
-  width: 1.75rem;            /* 固定icon欄寬，想更寬/窄就調這裡 */
+.menu-emoji {
+  width: 1.75rem;
+  /* 固定icon欄寬，想更寬/窄就調這裡 */
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 auto;            /* 等同 shrink-0 */
+  flex: 0 0 auto;
+  /* 等同 shrink-0 */
   line-height: 1;
-  font-size: 1.25rem;        /* 約等於 text-xl */
+  font-size: 1.25rem;
+  /* 約等於 text-xl */
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  /* ✅讓省略號在 flex 裡能生效 */
+}
+
+.menu-emoji {
+  width: 1.8em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  line-height: 1;
+}
+
+.menu-text {
+  flex: 1;
+  min-width: 0;
+  /* ✅同上 */
+  white-space: nowrap;
+  /* ✅不換行 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* ✅超出變 ... */
 }
