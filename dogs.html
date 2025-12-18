@@ -1,12 +1,11 @@
-<!doctype html>
+<!DOCTYPE html>
+
 <html lang="zh-Hant-TW">
-
 <head>
-  <meta charset="utf-8" />
-
-  <!-- GA4 -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-YBC0MQBC2F"></script>
-  <script>
+<meta charset="utf-8"/>
+<!-- GA4 -->
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-YBC0MQBC2F"></script>
+<script>
     window.dataLayer = window.dataLayer || [];
     function gtag() { dataLayer.push(arguments); }
     gtag('js', new Date());
@@ -14,20 +13,19 @@
     // 若在本機開發，開啟 DebugView；正式站不會開
     gtag('config', 'G-YBC0MQBC2F', { debug_mode: location.hostname.includes('localhost') });
   </script>
-
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="icon" href="images/dogpaw-32.png" sizes="32x32" type="image/png">
-  <link rel="apple-touch-icon" href="images/dogpaw-180.png">
-  <title>我想養狗狗｜台中簡媽媽狗園</title>
-  <meta name="description" content="瀏覽待認養狗狗清單，支援品種、毛色、年齡、性別篩選，快速找到適合你的毛孩。">
-  <meta name="theme-color" content="#fcd34d">
-  <link rel="manifest" href="./manifest.webmanifest">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="assets/tailwind.css">
-  <link rel="stylesheet" href="assets/shared.css">
-  <style>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<link href="images/dogpaw-32.png" rel="icon" sizes="32x32" type="image/png"/>
+<link href="images/dogpaw-180.png" rel="apple-touch-icon"/>
+<title>我想養狗狗｜台中簡媽媽狗園</title>
+<meta content="瀏覽待認養狗狗清單，支援品種、毛色、年齡、性別篩選，快速找到適合你的毛孩。" name="description"/>
+<meta content="#fcd34d" name="theme-color"/>
+<link href="./manifest.webmanifest" rel="manifest"/>
+<meta content="yes" name="mobile-web-app-capable"/>
+<meta content="yes" name="apple-mobile-web-app-capable"/>
+<meta content="default" name="apple-mobile-web-app-status-bar-style"/>
+<link href="assets/tailwind.css" rel="stylesheet"/>
+<link href="assets/shared.css" rel="stylesheet"/>
+<style>
     /* 狗掌：單點回首頁、長按登入（避免 iOS 長按選字/呼叫選單） */
     #GoogleLogin {
       -webkit-user-select: none;
@@ -42,127 +40,52 @@
     }
   </style>
 </head>
-
 <body class="text-gray-800 bg-gradient-to-br from-brand-50 to-white">
-  <!-- Navbar -->
-  <header class="bg-white/80 backdrop-blur border-b border-gray-200">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="h-16 flex items-center justify-between">
-        <a href="index.html" class="flex items-center gap-2 font-semibold text-2xl">
-          <img src="images/dogpaw.png" alt="dogpaw" id="GoogleLogin" class="h-8 w-8 object-contain" />
-          <span class="flex items-baseline gap-1">
-            <span>台中簡媽媽狗園</span>
-            <span id="adminLabel" class="text-sm text-red-500 hidden">我是小編</span>
-          </span>
-        </a>
-
-        <!-- 桌機導覽 -->
-        <nav class="hidden md:flex items-center gap-6 ml-auto">
-          <a href="index.html" class="hover:text-brand-600">首 頁</a>
-          <a href="cats.html" class="hover:text-brand-600">我想養貓咪</a>
-          <a href="about.html" class="hover:text-brand-600">關於簡媽媽</a>
-          <a href="home.html" class="hover:text-brand-600">幸福的歸宿</a>
-          <a href="admin.html" class="hover:text-brand-600 nav-admin-link hidden">後台管理</a>
-          <button type="button" id="btnLogoutDesktop" class="text-red-500 hover:text-brand-600 nav-logout-btn hidden">
+<!-- Navbar -->
+<header class="bg-white/80 backdrop-blur border-b border-gray-200">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="h-16 flex items-center justify-between">
+<a class="flex items-center gap-2 font-semibold text-2xl" href="index.html">
+<img alt="dogpaw" class="h-8 w-8 object-contain" id="GoogleLogin" src="images/dogpaw.png"/>
+<span class="flex items-baseline gap-1">
+<span>台中簡媽媽狗園</span>
+<span class="text-sm text-red-500 hidden" id="adminLabel">我是小編</span>
+</span>
+</a>
+<!-- 桌機導覽 -->
+<nav class="hidden md:flex items-center gap-6 ml-auto">
+<a class="hover:text-brand-600" href="index.html">首 頁</a>
+<a class="hover:text-brand-600" href="cats.html">我想養貓咪</a>
+<a class="hover:text-brand-600" href="about.html">關於簡媽媽</a>
+<a class="hover:text-brand-600" href="home.html">幸福的歸宿</a>
+<a class="hover:text-brand-600 nav-admin-link hidden" href="admin.html">後台管理</a>
+<button class="text-red-500 hover:text-brand-600 nav-logout-btn hidden" id="btnLogoutDesktop" type="button">
             登出
           </button>
-        </nav>
-
-        <!-- 手機漢堡鈕 -->
-        <div class="flex items-center gap-2">
-          <button id="menuBtn"
-            class="md:hidden p-2 rounded-lg border border-[#AEDDEF] bg-white/80 hover:bg-[#AEDDEF]/10" aria-label="開啟選單"
-            aria-haspopup="menu" aria-expanded="false" aria-controls="menuOverlay">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z" />
-            </svg>
-          </button>
-        </div>
-      </div>
-    </div>
-  </header>
-  <!-- 透明覆蓋層：專門接「點外面關閉」 -->
-  <div id="menuOverlay" class="fixed inset-0 z-50 hidden" role="dialog" aria-modal="true">
-    <div id="overlayClickArea" class="absolute inset-0"></div>
-
-    <!-- 右上角彈出選單：固定位置，不推版，覆蓋 hero -->
-    <nav id="menuPanel" class="fixed opacity-0 scale-y-0 origin-top-right rounded-2xl shadow-xl
-            bg-[#AEDDEF] w-fit max-w-[90vw] p-3 transition duration-150 ease-out">
-      <!-- 小箭頭（同面板色） -->
-      <div class="absolute -top-2 right-5 w-3 h-3 rotate-45 bg-[#AEDDEF]"></div>
-
-      <!-- 按鈕群：保留 space-y-2、字體 18px -->
-      <ul class="space-y-2 py-1 text-[18px]" role="menu" aria-orientation="vertical" tabindex="-1">
-        <li>
-          <a href="index.html" role="menuitem" tabindex="-1"
-            class="grid w-full grid-cols-[32px_1fr_32px] items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
-                   text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
-                   focus:outline-none focus:ring-2 focus:ring-white/70">
-            <span aria-hidden="true" class="grid size-8 place-items-center rounded-lg bg-white shadow text-xl leading-none">🧭</span>
-            <span class="text-center">首頁</span>
-            <span aria-hidden="true" class="size-8"></span>
-          </a>
-        </li>
-
-        <li>
-          <a href="cats.html" role="menuitem" tabindex="-1"
-            class="grid w-full grid-cols-[32px_1fr_32px] items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
-                   text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
-                   focus:outline-none focus:ring-2 focus:ring-white/70">
-            <span aria-hidden="true" class="grid size-8 place-items-center rounded-lg bg-white shadow text-xl leading-none">🐱</span>
-            <span class="text-center">我想養貓咪</span>
-            <span aria-hidden="true" class="size-8"></span>
-          </a>
-        </li>
-
-        <li>
-          <a href="about.html" role="menuitem" tabindex="-1"
-            class="grid w-full grid-cols-[32px_1fr_32px] items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
-                   text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
-                   focus:outline-none focus:ring-2 focus:ring-white/70">
-            <span aria-hidden="true" class="grid size-8 place-items-center rounded-lg bg-white shadow text-xl leading-none">ℹ️</span>
-            <span class="text-center">關於簡媽媽</span>
-            <span aria-hidden="true" class="size-8"></span>
-          </a>
-        </li>
-
-        <li>
-          <a href="home.html" role="menuitem" tabindex="-1"
-            class="grid w-full grid-cols-[32px_1fr_32px] items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
-                   text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
-                   focus:outline-none focus:ring-2 focus:ring-white/70">
-            <span aria-hidden="true" class="grid size-8 place-items-center rounded-lg bg-white shadow text-xl leading-none">🏠</span>
-            <span class="text-center">幸福的歸宿</span>
-            <span aria-hidden="true" class="size-8"></span>
-          </a>
-        </li>
-
-        <li class="pt-1">
-          <a href="admin.html" role="menuitem" tabindex="-1"
-            class="grid w-full grid-cols-[32px_1fr_32px] items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
-                   text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
-                   focus:outline-none focus:ring-2 focus:ring-white/70 nav-admin-link hidden">
-            <span aria-hidden="true" class="grid size-8 place-items-center rounded-lg bg-white shadow text-xl leading-none">🔒</span>
-            <span class="text-center">後台管理</span>
-            <span aria-hidden="true" class="size-8"></span>
-          </a>
-        </li>
-
-        <li>
-          <button type="button" id="btnLogoutMobile"
-            class="grid w-full grid-cols-[32px_1fr_32px] items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
-                   text-red-600 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
-                   focus:outline-none focus:ring-2 focus:ring-white/70 nav-logout-btn hidden"
-            role="menuitem" tabindex="-1">
-            <span aria-hidden="true" class="grid size-8 place-items-center rounded-lg bg-white shadow text-xl leading-none">🚪</span>
-            <span class="text-center">登出</span>
-            <span aria-hidden="true" class="size-8"></span>
-          </button>
-        </li>
-      </ul>
-    </nav>
-  </div>
-  <script>
+</nav>
+<!-- 手機漢堡鈕 -->
+<div class="flex items-center gap-2">
+<button aria-controls="menuOverlay" aria-expanded="false" aria-haspopup="menu" aria-label="開啟選單" class="md:hidden p-2 rounded-lg border border-[#AEDDEF] bg-white/80 hover:bg-[#AEDDEF]/10" id="menuBtn">
+<svg class="h-6 w-6" fill="currentColor" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path>
+</svg>
+</button>
+</div>
+</div>
+</div>
+</header>
+<!-- 透明覆蓋層：專門接「點外面關閉」 -->
+<div aria-modal="true" class="fixed inset-0 z-50 hidden" id="menuOverlay" role="dialog">
+<div class="absolute inset-0" id="overlayClickArea"></div>
+<!-- 右上角彈出選單：固定位置，不推版，覆蓋 hero -->
+<nav class="fixed opacity-0 scale-y-0 origin-top-right rounded-2xl shadow-xl bg-[#AEDDEF] p-3 transition duration-150 ease-out w-[90%] max-w-sm" id="menuPanel">
+<!-- 小箭頭（同面板色） -->
+<div class="absolute -top-2 right-5 w-3 h-3 rotate-45 bg-[#AEDDEF]"></div>
+<!-- 按鈕群：保留 space-y-2、字體 18px -->
+<ul aria-orientation="vertical" class="space-y-2 py-1 text-[18px]" role="menu" tabindex="-1"><li><a class="w-full flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2 text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-white/70" href="index.html" role="menuitem" tabindex="-1"><span aria-hidden="true" class="grid size-8 place-items-center rounded-lg bg-white shadow text-xl leading-none">🧭</span><span class="flex-1 text-center">首頁</span><span aria-hidden="true" class="size-8"></span></a></li><li><a class="w-full flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2 text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-white/70" href="cats.html" role="menuitem" tabindex="-1"><span aria-hidden="true" class="grid size-8 place-items-center rounded-lg bg-white shadow text-xl leading-none">🐱</span><span class="flex-1 text-center">我想養貓咪</span><span aria-hidden="true" class="size-8"></span></a></li><li><a class="w-full flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2 text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-white/70" href="about.html" role="menuitem" tabindex="-1"><span aria-hidden="true" class="grid size-8 place-items-center rounded-lg bg-white shadow text-xl leading-none">ℹ️</span><span class="flex-1 text-center">關於簡媽媽</span><span aria-hidden="true" class="size-8"></span></a></li><li><a class="w-full flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2 text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-white/70" href="home.html" role="menuitem" tabindex="-1"><span aria-hidden="true" class="grid size-8 place-items-center rounded-lg bg-white shadow text-xl leading-none">🏠</span><span class="flex-1 text-center">幸福的歸宿</span><span aria-hidden="true" class="size-8"></span></a></li><li class="pt-2 mt-2 border-t border-gray-200"></li><li><a class="w-full flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2 text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-white/70 nav-admin-link hidden" href="admin.html" role="menuitem" tabindex="-1"><span aria-hidden="true" class="grid size-8 place-items-center rounded-lg bg-white shadow text-xl leading-none">🔒</span><span class="flex-1 text-center">後台管理</span><span aria-hidden="true" class="size-8"></span></a></li><li><button class="w-full flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-white/70 text-red-600 nav-logout-btn hidden" id="btnLogoutMobile" role="menuitem" tabindex="-1" type="button"><span aria-hidden="true" class="grid size-8 place-items-center rounded-lg bg-white shadow text-xl leading-none">🚪</span><span class="flex-1 text-center">登出</span><span aria-hidden="true" class="size-8"></span></button></li></ul>
+</nav>
+</div>
+<script>
     const menuBtn = document.getElementById('menuBtn');
     const overlay = document.getElementById('menuOverlay');
     const clickArea = document.getElementById('overlayClickArea');
@@ -225,276 +148,234 @@
       el.addEventListener('click', () => { try { closeMenu(); } catch (_) { } });
     });
   </script>
-
-  <!-- Title + Filters + Cards -->
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-    <header class="mb-6">
-      <h1 class="text-3xl font-bold">我想養狗狗</h1>
-      <p class="text-gray-600 mt-2">查看所有的狗狗，可以依品種、毛色、年齡與性別篩選。</p>
-    </header>
-
-    <!-- Filters -->
-    <section class="mb-6 grid grid-cols-2 md:grid-cols-4 gap-3">
-      <select id="fBreedType" class="col-span-1 rounded-xl border border-gray-300 bg-white p-2 text-sm">
-        <option value="">不限品種</option>
-        <option value="品種犬">品種犬</option>
-        <option value="米克斯">米克斯</option>
-      </select>
-
-      <select id="fBreed"
-        class="col-span-1 rounded-xl border border-gray-300 bg-white p-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-        disabled>
-        <option value="">請先選擇「品種」</option>
-      </select>
-
-      <select id="fAge" class="col-span-1 rounded-xl border border-gray-300 bg-white p-2 text-sm">
-        <option value="">不限年齡</option>
-        <option value="1以下">1 歲以下</option>
-        <option value="1-5">1～5 歲</option>
-        <option value="6-10">6～10 歲</option>
-        <option value="10以上">10 歲以上</option>
-      </select>
-
-      <select id="fGender" class="col-span-1 rounded-xl border border-gray-300 bg-white p-2 text-sm">
-        <option value="">不限性別</option>
-        <option value="男生">男生</option>
-        <option value="女生">女生</option>
-      </select>
-    </section>
-
-    <!-- Grid -->
-    <section>
-      <div id="grid" class="mt-4 grid grid-cols-2 gap-6 sm:grid-cols-4 lg:grid-cols-4"></div>
-      <div id="emptyState" class="hidden mt-10 text-center text-gray-500">沒有符合條件的毛孩。</div>
-      <!-- 分頁控制 -->
-      <div id="pagination" class="mt-8 flex items-center justify-center gap-3 hidden">
-        <button id="prevPage"
-          class="px-3 py-1 rounded-lg border border-gray-300 text-sm disabled:opacity-40 disabled:cursor-not-allowed">
+<!-- Title + Filters + Cards -->
+<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+<header class="mb-6">
+<h1 class="text-3xl font-bold">我想養狗狗</h1>
+<p class="text-gray-600 mt-2">查看所有的狗狗，可以依品種、毛色、年齡與性別篩選。</p>
+</header>
+<!-- Filters -->
+<section class="mb-6 grid grid-cols-2 md:grid-cols-4 gap-3">
+<select class="col-span-1 rounded-xl border border-gray-300 bg-white p-2 text-sm" id="fBreedType">
+<option value="">不限品種</option>
+<option value="品種犬">品種犬</option>
+<option value="米克斯">米克斯</option>
+</select>
+<select class="col-span-1 rounded-xl border border-gray-300 bg-white p-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled="" id="fBreed">
+<option value="">請先選擇「品種」</option>
+</select>
+<select class="col-span-1 rounded-xl border border-gray-300 bg-white p-2 text-sm" id="fAge">
+<option value="">不限年齡</option>
+<option value="1以下">1 歲以下</option>
+<option value="1-5">1～5 歲</option>
+<option value="6-10">6～10 歲</option>
+<option value="10以上">10 歲以上</option>
+</select>
+<select class="col-span-1 rounded-xl border border-gray-300 bg-white p-2 text-sm" id="fGender">
+<option value="">不限性別</option>
+<option value="男生">男生</option>
+<option value="女生">女生</option>
+</select>
+</section>
+<!-- Grid -->
+<section>
+<div class="mt-4 grid grid-cols-2 gap-6 sm:grid-cols-4 lg:grid-cols-4" id="grid"></div>
+<div class="hidden mt-10 text-center text-gray-500" id="emptyState">沒有符合條件的毛孩。</div>
+<!-- 分頁控制 -->
+<div class="mt-8 flex items-center justify-center gap-3 hidden" id="pagination">
+<button class="px-3 py-1 rounded-lg border border-gray-300 text-sm disabled:opacity-40 disabled:cursor-not-allowed" id="prevPage">
           上一頁
         </button>
-        <span id="pageInfo" class="text-sm text-gray-600"></span>
-        <button id="nextPage"
-          class="px-3 py-1 rounded-lg border border-gray-300 text-sm disabled:opacity-40 disabled:cursor-not-allowed">
+<span class="text-sm text-gray-600" id="pageInfo"></span>
+<button class="px-3 py-1 rounded-lg border border-gray-300 text-sm disabled:opacity-40 disabled:cursor-not-allowed" id="nextPage">
           下一頁
         </button>
-      </div>
-    </section>
-  </main>
-
-  <!-- Footer -->
-  <footer class="bg-gray-50 border-t border-gray-200">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-sm text-gray-500">© <span id="year"></span>
-      <img src="images/浪浪轉運站 Logo.png" alt="浪浪轉運站 Logo"
-        style="display:inline-flex;width:1em;height:1em;vertical-align:-0.15em;margin:0.01em -0.25em 0.01em 0.25em;">
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="bg-gray-50 border-t border-gray-200">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-sm text-gray-500">© <span id="year"></span>
+<img alt="浪浪轉運站 Logo" src="images/浪浪轉運站 Logo.png" style="display:inline-flex;width:1em;height:1em;vertical-align:-0.15em;margin:0.01em -0.25em 0.01em 0.25em;"/>
       浪浪轉運站 Stray Station. 保留所有權利。
     </div>
-  </footer>
-
-  <!-- Pet Detail Modal -->
-  <dialog id="petDialog" class="w-full max-w-2xl max-h-[90vh] rounded-2xl p-0 overflow-y-auto">
-    <div class="bg-white">
-      <!-- 新增：與下方縮圖 p-3 對齊 -->
-      <div class="px-3 pt-2">
-        <p class="text-center text-xs text-gray-500 mb-1">點主圖可放大</p>
-        <div class="relative aspect-video bg-gray-100 overflow-hidden rounded-lg">
-          <!-- 只模糊這張背景圖 -->
-          <img id="dlgBg" aria-hidden="true" class="absolute inset-0 w-full h-full object-cover blur-md scale-110">
-
-          <!-- 可選：柔化一下背景，沒有加任何 blur -->
-          <div class="absolute inset-0 bg-white/20"></div>
-
-          <!-- 主圖在最上層，沒有 blur -->
-          <img id="dlgImg" alt="毛孩照片"
-            class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg">
-
-          <button id="dlgClose" class="absolute top-1 right-1 z-20 bg-black/60 text-white p-2 rounded-full leading-none"
-            aria-label="關閉">✕</button>
-        </div>
-      </div>
-
-      <div id="dlgThumbs" class="flex gap-2 overflow-x-auto p-3"></div>
-      <div class="p-5 space-y-4">
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <!-- 標題 -->
-            <h3 id="dlgName" class="text-2xl font-semibold leading-snug">—</h3>
-
-            <!-- 三個圓角標籤：不換行、可水平捲動 -->
-            <div id="dlgTags" class="mt-1 flex flex-nowrap gap-2 text-sm">
-              <span id="dlgTagBreed"
-                class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap"></span>
-              <span id="dlgTagAge"
-                class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap"></span>
-              <span id="dlgTagGender"
-                class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap"></span>
-            </div>
-            <!-- 第二排：結紮 / 預防針（淡藍色圓角標籤） -->
-            <div id="dlgTagsHealth" class="mt-2 flex gap-2 text-sm">
-              <span id="dlgTagNeutered"
-                class="inline-flex items-center rounded-full ring-1 ring-sky-200 bg-sky-50 text-sky-700 px-3 py-1 whitespace-nowrap"></span>
-              <span id="dlgTagVaccinated"
-                class="inline-flex items-center rounded-full ring-1 ring-sky-200 bg-sky-50 text-sky-700 px-3 py-1 whitespace-nowrap"></span>
-            </div>
-          </div>
-        </div>
-        <div class="bg-orange-50 rounded-xl p-4 leading-7">
-          <p id="dlgDesc" class="text-gray-700 text-sm whitespace-pre-line break-words"></p>
-        </div>
-        <div id="guestActionBar" class="flex justify-end gap-3 pt-2">
-          <button id="dlgAdopt" class="px-4 py-2 rounded-xl bg-brand-600 text-white text-sm">我要認養</button>
-          <button id="dlgShare" class="px-4 py-2 rounded-xl text-white shadow-sm" style="background:#06C755">分享</button>
-        </div>
-
-        <!-- 內嵌編輯區 -->
-        <div id="editArea" class="hidden space-y-4">
-          <div>
-            <label class="block text-sm font-medium mb-1">名字 <span class="text-red-500">*</span></label>
-            <input id="editName" class="w-full rounded-xl border border-gray-300 p-2" />
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium mb-1">類別 <span class="text-red-500">*</span></label>
-            <div class="flex gap-3">
-              <label class="inline-flex items-center gap-2">
-                <input type="radio" name="editSpecies" value="貓" class="accent-brand-600" />
-                <span>貓</span>
-              </label>
-              <label class="inline-flex items-center gap-2">
-                <input type="radio" name="editSpecies" value="狗" class="accent-brand-600" />
-                <span>狗</span>
-              </label>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-sm font-medium mb-1">品種</label>
-              <select id="editBreedType" class="w-full rounded-xl border border-gray-300 p-2">
-                <option value="">請選擇</option>
-              </select>
-            </div>
-            <div>
-              <label id="editBreedLabel" class="block text-sm font-medium mb-1">品種/毛色</label>
-              <select id="editBreed" class="w-full rounded-xl border border-gray-300 p-2" disabled>
-                <option value="">請先選擇品種</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-sm font-medium mb-1">年齡</label>
-              <input id="editAge" class="w-full rounded-xl border border-gray-300 p-2" placeholder="例：2 歲 或 8 個月" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium mb-1">性別</label>
-              <select id="editGender" class="w-full rounded-xl border border-gray-300 p-2">
-                <option value="">未設定</option>
-                <option value="男生">男生</option>
-                <option value="女生">女生</option>
-              </select>
-            </div>
-          </div>
-          <!-- 健康（編輯用） -->
-          <div>
-            <label class="block text-sm font-medium mb-1">健康</label>
-            <div class="flex items-center gap-6">
-              <label class="inline-flex items-center gap-2">
-                <input id="editNeutered" type="checkbox" class="h-4 w-4">
-                <span>結紮</span>
-              </label>
-              <label class="inline-flex items-center gap-2">
-                <input id="editVaccinated" type="checkbox" class="h-4 w-4">
-                <span>預防針</span>
-              </label>
-            </div>
-          </div>
-
-
-          <div>
-            <label class="block text-sm font-medium mb-1">簡介</label>
-            <textarea id="editDesc" rows="4" class="w-full rounded-xl border border-gray-300 p-2"></textarea>
-          </div>
-
-          <div>
-            <input id="editFiles" type="file" accept="image/*" multiple class="sr-only" />
-            <div class="flex items-center gap-3">
-              <button id="btnPickEdit" type="button"
-                class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增照片</button>
-              <span id="editCount" class="text-xs text-gray-500"></span>
-              <span class="text-sm text-gray-400">最多 5 張</span>
-            </div>
-            <!-- 和新增模式一致：三欄縮圖 + 上方間距 -->
-            <div id="editPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
-          </div>
-        </div>
-
-        <!-- 動作列 -->
-        <div id="actionBar" class="pt-2 flex flex-col sm:flex-row gap-3 hidden">
-          <button id="btnEdit" class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm">
+</footer>
+<!-- Pet Detail Modal -->
+<dialog class="w-full max-w-2xl max-h-[90vh] rounded-2xl p-0 overflow-y-auto" id="petDialog">
+<div class="bg-white">
+<!-- 新增：與下方縮圖 p-3 對齊 -->
+<div class="px-3 pt-2">
+<p class="text-center text-xs text-gray-500 mb-1">點主圖可放大</p>
+<div class="relative aspect-video bg-gray-100 overflow-hidden rounded-lg">
+<!-- 只模糊這張背景圖 -->
+<img aria-hidden="true" class="absolute inset-0 w-full h-full object-cover blur-md scale-110" id="dlgBg"/>
+<!-- 可選：柔化一下背景，沒有加任何 blur -->
+<div class="absolute inset-0 bg-white/20"></div>
+<!-- 主圖在最上層，沒有 blur -->
+<img alt="毛孩照片" class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg" id="dlgImg"/>
+<button aria-label="關閉" class="absolute top-1 right-1 z-20 bg-black/60 text-white p-2 rounded-full leading-none" id="dlgClose">✕</button>
+</div>
+</div>
+<div class="flex gap-2 overflow-x-auto p-3" id="dlgThumbs"></div>
+<div class="p-5 space-y-4">
+<div class="flex items-start justify-between gap-3">
+<div>
+<!-- 標題 -->
+<h3 class="text-2xl font-semibold leading-snug" id="dlgName">—</h3>
+<!-- 三個圓角標籤：不換行、可水平捲動 -->
+<div class="mt-1 flex flex-nowrap gap-2 text-sm" id="dlgTags">
+<span class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap" id="dlgTagBreed"></span>
+<span class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap" id="dlgTagAge"></span>
+<span class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap" id="dlgTagGender"></span>
+</div>
+<!-- 第二排：結紮 / 預防針（淡藍色圓角標籤） -->
+<div class="mt-2 flex gap-2 text-sm" id="dlgTagsHealth">
+<span class="inline-flex items-center rounded-full ring-1 ring-sky-200 bg-sky-50 text-sky-700 px-3 py-1 whitespace-nowrap" id="dlgTagNeutered"></span>
+<span class="inline-flex items-center rounded-full ring-1 ring-sky-200 bg-sky-50 text-sky-700 px-3 py-1 whitespace-nowrap" id="dlgTagVaccinated"></span>
+</div>
+</div>
+</div>
+<div class="bg-orange-50 rounded-xl p-4 leading-7">
+<p class="text-gray-700 text-sm whitespace-pre-line break-words" id="dlgDesc"></p>
+</div>
+<div class="flex justify-end gap-3 pt-2" id="guestActionBar">
+<button class="px-4 py-2 rounded-xl bg-brand-600 text-white text-sm" id="dlgAdopt">我要認養</button>
+<button class="px-4 py-2 rounded-xl text-white shadow-sm" id="dlgShare" style="background:#06C755">分享</button>
+</div>
+<!-- 內嵌編輯區 -->
+<div class="hidden space-y-4" id="editArea">
+<div>
+<label class="block text-sm font-medium mb-1">名字 <span class="text-red-500">*</span></label>
+<input class="w-full rounded-xl border border-gray-300 p-2" id="editName"/>
+</div>
+<div>
+<label class="block text-sm font-medium mb-1">類別 <span class="text-red-500">*</span></label>
+<div class="flex gap-3">
+<label class="inline-flex items-center gap-2">
+<input class="accent-brand-600" name="editSpecies" type="radio" value="貓"/>
+<span>貓</span>
+</label>
+<label class="inline-flex items-center gap-2">
+<input class="accent-brand-600" name="editSpecies" type="radio" value="狗"/>
+<span>狗</span>
+</label>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-3">
+<div>
+<label class="block text-sm font-medium mb-1">品種</label>
+<select class="w-full rounded-xl border border-gray-300 p-2" id="editBreedType">
+<option value="">請選擇</option>
+</select>
+</div>
+<div>
+<label class="block text-sm font-medium mb-1" id="editBreedLabel">品種/毛色</label>
+<select class="w-full rounded-xl border border-gray-300 p-2" disabled="" id="editBreed">
+<option value="">請先選擇品種</option>
+</select>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-3">
+<div>
+<label class="block text-sm font-medium mb-1">年齡</label>
+<input class="w-full rounded-xl border border-gray-300 p-2" id="editAge" placeholder="例：2 歲 或 8 個月"/>
+</div>
+<div>
+<label class="block text-sm font-medium mb-1">性別</label>
+<select class="w-full rounded-xl border border-gray-300 p-2" id="editGender">
+<option value="">未設定</option>
+<option value="男生">男生</option>
+<option value="女生">女生</option>
+</select>
+</div>
+</div>
+<!-- 健康（編輯用） -->
+<div>
+<label class="block text-sm font-medium mb-1">健康</label>
+<div class="flex items-center gap-6">
+<label class="inline-flex items-center gap-2">
+<input class="h-4 w-4" id="editNeutered" type="checkbox"/>
+<span>結紮</span>
+</label>
+<label class="inline-flex items-center gap-2">
+<input class="h-4 w-4" id="editVaccinated" type="checkbox"/>
+<span>預防針</span>
+</label>
+</div>
+</div>
+<div>
+<label class="block text-sm font-medium mb-1">簡介</label>
+<textarea class="w-full rounded-xl border border-gray-300 p-2" id="editDesc" rows="4"></textarea>
+</div>
+<div>
+<input accept="image/*" class="sr-only" id="editFiles" multiple="" type="file">
+<div class="flex items-center gap-3">
+<button class="px-3 py-2 rounded-lg border border-gray-300 text-sm" id="btnPickEdit" type="button">新增照片</button>
+<span class="text-xs text-gray-500" id="editCount"></span>
+<span class="text-sm text-gray-400">最多 5 張</span>
+</div>
+<!-- 和新增模式一致：三欄縮圖 + 上方間距 -->
+<div class="mt-3 grid grid-cols-3 gap-2" id="editPreview"></div>
+</input></div>
+</div>
+<!-- 動作列 -->
+<div class="pt-2 flex flex-col sm:flex-row gap-3 hidden" id="actionBar">
+<button class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm" id="btnEdit">
             編輯
           </button>
-          <button id="btnAdopted" class="w-full px-4 py-3 rounded-xl bg-emerald-600 text-white text-sm">
+<button class="w-full px-4 py-3 rounded-xl bg-emerald-600 text-white text-sm" id="btnAdopted">
             已送養
           </button>
-          <button id="btnUnadopt"
-            class="w-full px-4 py-3 rounded-xl border border-amber-300 text-amber-700 text-sm hidden">
+<button class="w-full px-4 py-3 rounded-xl border border-amber-300 text-amber-700 text-sm hidden" id="btnUnadopt">
             退養
           </button>
-          <button id="btnDelete" class="w-full px-4 py-3 rounded-xl border border-red-300 text-red-600 text-sm">
+<button class="w-full px-4 py-3 rounded-xl border border-red-300 text-red-600 text-sm" id="btnDelete">
             刪除
           </button>
-        </div>
-        <div id="editActionBar" class="hidden pt-2 grid grid-cols-2 gap-3">
-          <button id="btnSave"
-            class="w-full px-4 py-3 rounded-xl bg-gray-900 text-white text-sm flex items-center justify-center gap-2">
-            <span id="saveText">儲存</span>
-          </button>
-          <button id="btnCancel" type="button" class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm">
+</div>
+<div class="hidden pt-2 grid grid-cols-2 gap-3" id="editActionBar">
+<button class="w-full px-4 py-3 rounded-xl bg-gray-900 text-white text-sm flex items-center justify-center gap-2" id="btnSave">
+<span id="saveText">儲存</span>
+</button>
+<button class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm" id="btnCancel" type="button">
             取消
           </button>
-        </div>
-
-        <!-- 已領養合照上傳 -->
-        <div id="adoptedUpload" class="hidden">
-          <input id="adoptedFiles" type="file" accept="image/*" multiple class="sr-only" />
-          <div class="flex items-center gap-3 mb-2">
-            <button id="btnPickAdopted" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
+</div>
+<!-- 已領養合照上傳 -->
+<div class="hidden" id="adoptedUpload">
+<input accept="image/*" class="sr-only" id="adoptedFiles" multiple="" type="file">
+<div class="flex items-center gap-3 mb-2">
+<button class="px-3 py-2 rounded-lg border border-gray-300 text-sm" id="btnPickAdopted" type="button">
               選擇合照
             </button>
-            <span id="adoptedCount" class="text-xs text-gray-500"></span>
-            <span class="text-sm text-gray-400">最多 5 張</span>
-          </div>
-          <div id="adoptedPreview" class="mt-1 grid grid-cols-3 gap-2"></div>
-          <button id="btnConfirmAdopted" class="mt-3 px-4 py-2 rounded-xl bg-gray-900 text-white text-sm">
+<span class="text-xs text-gray-500" id="adoptedCount"></span>
+<span class="text-sm text-gray-400">最多 5 張</span>
+</div>
+<div class="mt-1 grid grid-cols-3 gap-2" id="adoptedPreview"></div>
+<button class="mt-3 px-4 py-2 rounded-xl bg-gray-900 text-white text-sm" id="btnConfirmAdopted">
             儲存領養資訊
           </button>
-          <button id="btnCancelAdopted" type="button"
-            class="px-3 py-2 rounded-lg bg-gray-200 text-gray-900 hover:bg-gray-300">
+<button class="px-3 py-2 rounded-lg bg-gray-200 text-gray-900 hover:bg-gray-300" id="btnCancelAdopted" type="button">
             取消
           </button>
-        </div>
-      </div>
-    </div>
-  </dialog>
-
-  <!-- Lightbox -->
-  <div id="lightbox" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[9999]">
-    <div id="lbWrap" class="relative inline-block">
-      <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg" />
-      <button id="lbClose" class="absolute top-1 right-1 z-10 bg-black/60 hover:bg-black/70 text-white rounded-full p-2
-           text-2xl leading-none select-none" aria-label="關閉">✕</button>
-    </div>
-    <div id="lbThumbs"
-      class="absolute bottom-20 left-0 w-full flex justify-center px-4 py-2 pb-[env(safe-area-inset-bottom)]">
-      <div id="lbThumbsInner" class="flex gap-3"></div>
-    </div>
-    <button id="lbPrev" class="absolute text-white text-4xl select-none">❮</button>
-    <button id="lbNext" class="absolute text-white text-4xl select-none">❯</button>
-  </div>
-
-  <script src="./assets/firebase-config.js"></script>
-  <script type="module">
+</input></div>
+</div>
+</div>
+</dialog>
+<!-- Lightbox -->
+<div class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[9999]" id="lightbox">
+<div class="relative inline-block" id="lbWrap">
+<img class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg" id="lbImg">
+<button aria-label="關閉" class="absolute top-1 right-1 z-10 bg-black/60 hover:bg-black/70 text-white rounded-full p-2 text-2xl leading-none select-none" id="lbClose">✕</button>
+</img></div>
+<div class="absolute bottom-20 left-0 w-full flex justify-center px-4 py-2 pb-[env(safe-area-inset-bottom)]" id="lbThumbs">
+<div class="flex gap-3" id="lbThumbsInner"></div>
+</div>
+<button class="absolute text-white text-4xl select-none" id="lbPrev">❮</button>
+<button class="absolute text-white text-4xl select-none" id="lbNext">❯</button>
+</div>
+<script src="./assets/firebase-config.js"></script>
+<script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
     import {
       getFirestore, collection, getDocs, query, orderBy, where,
@@ -1000,10 +881,10 @@
     window.loadPets = loadPets;
     loadPets();
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script src="assets/Modal.js"></script>
-  <script src="assets/Lightbox.js"></script>
-  <script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="assets/Modal.js"></script>
+<script src="assets/Lightbox.js"></script>
+<script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
         navigator.serviceWorker.register("./sw.js");
@@ -1011,5 +892,4 @@
     }
   </script>
 </body>
-
 </html>
