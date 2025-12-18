@@ -1,17 +1,3 @@
-.menu-emoji {
-  width: 1.75rem;
-  /* 固定icon欄寬，想更寬/窄就調這裡 */
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  /* 等同 shrink-0 */
-  line-height: 1;
-  font-size: 1.25rem;
-  /* 約等於 text-xl */
-}
-
-
 dialog::backdrop {
   background: rgba(0, 0, 0, 0.5);
 }
@@ -138,7 +124,12 @@ dialog::backdrop {
   }
 }
 
-.login-button {
-  margin-left: 1px;
-  /* 想多一點就改大，例如 60px、80px */
+.menu-emoji{
+  width: 1.75rem;            /* 固定icon欄寬，想更寬/窄就調這裡 */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;            /* 等同 shrink-0 */
+  line-height: 1;
+  font-size: 1.25rem;        /* 約等於 text-xl */
 }
