@@ -87,74 +87,74 @@
 
     <!-- 右上角彈出選單：固定位置，不推版，覆蓋 hero -->
     <nav id="menuPanel" class="fixed opacity-0 scale-y-0 origin-top-right rounded-2xl shadow-xl
-            bg-[#AEDDEF] w-64 max-w-[90vw] p-3 transition duration-150 ease-out">
+            bg-[#AEDDEF] w-fit max-w-[90vw] p-3 transition duration-150 ease-out">
       <!-- 小箭頭（同面板色） -->
       <div class="absolute -top-2 right-5 w-3 h-3 rotate-45 bg-[#AEDDEF]"></div>
 
       <!-- 按鈕群：保留 space-y-2、字體 18px -->
       <ul class="space-y-2 py-1 text-[18px]" role="menu" aria-orientation="vertical" tabindex="-1">
         <li>
-          <a href="index.html" role="menuitem" tabindex="-1" class="grid w-full grid-cols-[32px_1fr_32px] items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
-             text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
-             focus:outline-none focus:ring-2 focus:ring-white/70">
-            <span aria-hidden="true"
-              class="grid size-8 place-items-center rounded-lg bg-white shadow text-xl leading-none">🧭</span>
+          <a href="index.html" role="menuitem" tabindex="-1"
+            class="grid w-full grid-cols-[32px_1fr_32px] items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+                   text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+                   focus:outline-none focus:ring-2 focus:ring-white/70">
+            <span aria-hidden="true" class="grid size-8 place-items-center rounded-lg bg-white shadow text-xl leading-none">🧭</span>
             <span class="text-center">首頁</span>
             <span aria-hidden="true" class="size-8"></span>
           </a>
         </li>
 
         <li>
-          <a href="cats.html" role="menuitem" tabindex="-1" class="grid w-full grid-cols-[32px_1fr_32px] items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
-             text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
-             focus:outline-none focus:ring-2 focus:ring-white/70">
-            <span aria-hidden="true"
-              class="grid size-8 place-items-center rounded-lg bg-white shadow text-xl leading-none">🐱</span>
+          <a href="cats.html" role="menuitem" tabindex="-1"
+            class="grid w-full grid-cols-[32px_1fr_32px] items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+                   text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+                   focus:outline-none focus:ring-2 focus:ring-white/70">
+            <span aria-hidden="true" class="grid size-8 place-items-center rounded-lg bg-white shadow text-xl leading-none">🐱</span>
             <span class="text-center">我想養貓咪</span>
             <span aria-hidden="true" class="size-8"></span>
           </a>
         </li>
 
         <li>
-          <a href="about.html" role="menuitem" tabindex="-1" class="grid w-full grid-cols-[32px_1fr_32px] items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
-             text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
-             focus:outline-none focus:ring-2 focus:ring-white/70">
-            <span aria-hidden="true"
-              class="grid size-8 place-items-center rounded-lg bg-white shadow text-xl leading-none">ℹ️</span>
+          <a href="about.html" role="menuitem" tabindex="-1"
+            class="grid w-full grid-cols-[32px_1fr_32px] items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+                   text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+                   focus:outline-none focus:ring-2 focus:ring-white/70">
+            <span aria-hidden="true" class="grid size-8 place-items-center rounded-lg bg-white shadow text-xl leading-none">ℹ️</span>
             <span class="text-center">關於簡媽媽</span>
             <span aria-hidden="true" class="size-8"></span>
           </a>
         </li>
 
         <li>
-          <a href="home.html" role="menuitem" tabindex="-1" class="grid w-full grid-cols-[32px_1fr_32px] items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
-             text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
-             focus:outline-none focus:ring-2 focus:ring-white/70">
-            <span aria-hidden="true"
-              class="grid size-8 place-items-center rounded-lg bg-white shadow text-xl leading-none">🏠</span>
+          <a href="home.html" role="menuitem" tabindex="-1"
+            class="grid w-full grid-cols-[32px_1fr_32px] items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+                   text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+                   focus:outline-none focus:ring-2 focus:ring-white/70">
+            <span aria-hidden="true" class="grid size-8 place-items-center rounded-lg bg-white shadow text-xl leading-none">🏠</span>
             <span class="text-center">幸福的歸宿</span>
             <span aria-hidden="true" class="size-8"></span>
           </a>
         </li>
 
-        <!-- 管理區：加分隔線，視覺上會更「合理」 -->
-        <li class="pt-2 mt-2 border-t border-white/70">
-          <a href="admin.html" role="menuitem" tabindex="-1" class="grid w-full grid-cols-[32px_1fr_32px] items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
-             text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
-             focus:outline-none focus:ring-2 focus:ring-white/70 nav-admin-link hidden">
-            <span aria-hidden="true"
-              class="grid size-8 place-items-center rounded-lg bg-white shadow text-xl leading-none">🔒</span>
+        <li class="pt-1">
+          <a href="admin.html" role="menuitem" tabindex="-1"
+            class="grid w-full grid-cols-[32px_1fr_32px] items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+                   text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+                   focus:outline-none focus:ring-2 focus:ring-white/70 nav-admin-link hidden">
+            <span aria-hidden="true" class="grid size-8 place-items-center rounded-lg bg-white shadow text-xl leading-none">🔒</span>
             <span class="text-center">後台管理</span>
             <span aria-hidden="true" class="size-8"></span>
           </a>
         </li>
 
         <li>
-          <button type="button" id="btnLogoutMobile" class="grid w-full grid-cols-[32px_1fr_32px] items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
-             text-red-600 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
-             focus:outline-none focus:ring-2 focus:ring-white/70 nav-logout-btn hidden" role="menuitem" tabindex="-1">
-            <span aria-hidden="true"
-              class="grid size-8 place-items-center rounded-lg bg-white shadow text-xl leading-none">🚪</span>
+          <button type="button" id="btnLogoutMobile"
+            class="grid w-full grid-cols-[32px_1fr_32px] items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+                   text-red-600 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+                   focus:outline-none focus:ring-2 focus:ring-white/70 nav-logout-btn hidden"
+            role="menuitem" tabindex="-1">
+            <span aria-hidden="true" class="grid size-8 place-items-center rounded-lg bg-white shadow text-xl leading-none">🚪</span>
             <span class="text-center">登出</span>
             <span aria-hidden="true" class="size-8"></span>
           </button>
