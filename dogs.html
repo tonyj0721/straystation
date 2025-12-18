@@ -1,93 +1,1002 @@
-<!DOCTYPE html>
-<html lang="zh-Hant">
+<!doctype html>
+<html lang="zh-Hant-TW">
+
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>我想養狗狗 | 台中簡媽媽狗園</title>
-  <link rel="stylesheet" href="tailwind.css">
-  <link rel="stylesheet" href="shared.css">
-</head>
-<body class="bg-[#fef9f8]">
-  <header class="flex justify-between items-center px-4 py-3 bg-white shadow">
-    <div class="flex items-center gap-2">
-      <img src="logo.png" alt="logo" class="w-8 h-8">
-      <h1 class="text-lg font-bold text-slate-800">台中簡媽媽狗園</h1>
-      <span class="text-red-500 text-sm ml-1">我是小編</span>
-    </div>
-    <button id="menuButton" class="text-3xl leading-none">☰</button>
-  </header>
+  <meta charset="utf-8" />
 
-  <nav id="menuPanel" class="fixed opacity-0 scale-y-0 origin-top-right rounded-2xl shadow-xl bg-[#AEDDEF] w-fit max-w-[90vw] p-3 transition duration-150 ease-out">
-    <ul class="space-y-2 text-[18px]" role="menu">
-      <li>
-        <a href="index.html" class="flex items-center gap-3 rounded-xl bg-white px-4 py-2 text-slate-700 shadow hover:shadow-md hover:bg-white/95">
-          <span class="text-xl">🧭</span><span>首頁</span>
-        </a>
-      </li>
-      <li>
-        <a href="cats.html" class="flex items-center gap-3 rounded-xl bg-white px-4 py-2 text-slate-700 shadow hover:shadow-md hover:bg-white/95">
-          <span class="text-xl">🐱</span><span>我想養貓咪</span>
-        </a>
-      </li>
-      <li>
-        <a href="about.html" class="flex items-center gap-3 rounded-xl bg-white px-4 py-2 text-slate-700 shadow hover:shadow-md hover:bg-white/95">
-          <span class="text-xl">ℹ️</span><span>關於簡媽媽</span>
-        </a>
-      </li>
-      <li>
-        <a href="home.html" class="flex items-center gap-3 rounded-xl bg-white px-4 py-2 text-slate-700 shadow hover:shadow-md hover:bg-white/95">
-          <span class="text-xl">🏠</span><span>幸福的歸宿</span>
-        </a>
-      </li>
-      <li class="border-t border-white/70 pt-2 mt-2">
-        <a href="admin.html" class="flex items-center gap-3 rounded-xl bg-white px-4 py-2 text-slate-700 shadow hover:shadow-md hover:bg-white/95 nav-admin-link hidden">
-          <span class="text-xl">🔒</span><span>後台管理</span>
-        </a>
-      </li>
-      <li>
-        <button id="btnLogoutMobile" class="flex items-center gap-3 rounded-xl bg-white px-4 py-2 text-red-600 shadow hover:shadow-md hover:bg-white/95 nav-logout-btn hidden">
-          <span class="text-xl">🚪</span><span>登出</span>
-        </button>
-      </li>
-    </ul>
-  </nav>
-
-  <main class="p-4">
-    <h2 class="text-2xl font-bold mb-4">我想養狗狗</h2>
-    <div class="flex flex-wrap gap-2 mb-4">
-      <select class="border rounded px-2 py-1">
-        <option>不限品種</option>
-      </select>
-      <select class="border rounded px-2 py-1">
-        <option>不限年齡</option>
-      </select>
-    </div>
-    <div class="grid grid-cols-2 gap-4">
-      <div class="bg-white rounded-xl shadow p-2 text-center">
-        <img src="dog1.jpg" class="rounded-lg mx-auto mb-2" />
-        <p class="font-bold">未取名</p>
-        <p class="text-sm text-slate-500">狐狸犬 | 3~4歲 | 男生</p>
-        <button class="mt-2 bg-slate-800 text-white px-3 py-1 rounded">查看</button>
-      </div>
-      <div class="bg-white rounded-xl shadow p-2 text-center">
-        <img src="dog2.jpg" class="rounded-lg mx-auto mb-2" />
-        <p class="font-bold">未取名</p>
-        <p class="text-sm text-slate-500">白黃色 | 1歲 | 男生</p>
-        <button class="mt-2 bg-slate-800 text-white px-3 py-1 rounded">查看</button>
-      </div>
-    </div>
-  </main>
-
+  <!-- GA4 -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-YBC0MQBC2F"></script>
   <script>
-    const menuBtn = document.getElementById('menuButton');
-    const menuPanel = document.getElementById('menuPanel');
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+
+    // 若在本機開發，開啟 DebugView；正式站不會開
+    gtag('config', 'G-YBC0MQBC2F', { debug_mode: location.hostname.includes('localhost') });
+  </script>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="images/dogpaw-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="images/dogpaw-180.png">
+  <title>我想養狗狗｜台中簡媽媽狗園</title>
+  <meta name="description" content="瀏覽待認養狗狗清單，支援品種、毛色、年齡、性別篩選，快速找到適合你的毛孩。">
+  <meta name="theme-color" content="#fcd34d">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="stylesheet" href="assets/tailwind.css">
+  <link rel="stylesheet" href="assets/shared.css">
+  <style>
+    /* 狗掌：單點回首頁、長按登入（避免 iOS 長按選字/呼叫選單） */
+    #GoogleLogin {
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+
+    #GoogleLogin img {
+      pointer-events: none;
+    }
+  </style>
+</head>
+
+<body class="text-gray-800 bg-gradient-to-br from-brand-50 to-white">
+  <!-- Navbar -->
+  <header class="bg-white/80 backdrop-blur border-b border-gray-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="h-16 flex items-center justify-between">
+        <a href="index.html" class="flex items-center gap-2 font-semibold text-2xl">
+          <img src="images/dogpaw.png" alt="dogpaw" id="GoogleLogin" class="h-8 w-8 object-contain" />
+          <span class="flex items-baseline gap-1">
+            <span>台中簡媽媽狗園</span>
+            <span id="adminLabel" class="text-sm text-red-500 hidden">我是小編</span>
+          </span>
+        </a>
+
+        <!-- 桌機導覽 -->
+        <nav class="hidden md:flex items-center gap-6 ml-auto">
+          <a href="index.html" class="hover:text-brand-600">首 頁</a>
+          <a href="cats.html" class="hover:text-brand-600">我想養貓咪</a>
+          <a href="about.html" class="hover:text-brand-600">關於簡媽媽</a>
+          <a href="home.html" class="hover:text-brand-600">幸福的歸宿</a>
+          <a href="admin.html" class="hover:text-brand-600 nav-admin-link hidden">後台管理</a>
+          <button type="button" id="btnLogoutDesktop" class="text-red-500 hover:text-brand-600 nav-logout-btn hidden">
+            登出
+          </button>
+        </nav>
+
+        <!-- 手機漢堡鈕 -->
+        <div class="flex items-center gap-2">
+          <button id="menuBtn"
+            class="md:hidden p-2 rounded-lg border border-[#AEDDEF] bg-white/80 hover:bg-[#AEDDEF]/10" aria-label="開啟選單"
+            aria-haspopup="menu" aria-expanded="false" aria-controls="menuOverlay">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+  <!-- 透明覆蓋層：專門接「點外面關閉」 -->
+  <div id="menuOverlay" class="fixed inset-0 z-50 hidden" role="dialog" aria-modal="true">
+    <div id="overlayClickArea" class="absolute inset-0"></div>
+
+    <!-- 右上角彈出選單：固定位置，不推版，覆蓋 hero -->
+    <nav id="menuPanel" class="fixed opacity-0 scale-y-0 origin-top-right rounded-2xl shadow-xl
+            bg-[#AEDDEF] w-fit max-w-[90vw] p-3 transition duration-150 ease-out">
+      <!-- 小箭頭（同面板色） -->
+      <div class="absolute -top-2 right-5 w-3 h-3 rotate-45 bg-[#AEDDEF]"></div>
+
+      <!-- 按鈕群：保留 space-y-2、字體 18px -->
+      <ul class="space-y-2 py-1 text-[18px]" role="menu" aria-orientation="vertical" tabindex="-1">
+        <li>
+          <a href="index.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+            text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+            focus:outline-none focus:ring-2 focus:ring-white/70">
+            <span aria-hidden="true" class="text-xl leading-none">🧭</span>
+            <span>首頁</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="cats.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+            text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+            focus:outline-none focus:ring-2 focus:ring-white/70">
+            <span aria-hidden="true" class="text-xl leading-none">🐱</span>
+            <span>我想養貓咪</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="about.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+            text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+            focus:outline-none focus:ring-2 focus:ring-white/70">
+            <span aria-hidden="true" class="text-xl leading-none">ℹ️</span>
+            <span>關於簡媽媽</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="home.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+            text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+            focus:outline-none focus:ring-2 focus:ring-white/70">
+            <span aria-hidden="true" class="text-xl leading-none">🏠</span>
+            <span>幸福的歸宿</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="admin.html" role="menuitem" tabindex="-1" class="w-full flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+            text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+            focus:outline-none focus:ring-2 focus:ring-white/70 nav-admin-link hidden">
+            <span aria-hidden="true" class="w-8 shrink-0 text-center text-xl leading-none">🔒</span>
+            <span>後台管理</span>
+          </a>
+        </li>
+
+        <li>
+          <button type="button" role="menuitem" tabindex="-1" class="w-full flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+            text-red-600 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+            focus:outline-none focus:ring-2 focus:ring-white/70 nav-logout-btn hidden" id="btnLogoutMobile">
+            <span aria-hidden="true" class="w-8 shrink-0 text-center text-xl leading-none">🚪</span>
+            <span>登出</span>
+          </button>
+        </li>
+      </ul>
+    </nav>
+  </div>
+  <script>
+    const menuBtn = document.getElementById('menuBtn');
+    const overlay = document.getElementById('menuOverlay');
+    const clickArea = document.getElementById('overlayClickArea');
+    const panel = document.getElementById('menuPanel');
+
+    function positionPanel() {
+      const r = menuBtn.getBoundingClientRect();
+      const gap = 8;
+      panel.style.top = '-1000px';
+      panel.style.left = '-1000px';
+      const w = panel.offsetWidth;
+      let left = r.right - w;
+      left = Math.max(8, Math.min(left, window.innerWidth - w - 8));
+      panel.style.top = (r.bottom + gap) + 'px';
+      panel.style.left = left + 'px';
+    }
+    function openMenu() {
+      overlay.classList.remove('hidden');
+      positionPanel();
+      requestAnimationFrame(() => {
+        panel.classList.remove('opacity-0', 'scale-y-0');
+        panel.classList.add('scale-y-100');
+      });
+      document.addEventListener('keydown', onEsc);
+      menuBtn.setAttribute('aria-expanded', 'true');
+      const firstItem = panel.querySelector('[role="menuitem"]');
+      if (firstItem) firstItem.focus();
+    }
+    function closeMenu() {
+      panel.classList.add('opacity-0');
+      panel.classList.remove('scale-y-100');
+      panel.classList.add('scale-y-0');
+      menuBtn.setAttribute('aria-expanded', 'false');
+      document.removeEventListener('keydown', onEsc);
+      setTimeout(() => overlay.classList.add('hidden'), 150);
+      menuBtn.focus();
+    }
+    function onEsc(e) { if (e.key === 'Escape') closeMenu(); }
+
     menuBtn.addEventListener('click', () => {
-      const isOpen = menuPanel.classList.contains('scale-y-100');
-      menuPanel.classList.toggle('opacity-0', isOpen);
-      menuPanel.classList.toggle('scale-y-0', isOpen);
-      menuPanel.classList.toggle('opacity-100', !isOpen);
-      menuPanel.classList.toggle('scale-y-100', !isOpen);
+      const expanded = menuBtn.getAttribute('aria-expanded') === 'true';
+      expanded ? closeMenu() : openMenu();
+    });
+    clickArea.addEventListener('click', (e) => {
+      if (!panel.contains(e.target) && e.target !== menuBtn) closeMenu();
+    });
+    panel.addEventListener('keydown', (e) => {
+      const items = Array.from(panel.querySelectorAll('[role="menuitem"]'));
+      const i = items.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown') { e.preventDefault(); items[(i + 1 + items.length) % items.length].focus(); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
+      if (e.key === 'Home') { e.preventDefault(); items[0].focus(); }
+      if (e.key === 'End') { e.preventDefault(); items[items.length - 1].focus(); }
+    });
+    window.addEventListener('resize', () => {
+      if (!overlay.classList.contains('hidden')) positionPanel();
+    });
+    // 點任何選單項目後就關閉（避免停留）
+    panel.querySelectorAll('[role="menuitem"]').forEach(el => {
+      el.addEventListener('click', () => { try { closeMenu(); } catch (_) { } });
     });
   </script>
+
+  <!-- Title + Filters + Cards -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <header class="mb-6">
+      <h1 class="text-3xl font-bold">我想養狗狗</h1>
+      <p class="text-gray-600 mt-2">查看所有的狗狗，可以依品種、毛色、年齡與性別篩選。</p>
+    </header>
+
+    <!-- Filters -->
+    <section class="mb-6 grid grid-cols-2 md:grid-cols-4 gap-3">
+      <select id="fBreedType" class="col-span-1 rounded-xl border border-gray-300 bg-white p-2 text-sm">
+        <option value="">不限品種</option>
+        <option value="品種犬">品種犬</option>
+        <option value="米克斯">米克斯</option>
+      </select>
+
+      <select id="fBreed"
+        class="col-span-1 rounded-xl border border-gray-300 bg-white p-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled>
+        <option value="">請先選擇「品種」</option>
+      </select>
+
+      <select id="fAge" class="col-span-1 rounded-xl border border-gray-300 bg-white p-2 text-sm">
+        <option value="">不限年齡</option>
+        <option value="1以下">1 歲以下</option>
+        <option value="1-5">1～5 歲</option>
+        <option value="6-10">6～10 歲</option>
+        <option value="10以上">10 歲以上</option>
+      </select>
+
+      <select id="fGender" class="col-span-1 rounded-xl border border-gray-300 bg-white p-2 text-sm">
+        <option value="">不限性別</option>
+        <option value="男生">男生</option>
+        <option value="女生">女生</option>
+      </select>
+    </section>
+
+    <!-- Grid -->
+    <section>
+      <div id="grid" class="mt-4 grid grid-cols-2 gap-6 sm:grid-cols-4 lg:grid-cols-4"></div>
+      <div id="emptyState" class="hidden mt-10 text-center text-gray-500">沒有符合條件的毛孩。</div>
+      <!-- 分頁控制 -->
+      <div id="pagination" class="mt-8 flex items-center justify-center gap-3 hidden">
+        <button id="prevPage"
+          class="px-3 py-1 rounded-lg border border-gray-300 text-sm disabled:opacity-40 disabled:cursor-not-allowed">
+          上一頁
+        </button>
+        <span id="pageInfo" class="text-sm text-gray-600"></span>
+        <button id="nextPage"
+          class="px-3 py-1 rounded-lg border border-gray-300 text-sm disabled:opacity-40 disabled:cursor-not-allowed">
+          下一頁
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-gray-50 border-t border-gray-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-sm text-gray-500">© <span id="year"></span>
+      <img src="images/浪浪轉運站 Logo.png" alt="浪浪轉運站 Logo"
+        style="display:inline-flex;width:1em;height:1em;vertical-align:-0.15em;margin:0.01em -0.25em 0.01em 0.25em;">
+      浪浪轉運站 Stray Station. 保留所有權利。
+    </div>
+  </footer>
+
+  <!-- Pet Detail Modal -->
+  <dialog id="petDialog" class="w-full max-w-2xl max-h-[90vh] rounded-2xl p-0 overflow-y-auto">
+    <div class="bg-white">
+      <!-- 新增：與下方縮圖 p-3 對齊 -->
+      <div class="px-3 pt-2">
+        <p class="text-center text-xs text-gray-500 mb-1">點主圖可放大</p>
+        <div class="relative aspect-video bg-gray-100 overflow-hidden rounded-lg">
+          <!-- 只模糊這張背景圖 -->
+          <img id="dlgBg" aria-hidden="true" class="absolute inset-0 w-full h-full object-cover blur-md scale-110">
+
+          <!-- 可選：柔化一下背景，沒有加任何 blur -->
+          <div class="absolute inset-0 bg-white/20"></div>
+
+          <!-- 主圖在最上層，沒有 blur -->
+          <img id="dlgImg" alt="毛孩照片"
+            class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg">
+
+          <button id="dlgClose" class="absolute top-1 right-1 z-20 bg-black/60 text-white p-2 rounded-full leading-none"
+            aria-label="關閉">✕</button>
+        </div>
+      </div>
+
+      <div id="dlgThumbs" class="flex gap-2 overflow-x-auto p-3"></div>
+      <div class="p-5 space-y-4">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <!-- 標題 -->
+            <h3 id="dlgName" class="text-2xl font-semibold leading-snug">—</h3>
+
+            <!-- 三個圓角標籤：不換行、可水平捲動 -->
+            <div id="dlgTags" class="mt-1 flex flex-nowrap gap-2 text-sm">
+              <span id="dlgTagBreed"
+                class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap"></span>
+              <span id="dlgTagAge"
+                class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap"></span>
+              <span id="dlgTagGender"
+                class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap"></span>
+            </div>
+            <!-- 第二排：結紮 / 預防針（淡藍色圓角標籤） -->
+            <div id="dlgTagsHealth" class="mt-2 flex gap-2 text-sm">
+              <span id="dlgTagNeutered"
+                class="inline-flex items-center rounded-full ring-1 ring-sky-200 bg-sky-50 text-sky-700 px-3 py-1 whitespace-nowrap"></span>
+              <span id="dlgTagVaccinated"
+                class="inline-flex items-center rounded-full ring-1 ring-sky-200 bg-sky-50 text-sky-700 px-3 py-1 whitespace-nowrap"></span>
+            </div>
+          </div>
+        </div>
+        <div class="bg-orange-50 rounded-xl p-4 leading-7">
+          <p id="dlgDesc" class="text-gray-700 text-sm whitespace-pre-line break-words"></p>
+        </div>
+        <div id="guestActionBar" class="flex justify-end gap-3 pt-2">
+          <button id="dlgAdopt" class="px-4 py-2 rounded-xl bg-brand-600 text-white text-sm">我要認養</button>
+          <button id="dlgShare" class="px-4 py-2 rounded-xl text-white shadow-sm" style="background:#06C755">分享</button>
+        </div>
+
+        <!-- 內嵌編輯區 -->
+        <div id="editArea" class="hidden space-y-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">名字 <span class="text-red-500">*</span></label>
+            <input id="editName" class="w-full rounded-xl border border-gray-300 p-2" />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-1">類別 <span class="text-red-500">*</span></label>
+            <div class="flex gap-3">
+              <label class="inline-flex items-center gap-2">
+                <input type="radio" name="editSpecies" value="貓" class="accent-brand-600" />
+                <span>貓</span>
+              </label>
+              <label class="inline-flex items-center gap-2">
+                <input type="radio" name="editSpecies" value="狗" class="accent-brand-600" />
+                <span>狗</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium mb-1">品種</label>
+              <select id="editBreedType" class="w-full rounded-xl border border-gray-300 p-2">
+                <option value="">請選擇</option>
+              </select>
+            </div>
+            <div>
+              <label id="editBreedLabel" class="block text-sm font-medium mb-1">品種/毛色</label>
+              <select id="editBreed" class="w-full rounded-xl border border-gray-300 p-2" disabled>
+                <option value="">請先選擇品種</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium mb-1">年齡</label>
+              <input id="editAge" class="w-full rounded-xl border border-gray-300 p-2" placeholder="例：2 歲 或 8 個月" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1">性別</label>
+              <select id="editGender" class="w-full rounded-xl border border-gray-300 p-2">
+                <option value="">未設定</option>
+                <option value="男生">男生</option>
+                <option value="女生">女生</option>
+              </select>
+            </div>
+          </div>
+          <!-- 健康（編輯用） -->
+          <div>
+            <label class="block text-sm font-medium mb-1">健康</label>
+            <div class="flex items-center gap-6">
+              <label class="inline-flex items-center gap-2">
+                <input id="editNeutered" type="checkbox" class="h-4 w-4">
+                <span>結紮</span>
+              </label>
+              <label class="inline-flex items-center gap-2">
+                <input id="editVaccinated" type="checkbox" class="h-4 w-4">
+                <span>預防針</span>
+              </label>
+            </div>
+          </div>
+
+
+          <div>
+            <label class="block text-sm font-medium mb-1">簡介</label>
+            <textarea id="editDesc" rows="4" class="w-full rounded-xl border border-gray-300 p-2"></textarea>
+          </div>
+
+          <div>
+            <input id="editFiles" type="file" accept="image/*" multiple class="sr-only" />
+            <div class="flex items-center gap-3">
+              <button id="btnPickEdit" type="button"
+                class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增照片</button>
+              <span id="editCount" class="text-xs text-gray-500"></span>
+              <span class="text-sm text-gray-400">最多 5 張</span>
+            </div>
+            <!-- 和新增模式一致：三欄縮圖 + 上方間距 -->
+            <div id="editPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
+          </div>
+        </div>
+
+        <!-- 動作列 -->
+        <div id="actionBar" class="pt-2 flex flex-col sm:flex-row gap-3 hidden">
+          <button id="btnEdit" class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm">
+            編輯
+          </button>
+          <button id="btnAdopted" class="w-full px-4 py-3 rounded-xl bg-emerald-600 text-white text-sm">
+            已送養
+          </button>
+          <button id="btnUnadopt"
+            class="w-full px-4 py-3 rounded-xl border border-amber-300 text-amber-700 text-sm hidden">
+            退養
+          </button>
+          <button id="btnDelete" class="w-full px-4 py-3 rounded-xl border border-red-300 text-red-600 text-sm">
+            刪除
+          </button>
+        </div>
+        <div id="editActionBar" class="hidden pt-2 grid grid-cols-2 gap-3">
+          <button id="btnSave"
+            class="w-full px-4 py-3 rounded-xl bg-gray-900 text-white text-sm flex items-center justify-center gap-2">
+            <span id="saveText">儲存</span>
+          </button>
+          <button id="btnCancel" type="button" class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm">
+            取消
+          </button>
+        </div>
+
+        <!-- 已領養合照上傳 -->
+        <div id="adoptedUpload" class="hidden">
+          <input id="adoptedFiles" type="file" accept="image/*" multiple class="sr-only" />
+          <div class="flex items-center gap-3 mb-2">
+            <button id="btnPickAdopted" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
+              選擇合照
+            </button>
+            <span id="adoptedCount" class="text-xs text-gray-500"></span>
+            <span class="text-sm text-gray-400">最多 5 張</span>
+          </div>
+          <div id="adoptedPreview" class="mt-1 grid grid-cols-3 gap-2"></div>
+          <button id="btnConfirmAdopted" class="mt-3 px-4 py-2 rounded-xl bg-gray-900 text-white text-sm">
+            儲存領養資訊
+          </button>
+          <button id="btnCancelAdopted" type="button"
+            class="px-3 py-2 rounded-lg bg-gray-200 text-gray-900 hover:bg-gray-300">
+            取消
+          </button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Lightbox -->
+  <div id="lightbox" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[9999]">
+    <div id="lbWrap" class="relative inline-block">
+      <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg" />
+      <button id="lbClose" class="absolute top-1 right-1 z-10 bg-black/60 hover:bg-black/70 text-white rounded-full p-2
+           text-2xl leading-none select-none" aria-label="關閉">✕</button>
+    </div>
+    <div id="lbThumbs"
+      class="absolute bottom-20 left-0 w-full flex justify-center px-4 py-2 pb-[env(safe-area-inset-bottom)]">
+      <div id="lbThumbsInner" class="flex gap-3"></div>
+    </div>
+    <button id="lbPrev" class="absolute text-white text-4xl select-none">❮</button>
+    <button id="lbNext" class="absolute text-white text-4xl select-none">❯</button>
+  </div>
+
+  <script src="./assets/firebase-config.js"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+    import {
+      getFirestore, collection, getDocs, query, orderBy, where,
+      doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp, limit as fbLimit,
+    } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+    import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject, listAll, } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
+    import {
+      getAuth,
+      GoogleAuthProvider,
+      signInWithRedirect,
+      getRedirectResult,
+      setPersistence,
+      indexedDBLocalPersistence,
+      browserLocalPersistence,
+      browserSessionPersistence,
+      inMemoryPersistence,
+      signOut,
+      onAuthStateChanged,
+    } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
+
+    // Firebase Hosting on web.app/custom domain + Safari/Firefox 的 storage partitioning：
+    // authDomain 盡量用「目前正在服務的網域」，redirect 會比較穩。
+    const __cfg = (window.firebaseConfig ? { ...window.firebaseConfig } : {});
+    try {
+      const host = window.location.hostname;
+      const isLocal =
+        host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "";
+      if (!isLocal && host) __cfg.authDomain = host;
+    } catch (_) { }
+    const app = initializeApp(__cfg);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+
+    // 讓 dialog（petDialog.fixed.js / shared.js）能在「非 module」腳本中使用 Firebase 與狀態
+    Object.assign(window, {
+      db, storage,
+      collection, getDocs, query, orderBy, where,
+      doc, getDoc, updateDoc, deleteDoc, serverTimestamp, fbLimit,
+      sRef, uploadBytes, getDownloadURL, deleteObject, listAll,
+    });
+
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+
+    const LoginBtn = document.getElementById("GoogleLogin");
+
+    async function ensurePersistence() {
+      try { await setPersistence(auth, indexedDBLocalPersistence); return; } catch (_) { }
+      try { await setPersistence(auth, browserLocalPersistence); return; } catch (_) { }
+      try { await setPersistence(auth, browserSessionPersistence); return; } catch (_) { }
+      try { await setPersistence(auth, inMemoryPersistence); } catch (_) { }
+    }
+
+    // 先設定持久化、再接回 redirect 結果（不輸出任何提示）
+    (async () => {
+      try { await ensurePersistence(); } catch (_) { }
+      try { await getRedirectResult(auth); } catch (_) { }
+    })();
+
+    async function startGoogleLogin() {
+      if (auth.currentUser) return; // 已登入就不重複登入
+      try { await ensurePersistence(); } catch (_) { }
+      try { sessionStorage.setItem("__pendingGoogleLogin", "1"); } catch (_) { }
+      try { await signInWithRedirect(auth, provider); } catch (_) { }
+    }
+
+    // 狗掌：單點回 index.html；長按 >= 650ms 觸發登入（不用放開）
+    if (LoginBtn) {
+      const LONG_PRESS_MS = 650;
+      let pressTimer = null;
+      let suppressNextClick = false;
+
+      const clearTimer = () => {
+        if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+      };
+
+      const onDown = (e) => {
+        suppressNextClick = false;
+        clearTimer();
+        pressTimer = setTimeout(() => {
+          suppressNextClick = true;
+          clearTimer();
+          startGoogleLogin();
+        }, LONG_PRESS_MS);
+      };
+
+      const onUp = () => { clearTimer(); };
+      const onCancel = () => { clearTimer(); };
+
+      if ("PointerEvent" in window) {
+        LoginBtn.addEventListener("pointerdown", onDown, { passive: false });
+        LoginBtn.addEventListener("pointerup", onUp, { passive: true });
+        LoginBtn.addEventListener("pointercancel", onCancel, { passive: true });
+        LoginBtn.addEventListener("pointerleave", onCancel, { passive: true });
+      } else {
+        LoginBtn.addEventListener("touchstart", onDown, { passive: false });
+        LoginBtn.addEventListener("touchend", onUp, { passive: true });
+        LoginBtn.addEventListener("touchcancel", onCancel, { passive: true });
+      }
+
+      LoginBtn.addEventListener("click", (e) => {
+        if (suppressNextClick) {
+          try { e.preventDefault(); } catch (_) { }
+          try { e.stopPropagation(); } catch (_) { }
+          suppressNextClick = false;
+          return;
+        }
+        window.location.href = "index.html";
+      });
+
+      // 避免 iOS 長按跳出選單（拷貝/開新頁）
+      LoginBtn.addEventListener("contextmenu", (e) => { try { e.preventDefault(); } catch (_) { } });
+    }
+
+    const adminLabel = document.getElementById("adminLabel");
+    const adminLinks = document.querySelectorAll(".nav-admin-link");
+    const logoutBtns = document.querySelectorAll(".nav-logout-btn");
+    // ⬇ 新增：modal 裡兩組按鈕
+    const guestActionBar = document.getElementById("guestActionBar");
+    const adminActionBar = document.getElementById("actionBar");
+
+    // 依登入狀態更新 header / 導覽
+    onAuthStateChanged(auth, (user) => {
+      const isLogin = !!user;
+      window.__isLogin = isLogin;  // ← 加這行
+
+      try { if (isLogin) sessionStorage.removeItem("__pendingGoogleLogin"); } catch (_) { }
+
+      adminLabel?.classList.toggle("hidden", !isLogin);
+
+      adminLinks.forEach((el) => {
+        el.classList.toggle("hidden", !isLogin);
+      });
+
+      logoutBtns.forEach((el) => {
+        el.classList.toggle("hidden", !isLogin);
+      });
+
+      // modal：訪客（我要認養/分享） vs 管理員（編輯/已送養/刪除）
+      if (guestActionBar) {
+        // class 保險，順便用 display 強制
+        guestActionBar.classList.toggle("hidden", isLogin);
+        guestActionBar.style.removeProperty("display"); // 保險：清掉舊的 inline display
+      }
+
+      if (adminActionBar) {
+        adminActionBar.classList.toggle("hidden", !isLogin);
+        adminActionBar.style.removeProperty("display"); // 保險
+      }
+
+      // 登出：強制收掉編輯狀態，且不要再 setEditMode（避免把 actionBar 又打開）
+      if (!isLogin) {
+        document.getElementById("editArea")?.classList.add("hidden");
+        document.getElementById("editActionBar")?.classList.add("hidden");
+        document.getElementById("adoptedUpload")?.classList.add("hidden");
+        return;
+      }
+
+      // 只有登入時，才同步一次目前是否在 edit mode
+      const inEdit = !document.getElementById("editArea")?.classList.contains("hidden");
+      if (typeof window.setEditMode === "function") window.setEditMode(inEdit); // ← 加這行
+    });
+
+    // 桌機 + 手機「登出」按鈕
+    logoutBtns.forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          await signOut(auth);
+
+          // 如果手機選單有開，把它關掉
+          const overlay = document.getElementById("menuOverlay");
+          if (overlay) overlay.classList.add("hidden");
+        } catch (err) {
+          console.error("登出失敗", err);
+          alert("登出失敗，請稍後再試。");
+        }
+      });
+    });
+
+    const SPECIES = "狗";
+    const pets = (window.pets ||= []);
+    let currentPetId = null;
+    let filteredPets = [];   // 目前套完篩選後的列表
+    let currentPage = 1;     // 目前頁碼（從 1 開始）
+
+    // 手機：2 張/列 * 4 列；桌機：4 張/列 * 2 列 => 都是 8 張一頁
+    function getPageSize() {
+      return 8;
+    }
+
+    const $ = (q) => document.querySelector(q);
+    const $$ = (q) => document.querySelectorAll(q);
+
+    const BREED_DICT = {
+      "品種犬": ["博美", "貴賓", "梗犬", "吉娃娃", "臘腸犬", "馬爾濟斯", "柯基", "柴犬", "狐狸犬", "哈士奇", "高山犬", "黃金獵犬", "邊境牧羊犬"],
+      "米克斯": ["黑色", "白色", "黑白色", "黃色", "白黃色", "米色", "棕色", "黑棕色", "虎斑", "花花"]
+    };
+
+    function ageBucket(ageStr) {
+      if (!ageStr) return "";
+      const s = ageStr.toString();
+
+      // 若寫「X月」或數值 < 1，皆歸「1以下」
+      const numMatch = s.match(/(\d+(?:\.\d+)?)/);
+      const years = numMatch ? parseFloat(numMatch[1]) : null;
+
+      if (s.includes("月") || (years !== null && years < 1)) return "1以下";
+
+      if (years !== null) {
+        if (years <= 5) return "1-5";   // 1~5 歲
+        if (years <= 10) return "6-10"; // 6~10 歲
+        return "10以上";
+      }
+
+      // 文字關鍵字後援
+      if (s.includes("幼")) return "1以下";
+      if (s.includes("成")) return "1-5";
+      if (s.includes("熟")) return "6-10";
+      return "";
+    }
+
+    function makePetUrl(id) {
+      return `${location.origin}${location.pathname}?pet=${encodeURIComponent(id)}`;
+    }
+
+    function openFromDeepLink() {
+      const q = new URLSearchParams(location.search);
+      const id = q.get('pet');
+      if (!id || !Array.isArray(pets)) return;
+      const hit = pets.find(p => p.id === id);
+      if (hit) openDialog(hit.id);
+    }
+
+    function render(list) {
+      filteredPets = list || [];
+
+      const grid = $('#grid');
+      const empty = $('#emptyState');
+      const pager = $('#pagination');
+      const pageInfo = $('#pageInfo');
+      const prevBtn = $('#prevPage');
+      const nextBtn = $('#nextPage');
+
+      grid.innerHTML = '';
+
+      if (!filteredPets.length) {
+        empty.classList.remove('hidden');
+        if (pager) pager.classList.add('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+
+      const pageSize = getPageSize();
+      const pageCount = Math.ceil(filteredPets.length / pageSize) || 1;
+
+      if (currentPage > pageCount) currentPage = pageCount;
+      if (currentPage < 1) currentPage = 1;
+
+      const start = (currentPage - 1) * pageSize;
+      const pageItems = filteredPets.slice(start, start + pageSize);
+
+      pageItems.forEach(p => {
+        const card = document.createElement('article');
+        card.className = 'group rounded-2xl overflow-hidden ring-1 ring-gray-200 bg-white hover:shadow-soft transition-shadow';
+
+        // 取封面圖（先用 p.images[0]，沒有的話退回 p.image）
+        const imgs = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
+        const img = imgs[0] || '';
+
+        card.innerHTML = `
+          <div class="blur-fit rounded-t-2xl aspect-[4/3]" style="--bg: url('${img}')">
+            <img src="${img}" alt="${p.name}">
+          </div>
+          <div class="p-4 flex-1 flex flex-col">
+            <!-- 第一行：左邊名字、右上角圓角標籤 -->
+            <div class="flex items-start justify-between gap-2">
+              <h3 class="font-semibold text-lg leading-snug line-clamp-1">${p.name}</h3>
+              <span class="shrink-0 rounded-full text-xs px-2 py-1
+                ${/(狗|犬)/.test(String(p.species || '')) ? 'bg-sky-50 text-sky-700' : 'bg-emerald-50 text-emerald-700'}">
+                ${/(狗|犬)/.test(String(p.species || '')) ? '狗狗' : '貓咪'}
+              </span>
+            </div>
+
+            <!-- 明細三行 -->
+            <div class="mt-2 mb-3 flex flex-col gap-2 text-xs">
+              <span class="self-start inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-2.5 py-1 whitespace-nowrap max-w-full truncate">
+                ${p.breed}
+              </span>
+              <span class="self-start inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-2.5 py-1 whitespace-nowrap max-w-full truncate">
+                ${p.age}
+              </span>
+              <span class="self-start inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-2.5 py-1 whitespace-nowrap max-w-full truncate">
+                ${p.gender}
+              </span>
+            </div>
+
+            <!-- 按鈕貼底 -->
+            <button class="mt-auto w-full px-3 py-2 rounded-xl bg-gray-900 text-white hover:bg-black btn-detail"
+                    data-id="${p.id}">
+              查看
+            </button>
+          </div>
+        `;
+
+        grid.appendChild(card);
+      });
+
+      // 更新分頁 UI
+      if (pager) {
+        if (pageCount > 1) {
+          pager.classList.remove('hidden');
+          if (pageInfo) pageInfo.textContent = `第 ${currentPage} / ${pageCount} 頁`;
+          if (prevBtn) prevBtn.disabled = currentPage === 1;
+          if (nextBtn) nextBtn.disabled = currentPage === pageCount;
+        } else {
+          pager.classList.add('hidden');
+        }
+      }
+
+      // 綁定「查看」按鈕
+      $$('.btn-detail').forEach(btn =>
+        btn.addEventListener('click', (e) => openDialog(e.currentTarget.dataset.id))
+      );
+    }
+
+    function buildBreedOptionsByType() {
+      const breedSel = document.getElementById('fBreed');
+      const type = document.getElementById('fBreedType').value; // "", "品種犬", "米克斯"
+
+      if (!type) {
+        // 未選：右側停用、顯示提示
+        breedSel.disabled = true;
+        breedSel.innerHTML = '<option value="">請先選擇「品種」</option>';
+        return;
+      }
+
+      // 已選：右側啟用；依左邊類型決定文案與清單
+      const label = (type === '米克斯') ? '不限毛色' : '不限品種';
+      const options = (BREED_DICT[type] || []);
+
+      breedSel.disabled = false;
+      breedSel.innerHTML =
+        `<option value="">${label}</option>` +
+        options.map(b => `<option value="${b}">${b}</option>`).join('');
+    }
+
+    function getFilters() {
+      return {
+        breedType: $('#fBreedType').value,
+        breed: $('#fBreed').value,
+        age: $('#fAge').value,
+        gender: $('#fGender').value
+      };
+    }
+
+    function applyFilters() {
+      const f = getFilters();
+      const list = pets.filter(p => {
+        if (f.breedType && p.breedType !== f.breedType) return false;
+        if (f.breed && p.breed !== f.breed) return false;
+
+        if (f.age) {
+          const bucket = ageBucket(p.age);
+          if (bucket !== f.age) return false;
+        }
+
+        if (f.gender && p.gender !== f.gender) return false;
+
+        return true;
+      });
+
+      filteredPets = list;
+      currentPage = 1;
+      render(filteredPets);
+    }
+
+    async function loadPets() {
+      const qRef = query(collection(db, "pets"), where("status", "==", "available"), orderBy("createdAt", "desc"));
+      const snap = await getDocs(qRef);
+      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      pets.length = 0;
+      pets.push(...all.filter(p => p.species === SPECIES));
+      filteredPets = pets.slice();  // 目前顯示全部
+      currentPage = 1;
+      buildBreedOptionsByType();
+      render(filteredPets);
+      openFromDeepLink();
+
+      // 即時篩選：任一選單變更就篩
+      $('#fBreedType').addEventListener('change', () => {
+        buildBreedOptionsByType(); // 先重建子選項
+        $('#fBreed').value = '';   // 切換類型時清空子選擇
+        applyFilters();
+      });
+
+      $('#fBreed').addEventListener('change', applyFilters);
+      $('#fAge').addEventListener('change', applyFilters);
+      $('#fGender').addEventListener('change', applyFilters);
+    }
+
+    $('#dlgShare').addEventListener('click', () => {
+      const petId = window.currentPetId;   // ✅ 用全域
+      if (!petId) return;
+      const name = document.getElementById('dlgName').textContent.trim();
+      const url = makePetUrl(petId);
+      const msg = `一起幫『 ${name} 』找到家！\n${url}`;
+
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+      const shareUrl = isMobile
+        ? `https://line.me/R/share?text=${encodeURIComponent(msg)}`
+        : `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}&text=${encodeURIComponent(`一起幫 ${name} 找到家！`)}`;
+
+      window.open(shareUrl, '_blank', 'noopener,noreferrer');
+    });
+
+    document.getElementById('dlgAdopt').onclick = () => {
+      const dlg = document.getElementById('petDialog');   // 目標 dialog
+      const name = document.getElementById('dlgName').textContent.trim();
+      const petId = (window.currentPetId || (typeof p !== 'undefined' && p.id) || '');
+      const goto = `adopt.html?pet=${encodeURIComponent(petId)}&name=${encodeURIComponent(name)}`;
+
+      // ① 先顯示「認養條件與流程」(確認/取消)
+      const precheckHTML = `
+      <div style="text-align:left;max-height:55vh;overflow:auto;padding:4px 2px;">
+        <div style="font-weight:800;margin-bottom:24px;text-align:center;font-size:24px;">認養條件與流程</div>
+        <ol style="line-height:1.7;padding-left:1.25rem;margin:0; list-style: decimal;">
+          <li>需年滿 20 歲，有穩定收入。</li>
+          <li>需先了解認養人住家環境、是否有原養寵物。</li>
+          <li>確認符合條件，小編篩選後，預約園區參訪。</li>
+          <li>確認領養需準備身份證影印本及印章，並簽署認養同意書。</li>
+          <li>需負擔結紮等相關費用。</li>
+          <li>認養人需長期主動更新毛孩近況，並接受不定期居家訪視。</li>
+        </ol>
+      </div>
+    `;
+
+      Swal.fire({
+        target: dlg,
+        backdrop: false,
+        html: precheckHTML,
+        showCancelButton: true,
+        confirmButtonText: '我符合，繼續',
+        cancelButtonText: '取消',
+      }).then(r => {
+        if (!r.isConfirmed) return;
+
+        Swal.fire({
+          target: dlg,          // 關鍵：把彈窗掛在 dialog 內
+          backdrop: false,      // 避免雙遮罩（dialog 已有 backdrop）
+          html: `
+          <div style="display:flex;flex-direction:column;align-items:center;gap:12px;padding:8px 0">
+            <div style="font-size:48px;line-height:1">💡</div>
+            <div style="text-align:center;color:#374151">
+              填寫完表單後，按下<br>
+              <strong>「📋 複製表單並聯絡小編」</strong><br><br>
+              系統會自動複製填寫訊息<br>並開啟 Messenger貼上
+            </div>
+          </div>
+        `,
+          confirmButtonText: '繼續',
+          showCloseButton: true,
+          buttonsStyling: false,
+          customClass: { popup: 'rounded-2xl', confirmButton: 'swal2-confirm-btn' }
+        }).then(r2 => {
+          if (r2.isConfirmed) window.location.href = goto;
+        });
+      });
+    };
+
+    // 分頁按鈕事件
+    $('#prevPage').addEventListener('click', () => {
+      if (currentPage <= 1) return;
+      currentPage -= 1;
+      render(filteredPets);
+      // 捲到頁面頂端
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    });
+
+    $('#nextPage').addEventListener('click', () => {
+      const totalPages = Math.ceil((filteredPets.length || 0) / getPageSize()) || 1;
+      if (currentPage >= totalPages) return;
+      currentPage += 1;
+      render(filteredPets);
+      // 捲到頁面頂端
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    });
+
+    // 螢幕尺寸改變時重新計算當前頁（目前 8 張固定，其實只是保險）
+    window.addEventListener('resize', () => {
+      const totalPages = Math.ceil((filteredPets.length || 0) / getPageSize()) || 1;
+      if (currentPage > totalPages) currentPage = totalPages;
+      render(filteredPets);
+    });
+
+    window.loadPets = loadPets;
+    loadPets();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="assets/Modal.js"></script>
+  <script src="assets/Lightbox.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js");
+      });
+    }
+  </script>
 </body>
+
 </html>
