@@ -112,16 +112,12 @@ async function openDialog(id) {
     try {
       const snap = await getDoc(doc(db, "pets", id));
       if (!snap.exists()) {
-        if (typeof swalInDialog === "function") {
-          await swalInDialog({ icon: "error", title: "找不到這筆資料" });
-        }
+        await swalInDialog({ icon: "error", title: "找不到這筆資料" });
         return;
       }
       p = { id: snap.id, ...snap.data() };
     } catch (e) {
-      if (typeof swalInDialog === "function") {
-        await swalInDialog({ icon: "error", title: "讀取資料失敗", text: String(e) });
-      }
+      await swalInDialog({ icon: "error", title: "讀取資料失敗", text: String(e) });
       return;
     }
   }
@@ -366,7 +362,7 @@ async function saveEdit() {
   if (newName && newName !== "未取名") {
     const taken = await isNameTaken(newName, currentDocId);
     if (taken) {
-      const { isConfirmed } = await (typeof swalInDialog === "function" ? swalInDialog : Swal.fire)({
+      const { isConfirmed } = await swalInDialog({
         icon: "warning",
         title: `「${newName}」已存在`,
         text: "確定繼續儲存？",
@@ -440,7 +436,7 @@ async function saveEdit() {
     stopDots();
     btn.disabled = false;
     txt.textContent = "儲存";
-    await Swal.fire({ icon: "error", title: "更新失敗", text: err.message });
+    await swalInDialog({ icon: "error", title: "更新失敗", text: err.message });
   }
 }
 
