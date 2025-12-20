@@ -4,6 +4,8 @@
 <head>
   <meta charset="utf-8" />
 
+  <script src="assets/admin-allowlist.js"></script>
+
   <!-- GA4 -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-YBC0MQBC2F"></script>
   <script>
@@ -625,12 +627,22 @@
     const logoutBtns = document.querySelectorAll(".nav-logout-btn");
 
     // ✅ 只有登入者才能進這頁
-    onAuthStateChanged(auth, (user) => {
-      const isLogin = !!user;
-      window.__isLogin = isLogin;  // ← 加這行
+    onAuthStateChanged(auth, async (user) => {
+      const email = (user && user.email ? String(user.email) : "").toLowerCase();
+      const allowed = !!user && (typeof window.isAdminAllowed === "function" ? window.isAdminAllowed(email) : false);
 
-      // 沒登入就踢回首頁
-      // if (!isLogin) { window.location.replace("index.html"); return; }
+      // 白名單不通過：立刻登出（避免「看起來登入了」但其實沒權限）
+      if (user && !allowed) {
+        try { sessionStorage.removeItem("__pendingGoogleLogin"); } catch (_) { }
+        try { await signOut(auth); } catch (_) { }
+        return;
+      }
+
+      const isLogin = allowed;
+      window.__isLogin = isLogin;
+
+      //沒登入就踢回首頁
+      if (!isLogin) { window.location.replace("index.html"); return; }
 
       // 登出按鈕：有登入才顯示
       logoutBtns.forEach(btn => btn.classList.toggle("hidden", !isLogin));
