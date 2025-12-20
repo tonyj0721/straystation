@@ -334,9 +334,9 @@
       try { await signInWithRedirect(auth, provider); } catch (_) { }
     }
 
-    // 狗掌：單點回 index.html；長按 >= 650ms 觸發登入（不用放開）
+    // 狗掌：單點回 index.html；長按 >= 2000ms 觸發登入（不用放開）
     if (LoginBtn) {
-      const LONG_PRESS_MS = 650;
+      const LONG_PRESS_MS = 2000;
       let pressTimer = null;
       let suppressNextClick = false;
 
