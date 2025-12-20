@@ -255,7 +255,7 @@
         </p>
         <form id="petForm" class="space-y-4">
           <div>
-            <label class="block text-sm font-medium mb-1">名字 </label>
+            <label id="namelabel" class="block text-sm font-medium mb-1">名字 </label>
             <input id="name" class="w-full rounded-xl border border-gray-300 p-2" placeholder="留空將以「未取名」代替" />
           </div>
           <div>
@@ -854,7 +854,7 @@
               // 名字重複且使用者取消：也捲到頁面最上方（回到表單區，方便修改）
               window.scrollTo({ top: 0, behavior: "smooth" });
               // 小延遲後聚焦名字欄位，避免被 scroll 動畫吃掉焦點
-              setTimeout(() => document.getElementById("name")?.focus(), 250);
+              setTimeout(() => document.getElementById("namelabel")?.focus(), 250);
               return;
             }
           }
