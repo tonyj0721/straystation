@@ -867,7 +867,7 @@
 
         // ★ 登錄完成 → 捲到最上方
         window.scrollTo({ top: 0, behavior: "smooth" });
-        
+        setTimeout(forceScrollTop, 250);
 
         // 成功提示後直接打開詳情
         Swal.fire({
