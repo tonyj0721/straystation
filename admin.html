@@ -887,7 +887,6 @@
           returnFocus: false, // 避免 Swal 關閉時把焦點/畫面拉回原位置
         }).then(() => {
           // 保險：Swal 關閉或 openDialog 前再捲一次
-          scrollTop();
           openDialog(docRef.id);
         });
 
