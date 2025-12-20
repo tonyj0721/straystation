@@ -875,10 +875,9 @@
           title: "已成功登錄！",
           showConfirmButton: false,
           timer: 1500,
-        }).then(() => {
-          window.scrollTo({ top: 0, behavior: "smooth" });
-          openDialog(docRef.id);
-        });
+        })
+
+        openDialog(docRef.id);
 
         // 重置表單與選擇圖片
         e.target.reset();
