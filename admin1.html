@@ -1,0 +1,1255 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+
+<head>
+  <meta charset="utf-8" />
+
+  <!-- GA4 -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-YBC0MQBC2F"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+
+    // 若在本機開發，開啟 DebugView；正式站不會開
+    gtag('config', 'G-YBC0MQBC2F', { debug_mode: location.hostname.includes('localhost') });
+  </script>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="images/dogpaw-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="images/dogpaw-180.png">
+  <title>管理後台｜台中簡媽媽狗園</title>
+  <meta name="description" content="TailwindCSS + Firebase Firestore 後台：登錄、管理動物資料；沿用前台 Modal/Lightbox。" />
+  <meta name="theme-color" content="#fcd34d">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="stylesheet" href="assets/tailwind.css">
+  <link rel="stylesheet" href="assets/shared.css">
+  <style>
+    .pager {
+      display: inline-flex;
+      align-items: center;
+      overflow: hidden;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, .05)
+    }
+
+    .pager-btn {
+      min-width: 38px;
+      height: 38px;
+      padding: 0 12px;
+      border: 0;
+      background: transparent;
+      color: #6b7280;
+      font-size: 14px;
+      cursor: pointer
+    }
+
+    .pager-btn+.pager-btn {
+      border-left: 1px solid #e5e7eb
+    }
+
+    .pager-btn:hover {
+      background: #f9fafb
+    }
+
+    .pager-btn.active {
+      color: #ef4444;
+      font-weight: 700;
+      background: #fff5f5
+    }
+
+    .pager-btn:disabled {
+      color: #d1d5db;
+      cursor: not-allowed;
+      background: transparent
+    }
+  </style>
+</head>
+
+<body class="text-gray-800 bg-gradient-to-br from-brand-50 to-white">
+  <!-- Navbar -->
+  <header class="bg-white/80 backdrop-blur border-b border-gray-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="h-16 flex items-center justify-between">
+        <a href="index.html" class="flex items-center gap-2 font-semibold text-2xl">
+          <span>管理後台</span>
+        </a>
+
+        <!-- 桌機導覽 -->
+        <nav class="hidden md:flex items-center gap-6 ml-auto">
+          <a href="index.html" class="hover:text-brand-600">首 頁</a>
+          <a href="cats.html" class="hover:text-brand-600">我想養貓咪</a>
+          <a href="dogs.html" class="hover:text-brand-600">我想養狗狗</a>
+          <a href="about.html" class="hover:text-brand-600">關於簡媽媽</a>
+          <a href="home.html" class="hover:text-brand-600">幸福的歸宿</a>
+          <button type="button" id="btnLogoutDesktop" class="text-red-500 hover:text-brand-600 nav-logout-btn hidden">
+            登 出
+          </button>
+        </nav>
+
+        <!-- 手機漢堡鈕 -->
+        <div class="flex items-center gap-2">
+          <button id="menuBtn"
+            class="md:hidden p-2 rounded-lg border border-[#AEDDEF] bg-white/80 hover:bg-[#AEDDEF]/10" aria-label="開啟選單"
+            aria-haspopup="menu" aria-expanded="false" aria-controls="menuOverlay">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+  <!-- 透明覆蓋層：專門接「點外面關閉」 -->
+  <div id="menuOverlay" class="fixed inset-0 z-50 hidden" role="dialog" aria-modal="true">
+    <div id="overlayClickArea" class="absolute inset-0"></div>
+
+    <!-- 右上角彈出選單：固定位置，不推版，覆蓋 hero -->
+    <nav id="menuPanel" class="fixed opacity-0 scale-y-0 origin-top-right rounded-2xl shadow-xl
+            bg-[#AEDDEF] w-fit max-w-[90vw] p-3 transition duration-150 ease-out">
+      <!-- 小箭頭（同面板色） -->
+      <div class="absolute -top-2 right-5 w-3 h-3 rotate-45 bg-[#AEDDEF]"></div>
+
+      <!-- 按鈕群：保留 space-y-2、字體 18px -->
+      <ul class="space-y-2 py-1 text-[18px]" role="menu" aria-orientation="vertical" tabindex="-1">
+        <li>
+          <a href="index.html" role="menuitem" tabindex="-1" class="flex w-full items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+            text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+            focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-white/70
+            ">
+            <span aria-hidden="true" class="text-xl w-8 text-center leading-none shrink-0">🧭</span>
+            <span class="flex-1 text-center">首&emsp;&emsp;頁</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="cats.html" role="menuitem" tabindex="-1" class="flex w-full items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+            text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+            focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-white/70
+            ">
+            <span aria-hidden="true" class="text-xl w-8 text-center leading-none shrink-0">🐱</span>
+            <span class="flex-1 text-center">我想養貓咪</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="dogs.html" role="menuitem" tabindex="-1" class="flex w-full items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+            text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+            focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-white/70
+            ">
+            <span aria-hidden="true" class="text-xl w-8 text-center leading-none shrink-0">🐶</span>
+            <span class="flex-1 text-center">我想養狗狗</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="about.html" role="menuitem" tabindex="-1" class="flex w-full items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+            text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+            focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-white/70
+            ">
+            <span aria-hidden="true" class="text-xl w-8 text-center leading-none shrink-0">ℹ️</span>
+            <span class="flex-1 text-center">關於簡媽媽</span>
+          </a>
+        </li>
+
+        <li>
+          <a href="home.html" role="menuitem" tabindex="-1" class="flex w-full items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+            text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+            focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-white/70
+            ">
+            <span aria-hidden="true" class="text-xl w-8 text-center leading-none shrink-0">🏠</span>
+            <span class="flex-1 text-center">幸福的歸宿</span>
+          </a>
+        </li>
+
+        <li>
+          <button type="button" role="menuitem" tabindex="-1" class="flex w-full items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+            text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
+            focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-white/70
+            nav-logout-btn hidden" id="btnLogoutMobile">
+            <span aria-hidden="true" class="text-xl w-8 text-center leading-none shrink-0">🚪</span>
+            <span class="flex-1 text-center">登&emsp;&emsp;出</span>
+          </button>
+        </li>
+      </ul>
+    </nav>
+  </div>
+  <script>
+    const menuBtn = document.getElementById('menuBtn');
+    const overlay = document.getElementById('menuOverlay');
+    const clickArea = document.getElementById('overlayClickArea');
+    const panel = document.getElementById('menuPanel');
+
+    function positionPanel() {
+      const r = menuBtn.getBoundingClientRect();
+      const gap = 8;
+      panel.style.top = '-1000px';
+      panel.style.left = '-1000px';
+      const w = panel.offsetWidth;
+      let left = r.right - w;
+      left = Math.max(8, Math.min(left, window.innerWidth - w - 8));
+      panel.style.top = (r.bottom + gap) + 'px';
+      panel.style.left = left + 'px';
+    }
+    function openMenu() {
+      overlay.classList.remove('hidden');
+      positionPanel();
+      requestAnimationFrame(() => {
+        panel.classList.remove('opacity-0', 'scale-y-0');
+        panel.classList.add('scale-y-100');
+      });
+      document.addEventListener('keydown', onEsc);
+      menuBtn.setAttribute('aria-expanded', 'true');
+      const firstItem = panel.querySelector('[role="menuitem"]');
+      if (firstItem) firstItem.focus();
+    }
+    function closeMenu() {
+      panel.classList.add('opacity-0');
+      panel.classList.remove('scale-y-100');
+      panel.classList.add('scale-y-0');
+      menuBtn.setAttribute('aria-expanded', 'false');
+      document.removeEventListener('keydown', onEsc);
+      setTimeout(() => overlay.classList.add('hidden'), 150);
+      menuBtn.focus();
+    }
+    function onEsc(e) { if (e.key === 'Escape') closeMenu(); }
+
+    menuBtn.addEventListener('click', () => {
+      const expanded = menuBtn.getAttribute('aria-expanded') === 'true';
+      expanded ? closeMenu() : openMenu();
+    });
+    clickArea.addEventListener('click', (e) => {
+      if (!panel.contains(e.target) && e.target !== menuBtn) closeMenu();
+    });
+    panel.addEventListener('keydown', (e) => {
+      const items = Array.from(panel.querySelectorAll('[role="menuitem"]'));
+      const i = items.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown') { e.preventDefault(); items[(i + 1 + items.length) % items.length].focus(); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
+      if (e.key === 'Home') { e.preventDefault(); items[0].focus(); }
+      if (e.key === 'End') { e.preventDefault(); items[items.length - 1].focus(); }
+    });
+    window.addEventListener('resize', () => {
+      if (!overlay.classList.contains('hidden')) positionPanel();
+    });
+    // 點任何選單項目後就關閉（避免停留）
+    panel.querySelectorAll('[role="menuitem"]').forEach(el => {
+      el.addEventListener('click', () => { try { closeMenu(); } catch (_) { } });
+    });
+  </script>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <h1 class="text-xl sm:text-2xl font-bold mb-4">新增／管理動物資料</h1>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- 左：登錄表單 -->
+      <section class="lg:col-span-1 bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
+        <h2 class="text-lg font-semibold">登錄表單</h2>
+        <p class="text-sm text-gray-500 mb-4">
+          ＊建議先登入並在 Firestore 規則限制寫入權限。
+        </p>
+        <form id="petForm" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">名字 </label>
+            <input id="name" class="w-full rounded-xl border border-gray-300 p-2" placeholder="留空將以「未取名」代替" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">類別 </label>
+            <div class="flex gap-3">
+              <label class="inline-flex items-center gap-2"><input type="radio" name="species" value="貓"
+                  class="accent-brand-600" checked /><span>貓</span></label>
+              <label class="inline-flex items-center gap-2"><input type="radio" name="species" value="狗"
+                  class="accent-brand-600" /><span>狗</span></label>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium mb-1">品種</label>
+              <select id="breedType" class="w-full rounded-xl border border-gray-300 bg-white p-2 text-sm">
+                <option value="">請選擇</option>
+              </select>
+            </div>
+            <div>
+              <label id="breedLabel" class="block text-sm font-medium mb-1">品種/毛色</label>
+              <select id="breed" class="w-full rounded-xl border border-gray-300 bg-white p-2 text-sm" disabled>
+                <option value="">請先選擇品種</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium mb-1">年齡</label>
+              <input id="age" class="w-full rounded-xl border border-gray-300 p-2" placeholder="例：2 歲 或 8 個月" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1">性別</label>
+              <select id="gender" class="w-full rounded-xl border border-gray-300 p-2">
+                <option value="">未設定</option>
+                <option value="男生">男生</option>
+                <option value="女生">女生</option>
+              </select>
+            </div>
+          </div>
+          <!-- 健康 -->
+          <div>
+            <label class="block text-sm font-medium mb-1">健康</label>
+            <div class="flex items-center gap-6">
+              <label class="inline-flex items-center gap-2">
+                <input id="neutered" type="checkbox" class="h-4 w-4">
+                <span>結紮</span>
+              </label>
+              <label class="inline-flex items-center gap-2">
+                <input id="vaccinated" type="checkbox" class="h-4 w-4">
+                <span>預防針</span>
+              </label>
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">簡介</label>
+            <textarea id="desc" rows="4" class="w-full rounded-xl border border-gray-300 p-2"
+              placeholder="個性、習慣、背景故事、注意事項…"></textarea>
+          </div>
+          <div>
+            <input id="imgFiles" type="file" accept="image/*" multiple class="sr-only" />
+            <div class="flex items-center gap-3">
+              <button id="btnPick" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
+                新增照片
+              </button>
+              <span id="fileCount" class="text-xs text-gray-500">已選 0 / 5 張</span>
+              <span class="text-sm text-gray-400">最多 5 張</span>
+            </div>
+            <div id="imgPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
+          </div>
+          <div class="flex gap-3 pt-2">
+            <button id="submitBtn" type="submit"
+              class="px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-gray-800 flex items-center gap-2">
+              <span id="submitText">登錄</span>
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- 右：資料表 -->
+      <section id="listSection" class="lg:col-span-2 space-y-6">
+        <div class="bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <h2 class="text-lg font-semibold">資料表</h2>
+            <div class="relative w-full sm:w-72">
+              <input id="searchName" class="w-full rounded-xl border border-gray-300 p-2 pl-9 text-base"
+                placeholder="搜尋名字…" />
+              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔎</span>
+            </div>
+          </div>
+          <div class="hidden md:block overflow-x-auto mt-4">
+            <table class="min-w-[640px] w-full text-sm">
+              <thead>
+                <tr class="text-left text-gray-500">
+                  <th class="py-2">名字</th>
+                  <th class="py-2">類別</th>
+                  <th class="py-2">品種</th>
+                  <th class="py-2">性別</th>
+                </tr>
+              </thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+          <div class="md:hidden mt-4 grid gap-3" id="rowsMobile"></div>
+          <div id="pagerWrap" class="mt-6 flex flex-col items-center gap-2">
+            <div id="pageInfo" class="text-xs text-gray-500"></div>
+            <div id="pager" class="pager"></div>
+          </div>
+
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-gray-50 border-t border-gray-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-sm text-gray-500">© <span id="year"></span>
+      <img src="images/浪浪轉運站 Logo.png" alt="浪浪轉運站 Logo"
+        style="display:inline-flex;width:1em;height:1em;vertical-align:-0.15em;margin:0.01em -0.25em 0.01em 0.25em;">
+      浪浪轉運站 Stray Station. 保留所有權利。
+    </div>
+  </footer>
+
+  <!-- Pet Detail Modal -->
+  <dialog id="petDialog" class="w-full max-w-2xl max-h-[90vh] rounded-2xl p-0 overflow-y-auto">
+    <div class="bg-white">
+      <!-- 新增：與下方縮圖 p-3 對齊 -->
+      <div class="px-3 pt-2">
+        <p class="text-center text-xs text-gray-500 mb-1">點主圖可放大</p>
+        <div class="relative aspect-video bg-gray-100 overflow-hidden rounded-lg">
+          <!-- 只模糊這張背景圖 -->
+          <img id="dlgBg" aria-hidden="true" class="absolute inset-0 w-full h-full object-cover blur-md scale-110">
+
+          <!-- 可選：柔化一下背景，沒有加任何 blur -->
+          <div class="absolute inset-0 bg-white/20"></div>
+
+          <!-- 主圖在最上層，沒有 blur -->
+          <img id="dlgImg" alt="毛孩照片"
+            class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg">
+
+          <button id="dlgClose" class="absolute top-1 right-1 z-20 bg-black/60 text-white p-2 rounded-full leading-none"
+            aria-label="關閉">✕</button>
+        </div>
+      </div>
+
+      <div id="dlgThumbs" class="flex gap-2 overflow-x-auto p-3"></div>
+      <div class="p-5 space-y-4">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <!-- 標題 -->
+            <h3 id="dlgName" class="text-2xl font-semibold leading-snug">—</h3>
+
+            <!-- 三個圓角標籤：不換行、可水平捲動 -->
+            <div id="dlgTags" class="mt-1 flex flex-nowrap gap-2 text-sm">
+              <span id="dlgTagBreed"
+                class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap"></span>
+              <span id="dlgTagAge"
+                class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap"></span>
+              <span id="dlgTagGender"
+                class="inline-flex items-center rounded-full ring-1 ring-gray-300 bg-orange-100 text-orange-700 px-3 py-1 whitespace-nowrap"></span>
+            </div>
+            <!-- 第二排：結紮 / 預防針（淡藍色圓角標籤） -->
+            <div id="dlgTagsHealth" class="mt-2 flex gap-2 text-sm">
+              <span id="dlgTagNeutered"
+                class="inline-flex items-center rounded-full ring-1 ring-sky-200 bg-sky-50 text-sky-700 px-3 py-1 whitespace-nowrap"></span>
+              <span id="dlgTagVaccinated"
+                class="inline-flex items-center rounded-full ring-1 ring-sky-200 bg-sky-50 text-sky-700 px-3 py-1 whitespace-nowrap"></span>
+            </div>
+          </div>
+        </div>
+        <div class="bg-orange-50 rounded-xl p-4 leading-7">
+          <p id="dlgDesc" class="text-gray-700 text-sm whitespace-pre-line break-words"></p>
+        </div>
+
+        <!-- 內嵌編輯區 -->
+        <div id="editArea" class="hidden space-y-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">名字 <span class="text-red-500">*</span></label>
+            <input id="editName" class="w-full rounded-xl border border-gray-300 p-2" />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-1">類別 <span class="text-red-500">*</span></label>
+            <div class="flex gap-3">
+              <label class="inline-flex items-center gap-2">
+                <input type="radio" name="editSpecies" value="貓" class="accent-brand-600" />
+                <span>貓</span>
+              </label>
+              <label class="inline-flex items-center gap-2">
+                <input type="radio" name="editSpecies" value="狗" class="accent-brand-600" />
+                <span>狗</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium mb-1">品種</label>
+              <select id="editBreedType" class="w-full rounded-xl border border-gray-300 p-2">
+                <option value="">請選擇</option>
+              </select>
+            </div>
+            <div>
+              <label id="editBreedLabel" class="block text-sm font-medium mb-1">品種/毛色</label>
+              <select id="editBreed" class="w-full rounded-xl border border-gray-300 p-2" disabled>
+                <option value="">請先選擇品種</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium mb-1">年齡</label>
+              <input id="editAge" class="w-full rounded-xl border border-gray-300 p-2" placeholder="例：2 歲 或 8 個月" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1">性別</label>
+              <select id="editGender" class="w-full rounded-xl border border-gray-300 p-2">
+                <option value="">未設定</option>
+                <option value="男生">男生</option>
+                <option value="女生">女生</option>
+              </select>
+            </div>
+          </div>
+          <!-- 健康（編輯用） -->
+          <div>
+            <label class="block text-sm font-medium mb-1">健康</label>
+            <div class="flex items-center gap-6">
+              <label class="inline-flex items-center gap-2">
+                <input id="editNeutered" type="checkbox" class="h-4 w-4">
+                <span>結紮</span>
+              </label>
+              <label class="inline-flex items-center gap-2">
+                <input id="editVaccinated" type="checkbox" class="h-4 w-4">
+                <span>預防針</span>
+              </label>
+            </div>
+          </div>
+
+
+          <div>
+            <label class="block text-sm font-medium mb-1">簡介</label>
+            <textarea id="editDesc" rows="4" class="w-full rounded-xl border border-gray-300 p-2"></textarea>
+          </div>
+
+          <div>
+            <input id="editFiles" type="file" accept="image/*" multiple class="sr-only" />
+            <div class="flex items-center gap-3">
+              <button id="btnPickEdit" type="button"
+                class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增照片</button>
+              <span id="editCount" class="text-xs text-gray-500"></span>
+              <span class="text-sm text-gray-400">最多 5 張</span>
+            </div>
+            <!-- 和新增模式一致：三欄縮圖 + 上方間距 -->
+            <div id="editPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
+          </div>
+        </div>
+
+        <!-- 動作列 -->
+        <div id="actionBar" class="pt-2 flex flex-col sm:flex-row gap-3 ">
+          <button id="btnEdit" class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm">
+            編輯
+          </button>
+          <button id="btnAdopted" class="w-full px-4 py-3 rounded-xl bg-emerald-600 text-white text-sm">
+            已送養
+          </button>
+          <button id="btnUnadopt"
+            class="w-full px-4 py-3 rounded-xl border border-amber-300 text-amber-700 text-sm hidden">
+            退養
+          </button>
+          <button id="btnDelete" class="w-full px-4 py-3 rounded-xl border border-red-300 text-red-600 text-sm">
+            刪除
+          </button>
+        </div>
+        <div id="editActionBar" class="hidden pt-2 grid grid-cols-2 gap-3">
+          <button id="btnSave"
+            class="w-full px-4 py-3 rounded-xl bg-gray-900 text-white text-sm flex items-center justify-center gap-2">
+            <span id="saveText">儲存</span>
+          </button>
+          <button id="btnCancel" type="button" class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm">
+            取消
+          </button>
+        </div>
+
+        <!-- 已領養合照上傳 -->
+        <div id="adoptedUpload" class="hidden">
+          <input id="adoptedFiles" type="file" accept="image/*" multiple class="sr-only" />
+          <div class="flex items-center gap-3 mb-2">
+            <button id="btnPickAdopted" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
+              選擇合照
+            </button>
+            <span id="adoptedCount" class="text-xs text-gray-500"></span>
+            <span class="text-sm text-gray-400">最多 5 張</span>
+          </div>
+          <div id="adoptedPreview" class="mt-1 grid grid-cols-3 gap-2"></div>
+          <button id="btnConfirmAdopted" class="mt-3 px-4 py-2 rounded-xl bg-gray-900 text-white text-sm">
+            儲存領養資訊
+          </button>
+          <button id="btnCancelAdopted" type="button"
+            class="px-3 py-2 rounded-lg bg-gray-200 text-gray-900 hover:bg-gray-300">
+            取消
+          </button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Lightbox -->
+  <div id="lightbox" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[9999]">
+    <div id="lbWrap" class="relative inline-block">
+      <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg" />
+      <button id="lbClose" class="absolute top-1 right-1 z-10 bg-black/60 hover:bg-black/70 text-white rounded-full p-2
+           text-2xl leading-none select-none" aria-label="關閉">✕</button>
+    </div>
+    <div id="lbThumbs"
+      class="absolute bottom-20 left-0 w-full flex justify-center px-4 py-2 pb-[env(safe-area-inset-bottom)]">
+      <div id="lbThumbsInner" class="flex gap-3"></div>
+    </div>
+    <button id="lbPrev" class="absolute text-white text-4xl select-none">❮</button>
+    <button id="lbNext" class="absolute text-white text-4xl select-none">❯</button>
+  </div>
+
+  <script src="./assets/firebase-config.js"></script>
+  <script type="module">
+    // 如果 withStableSearchRender 沒定義，就退成「直接渲染」
+    const renderStable = (typeof withStableSearchRender === 'function')
+      ? withStableSearchRender
+      : (fn) => fn();
+
+    // --- Set a fixed minimum height for the results area (no inner scrolling) ---
+    (function setResultsFloor() {
+      const rowsMobile = document.getElementById('rowsMobile');
+      const rows = document.getElementById('rows');
+      const host = rowsMobile ? rowsMobile.parentElement : (rows ? rows.closest('div') : null);
+      if (host) {
+        host.style.minHeight = '685px';
+      }
+    })();
+
+    // ===============================
+    // Firebase 設定與初始化
+    // ===============================
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+    import {
+      getFirestore, collection, getDocs, query, orderBy, where,
+      doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp, limit as fbLimit,
+    } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+    import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject, listAll, } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
+    import {
+      getAuth,
+      signOut,
+      onAuthStateChanged,
+    } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
+
+    const app = initializeApp(window.firebaseConfig);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+
+    // 讓 dialog（petDialog.fixed.js / shared.js）能在「非 module」腳本中使用 Firebase 與狀態
+    Object.assign(window, {
+      db, storage,
+      collection, getDocs, query, orderBy, where,
+      doc, getDoc, updateDoc, deleteDoc, serverTimestamp, fbLimit,
+      sRef, uploadBytes, getDownloadURL, deleteObject, listAll,
+    });
+
+    const auth = getAuth(app);
+    const logoutBtns = document.querySelectorAll(".nav-logout-btn");
+
+    // ✅ 只有登入者才能進這頁
+    onAuthStateChanged(auth, (user) => {
+      const isLogin = !!user;
+      window.__isLogin = isLogin;  // ← 加這行
+
+      // 沒登入就踢回首頁
+      // if (!isLogin) { window.location.replace("index.html"); return; }
+
+      // 登出按鈕：有登入才顯示
+      logoutBtns.forEach(btn => btn.classList.toggle("hidden", !isLogin));
+    });
+
+    // ✅ 桌機＋手機「登出」
+    logoutBtns.forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          await signOut(auth);
+          // 登出後也導回首頁
+          window.location.replace("index.html");
+        } catch (err) {
+          console.error("登出失敗", err);
+          alert("登出失敗，請稍後再試。");
+        }
+      });
+    });
+
+    // 全域狀態
+    const pets = (window.pets ||= []);            // 目前載入的動物列表（最多 15 筆）
+    window.pets = pets;
+    let currentPetId = null;  // 目前在 Dialog 中的動物 id（編輯/領養用）
+
+    // 小工具：選擇器
+    const $ = (q) => document.querySelector(q);
+
+    const speciesInputs = document.querySelectorAll('input[name="species"]');
+    const breedTypeSel = $("#breedType");
+    const breedSel = $("#breed");
+    const breedLabel = $("#breedLabel");
+
+    // 讀取目前勾選的物種
+    const getSpecies = () =>
+      Array.from(speciesInputs).find((i) => i.checked)?.value || "貓";
+
+    // 依「品種類型」調整右側標籤文字
+    const updateBreedLabel = () => {
+      const t = breedTypeSel.value;
+      breedLabel.textContent = !t ? "品種/毛色" : t === "米克斯" ? "毛色" : "品種";
+    };
+
+    // 重置右側下拉
+    const resetBreedRight = () => {
+      breedSel.disabled = true;
+      breedSel.innerHTML = '<option value="">請先選擇品種</option>';
+    };
+
+    // 左側「品種類型」與右側「品種/毛色」同步
+    function syncBreedSelectors() {
+      const isCat = getSpecies() === "貓";
+      breedTypeSel.innerHTML = isCat
+        ? '<option value="">請選擇</option><option value="品種貓">品種貓</option><option value="米克斯">米克斯</option>'
+        : '<option value="">請選擇</option><option value="品種犬">品種犬</option><option value="米克斯">米克斯</option>';
+      resetBreedRight();
+      updateBreedLabel();
+    }
+
+    // 依左側選擇，建立右側選項
+    function buildBreedOptions() {
+      const list = (BREEDS[getSpecies()] || {})[breedTypeSel.value] || [];
+      if (!breedTypeSel.value) {
+        resetBreedRight();
+        return;
+      }
+      breedSel.disabled = false;
+      breedSel.innerHTML = ['<option value="">請選擇</option>']
+        .concat(list.map((b) => `<option value="${b}">${b}</option>`))
+        .join("");
+    }
+
+    // 綁定事件
+    speciesInputs.forEach((i) => i.addEventListener("change", syncBreedSelectors));
+    breedTypeSel.addEventListener("change", () => {
+      buildBreedOptions();
+      updateBreedLabel();
+    });
+    syncBreedSelectors(); // 初始化一次
+
+    // ===============================
+    // 新增：圖片選取/預覽（最多 5 張）
+    // ===============================
+    const imgFiles = $("#imgFiles");
+    const btnPick = $("#btnPick");
+    const fileCount = $("#fileCount");
+    const imgPreview = $("#imgPreview");
+    let selectedFiles = []; // 暫存待上傳檔案
+
+    btnPick?.addEventListener("click", () => imgFiles.click());
+
+    // 渲染預覽格子 + 刪除按鈕
+    function renderPreviews() {
+      fileCount.textContent = `已選 ${selectedFiles.length} / 5 張`;
+
+      imgPreview.innerHTML = selectedFiles
+        .map((f, i) => {
+          const u = URL.createObjectURL(f);
+          return `
+        <div class="relative">
+          <img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽">
+          <button data-idx="${i}" class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button>
+        </div>
+      `;
+        })
+        .join("");
+
+      // 綁定刪除單張圖片
+      imgPreview.querySelectorAll("button[data-idx]").forEach((btn) =>
+        btn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const i = +btn.dataset.idx;
+          selectedFiles.splice(i, 1);
+          renderPreviews();
+        })
+      );
+    }
+
+    // 檔案挑選後：合併並截斷到 5 張
+    imgFiles?.addEventListener("change", () => {
+      const incoming = Array.from(imgFiles.files || []);
+      const next = selectedFiles.concat(incoming);
+      if (next.length > 5) {
+        Swal.fire({ icon: "warning", title: "最多 5 張照片" });
+      }
+      selectedFiles = next.slice(0, 5);
+      renderPreviews();
+      imgFiles.value = ""; // 清空 input，避免重複選取不到
+    });
+
+    // ===============================
+    // 表單送出：新增動物資料
+    // ===============================
+    $("#petForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      // 讀值
+      const name = ($("#name")?.value || "").trim() || "未取名";
+
+      const rawBreedType = breedTypeSel.value || "";
+      const rawBreed = breedSel.value || "";
+      let breed = "";
+      if (!rawBreedType) {
+        breed = "品種不詳";
+      } else if (rawBreedType === "米克斯") {
+        breed = rawBreed ? `米克斯/${rawBreed}` : "米克斯";
+      } else {
+        breed = rawBreed || "品種不詳";
+      }
+
+      const age = ($("#age")?.value || "").trim() || "年齡不詳";
+      const gender = $("#gender")?.value || "性別不詳";
+      const desc = ($("#desc")?.value || "").trim() || "無備註";
+
+      // 新增的基本 payload（圖片先空陣列，稍後補）
+      const payload = {
+        species: getSpecies(),
+        name,
+        nameLower: name.toLowerCase(),
+        breedType: rawBreedType,
+        breed,
+        age,
+        gender,
+        desc,
+        neutered: document.getElementById('neutered')?.checked || false,
+        vaccinated: document.getElementById('vaccinated')?.checked || false,
+        images: [],
+        status: "available",
+        showOnHome: false,
+        showOnCats: true,
+        showOnDogs: true,
+        showOnIndex: true,
+        createdAt: serverTimestamp(), // Firestore 伺服器時間
+      };
+
+      // 先檢查是否有同名（可選擇仍然新增）
+      if (name !== "未取名") {
+        try {
+          const dupQ = query(collection(db, "pets"), where("name", "==", name));
+          const dupSnap = await getDocs(dupQ);
+          if (!dupSnap.empty) {
+            const r = await Swal.fire({
+              icon: "question",
+              title: `名字「${name}」已存在`,
+              text: "確定繼續登錄？",
+              showCancelButton: true,
+              confirmButtonText: "確定",
+              cancelButtonText: "取消",
+            });
+            if (!r.isConfirmed) {
+              // 名字重複且使用者取消：也捲到頁面最上方（回到表單區，方便修改）
+              window.scrollTo({ top: 0, behavior: "smooth" });
+              // 小延遲後聚焦名字欄位，避免被 scroll 動畫吃掉焦點
+              setTimeout(() => document.getElementById("name")?.focus(), 250);
+              return;
+            }
+          }
+        } catch (err) {
+          console.error("重複檢查錯誤：", err);
+        }
+      }
+
+      // 按鈕進度狀態
+      const submitBtn = $("#submitBtn");
+      const submitText = $("#submitText");
+      submitBtn.disabled = true;
+      const stopDots = startDots(submitText, "登錄中");
+
+      try {
+        // 1) 新增基本文件
+        const docRef = await addDoc(collection(db, "pets"), payload);
+
+        // 2) 逐張上傳圖片，取得 Storage URL
+        const urls = [];
+        for (const f of selectedFiles) {
+          const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+          const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
+          const base = f.name.replace(/\.[^.]+$/, '');
+          const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
+          const r = sRef(storage, path);
+          await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
+          urls.push(await getDownloadURL(r));
+        }
+
+        // 3) 回寫 images 欄位
+        if (urls.length) {
+          await updateDoc(doc(db, "pets", docRef.id), { images: urls });
+        }
+
+        // UI 收尾
+        stopDots();
+        submitBtn.disabled = false;
+        submitText.textContent = "登錄";
+
+        // ★ 清空名字欄位 + 把「已被使用」提示/紅框移除
+        const nameInput = document.getElementById("name");
+        if (nameInput) nameInput.value = "";
+        if (window.resetNameCheck) resetNameCheck();
+
+        const scrollTop = () => {
+          const el = document.scrollingElement || document.documentElement;
+          el.scrollTo({ top: 0, behavior: "smooth" });
+        };
+
+        // ★ 登錄完成 → 先捲一次
+        scrollTop();
+
+        Swal.fire({
+          icon: "success",
+          title: "已成功登錄！",
+          showConfirmButton: false,
+          timer: 1500,
+          returnFocus: false, // 避免 Swal 關閉時把焦點/畫面拉回原位置
+        }).then(() => {
+          // 保險：Swal 關閉或 openDialog 前再捲一次
+          scrollTop();
+          openDialog(docRef.id);
+        });
+
+        // 重置表單與選擇圖片
+        e.target.reset();
+        imgPreview.innerHTML = "";
+        selectedFiles = [];
+        fileCount.textContent = "已選 0 / 5 張";
+        syncBreedSelectors();
+
+        // 重新載入列表
+        await loadPets();
+      } catch (err) {
+        stopDots();
+        submitBtn.disabled = false;
+        submitText.textContent = "登錄";
+        Swal.fire({ icon: "error", title: "登錄失敗", text: err.message });
+      }
+    });
+
+    // ===============================
+    // 列表載入 + 搜尋 + 渲染（桌機/手機）
+    // ===============================
+    async function loadPets() {
+      const q = query(collection(db, "pets"), orderBy("createdAt", "desc"));
+      const snap = await getDocs(q);
+      pets.length = 0;
+      pets.push(...snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      applyFilterAndRender();
+    }
+
+    const searchInput = $("#searchName");
+    searchInput.addEventListener("input", onSearchByName);
+
+    // ===== Pagination (1頁10筆) =====
+    const PAGE_SIZE = 10;
+    let currentPage = 1;
+    let viewList = [];
+
+    function setViewList(list, resetPage = true) {
+      viewList = Array.isArray(list) ? list : [];
+      if (resetPage) currentPage = 1;
+      renderCurrentPage();
+    }
+
+    function renderCurrentPage() {
+      const totalItems = viewList.length;
+      const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+
+      if (currentPage > totalPages) currentPage = totalPages;
+      if (currentPage < 1) currentPage = 1;
+
+      const start = (currentPage - 1) * PAGE_SIZE;
+      const pageList = viewList.slice(start, start + PAGE_SIZE);
+
+      renderStable(() => {
+        renderRows(pageList);
+        renderRowsMobile(pageList);
+      });
+
+      updatePager(totalItems, totalPages);
+    }
+
+    function updatePager(totalItems, totalPages) {
+      const wrap = document.getElementById("pagerWrap");
+      const info = document.getElementById("pageInfo");
+      const pager = document.getElementById("pager");
+      if (!wrap || !info || !pager) return;
+
+      if (totalItems === 0) {
+        wrap.classList.add("hidden");
+        return;
+      }
+      wrap.classList.remove("hidden");
+
+      info.textContent = `第 ${currentPage}/${totalPages} 頁（共 ${totalItems} 筆）`;
+
+      pager.innerHTML = "";
+      const makeBtn = (label, targetPage, disabled = false, active = false) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "pager-btn" + (active ? " active" : "");
+        b.textContent = label;
+        b.disabled = disabled;
+        if (!disabled) {
+          b.addEventListener("click", () => {
+            currentPage = targetPage;
+            renderCurrentPage();
+            document.getElementById("listSection")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+        }
+        return b;
+      };
+
+      pager.appendChild(makeBtn("«", 1, currentPage === 1));
+      pager.appendChild(makeBtn("‹", Math.max(1, currentPage - 1), currentPage === 1));
+
+      const maxNums = 5;
+      let start = Math.max(1, currentPage - Math.floor(maxNums / 2));
+      let end = Math.min(totalPages, start + maxNums - 1);
+      start = Math.max(1, end - maxNums + 1);
+
+      for (let p = start; p <= end; p++) {
+        pager.appendChild(makeBtn(String(p), p, false, p === currentPage));
+      }
+
+      pager.appendChild(makeBtn("›", Math.min(totalPages, currentPage + 1), currentPage === totalPages));
+      pager.appendChild(makeBtn("»", totalPages, currentPage === totalPages));
+    }
+
+    function applyFilterAndRender() {
+      const kw = searchInput.value.trim().toLowerCase();
+      const list = kw
+        ? pets.filter((p) => String(p.name || "").toLowerCase().includes(kw))
+        : pets;
+      setViewList(list, true);
+    }
+
+    // 後端依名字（前綴）查詢：有關鍵字→打 Firestore；空字串→回到預設清單
+    async function onSearchByName() {
+      const kwRaw = searchInput.value.trim();
+      const kw = kwRaw.toLowerCase();
+      if (!kw) {
+        applyFilterAndRender();
+        return;
+      }
+
+      try {
+        // Phase 1：前綴（加速）
+        let prefix = [];
+        try {
+          const qPrefix = query(
+            collection(db, "pets"),
+            orderBy("nameLower"),
+            where("nameLower", ">=", kw),
+            where("nameLower", "<=", kw + "\uf8ff"),
+            fbLimit(100)
+          );
+          const snapPrefix = await getDocs(qPrefix);
+          prefix = snapPrefix.docs.map(d => ({ id: d.id, ...d.data() }));
+        } catch (e) {
+          console.warn("prefix search skipped:", e);
+        }
+
+        // Phase 2：最近 N 筆做「任意位置包含」
+        let recentDocs = [];
+        try {
+          const snapRecent = await getDocs(query(
+            collection(db, "pets"),
+            orderBy("createdAt", "desc"),
+            fbLimit(1200)
+          ));
+          recentDocs = snapRecent.docs;
+        } catch (e) {
+          // 若沒有 createdAt 可排序，退回 nameLower 排序拿一批
+          const snapRecent = await getDocs(query(
+            collection(db, "pets"),
+            orderBy("nameLower"),
+            fbLimit(1200)
+          ));
+          recentDocs = snapRecent.docs;
+        }
+
+        const contains = recentDocs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(p => {
+            const nm = String(p.name || "");
+            const nmLower = String(p.nameLower || nm).toLowerCase();
+            return nmLower.includes(kw) || nm.includes(kwRaw);
+          });
+
+        // 合併 + 去重（新者優先）
+        const byId = new Map();
+        [...contains, ...prefix].forEach(p => byId.set(p.id, p));
+        const list = Array.from(byId.values()).sort((a, b) => {
+          const ta = (a.createdAt && a.createdAt.seconds) ? a.createdAt.seconds : 0;
+          const tb = (b.createdAt && b.createdAt.seconds) ? b.createdAt.seconds : 0;
+          return tb - ta;
+        });
+
+        setViewList(list, true);
+      } catch (err) {
+        console.error("search error", err);
+        // 後備：用目前記憶中的清單做包含搜尋
+        const list = pets.filter(p => String(p.name || "").toLowerCase().includes(kw));
+        setViewList(list, true);
+      }
+    }
+
+    // 桌機表格
+    function renderRows(list) {
+      const tb = document.getElementById("rows");
+      if (!tb) return;
+
+      tb.innerHTML = list
+        .map(
+          (p) => `
+      <tr class="border-t hover:bg-gray-50 cursor-pointer" data-id="${p.id}">
+        <td class="py-2 pr-2 font-medium">${p.name}</td>
+        <td class="py-2 pr-2">${p.species}</td>
+        <td class="py-2 pr-2">${p.breed}</td>
+        <td class="py-2 pr-2">${p.gender}</td>
+      </tr>`
+        )
+        .join("");
+
+      tb.querySelectorAll("tr").forEach((tr) =>
+        tr.addEventListener("click", () => {
+          const data = list.find((p) => p.id === tr.dataset.id);
+          if (data) openDialog(data.id);
+        })
+      );
+    }
+
+    // 手機卡片
+    function renderRowsMobile(list) {
+      const wrap = document.getElementById("rowsMobile");
+      if (!wrap) return;
+
+      wrap.innerHTML = list
+        .map((p) => {
+          const img = (Array.isArray(p.images) && p.images[0]) || p.image || "";
+          return `
+        <div class="rounded-xl ring-1 ring-gray-200 p-3 flex gap-3 items-center cursor-pointer"
+             data-id="${p.id}">
+          <img src="${img}" class="w-16 h-16 object-cover rounded-lg bg-gray-100">
+          <div class="min-w-0 flex-1">
+            <div class="font-semibold truncate">${p.name}</div>
+            <div class="text-xs text-gray-600 mt-1 truncate">
+              ${p.species}・${p.breed}・${p.gender}
+            </div>
+          </div>
+        </div>`;
+        })
+        .join("");
+
+      wrap.querySelectorAll("[data-id]").forEach((card) =>
+        card.addEventListener("click", () => {
+          const data = list.find((p) => p.id === card.dataset.id);
+          if (data) openDialog(data.id);
+        })
+      );
+    }
+
+    // === 名字輸入：即時重複檢查（建立時用） ===
+    (() => {
+      const input = document.getElementById("name");
+      if (!input) return;
+
+      // 建一個提示元素（顯示 檢查中 / 可用 / 已被使用）
+      let hint = document.getElementById("nameHint");
+      if (!hint) {
+        hint = document.createElement("div");
+        hint.id = "nameHint";
+        hint.setAttribute("aria-live", "polite");
+        // 直接用內聯樣式，避免 Tailwind purge
+        hint.style.minHeight = "20px";   // 預留 1 行高度
+        hint.style.lineHeight = "20px";  // 讓文字置中該行
+        hint.style.whiteSpace = "nowrap";
+        hint.style.marginTop = "4px";
+        hint.style.fontSize = "0.875rem"; // 約等於 text-sm
+        hint.style.color = "#6b7280";     // 約等於 text-gray-500
+        // 放在名字輸入框的正後方
+        document.getElementById("name").insertAdjacentElement("afterend", hint);
+      }
+
+      // 簡單防抖，避免每個字都打 API
+      const debounce = (fn, d = 350) => {
+        let t;
+        return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), d); };
+      };
+
+      // 避免回應亂序：只處理最後一次查詢
+      let lastVer = 0;
+      const setState = (status, text) => {
+        // 邊框：只有 bad 用紅框，其餘恢復原樣
+        if (!input.dataset._origClass) input.dataset._origClass = input.className;
+        if (status === "bad") {
+          input.className = `${input.dataset._origClass} border-red-500 focus:outline-none`;
+        } else {
+          input.className = input.dataset._origClass;
+        }
+
+        // 提示：只有 bad 顯示文字，其餘清空
+        hint.textContent = (status === "bad") ? (text || "") : "";
+
+        // 顏色：只有 bad 顯示紅色
+        hint.style.color = (status === "bad") ? "#dc2626" /* red-600 */ : "#6b7280" /* gray-500 */;
+      };
+
+      const runCheck = debounce(async () => {
+        const ver = ++lastVer;
+        const name = (input.value || "").trim();
+        if (!name) { setState("idle", ""); return; }
+
+        hint.textContent = "";
+
+        const kw = name.toLowerCase();
+
+        try {
+          // 先用 nameLower 精準比對（你已在新增/編輯會寫入 nameLower）
+          const q1 = query(
+            collection(db, "pets"),
+            where("nameLower", "==", kw),
+            fbLimit(1)
+          );
+          const s1 = await getDocs(q1);
+          if (ver !== lastVer) return; // 只處理最新一次
+
+          // 若舊資料沒 nameLower，補做一次 name 精準比對（較慢，但只查 1 筆）
+          let duplicated = !s1.empty;
+          if (!duplicated) {
+            const q2 = query(
+              collection(db, "pets"),
+              where("name", "==", name),
+              fbLimit(1)
+            );
+            const s2 = await getDocs(q2);
+            duplicated = !s2.empty;
+            if (ver !== lastVer) return;
+          }
+
+          if (duplicated) {
+            setState("bad", `「${name}」已被使用`);
+          } else {
+            setState("idle", ""); // 不顯示「可以使用」
+          }
+        } catch (e) {
+          // 失敗時不要卡紅框，只顯示訊息
+          setState("idle", "檢查失敗，稍後再試");
+          console.error("name check error:", e);
+        } finally {
+          input.removeAttribute("aria-busy");
+        }
+      }, 100);
+
+      input.addEventListener("input", runCheck);
+
+      // 讓外部可在「登錄成功」後重置提示與樣式
+      window.resetNameCheck = () => {
+        // 把最新檢查版本往前推，避免舊請求回來覆蓋
+        lastVer++;
+        // 清除提示與紅框
+        setState("idle", "");
+        input.removeAttribute("aria-busy");
+      };
+    })();
+
+    // 再呼叫一次（與 IIFE 等價，保險）
+    window.loadPets = loadPets;
+    loadPets();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="assets/Modal.js"></script>
+  <script src="assets/Lightbox.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js");
+      });
+    }
+  </script>
+</body>
+
+</html>
