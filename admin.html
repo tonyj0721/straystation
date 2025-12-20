@@ -850,7 +850,13 @@
               cancelButtonText: "取消",
               returnFocus: false, // 避免關閉後把焦點還給 input 而導致捲動回彈
             });
-            if (!r.isConfirmed) return;
+            if (!r.isConfirmed) {
+              // 名字重複且使用者取消：也捲到頁面最上方（回到表單區，方便修改）
+              window.scrollTo({ top: 0, behavior: "smooth" });
+              // 小延遲後聚焦名字欄位，避免被 scroll 動畫吃掉焦點
+              setTimeout(() => document.getElementById("name")?.focus(), 250);
+              return;
+            }
           }
         } catch (err) {
           console.error("重複檢查錯誤：", err);
