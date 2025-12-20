@@ -4,7 +4,7 @@
 (function () {
   const ADMIN_ALLOWLIST = window.ADMIN_ALLOWLIST || {
     emails: [
-      "aaa@gmail.com",
+      "tonyj0721@gmail.com",
       "bbb@gmail.com",
       "ccc@gmail.com",
       "ddd@gmail.com",
