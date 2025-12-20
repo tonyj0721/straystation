@@ -395,6 +395,7 @@
       if (user && !allowed) {
         try { sessionStorage.removeItem("__pendingGoogleLogin"); } catch (_) { }
         try { await signOut(auth); } catch (_) { }
+        location.href = "index.html";
         return;
       }
 
