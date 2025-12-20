@@ -765,13 +765,39 @@
     // ===============================
     // 表單送出：新增動物資料
     // ===============================
+
+    // ===============================
+    // 捲到最上方（保險版）
+    // ===============================
+    function forceScrollTop() {
+      const root = document.documentElement;
+      const prev = root.style.scrollBehavior;
+      // 避免 smooth 在 DOM 重排 / focus restore 時被中斷卡在中途
+      root.style.scrollBehavior = "auto";
+      window.scrollTo(0, 0);
+      root.scrollTop = 0;
+      document.body.scrollTop = 0;
+
+      requestAnimationFrame(() => {
+        window.scrollTo(0, 0);
+        root.scrollTop = 0;
+        document.body.scrollTop = 0;
+        root.style.scrollBehavior = prev || "";
+      });
+
+      // 再補一次，避免 SweetAlert / focus restore / DOM 重排造成回彈
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        root.scrollTop = 0;
+        document.body.scrollTop = 0;
+      }, 80);
+    }
+
     $("#petForm").addEventListener("submit", async (e) => {
       e.preventDefault();
 
       // 讀值
       const name = ($("#name")?.value || "").trim() || "未取名";
-
-      let duplicatedConfirmed = false; // ✅ 只有同名仍繼續登錄才會變 true
 
       const rawBreedType = breedTypeSel.value || "";
       const rawBreed = breedSel.value || "";
@@ -822,9 +848,9 @@
               showCancelButton: true,
               confirmButtonText: "確定",
               cancelButtonText: "取消",
+              returnFocus: false, // 避免關閉後把焦點還給 input 而導致捲動回彈
             });
             if (!r.isConfirmed) return;
-            duplicatedConfirmed = true; // ✅ 同名但使用者仍選擇繼續
           }
         } catch (err) {
           console.error("重複檢查錯誤：", err);
@@ -868,8 +894,20 @@
         if (nameInput) nameInput.value = "";
         if (window.resetNameCheck) resetNameCheck();
 
-        // ★ 登錄完成 → 捲到最上方
+        // 重置表單與選擇圖片（先做，避免 DOM 還在變動導致 smooth scroll 卡住）
+        e.target.reset();
+        imgPreview.innerHTML = "";
+        selectedFiles = [];
+        fileCount.textContent = "已選 0 / 5 張";
+        syncBreedSelectors();
+
+        // 先啟動重新載入列表（避免等到提示結束才開始抓資料）
+        const reloadPromise = loadPets();
+
+        // ★ 登錄完成 → 捲到最上方（先 smooth，最後再硬捲補正）
         window.scrollTo({ top: 0, behavior: "smooth" });
+        setTimeout(forceScrollTop, 250); // smooth 途中若被打斷，250ms 後硬捲補正
+
 
         // 成功提示後直接打開詳情
         Swal.fire({
@@ -877,25 +915,17 @@
           title: "已成功登錄！",
           showConfirmButton: false,
           timer: 1500,
-        }).then(() => {
-          openDialog(docRef.id);
-          // ✅ 只有「名字重複仍登錄」才補捲到最上面
-          if (duplicatedConfirmed) {
-            requestAnimationFrame(() => {
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            });
+          returnFocus: false, // 避免關閉後把焦點還給原 input 而導致捲動回彈
+        }).then(async () => {
+          try {
+            await reloadPromise;
+          } catch (e) {
+            console.error("loadPets error:", e);
           }
+          forceScrollTop(); // ✅ 保證捲到最上面（不會卡在一半）
+          openDialog(docRef.id);
         });
 
-        // 重置表單與選擇圖片
-        e.target.reset();
-        imgPreview.innerHTML = "";
-        selectedFiles = [];
-        fileCount.textContent = "已選 0 / 5 張";
-        syncBreedSelectors();
-
-        // 重新載入列表
-        await loadPets();
       } catch (err) {
         stopDots();
         submitBtn.disabled = false;
