@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>網站建置中｜Under Construction</title>
+  <meta name="description" content="這個頁面正在建置中，很快就會與您見面。" />
+  <style>
+    :root {
+      --bg-1: #f7fafc;
+      --bg-2: #eef2f7;
+      --text: #0f172a;
+      --muted: #475569;
+      --accent: #2563eb;
+      --card: #ffffffcc;
+      --border: #e5e7eb80;
+      --shadow: 0 10px 30px rgba(2,6,23,.08);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-1: #0b1220;
+        --bg-2: #111827;
+        --text: #e5e7eb;
+        --muted: #94a3b8;
+        --accent: #60a5fa;
+        --card: #0b1220cc;
+        --border: #1f293780;
+        --shadow: 0 10px 30px rgba(0,0,0,.5);
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans TC", "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", sans-serif;
+      color: var(--text);
+      background: radial-gradient(1200px 600px at 10% -10%, var(--bg-2), transparent),
+                  radial-gradient(1000px 500px at 110% 10%, var(--bg-2), transparent),
+                  linear-gradient(180deg, var(--bg-1), var(--bg-2));
+      display: grid;
+      place-items: center;
+      min-height: 100svh;
+    }
+
+    .card {
+      width: min(680px, 92vw);
+      background: var(--card);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      padding: clamp(24px, 4vw, 36px);
+      text-align: center;
+    }
+
+    .icon {
+      width: 88px;
+      height: 88px;
+      margin-inline: auto;
+      display: block;
+      animation: float 3.5s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%,100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+
+    h1 {
+      font-size: clamp(24px, 4vw, 36px);
+      line-height: 1.15;
+      margin: 16px 0 8px;
+    }
+
+    p.lead {
+      font-size: clamp(14px, 2.4vw, 18px);
+      color: var(--muted);
+      margin: 0 0 18px;
+    }
+
+    .progress {
+      height: 10px;
+      width: 100%;
+      border-radius: 999px;
+      background: color-mix(in oklab, var(--accent) 15%, transparent);
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      margin: 14px auto 6px;
+    }
+
+    .progress::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      transform: translateX(-100%);
+      background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--accent) 40%, white), transparent);
+      animation: shimmer 1.4s linear infinite;
+    }
+
+    @keyframes shimmer {
+      100% { transform: translateX(100%); }
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 18px;
+    }
+
+    a.button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 16px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      text-decoration: none;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    a.button.primary {
+      background: var(--accent);
+      color: white;
+      border-color: transparent;
+    }
+
+    .small {
+      margin-top: 12px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    footer {
+      margin-top: 14px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <main class="card" role="main" aria-labelledby="headline">
+    <svg class="icon" viewBox="0 0 64 64" aria-hidden="true">
+      <!-- Simple construction cone -->
+      <defs>
+        <linearGradient id="g" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0" stop-color="#f59e0b"/>
+          <stop offset="1" stop-color="#d97706"/>
+        </linearGradient>
+      </defs>
+      <path d="M6 56h52a2 2 0 0 1 0 4H6a2 2 0 0 1 0-4z" fill="#94a3b8" opacity=".35"/>
+      <path d="M15 48h34L36 12h-8L15 48z" fill="url(#g)"/>
+      <rect x="22" y="20" width="20" height="4" rx="2" fill="#fef3c7"/>
+      <rect x="19" y="32" width="26" height="4" rx="2" fill="#fef3c7"/>
+    </svg>
+
+    <h1 id="headline">網頁建構中</h1>
+    <p class="lead">我們正在努力完成內容，敬請期待。</p>
+
+    <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuetext="建置中"></div>
+    
+
+    <div class="actions">
+      <a class="button primary" href="index.html">回到首頁</a>
+    </div>
+
+    <footer>© <span id="year"></span> 浪浪轉運站 Stray Station</footer>
+  </main>
+
+  <script>
+  // 動態年份
+  var yEl = document.getElementById('year');
+  if (yEl) yEl.textContent = new Date().getFullYear();
+</script>
+</body>
+</html>
