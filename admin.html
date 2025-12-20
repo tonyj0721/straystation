@@ -27,6 +27,48 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="stylesheet" href="assets/tailwind.css">
   <link rel="stylesheet" href="assets/shared.css">
+  <style>
+    .pager {
+      display: inline-flex;
+      align-items: center;
+      overflow: hidden;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, .05)
+    }
+
+    .pager-btn {
+      min-width: 38px;
+      height: 38px;
+      padding: 0 12px;
+      border: 0;
+      background: transparent;
+      color: #6b7280;
+      font-size: 14px;
+      cursor: pointer
+    }
+
+    .pager-btn+.pager-btn {
+      border-left: 1px solid #e5e7eb
+    }
+
+    .pager-btn:hover {
+      background: #f9fafb
+    }
+
+    .pager-btn.active {
+      color: #ef4444;
+      font-weight: 700;
+      background: #fff5f5
+    }
+
+    .pager-btn:disabled {
+      color: #d1d5db;
+      cursor: not-allowed;
+      background: transparent
+    }
+  </style>
 </head>
 
 <body class="text-gray-800 bg-gradient-to-br from-brand-50 to-white">
@@ -45,8 +87,7 @@
           <a href="dogs.html" class="hover:text-brand-600">我想養狗狗</a>
           <a href="about.html" class="hover:text-brand-600">關於簡媽媽</a>
           <a href="home.html" class="hover:text-brand-600">幸福的歸宿</a>
-          <button type="button" id="btnLogoutDesktop"
-            class="text-sm text-gray-600 hover:text-brand-600 nav-logout-btn hidden">
+          <button type="button" id="btnLogoutDesktop" class="text-red-500 hover:text-brand-600 nav-logout-btn hidden">
             登 出
           </button>
         </nav>
@@ -77,63 +118,63 @@
       <!-- 按鈕群：保留 space-y-2、字體 18px -->
       <ul class="space-y-2 py-1 text-[18px]" role="menu" aria-orientation="vertical" tabindex="-1">
         <li>
-          <a href="index.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+          <a href="index.html" role="menuitem" tabindex="-1" class="flex w-full items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
             text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
             focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-white/70
             ">
-            <span aria-hidden="true" class="text-xl leading-none">🧭</span>
-            <span class="w-full text-center">首&emsp;&emsp;頁</span>
+            <span aria-hidden="true" class="text-xl w-8 text-center leading-none shrink-0">🧭</span>
+            <span class="flex-1 text-center">首&emsp;&emsp;頁</span>
           </a>
         </li>
 
         <li>
-          <a href="cats.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+          <a href="cats.html" role="menuitem" tabindex="-1" class="flex w-full items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
             text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
             focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-white/70
             ">
-            <span aria-hidden="true" class="text-xl leading-none">🐱</span>
-            <span class="w-full" style="text-align: right;">我想養貓咪</span>
+            <span aria-hidden="true" class="text-xl w-8 text-center leading-none shrink-0">🐱</span>
+            <span class="flex-1 text-center">我想養貓咪</span>
           </a>
         </li>
 
         <li>
-          <a href="dogs.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+          <a href="dogs.html" role="menuitem" tabindex="-1" class="flex w-full items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
             text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
             focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-white/70
             ">
-            <span aria-hidden="true" class="text-xl leading-none">🐶</span>
-            <span class="w-full" style="text-align: right;">我想養狗狗</span>
+            <span aria-hidden="true" class="text-xl w-8 text-center leading-none shrink-0">🐶</span>
+            <span class="flex-1 text-center">我想養狗狗</span>
           </a>
         </li>
 
         <li>
-          <a href="about.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+          <a href="about.html" role="menuitem" tabindex="-1" class="flex w-full items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
             text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
             focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-white/70
             ">
-            <span aria-hidden="true" class="text-xl leading-none">ℹ️</span>
-            <span class="w-full" style="text-align: right;">關於簡媽媽</span>
+            <span aria-hidden="true" class="text-xl w-8 text-center leading-none shrink-0">ℹ️</span>
+            <span class="flex-1 text-center">關於簡媽媽</span>
           </a>
         </li>
 
         <li>
-          <a href="home.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+          <a href="home.html" role="menuitem" tabindex="-1" class="flex w-full items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
             text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
             focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-white/70
             ">
-            <span aria-hidden="true" class="text-xl leading-none">🏠</span>
-            <span class="w-full" style="text-align: right;">幸福的歸宿</span>
+            <span aria-hidden="true" class="text-xl w-8 text-center leading-none shrink-0">🏠</span>
+            <span class="flex-1 text-center">幸福的歸宿</span>
           </a>
         </li>
 
         <li>
-          <a type="button" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+          <button type="button" role="menuitem" tabindex="-1" class="flex w-full items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
             text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
             focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-white/70
             nav-logout-btn hidden" id="btnLogoutMobile">
-            <span aria-hidden="true" class="text-xl leading-none">🚪</span>
-            <span class="w-full text-center">登&emsp;&emsp;出</span>
-          </a>
+            <span aria-hidden="true" class="text-xl w-8 text-center leading-none shrink-0">🚪</span>
+            <span class="flex-1 text-center">登&emsp;&emsp;出</span>
+          </button>
         </li>
       </ul>
     </nav>
@@ -205,11 +246,14 @@
   <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
     <h1 class="text-xl sm:text-2xl font-bold mb-4">新增／管理動物資料</h1>
 
-    <div class="grid lg:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- 左：登錄表單 -->
       <section class="lg:col-span-1 bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
         <h2 class="text-lg font-semibold">登錄表單</h2>
-<form id="petForm" class="space-y-4">
+        <p class="text-sm text-gray-500 mb-4">
+          ＊建議先登入並在 Firestore 規則限制寫入權限。
+        </p>
+        <form id="petForm" class="space-y-4">
           <div>
             <label class="block text-sm font-medium mb-1">名字 </label>
             <input id="name" class="w-full rounded-xl border border-gray-300 p-2" placeholder="留空將以「未取名」代替" />
@@ -291,7 +335,7 @@
       </section>
 
       <!-- 右：資料表 -->
-      <section class="lg:col-span-2 space-y-6">
+      <section id="listSection" class="lg:col-span-2 space-y-6">
         <div class="bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <h2 class="text-lg font-semibold">資料表</h2>
@@ -315,16 +359,9 @@
             </table>
           </div>
           <div class="md:hidden mt-4 grid gap-3" id="rowsMobile"></div>
-          <div id="pager" class="mt-4 flex items-center justify-between gap-3">
-            <button id="pagerPrev" type="button"
-              class="px-3 py-2 rounded-lg border border-gray-300 text-sm disabled:opacity-40 disabled:cursor-not-allowed">
-              上一頁
-            </button>
-            <div id="pagerInfo" class="text-xs text-gray-500 text-center flex-1"></div>
-            <button id="pagerNext" type="button"
-              class="px-3 py-2 rounded-lg border border-gray-300 text-sm disabled:opacity-40 disabled:cursor-not-allowed">
-              下一頁
-            </button>
+          <div id="pagerWrap" class="mt-6 flex flex-col items-center gap-2">
+            <div id="pageInfo" class="text-xs text-gray-500"></div>
+            <div id="pager" class="pager"></div>
           </div>
 
         </div>
@@ -615,7 +652,7 @@
     });
 
     // 全域狀態
-    const pets = (window.pets ||= []);            // 目前載入的動物列表（不限制筆數；畫面每頁顯示 15 筆）
+    const pets = (window.pets ||= []);            // 目前載入的動物列表（最多 15 筆）
     window.pets = pets;
     let currentPetId = null;  // 目前在 Dialog 中的動物 id（編輯/領養用）
 
@@ -862,92 +899,99 @@
     // 列表載入 + 搜尋 + 渲染（桌機/手機）
     // ===============================
     async function loadPets() {
-  // 不限制筆數：全部抓回來，再用「每頁 15 筆」做分頁顯示
-  let snap;
-  try {
-    snap = await getDocs(query(collection(db, "pets"), orderBy("createdAt", "desc")));
-  } catch (e) {
-    console.warn("orderBy(createdAt) failed, fallback to nameLower:", e);
-    snap = await getDocs(query(collection(db, "pets"), orderBy("nameLower")));
-  }
-  pets.length = 0;
-  pets.push(...snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-  applyFilterAndRender();
-}
+      const q = query(collection(db, "pets"), orderBy("createdAt", "desc"));
+      const snap = await getDocs(q);
+      pets.length = 0;
+      pets.push(...snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      applyFilterAndRender();
+    }
 
     const searchInput = $("#searchName");
-
-// ===============================
-// 分頁（每頁 15 筆）
-// ===============================
-const PAGE_SIZE = 15;
-let currentPage = 1;
-let currentList = []; // 目前（已搜尋/已過濾後）的清單
-
-const pagerPrev = document.getElementById("pagerPrev");
-const pagerNext = document.getElementById("pagerNext");
-const pagerInfo = document.getElementById("pagerInfo");
-
-const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
-
-function setCurrentList(list) {
-  currentList = Array.isArray(list) ? list : [];
-  currentPage = 1;
-  renderCurrentPage();
-}
-
-function updatePager(total, totalPages, startIdx, count) {
-  if (!pagerInfo) return;
-
-  if (!total) {
-    pagerInfo.textContent = "沒有資料";
-  } else {
-    const from = startIdx + 1;
-    const to = startIdx + count;
-    pagerInfo.textContent = `顯示 ${from}-${to} / ${total}（第 ${currentPage} / ${totalPages} 頁）`;
-  }
-
-  if (pagerPrev) pagerPrev.disabled = (currentPage <= 1);
-  if (pagerNext) pagerNext.disabled = (currentPage >= totalPages);
-}
-
-function renderCurrentPage() {
-  const total = currentList.length;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  currentPage = clamp(currentPage, 1, totalPages);
-
-  const start = (currentPage - 1) * PAGE_SIZE;
-  const pageItems = currentList.slice(start, start + PAGE_SIZE);
-
-  renderRows(pageItems);
-  renderRowsMobile(pageItems);
-  updatePager(total, totalPages, start, pageItems.length);
-}
-
-pagerPrev?.addEventListener("click", () => {
-  if (currentPage > 1) {
-    currentPage -= 1;
-    renderCurrentPage();
-  }
-});
-
-pagerNext?.addEventListener("click", () => {
-  const totalPages = Math.max(1, Math.ceil(currentList.length / PAGE_SIZE));
-  if (currentPage < totalPages) {
-    currentPage += 1;
-    renderCurrentPage();
-  }
-});
     searchInput.addEventListener("input", onSearchByName);
 
-    function applyFilterAndRender() {
-  const kw = searchInput.value.trim().toLowerCase();
-  const list = kw
-    ? pets.filter((p) => String(p.name || "").toLowerCase().includes(kw))
-    : pets;
+    // ===== Pagination (1頁10筆) =====
+    const PAGE_SIZE = 10;
+    let currentPage = 1;
+    let viewList = [];
 
-  setCurrentList(list);
-}
+    function setViewList(list, resetPage = true) {
+      viewList = Array.isArray(list) ? list : [];
+      if (resetPage) currentPage = 1;
+      renderCurrentPage();
+    }
+
+    function renderCurrentPage() {
+      const totalItems = viewList.length;
+      const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+
+      if (currentPage > totalPages) currentPage = totalPages;
+      if (currentPage < 1) currentPage = 1;
+
+      const start = (currentPage - 1) * PAGE_SIZE;
+      const pageList = viewList.slice(start, start + PAGE_SIZE);
+
+      renderStable(() => {
+        renderRows(pageList);
+        renderRowsMobile(pageList);
+      });
+
+      updatePager(totalItems, totalPages);
+    }
+
+    function updatePager(totalItems, totalPages) {
+      const wrap = document.getElementById("pagerWrap");
+      const info = document.getElementById("pageInfo");
+      const pager = document.getElementById("pager");
+      if (!wrap || !info || !pager) return;
+
+      if (totalItems === 0) {
+        wrap.classList.add("hidden");
+        return;
+      }
+      wrap.classList.remove("hidden");
+
+      info.textContent = `第 ${currentPage}/${totalPages} 頁（共 ${totalItems} 筆）`;
+
+      pager.innerHTML = "";
+      const makeBtn = (label, targetPage, disabled = false, active = false) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "pager-btn" + (active ? " active" : "");
+        b.textContent = label;
+        b.disabled = disabled;
+        if (!disabled) {
+          b.addEventListener("click", () => {
+            currentPage = targetPage;
+            renderCurrentPage();
+            document.getElementById("listSection")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+        }
+        return b;
+      };
+
+      pager.appendChild(makeBtn("«", 1, currentPage === 1));
+      pager.appendChild(makeBtn("‹", Math.max(1, currentPage - 1), currentPage === 1));
+
+      const maxNums = 5;
+      let start = Math.max(1, currentPage - Math.floor(maxNums / 2));
+      let end = Math.min(totalPages, start + maxNums - 1);
+      start = Math.max(1, end - maxNums + 1);
+
+      for (let p = start; p <= end; p++) {
+        pager.appendChild(makeBtn(String(p), p, false, p === currentPage));
+      }
+
+      pager.appendChild(makeBtn("›", Math.min(totalPages, currentPage + 1), currentPage === totalPages));
+      pager.appendChild(makeBtn("»", totalPages, currentPage === totalPages));
+    }
+
+    function applyFilterAndRender() {
+      const kw = searchInput.value.trim().toLowerCase();
+      const list = kw
+        ? pets.filter((p) => String(p.name || "").toLowerCase().includes(kw))
+        : pets;
+      setViewList(list, true);
+    }
 
     // 後端依名字（前綴）查詢：有關鍵字→打 Firestore；空字串→回到預設清單
     async function onSearchByName() {
@@ -1011,16 +1055,12 @@ pagerNext?.addEventListener("click", () => {
           return tb - ta;
         });
 
-        renderStable(() => {
-          setCurrentList(list);
-        });
+        setViewList(list, true);
       } catch (err) {
         console.error("search error", err);
         // 後備：用目前記憶中的清單做包含搜尋
         const list = pets.filter(p => String(p.name || "").toLowerCase().includes(kw));
-        renderStable(() => {
-          setCurrentList(list);
-        });
+        setViewList(list, true);
       }
     }
 

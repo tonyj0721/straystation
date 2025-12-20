@@ -40,6 +40,48 @@
     #GoogleLogin img {
       pointer-events: none;
     }
+
+    /* Pagination (match screenshot) */
+    .pager {
+      display: inline-flex;
+      align-items: center;
+      overflow: hidden;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, .05)
+    }
+
+    .pager-btn {
+      min-width: 38px;
+      height: 38px;
+      padding: 0 12px;
+      border: 0;
+      background: transparent;
+      color: #6b7280;
+      font-size: 14px;
+      cursor: pointer
+    }
+
+    .pager-btn+.pager-btn {
+      border-left: 1px solid #e5e7eb
+    }
+
+    .pager-btn:hover {
+      background: #f9fafb
+    }
+
+    .pager-btn.active {
+      color: #ef4444;
+      font-weight: 700;
+      background: #fff5f5
+    }
+
+    .pager-btn:disabled {
+      color: #d1d5db;
+      cursor: not-allowed;
+      background: transparent
+    }
   </style>
 </head>
 
@@ -94,63 +136,63 @@
       <!-- 按鈕群：保留 space-y-2、字體 18px -->
       <ul class="space-y-2 py-1 text-[18px]" role="menu" aria-orientation="vertical" tabindex="-1">
         <li>
-          <a href="index.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+          <a href="index.html" role="menuitem" tabindex="-1" class="flex w-full items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
             text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
             focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-white/70
             ">
-            <span aria-hidden="true" class="text-xl leading-none">🧭</span>
-            <span class="w-full text-center">首&emsp;&emsp;頁</span>
+            <span aria-hidden="true" class="text-xl w-8 text-center leading-none shrink-0">🧭</span>
+            <span class="flex-1 text-center">首&emsp;&emsp;頁</span>
           </a>
         </li>
 
         <li>
-          <a href="cats.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+          <a href="cats.html" role="menuitem" tabindex="-1" class="flex w-full items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
             text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
             focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-white/70
             ">
-            <span aria-hidden="true" class="text-xl leading-none">🐱</span>
-            <span class="w-full" style="text-align: right;">我想養貓咪</span>
+            <span aria-hidden="true" class="text-xl w-8 text-center leading-none shrink-0">🐱</span>
+            <span class="flex-1 text-center">我想養貓咪</span>
           </a>
         </li>
 
         <li>
-          <a href="about.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+          <a href="about.html" role="menuitem" tabindex="-1" class="flex w-full items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
             text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
             focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-white/70
             ">
-            <span aria-hidden="true" class="text-xl leading-none">ℹ️</span>
-            <span class="w-full" style="text-align: right;">關於簡媽媽</span>
+            <span aria-hidden="true" class="text-xl w-8 text-center leading-none shrink-0">ℹ️</span>
+            <span class="flex-1 text-center">關於簡媽媽</span>
           </a>
         </li>
 
         <li>
-          <a href="home.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+          <a href="home.html" role="menuitem" tabindex="-1" class="flex w-full items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
             text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
             focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-white/70
             ">
-            <span aria-hidden="true" class="text-xl leading-none">🏠</span>
-            <span class="w-full" style="text-align: right;">幸福的歸宿</span>
+            <span aria-hidden="true" class="text-xl w-8 text-center leading-none shrink-0">🏠</span>
+            <span class="flex-1 text-center">幸福的歸宿</span>
           </a>
         </li>
 
         <li>
-          <a href="admin.html" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+          <a href="admin.html" role="menuitem" tabindex="-1" class="flex w-full items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
             text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
             focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-white/70
             nav-admin-link hidden">
-            <span aria-hidden="true" class="text-xl leading-none">🔒</span>
-            <span class="w-full text-center">後&thinsp;台&thinsp;管&thinsp;理</span>
+            <span aria-hidden="true" class="text-xl w-8 text-center leading-none shrink-0">🔒</span>
+            <span class="flex-1 text-center">後&thinsp;台&thinsp;管&thinsp;理</span>
           </a>
         </li>
 
         <li>
-          <a type="button" role="menuitem" tabindex="-1" class="flex items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
+          <button type="button" role="menuitem" tabindex="-1" class="flex w-full items-center gap-3 whitespace-nowrap rounded-xl bg-white px-4 py-2
             text-slate-700 shadow hover:shadow-md hover:bg-white/95 active:scale-[0.99]
             focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-white/70
             nav-logout-btn hidden" id="btnLogoutMobile">
-            <span aria-hidden="true" class="text-xl leading-none">🚪</span>
-            <span class="w-full text-center">登&emsp;&emsp;出</span>
-          </a>
+            <span aria-hidden="true" class="text-xl w-8 text-center leading-none shrink-0">🚪</span>
+            <span class="flex-1 text-center">登&emsp;&emsp;出</span>
+          </button>
         </li>
       </ul>
     </nav>
@@ -222,7 +264,7 @@
   <!-- Title + Filters + Cards -->
   <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
     <header class="mb-6">
-      <h1 class="text-3xl font-bold">我想養狗狗</h1>
+      <h1 id="listSection" class="text-3xl font-bold">我想養狗狗</h1>
       <p class="text-gray-600 mt-2">查看所有的狗狗，可以依品種、毛色、年齡與性別篩選。</p>
     </header>
 
@@ -259,17 +301,9 @@
     <section>
       <div id="grid" class="mt-4 grid grid-cols-2 gap-6 sm:grid-cols-4 lg:grid-cols-4"></div>
       <div id="emptyState" class="hidden mt-10 text-center text-gray-500">沒有符合條件的毛孩。</div>
-      <!-- 分頁控制 -->
-      <div id="pagination" class="mt-8 flex items-center justify-center gap-3 hidden">
-        <button id="prevPage"
-          class="px-3 py-1 rounded-lg border border-gray-300 text-sm disabled:opacity-40 disabled:cursor-not-allowed">
-          上一頁
-        </button>
-        <span id="pageInfo" class="text-sm text-gray-600"></span>
-        <button id="nextPage"
-          class="px-3 py-1 rounded-lg border border-gray-300 text-sm disabled:opacity-40 disabled:cursor-not-allowed">
-          下一頁
-        </button>
+      <div id="pagerWrap" class="mt-6 flex flex-col items-center gap-2">
+        <div id="pageInfo" class="text-xs text-gray-500"></div>
+        <div id="pager" class="pager"></div>
       </div>
     </section>
   </main>
@@ -671,13 +705,11 @@
     const SPECIES = "狗";
     const pets = (window.pets ||= []);
     let currentPetId = null;
-    let filteredPets = [];   // 目前套完篩選後的列表
-    let currentPage = 1;     // 目前頁碼（從 1 開始）
 
-    // 手機：2 張/列 * 4 列；桌機：4 張/列 * 2 列 => 都是 8 張一頁
-    function getPageSize() {
-      return 8;
-    }
+    // ===== Pagination (1頁10隻) =====
+    const PAGE_SIZE = 10;
+    let currentPage = 1;
+    let viewList = [];
 
     const $ = (q) => document.querySelector(q);
     const $$ = (q) => document.querySelectorAll(q);
@@ -723,34 +755,29 @@
     }
 
     function render(list) {
-      filteredPets = list || [];
-
       const grid = $('#grid');
-      const empty = $('#emptyState');
-      const pager = $('#pagination');
-      const pageInfo = $('#pageInfo');
-      const prevBtn = $('#prevPage');
-      const nextBtn = $('#nextPage');
-
       grid.innerHTML = '';
-
-      if (!filteredPets.length) {
-        empty.classList.remove('hidden');
-        if (pager) pager.classList.add('hidden');
+      if (!list.length) {
+        $('#emptyState').classList.remove('hidden');
+        const pw = $('#pagerWrap');
+        if (pw) pw.classList.add('hidden');
         return;
       }
-      empty.classList.add('hidden');
+      $('#emptyState').classList.add('hidden');
 
-      const pageSize = getPageSize();
-      const pageCount = Math.ceil(filteredPets.length / pageSize) || 1;
-
-      if (currentPage > pageCount) currentPage = pageCount;
+      viewList = list;
+      const totalItems = list.length;
+      const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+      if (currentPage > totalPages) currentPage = totalPages;
       if (currentPage < 1) currentPage = 1;
 
-      const start = (currentPage - 1) * pageSize;
-      const pageItems = filteredPets.slice(start, start + pageSize);
+      const start = (currentPage - 1) * PAGE_SIZE;
+      const pageList = list.slice(start, start + PAGE_SIZE);
 
-      pageItems.forEach(p => {
+      const pagerWrap = $('#pagerWrap');
+      if (pagerWrap) pagerWrap.classList.remove('hidden');
+
+      pageList.forEach(p => {
         const card = document.createElement('article');
         card.className = 'group rounded-2xl overflow-hidden ring-1 ring-gray-200 bg-white hover:shadow-soft transition-shadow';
 
@@ -796,22 +823,63 @@
         grid.appendChild(card);
       });
 
-      // 更新分頁 UI
-      if (pager) {
-        if (pageCount > 1) {
-          pager.classList.remove('hidden');
-          if (pageInfo) pageInfo.textContent = `第 ${currentPage} / ${pageCount} 頁`;
-          if (prevBtn) prevBtn.disabled = currentPage === 1;
-          if (nextBtn) nextBtn.disabled = currentPage === pageCount;
-        } else {
-          pager.classList.add('hidden');
-        }
-      }
-
       // 綁定「查看」按鈕
       $$('.btn-detail').forEach(btn =>
         btn.addEventListener('click', (e) => openDialog(e.currentTarget.dataset.id))
       );
+
+      updatePager();
+    }
+
+    function updatePager() {
+      const wrap = $('#pagerWrap');
+      const info = $('#pageInfo');
+      const pager = $('#pager');
+      if (!wrap || !info || !pager) return;
+
+      const totalItems = viewList.length;
+      const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+
+      if (totalItems === 0) {
+        wrap.classList.add('hidden');
+        return;
+      }
+      wrap.classList.remove('hidden');
+
+      info.textContent = `第 ${currentPage}/${totalPages} 頁（共 ${totalItems} 隻）`;
+
+      pager.innerHTML = '';
+
+      const makeBtn = (label, targetPage, disabled = false, active = false) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'pager-btn' + (active ? ' active' : '');
+        b.textContent = label;
+        b.disabled = disabled;
+        if (!disabled) {
+          b.addEventListener('click', () => {
+            currentPage = targetPage;
+            render(viewList);
+            document.getElementById('listSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
+        }
+        return b;
+      };
+
+      pager.appendChild(makeBtn('«', 1, currentPage === 1));
+      pager.appendChild(makeBtn('‹', Math.max(1, currentPage - 1), currentPage === 1));
+
+      const maxNums = 5;
+      let start = Math.max(1, currentPage - Math.floor(maxNums / 2));
+      let end = Math.min(totalPages, start + maxNums - 1);
+      start = Math.max(1, end - maxNums + 1);
+
+      for (let p = start; p <= end; p++) {
+        pager.appendChild(makeBtn(String(p), p, false, p === currentPage));
+      }
+
+      pager.appendChild(makeBtn('›', Math.min(totalPages, currentPage + 1), currentPage === totalPages));
+      pager.appendChild(makeBtn('»', totalPages, currentPage === totalPages));
     }
 
     function buildBreedOptionsByType() {
@@ -860,9 +928,8 @@
         return true;
       });
 
-      filteredPets = list;
       currentPage = 1;
-      render(filteredPets);
+      render(list);
     }
 
     async function loadPets() {
@@ -871,10 +938,8 @@
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       pets.length = 0;
       pets.push(...all.filter(p => p.species === SPECIES));
-      filteredPets = pets.slice();  // 目前顯示全部
-      currentPage = 1;
-      buildBreedOptionsByType();
-      render(filteredPets);
+      buildBreedOptionsByType(); // ← 新的
+      render(pets);
       openFromDeepLink();
 
       // 即時篩選：任一選單變更就篩
@@ -958,37 +1023,6 @@
         });
       });
     };
-
-    // 分頁按鈕事件
-    $('#prevPage').addEventListener('click', () => {
-      if (currentPage <= 1) return;
-      currentPage -= 1;
-      render(filteredPets);
-      // 捲到頁面頂端
-      window.scrollTo({
-        top: 0,
-        behavior: 'smooth'
-      });
-    });
-
-    $('#nextPage').addEventListener('click', () => {
-      const totalPages = Math.ceil((filteredPets.length || 0) / getPageSize()) || 1;
-      if (currentPage >= totalPages) return;
-      currentPage += 1;
-      render(filteredPets);
-      // 捲到頁面頂端
-      window.scrollTo({
-        top: 0,
-        behavior: 'smooth'
-      });
-    });
-
-    // 螢幕尺寸改變時重新計算當前頁（目前 8 張固定，其實只是保險）
-    window.addEventListener('resize', () => {
-      const totalPages = Math.ceil((filteredPets.length || 0) / getPageSize()) || 1;
-      if (currentPage > totalPages) currentPage = totalPages;
-      render(filteredPets);
-    });
 
     window.loadPets = loadPets;
     loadPets();
