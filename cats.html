@@ -521,7 +521,6 @@
   </div>
 
   <script src="./assets/firebase-config.js"></script>
-  <script src="./assets/admin-allowlist.js"></script>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
     import {
@@ -567,6 +566,24 @@
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
 
+    // ===== Google 登入白名單 =====
+    const adminWhitelist = window.firebaseAdminWhitelist || {};
+    const ALLOWED_EMAILS = (adminWhitelist.emails || []).map((e) => String(e).toLowerCase());
+    const ALLOWED_DOMAINS = (adminWhitelist.domains || []).map((d) => String(d).toLowerCase());
+
+    function isWhitelisted(user) {
+      if (!user || !user.email) return false;
+      const email = String(user.email).toLowerCase();
+
+      // 精準 email 白名單
+      if (ALLOWED_EMAILS.includes(email)) return true;
+
+      // 網域白名單，例如 *@yourorg.com
+      if (ALLOWED_DOMAINS.some((domain) => email.endsWith("@" + domain))) return true;
+
+      return false;
+    }
+
     const LoginBtn = document.getElementById("GoogleLogin");
 
     async function ensurePersistence() {
@@ -576,44 +593,17 @@
       try { await setPersistence(auth, inMemoryPersistence); } catch (_) { }
     }
 
-        // 先設定持久化、再接回 redirect 結果（不輸出任何提示）
+    // 先設定持久化、再接回 redirect 結果（不輸出任何提示）
     (async () => {
       try { await ensurePersistence(); } catch (_) { }
-      try {
-        await getRedirectResult(auth);
-      } catch (err) {
-        let pending = false;
-        try { pending = sessionStorage.getItem("__pendingGoogleLogin") === "1"; } catch (_) { }
-        try { sessionStorage.removeItem("__pendingGoogleLogin"); } catch (_) { }
-        if (pending && !location.pathname.endsWith("/index.html")) {
-          location.href = "index.html";
-        }
-        console.error("getRedirectResult error:", err);
-      }
+      try { await getRedirectResult(auth); } catch (_) { }
     })();
 
-        async function startGoogleLogin() {
-      // 已經是白名單的小編 → 不重複登入（避免誤觸）
-      try {
-        const curEmail = (auth.currentUser && auth.currentUser.email ? String(auth.currentUser.email) : "").toLowerCase();
-        const ok = !!auth.currentUser && (typeof window.isAdminAllowed === "function" ? window.isAdminAllowed(curEmail) : false);
-
-        // 若目前已登入但不是白名單，先登出，確保可以換帳號
-        if (auth.currentUser && !ok) {
-          try { await signOut(auth); } catch (_) { }
-        }
-        if (ok) return;
-      } catch (_) { }
-
+    async function startGoogleLogin() {
+      if (auth.currentUser) return; // 已登入就不重複登入
       try { await ensurePersistence(); } catch (_) { }
       try { sessionStorage.setItem("__pendingGoogleLogin", "1"); } catch (_) { }
-      try {
-        await signInWithRedirect(auth, provider);
-      } catch (err) {
-        try { sessionStorage.removeItem("__pendingGoogleLogin"); } catch (_) { }
-        console.error("Google login failed:", err);
-        if (!location.pathname.endsWith("/index.html")) location.href = "index.html";
-      }
+      try { await signInWithRedirect(auth, provider); } catch (_) { }
     }
 
     // 狗掌：單點回 index.html；長按 >= 650ms 觸發登入（不用放開）
@@ -672,18 +662,18 @@
     const adminActionBar = document.getElementById("actionBar");
 
     // 依登入狀態更新 header / 導覽
-    onAuthStateChanged(auth, async (user) => {
-            const email = (user && user.email ? String(user.email) : "").toLowerCase();
-      const allowed = !!user && (typeof window.isAdminAllowed === "function" ? window.isAdminAllowed(email) : false);
-
-      // 白名單不通過：立刻登出（畫面當作未登入）
-      if (user && !allowed) {
-        try { sessionStorage.removeItem("__pendingGoogleLogin"); } catch (_) { }
-        try { await signOut(auth); } catch (_) { }
-      }
-
-      const isLogin = allowed;
+    onAuthStateChanged(auth, (user) => {
+      const isLogin = isWhitelisted(user);  // ✅ 改成白名單判斷
       window.__isLogin = isLogin;  // ← 加這行
+
+      // 有登入，但不在白名單裡：直接登出 + 提示
+      if (user && !isLogin) {
+        try {
+          alert("此 Google 帳號沒有管理員權限，僅白名單中的帳號可以管理後台。");
+        } catch (_) { }
+        // 登出後 onAuthStateChanged 會再觸發一次（user 變 null）
+        signOut(auth).catch(() => { });
+      }
 
       try { if (isLogin) sessionStorage.removeItem("__pendingGoogleLogin"); } catch (_) { }
 
