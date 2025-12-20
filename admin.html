@@ -821,13 +821,7 @@
               confirmButtonText: "確定",
               cancelButtonText: "取消",
             });
-            if (!r.isConfirmed) {
-              // 名字重複且使用者取消：也捲到頁面最上方（回到表單區，方便修改）
-              window.scrollTo({ top: 0, behavior: "smooth" });
-              // 小延遲後聚焦名字欄位，避免被 scroll 動畫吃掉焦點
-              setTimeout(() => document.getElementById("name")?.focus(), 250);
-              return;
-            }
+            if (!r.isConfirmed) return;
           }
         } catch (err) {
           console.error("重複檢查錯誤：", err);
@@ -871,22 +865,18 @@
         if (nameInput) nameInput.value = "";
         if (window.resetNameCheck) resetNameCheck();
 
-        const scrollTop = () => {
-          const el = document.scrollingElement || document.documentElement;
-          el.scrollTo({ top: 0, behavior: "smooth" });
-        };
+        // ★ 登錄完成 → 捲到最上方
+        //（先捲一次，並在成功提示結束後再補捲一次，避免 SweetAlert/focus restore 造成捲動位置回彈）
+        window.scrollTo({ top: 0, behavior: "smooth" });
 
-        // ★ 登錄完成 → 先捲一次
-        scrollTop();
-
+        // 成功提示後直接打開詳情
         Swal.fire({
           icon: "success",
           title: "已成功登錄！",
           showConfirmButton: false,
           timer: 1500,
-          returnFocus: false, // 避免 Swal 關閉時把焦點/畫面拉回原位置
         }).then(() => {
-          // 保險：Swal 關閉或 openDialog 前再捲一次
+          window.scrollTo({ top: 0, behavior: "smooth" });
           openDialog(docRef.id);
         });
 
