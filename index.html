@@ -678,6 +678,8 @@
     onAuthStateChanged(auth, async (user) => {
       const email = (user && user.email ? String(user.email) : "").toLowerCase();
       const allowed = !!user && (typeof window.isAdminAllowed === "function" ? window.isAdminAllowed(email) : false);
+      const isLogin = allowed;
+      window.__isLogin = isLogin;
 
       // 白名單不通過：立刻登出（避免「看起來登入了」但其實沒權限）
       if (user && !allowed) {
@@ -686,9 +688,6 @@
         location.href = "index.html";
         return;
       }
-
-      const isLogin = allowed;
-      window.__isLogin = isLogin;
 
       try { if (isLogin) sessionStorage.removeItem("__pendingGoogleLogin"); } catch (_) { }
 
