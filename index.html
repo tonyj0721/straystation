@@ -595,43 +595,6 @@
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
 
-    // ===== Google 登入白名單設定（防呆版） =====
-    const adminWhitelist = window.firebaseAdminWhitelist || {};
-    const rawEmails = adminWhitelist.emails ?? [];
-    const rawDomains = adminWhitelist.domains ?? [];
-
-    // 轉成「乾淨的陣列」
-    const ALLOWED_EMAILS = (Array.isArray(rawEmails) ? rawEmails : [rawEmails])
-      .filter(Boolean)
-      .map((e) => String(e).toLowerCase().trim());
-
-    const ALLOWED_DOMAINS = (Array.isArray(rawDomains) ? rawDomains : [rawDomains])
-      .filter(Boolean)
-      .map((d) => {
-        let s = String(d).toLowerCase().trim();
-        // 如果不小心填了整個 email，就幫你取 @ 後面的網域
-        if (s.includes("@")) {
-          s = s.split("@").pop();
-        }
-        return s;
-      });
-
-    function isWhitelisted(user) {
-      if (!user || !user.email) return false;
-      const email = String(user.email).toLowerCase().trim();
-
-      // 精準 email 白名單
-      if (ALLOWED_EMAILS.includes(email)) return true;
-
-      // 網域白名單，例如 *@yourorg.com
-      if (ALLOWED_DOMAINS.some((domain) => email.endsWith("@" + domain))) {
-        return true;
-      }
-
-      return false;
-    }
-    // ===== 白名單工具函式到這裡 =====
-
     const LoginBtn = document.getElementById("GoogleLogin");
 
     async function ensurePersistence() {
@@ -711,22 +674,8 @@
 
     // 依登入狀態更新 header / 導覽
     onAuthStateChanged(auth, (user) => {
-      const isLogin = isWhitelisted(user);  // ✅ 改成白名單判斷
+      const isLogin = !!user;
       window.__isLogin = isLogin;  // ← 加這行
-
-      // 有登入，但不在白名單裡：直接登出 + 提示
-      if (user && !isLogin) {
-        try {
-          alert("此 Google 帳號沒有管理員權限，僅白名單中的帳號可以管理後台。");
-        } catch (_) { }
-        // 登出後 onAuthStateChanged 會再觸發一次（user 變 null）
-        signOut(auth).catch(() => { });
-      }
-
-      console.log("登入使用者 email =", user?.email);
-      console.log("白名單 emails =", ALLOWED_EMAILS);
-      console.log("白名單 domains =", ALLOWED_DOMAINS);
-      console.log("isWhitelisted =", isWhitelisted(user));
 
       try { if (isLogin) sessionStorage.removeItem("__pendingGoogleLogin"); } catch (_) { }
 

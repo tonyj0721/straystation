@@ -578,7 +578,6 @@
   </div>
 
   <script src="./assets/firebase-config.js"></script>
-  <script src="./assets/admin-allowlist.js"></script>
   <script type="module">
     // 如果 withStableSearchRender 沒定義，就退成「直接渲染」
     const renderStable = (typeof withStableSearchRender === 'function')
@@ -626,22 +625,12 @@
     const logoutBtns = document.querySelectorAll(".nav-logout-btn");
 
     // ✅ 只有登入者才能進這頁
-    onAuthStateChanged(auth, async (user) => {
-            const email = (user && user.email ? String(user.email) : "").toLowerCase();
-      const allowed = !!user && (typeof window.isAdminAllowed === "function" ? window.isAdminAllowed(email) : false);
-
-      // 白名單不通過：立刻登出並回首頁（用 href，不要 replace）
-      if (user && !allowed) {
-        try { await signOut(auth); } catch (_) { }
-        if (!location.pathname.endsWith("/index.html")) location.href = "index.html";
-        return;
-      }
-
-      const isLogin = allowed;
+    onAuthStateChanged(auth, (user) => {
+      const isLogin = !!user;
       window.__isLogin = isLogin;  // ← 加這行
 
-      // 沒登入就踢回首頁（用 href，不要 replace）
-      if (!isLogin) { if (!location.pathname.endsWith("/index.html")) location.href = "index.html"; return; }
+      // 沒登入就踢回首頁
+      // if (!isLogin) { window.location.replace("index.html"); return; }
 
       // 登出按鈕：有登入才顯示
       logoutBtns.forEach(btn => btn.classList.toggle("hidden", !isLogin));
@@ -654,7 +643,7 @@
         try {
           await signOut(auth);
           // 登出後也導回首頁
-          window.location.href = "index.html";
+          window.location.replace("index.html");
         } catch (err) {
           console.error("登出失敗", err);
           alert("登出失敗，請稍後再試。");
