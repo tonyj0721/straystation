@@ -395,8 +395,12 @@
     //    - 先用 emails 精準控管；或改用 domains 允許整個網域
     //    - 若兩個清單都留空：維持原本行為（任何帳號登入都算「小編」）
     const __WL_EMAILS = new Set([
-      // "editor@gmail.com",
-      // "someone@your-org.com",
+      // "tonyj0721@gmail.com",
+      // "cookiech0926@gmail.com",
+      // "ccc@gmail.com",
+      // "ddd@gmail.com",
+      // "eee@gmail.com",
+      // "fff@gmail.com",
     ]);
     const __WL_DOMAINS = new Set([
       // "your-org.com",
@@ -493,10 +497,16 @@
     onAuthStateChanged(auth, async (user) => {
       const rawLogin = !!user;
       const isLogin = rawLogin && __wlAllowed(user);
-      window.__isLogin = isLogin;
       window.__isAdmin = isLogin;
 
       try { if (rawLogin) sessionStorage.removeItem("__pendingGoogleLogin"); } catch (_) { }
+
+      // 有登入但不在白名單自動登出
+      if (rawLogin && !isLogin && !__wlSigningOut) {
+        __wlSigningOut = true;
+        try { await signOut(auth); } catch (e) { console.error("signOut failed", e); }
+        __wlSigningOut = false;
+      }
 
       adminLabel?.classList.toggle("hidden", !isLogin);
 
@@ -507,21 +517,6 @@
       logoutBtns.forEach((el) => {
         el.classList.toggle("hidden", !isLogin);
       });
-
-      // 有登入但不在白名單：提示一次並自動登出
-      if (rawLogin && !isLogin && !__wlSigningOut) {
-        __wlSigningOut = true;
-        const email = user?.email || "";
-        try {
-          const k = "__wl_denied_once";
-          if (!sessionStorage.getItem(k)) {
-            alert(`此帳號 (${email || "未知"}) 未在白名單內，已自動登出。`);
-            sessionStorage.setItem(k, "1");
-          }
-        } catch (_) { }
-        try { await signOut(auth); } catch (e) { console.error("signOut failed", e); }
-        __wlSigningOut = false;
-      }
     });
 
     // 桌機 + 手機「登出」按鈕
@@ -547,11 +542,11 @@
       const box = document.getElementById('heroMosaic');
       if (!box) return;
 
-      imgs = (imgs || []).filter(Boolean).slice(0, 9);
+      imgs = (imgs || []).filter(Boolean).slice(0, 10);
 
       // 若沒有圖片，放幾張漸層占位
       if (imgs.length === 0) {
-        box.innerHTML = Array.from({ length: 9 }).map(() => (
+        box.innerHTML = Array.from({ length: 10 }).map(() => (
           `<div class="itm" style="background:linear-gradient(135deg,#fde68a,#fecaca);"></div>`
         )).join('');
         return;
@@ -619,8 +614,8 @@
       const seed = getWeeklySeed();
       shuffleWithSeed(allPhotos, seed);
 
-      // 建立右側相片拼貼（每週一組隨機 9 張）
-      buildMosaic(allPhotos.slice(0, 9));
+      // 建立右側相片拼貼（每週一組隨機 10 張）
+      buildMosaic(allPhotos.slice(0, 10));
     }
 
     loadPets();
