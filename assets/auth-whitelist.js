@@ -6,7 +6,7 @@ console.log("[auth-whitelist] loaded");
 export const WL = {
   // 允許的完整 email（全部小寫）
   emails: [
-    "aaa@gmail.com",
+    // "aaa@gmail.com",
     // "bbb@gmail.com",
     // "ccc@gmail.com",
     // "ddd@gmail.com",
@@ -22,7 +22,7 @@ export const WL = {
   // 為了避免一上線就把自己鎖死：
   // - emails/domains 兩者都空時，預設「允許任何已登入帳號」(等同沒開白名單)
   // - 若你要「一定要符合白名單」才算登入，請把 allowIfEmpty 改成 false（或填入白名單）
-  allowIfEmpty: false,
+  allowIfEmpty: true,
 
   // 非白名單時的提示文字（目前預設不會跳提示；若你想顯示，可在呼叫 enforceWhitelist 時把 alertOnReject 設為 true）
   rejectionMessage: "此帳號不在白名單內，已自動登出。"
