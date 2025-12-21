@@ -5,7 +5,7 @@
 export const WL = {
   // 允許的完整 email（全部小寫）
   emails: [
-    // "aaa@gmail.com",
+     "aaa@gmail.com",
     // "bbb@gmail.com",
     // "ccc@gmail.com",
     // "ddd@gmail.com",
