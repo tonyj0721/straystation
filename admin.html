@@ -608,7 +608,6 @@
       signOut,
       onAuthStateChanged,
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
-    import { WL, enforceWhitelist, requireEditorOrRedirect } from "./assets/auth-whitelist.js";
 
     const app = initializeApp(window.firebaseConfig);
     const db = getFirestore(app);
@@ -625,15 +624,52 @@
     const auth = getAuth(app);
     const logoutBtns = document.querySelectorAll(".nav-logout-btn");
 
-    // ✅ 只有登入者才能進這頁
-    onAuthStateChanged(auth, async (user) => {
-      const { isEditor } = await enforceWhitelist({ auth, user, signOut, whitelist: WL });
+    // ===============================
+    // Google 登入白名單（後台/編輯權限）
+    // ===============================
+    // ✅ 只允許白名單帳號成為「小編」
+    //    - 先用 emails 精準控管；或改用 domains 允許整個網域
+    //    - 若兩個清單都留空：維持原本行為（任何帳號登入都算「小編」）
+    const __WL_EMAILS = new Set([
+      // "editor@gmail.com",
+      // "someone@your-org.com",
+    ]);
+    const __WL_DOMAINS = new Set([
+      // "your-org.com",
+    ]);
 
-      const isLogin = isEditor;
-      window.__isLogin = isLogin;  // ← 加這行
+    const __wlNorm = (s) => (s || "").trim().toLowerCase();
+    const __wlEnabled = () => (__WL_EMAILS.size > 0 || __WL_DOMAINS.size > 0);
+    const __wlAllowed = (user) => {
+      if (!__wlEnabled()) return true; // 沒設定白名單時，維持原本行為
+      const email = __wlNorm(user?.email);
+      if (!email) return false;
+      if (__WL_EMAILS.has(email)) return true;
+      const domain = email.split("@")[1];
+      if (domain && __WL_DOMAINS.has(domain)) return true;
+      return false;
+    };
+
+    // ✅ 只有登入者才能進這頁
+    let __wlSigningOut = false;
+    onAuthStateChanged(auth, async (user) => {
+      const rawLogin = !!user;
+      const isLogin = rawLogin && __wlAllowed(user);
+      window.__isLogin = isLogin;
+      window.__isAdmin = isLogin;
 
       // 沒登入就踢回首頁
-      if (!isLogin) { window.location.replace("index.html"); return; }
+      if (!rawLogin) { window.location.replace("index.html"); return; }
+
+      // 有登入但不在白名單：提示並踢回首頁
+      if (!isLogin && !__wlSigningOut) {
+        __wlSigningOut = true;
+        const email = user?.email || "";
+        try { alert(`此帳號 (${email || "未知"}) 未在白名單內，無法進入後台。`); } catch (_) { }
+        try { await signOut(auth); } catch (e) { console.error("signOut failed", e); }
+        window.location.replace("index.html");
+        return;
+      }
 
       // 登出按鈕：有登入才顯示
       logoutBtns.forEach(btn => btn.classList.toggle("hidden", !isLogin));
