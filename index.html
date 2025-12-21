@@ -51,7 +51,7 @@
         <a href="index.html" class="flex items-center gap-2 font-semibold text-2xl">
           <img src="images/dogpaw.png" alt="dogpaw" id="GoogleLogin" class="h-8 w-8 object-contain" />
           <span class="flex items-baseline gap-1">
-            <span>簡媽媽狗園</span>
+            <span>台中簡媽媽狗園</span>
             <span id="adminLabel" class="text-sm text-red-500 hidden">我是小編</span>
           </span>
         </a>
@@ -570,6 +570,7 @@
       signOut,
       onAuthStateChanged,
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
+    import { WL, enforceWhitelist, requireEditorOrRedirect } from "./assets/auth-whitelist.js";
 
     // Firebase Hosting on web.app/custom domain + Safari/Firefox 的 storage partitioning：
     // authDomain 盡量用「目前正在服務的網域」，redirect 會比較穩。
@@ -594,32 +595,6 @@
 
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
-
-    // ===============================
-    // Google 登入白名單（後台/編輯權限）
-    // ===============================
-    // ✅ 只允許白名單帳號成為「小編」
-    //    - 先用 emails 精準控管；或改用 domains 允許整個網域
-    //    - 若兩個清單都留空：維持原本行為（任何帳號登入都算「小編」）
-    const __WL_EMAILS = new Set([
-      "tonyj0721@gmail.com",
-      // "someone@your-org.com",
-    ]);
-    const __WL_DOMAINS = new Set([
-      // "your-org.com",
-    ]);
-
-    const __wlNorm = (s) => (s || "").trim().toLowerCase();
-    const __wlEnabled = () => (__WL_EMAILS.size > 0 || __WL_DOMAINS.size > 0);
-    const __wlAllowed = (user) => {
-      if (!__wlEnabled()) return true; // 沒設定白名單時，維持原本行為
-      const email = __wlNorm(user?.email);
-      if (!email) return false;
-      if (__WL_EMAILS.has(email)) return true;
-      const domain = email.split("@")[1];
-      if (domain && __WL_DOMAINS.has(domain)) return true;
-      return false;
-    };
 
     const LoginBtn = document.getElementById("GoogleLogin");
 
@@ -699,14 +674,13 @@
     const adminActionBar = document.getElementById("actionBar");
 
     // 依登入狀態更新 header / 導覽
-    let __wlSigningOut = false;
     onAuthStateChanged(auth, async (user) => {
-      const rawLogin = !!user;
-      const isLogin = rawLogin && __wlAllowed(user);
-      window.__isLogin = isLogin;  // ← 加這行
-      window.__isAdmin = isLogin;
+      const { isEditor } = await enforceWhitelist({ auth, user, signOut, whitelist: WL });
 
-      try { if (rawLogin) sessionStorage.removeItem("__pendingGoogleLogin"); } catch (_) { }
+      const isLogin = isEditor;
+      window.__isLogin = isLogin;  // ← 加這行
+
+      try { if (isLogin) sessionStorage.removeItem("__pendingGoogleLogin"); } catch (_) { }
 
       adminLabel?.classList.toggle("hidden", !isLogin);
 
@@ -730,24 +704,7 @@
         adminActionBar.style.removeProperty("display"); // 保險
       }
 
-      
-
-
-      // 有登入但不在白名單：提示一次並自動登出
-      if (rawLogin && !isLogin && !__wlSigningOut) {
-        __wlSigningOut = true;
-        const email = user?.email || "";
-        try {
-          const k = "__wl_denied_once";
-          if (!sessionStorage.getItem(k)) {
-            alert(`此帳號 (${email || "未知"}) 未在白名單內，已自動登出。`);
-            sessionStorage.setItem(k, "1");
-          }
-        } catch (_) { }
-        try { await signOut(auth); } catch (e) { console.error("signOut failed", e); }
-        __wlSigningOut = false;
-      }
-// 登出：強制收掉編輯狀態，且不要再 setEditMode（避免把 actionBar 又打開）
+      // 登出：強制收掉編輯狀態，且不要再 setEditMode（避免把 actionBar 又打開）
       if (!isLogin) {
         document.getElementById("editArea")?.classList.add("hidden");
         document.getElementById("editActionBar")?.classList.add("hidden");
