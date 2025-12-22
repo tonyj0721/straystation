@@ -759,6 +759,116 @@
     // ===============================
     // 新增：圖片選取/預覽（最多 5 張）
     // ===============================
+    // ObjectURL 快取（避免重畫/拖曳排序時一直產生新 URL）
+    const __previewURL = new WeakMap();
+    function getPreviewURL(file) {
+      if (!file) return "";
+      let u = __previewURL.get(file);
+      if (!u) {
+        u = URL.createObjectURL(file);
+        __previewURL.set(file, u);
+      }
+      return u;
+    }
+    function revokePreviewURL(file) {
+      const u = __previewURL.get(file);
+      if (u) {
+        try { URL.revokeObjectURL(u); } catch { }
+        __previewURL.delete(file);
+      }
+    }
+    function __moveArrayItem(list, from, to) {
+      const a = list.slice();
+      const [x] = a.splice(from, 1);
+      a.splice(to, 0, x);
+      return a;
+    }
+    function bindPreviewDragSort(container, { getList, setList, itemSelector = "[data-sort-idx]" }) {
+      if (!container) return;
+      const els = Array.from(container.querySelectorAll(itemSelector));
+      if (!els.length) return;
+
+      const clearHint = () => {
+        Array.from(container.querySelectorAll(itemSelector)).forEach((n) => {
+          n.classList.remove("ring-2", "ring-brand-600", "opacity-60");
+        });
+      };
+
+      let dragIndex = null;
+      els.forEach((el) => {
+        el.draggable = true;
+
+        el.addEventListener("dragstart", (e) => {
+          dragIndex = Number(el.dataset.sortIdx);
+          try {
+            e.dataTransfer?.setData("text/plain", String(dragIndex));
+            if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+          } catch { }
+          clearHint();
+          el.classList.add("opacity-60");
+        });
+
+        el.addEventListener("dragend", () => {
+          dragIndex = null;
+          clearHint();
+        });
+
+        el.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          try { if (e.dataTransfer) e.dataTransfer.dropEffect = "move"; } catch { }
+          clearHint();
+          el.classList.add("ring-2", "ring-brand-600");
+        });
+
+        el.addEventListener("drop", (e) => {
+          e.preventDefault();
+          const from = Number.isFinite(dragIndex)
+            ? dragIndex
+            : Number(e.dataTransfer?.getData("text/plain"));
+          const to = Number(el.dataset.sortIdx);
+          clearHint();
+          dragIndex = null;
+          if (!Number.isFinite(from) || !Number.isFinite(to) || from === to) return;
+          setList(__moveArrayItem(getList(), from, to));
+        });
+
+        // 手機/平板：pointer 放開才重新排序
+        let touch = null;
+        el.addEventListener("pointerdown", (e) => {
+          if (e.pointerType === "mouse") return;
+          e.preventDefault();
+          clearHint();
+          const from = Number(el.dataset.sortIdx);
+          if (!Number.isFinite(from)) return;
+          touch = { pointerId: e.pointerId, from, over: from };
+          try { el.setPointerCapture(e.pointerId); } catch { }
+          el.classList.add("opacity-60");
+        }, { passive: false });
+
+        el.addEventListener("pointermove", (e) => {
+          if (!touch || e.pointerId !== touch.pointerId) return;
+          const hit = document.elementFromPoint(e.clientX, e.clientY)?.closest(itemSelector);
+          const over = hit ? Number(hit.dataset.sortIdx) : touch.over;
+          if (!Number.isFinite(over)) return;
+          touch.over = over;
+          clearHint();
+          if (hit) hit.classList.add("ring-2", "ring-brand-600");
+          el.classList.add("opacity-60");
+        });
+
+        const endTouch = (e) => {
+          if (!touch || e.pointerId !== touch.pointerId) return;
+          const { from, over } = touch;
+          touch = null;
+          clearHint();
+          if (!Number.isFinite(from) || !Number.isFinite(over) || from === over) return;
+          setList(__moveArrayItem(getList(), from, over));
+        };
+        el.addEventListener("pointerup", endTouch);
+        el.addEventListener("pointercancel", endTouch);
+      });
+    }
+
     const imgFiles = $("#imgFiles");
     const btnPick = $("#btnPick");
     const fileCount = $("#fileCount");
@@ -773,9 +883,9 @@
 
       imgPreview.innerHTML = selectedFiles
         .map((f, i) => {
-          const u = URL.createObjectURL(f);
+          const u = getPreviewURL(f);
           return `
-        <div class="relative">
+        <div class="relative cursor-move" draggable="true" data-sort-idx="${i}">
           <img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽">
           <button data-idx="${i}" class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button>
         </div>
@@ -789,10 +899,27 @@
           e.preventDefault();
           e.stopPropagation();
           const i = +btn.dataset.idx;
+          const f = selectedFiles[i];
+          if (f) revokePreviewURL(f);
           selectedFiles.splice(i, 1);
           renderPreviews();
         })
       );
+
+      // 避免刪除鈕觸發拖曳
+      imgPreview.querySelectorAll("button[data-idx]").forEach((btn) => {
+        btn.addEventListener("pointerdown", (e) => e.stopPropagation());
+        btn.addEventListener("dragstart", (e) => { e.preventDefault(); e.stopPropagation(); });
+      });
+
+      // ✅ 拖曳排序
+      bindPreviewDragSort(imgPreview, {
+        getList: () => selectedFiles,
+        setList: (next) => {
+          selectedFiles = next;
+          renderPreviews();
+        },
+      });
     }
 
     // 檔案挑選後：合併並截斷到 5 張
@@ -802,7 +929,10 @@
       if (next.length > 5) {
         Swal.fire({ icon: "warning", title: "最多 5 張照片" });
       }
-      selectedFiles = next.slice(0, 5);
+      const kept = next.slice(0, 5);
+      const discarded = next.slice(5);
+      discarded.forEach(revokePreviewURL);
+      selectedFiles = kept;
       renderPreviews();
       imgFiles.value = ""; // 清空 input，避免重複選取不到
     });
@@ -924,6 +1054,8 @@
           const r = sRef(storage, path);
           await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
           urls.push(await getDownloadURL(r));
+          // 釋放預覽用 ObjectURL
+          revokePreviewURL(f);
         }
 
         // 3) 回寫 images 欄位
@@ -943,6 +1075,8 @@
 
         // 重置表單與選擇圖片（先做，避免 DOM 還在變動導致 smooth scroll 卡住）
         e.target.reset();
+        // 先釋放預覽 ObjectURL 再清空
+        selectedFiles.forEach(revokePreviewURL);
         imgPreview.innerHTML = "";
         selectedFiles = [];
         fileCount.textContent = "已選 0 / 5 張";
