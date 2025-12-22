@@ -760,363 +760,209 @@
     // 新增：圖片選取/預覽（最多 5 張）
     // ===============================
     const imgFiles = $("#imgFiles");
-    const btnPick = $("#btnPick");
-    const fileCount = $("#fileCount");
-    const imgPreview = $("#imgPreview");
-        let selectedFiles = []; // [{id, file}] 暫存待上傳檔案（可拖曳排序）
+const btnPick = $("#btnPick");
+const fileCount = $("#fileCount");
+const imgPreview = $("#imgPreview");
 
-    const uid = () => (crypto?.randomUUID
-      ? crypto.randomUUID()
-      : (Date.now().toString(36) + Math.random().toString(36).slice(2)));
+// ✅ 改成「快取預覽 URL」：避免每次 render 都重新 createObjectURL（會讓大圖反覆解碼、超慢）
+// selectedFiles: [{ file: File, url: string }]
+let selectedFiles = [];
 
-    btnPick?.addEventListener("click", () => imgFiles.click());
+const revokePreviewUrl = (item) => {
+  try { if (item?.url) URL.revokeObjectURL(item.url); } catch { }
+};
+const revokeAllPreviewUrls = () => {
+  selectedFiles.forEach(revokePreviewUrl);
+};
 
-    // 依照 DOM 順序回寫 selectedFiles
-    function reorderSelectedFilesByDom(container) {
-      const order = Array.from(container.querySelectorAll("[data-id]")).map(el => el.dataset.id);
-      const map = new Map(selectedFiles.map(it => [it.id, it]));
-      selectedFiles = order.map(id => map.get(id)).filter(Boolean);
-    }
+// ✅ 進一步加速：用 createImageBitmap 產生小縮圖（非同步），避免大圖解碼/重繪把頁面卡住
+const __canThumb = typeof createImageBitmap === 'function';
+let __thumbGenRunning = false;
 
-    // 讓縮圖區支援「滑鼠/觸控拖曳排序」（不靠 HTML5 drag&drop）
-    // 改成 delegation + pointerEvents=none（解決 elementFromPoint 常常抓到自己、導致拖不動/不換位）
-    // 讓縮圖區支援「滑鼠/觸控拖曳排序」（Pointer Events；支援手機；避免亂跳）
-    // 做法：用「placeholder + 影子(ghost)」，拖曳時只移動 placeholder，不直接搬動原縮圖
-    function enablePointerReorder(container) {
-      if (!container || container.dataset.pointerReorderBound === "1") return;
-      container.dataset.pointerReorderBound = "1";
+async function __makeThumbBlob(file, maxSide = 900, quality = 0.78) {
+  if (!__canThumb) return null;
+  const bmp = await createImageBitmap(file);
+  const w = bmp.width || 0;
+  const h = bmp.height || 0;
+  if (!w || !h) { try { bmp.close?.(); } catch { } return null; }
 
-      // 防止手機拖曳時被當成捲動
-      container.style.touchAction = "none";
-      container.style.userSelect = "none";
-      container.style.webkitUserSelect = "none";
-      container.style.overscrollBehavior = "contain";
+  const scale = Math.min(1, maxSide / Math.max(w, h));
+  const tw = Math.max(1, Math.round(w * scale));
+  const th = Math.max(1, Math.round(h * scale));
 
-      let draggingEl = null;
-      let placeholder = null;
-      let ghost = null;
-      let pid = null;
-      let moved = false;
-      let startX = 0;
-      let startY = 0;
-      let offsetX = 0;
-      let offsetY = 0;
-      let raf = 0;
-      let lastX = 0;
-      let lastY = 0;
+  const canvas = document.createElement('canvas');
+  canvas.width = tw;
+  canvas.height = th;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(bmp, 0, 0, tw, th);
+  try { bmp.close?.(); } catch { }
 
-      const TH = 4;   // 觸發拖曳門檻
-      const DZ = 8;   // 中線死區，避免在正中間抖動來回換位
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
+  return blob || null;
+}
 
-      function cleanup() {
-        if (raf) cancelAnimationFrame(raf);
-        raf = 0;
-        document.removeEventListener("pointermove", onMove, true);
-        document.removeEventListener("pointerup", onUp, true);
-        document.removeEventListener("pointercancel", onUp, true);
-      }
+async function enhanceThumbnails() {
+  if (__thumbGenRunning) return;
+  __thumbGenRunning = true;
+  try {
+    // 先讓瀏覽器把 DOM 先畫出來，再開始縮圖
+    await new Promise((r) => requestAnimationFrame(() => r()));
 
-      function makePlaceholderFrom(el) {
-        const p = document.createElement("div");
-        p.className = el.className;
-        p.dataset.id = el.dataset.id;
-        p.dataset.placeholder = "1";
-        p.innerHTML = `
-          <div class="w-full aspect-square rounded-lg border-2 border-dashed border-gray-300 bg-gray-100/60"></div>
-        `;
-        return p;
-      }
+    for (const it of selectedFiles) {
+      if (!it?.file || it.__thumbReady) continue;
+      // 小檔案直接略過（通常不會卡）
+      if ((it.file.size || 0) < 1200_000) { it.__thumbReady = true; continue; }
 
-      function makeGhostFrom(el, rect) {
-        const g = el.cloneNode(true);
-        g.querySelectorAll?.("button")?.forEach?.((b) => b.remove());
-        g.style.position = "fixed";
-        g.style.left = rect.left + "px";
-        g.style.top = rect.top + "px";
-        g.style.width = rect.width + "px";
-        g.style.height = rect.height + "px";
-        g.style.margin = "0";
-        g.style.zIndex = "9999";
-        g.style.pointerEvents = "none";
-        g.style.opacity = "0.92";
-        g.style.transform = "scale(1.02)";
-        g.style.boxShadow = "0 10px 30px rgba(0,0,0,.18)";
-        g.style.borderRadius = "12px";
-        g.style.overflow = "hidden";
-        return g;
-      }
+      let blob = null;
+      try { blob = await __makeThumbBlob(it.file); } catch (e) { blob = null; }
+      it.__thumbReady = true;
+      if (!blob) continue;
 
-      function getOverItem(x, y) {
-        const hit = document.elementFromPoint(x, y);
-        const over = hit?.closest?.("[data-id]");
-        if (!over || over.parentElement !== container) return null;
-        if (over.dataset.placeholder === "1") return null;
-        return over;
-      }
+      // 使用者可能在縮圖過程中刪掉/改順序：確認還在列表裡
+      if (!selectedFiles.includes(it)) continue;
 
-      function placePlaceholder(over, x, y) {
-        if (!placeholder) return;
+      const oldUrl = it.url;
+      const thumbUrl = URL.createObjectURL(blob);
+      it.url = thumbUrl;
+      try { if (oldUrl) URL.revokeObjectURL(oldUrl); } catch { }
 
-        if (!over) {
-          if (container.lastElementChild !== placeholder) {
-            container.appendChild(placeholder);
-          }
-          return;
-        }
-
-        const r = over.getBoundingClientRect();
-        const xMid = r.left + r.width / 2;
-        const yMid = r.top + r.height / 2;
-
-        // 判斷要插在 over 的前/後；加死區避免一直翻轉
-        let before = true;
-        const sameRow = (y >= r.top && y <= r.bottom);
-
-        if (sameRow) {
-          if (x < xMid - DZ) before = true;
-          else if (x > xMid + DZ) before = false;
-          else return; // 在中線附近，先不要動，避免抖動
-        } else {
-          if (y < yMid - DZ) before = true;
-          else if (y > yMid + DZ) before = false;
-          else return;
-        }
-
-        // 已經在正確位置就不要再插一次（避免抖動）
-        if (before) {
-          if (placeholder.nextSibling === over) return;
-          container.insertBefore(placeholder, over);
-        } else {
-          if (over.nextSibling === placeholder) return;
-          container.insertBefore(placeholder, over.nextSibling);
-        }
-      }
-
-      function updateGhost(x, y) {
-        if (!ghost) return;
-        ghost.style.left = (x - offsetX) + "px";
-        ghost.style.top = (y - offsetY) + "px";
-      }
-
-      function tick() {
-        raf = 0;
-        if (!draggingEl) return;
-        updateGhost(lastX, lastY);
-
-        const over = getOverItem(lastX, lastY);
-        placePlaceholder(over, lastX, lastY);
-      }
-
-      function onMove(e) {
-        if (!draggingEl || e.pointerId !== pid) return;
-
-        const dx = e.clientX - startX;
-        const dy = e.clientY - startY;
-        if (!moved && (dx * dx + dy * dy) < (TH * TH)) return;
-
-        moved = true;
-        e.preventDefault();
-
-        lastX = e.clientX;
-        lastY = e.clientY;
-        if (!raf) raf = requestAnimationFrame(tick);
-      }
-
-      function finish(e) {
-        if (!draggingEl) return;
-        try { container.releasePointerCapture(pid); } catch {}
-
-        cleanup();
-
-        // 還原 DOM
-        if (placeholder && placeholder.parentElement) {
-          placeholder.replaceWith(draggingEl);
-        } else {
-          container.appendChild(draggingEl);
-        }
-        placeholder = null;
-
-        if (ghost && ghost.parentElement) ghost.remove();
-        ghost = null;
-
-        const didMove = moved;
-        draggingEl = null;
-        pid = null;
-        moved = false;
-
-        if (didMove) {
-          reorderSelectedFilesByDom(container);
-          renderPreviews();
-        }
-      }
-
-      function onUp(e) {
-        if (!draggingEl || e.pointerId !== pid) return;
-        finish(e);
-      }
-
-      container.addEventListener("pointerdown", (e) => {
-        const item = e.target.closest?.("[data-id]");
-        if (!item || item.parentElement !== container) return;
-        if (e.target.closest("button")) return;
-        if (typeof e.button === "number" && e.button !== 0) return;
-        if (container.querySelectorAll("[data-id]").length < 2) return;
-
-        const rect = item.getBoundingClientRect();
-        draggingEl = item;
-        pid = e.pointerId;
-        moved = false;
-        startX = e.clientX;
-        startY = e.clientY;
-        offsetX = e.clientX - rect.left;
-        offsetY = e.clientY - rect.top;
-        lastX = e.clientX;
-        lastY = e.clientY;
-
-        // placeholder 取代原本的位置，避免版面亂跳
-        placeholder = makePlaceholderFrom(item);
-        item.replaceWith(placeholder);
-
-        // ghost 跟著手指走
-        ghost = makeGhostFrom(item, rect);
-        document.body.appendChild(ghost);
-        updateGhost(lastX, lastY);
-
-        try { container.setPointerCapture(pid); } catch {}
-
-        document.addEventListener("pointermove", onMove, { passive: false, capture: true });
-        document.addEventListener("pointerup", onUp, { capture: true });
-        document.addEventListener("pointercancel", onUp, { capture: true });
-
-        e.preventDefault();
-      });
-    }
-        return best;
-      }
-
-      function cleanup() {
-        document.removeEventListener("pointermove", onMove);
-        document.removeEventListener("pointerup", onUp);
-        document.removeEventListener("pointercancel", onUp);
-      }
-
-      function finish() {
-        if (!dragging) return;
-        try { container.releasePointerCapture(pid); } catch {}
-
-        dragging.style.opacity = "";
-        dragging.style.transform = "";
-        dragging.style.pointerEvents = "";
-
-        const didMove = moved;
-        dragging = null;
-        pid = null;
-        moved = false;
-
-        cleanup();
-
-        if (didMove) {
-          reorderSelectedFilesByDom(container);
-          renderPreviews(); // 重新掛事件 & 更新刪除 idx
-        }
-      }
-
-      function onMove(e) {
-        if (!dragging || e.pointerId !== pid) return;
-        const dx = e.clientX - startX;
-        const dy = e.clientY - startY;
-        if (!moved && (dx * dx + dy * dy) < (TH * TH)) return;
-        moved = true;
-        e.preventDefault();
-
-        const over = getOverItem(e.clientX, e.clientY);
-        if (!over || over === dragging) return;
-
-        const r = over.getBoundingClientRect();
-        const xMid = r.left + r.width / 2;
-        const yMid = r.top + r.height / 2;
-        const sameRow = (e.clientY >= r.top && e.clientY <= r.bottom);
-        const before = sameRow ? (e.clientX < xMid) : (e.clientY < yMid);
-
-        if (before) container.insertBefore(dragging, over);
-        else container.insertBefore(dragging, over.nextSibling);
-      }
-
-      function onUp(e) {
-        if (!dragging || e.pointerId !== pid) return;
-        finish();
-      }
-
-      container.addEventListener("pointerdown", (e) => {
-        const item = e.target.closest?.("[data-id]");
-        if (!item || item.parentElement !== container) return;
-        if (e.target.closest("button")) return;
-        if (typeof e.button === "number" && e.button !== 0) return;
-        if (container.querySelectorAll("[data-id]").length < 2) return;
-
-        dragging = item;
-        pid = e.pointerId;
-        moved = false;
-        startX = e.clientX;
-        startY = e.clientY;
-
-        // 讓 elementFromPoint 不會一直命中「自己」
-        dragging.style.pointerEvents = "none";
-        dragging.style.opacity = "0.6";
-        dragging.style.transform = "scale(0.98)";
-
-        try { container.setPointerCapture(pid); } catch {}
-
-        document.addEventListener("pointermove", onMove, { passive: false });
-        document.addEventListener("pointerup", onUp);
-        document.addEventListener("pointercancel", onUp);
-        e.preventDefault();
-      });
-    }
-
-    // 渲染預覽格子 + 刪除按鈕
-    function renderPreviews() {
-      fileCount.textContent = `已選 ${selectedFiles.length} / 5 張`;
-
-      imgPreview.innerHTML = selectedFiles
-        .map((it, i) => {
-          const u = URL.createObjectURL(it.file);
-          return `
-        <div class="relative cursor-grab select-none" style="touch-action:none;" data-id="${it.id}">
-          <img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽" draggable="false">
-          <button data-idx="${i}" class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button>
-        </div>
-      `;
-        })
-        .join("");
-
-      // 綁定刪除單張圖片
-      imgPreview.querySelectorAll("button[data-idx]").forEach((btn) =>
-        btn.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          const i = +btn.dataset.idx;
-          selectedFiles.splice(i, 1);
-          renderPreviews();
-        })
-      );
-
-      // ✅ 觸控/滑鼠拖曳排序
-      enablePointerReorder(imgPreview);
-    }
-
-    // 檔案挑選後：合併並截斷到 5 張
-    imgFiles?.addEventListener("change", () => {
-      const incoming = Array.from(imgFiles.files || []).map((f) => ({ id: uid(), file: f }));
-      const next = selectedFiles.concat(incoming);
-      if (next.length > 5) {
-        Swal.fire({ icon: "warning", title: "最多 5 張照片" });
-      }
-      selectedFiles = next.slice(0, 5);
+      // 更新 UI（只有 5 張，重畫一次成本可接受）
       renderPreviews();
-      imgFiles.value = ""; // 清空 input，避免重複選取不到
-    });
-// ===============================
+
+      // 讓出主執行緒，避免連續縮圖造成卡頓
+      await new Promise((r) => setTimeout(r, 0));
+    }
+  } finally {
+    __thumbGenRunning = false;
+  }
+}
+
+
+// 讓「新增照片」預覽可以拖曳換順序（桌機 + 手機）
+// - 縮圖外層需有 data-sort-idx
+// - 點刪除鈕不會觸發拖曳
+(() => {
+  if (!document.getElementById("previewSortableStyle")) {
+    const s = document.createElement("style");
+    s.id = "previewSortableStyle";
+    s.textContent = `
+      .preview-sort-item{touch-action:none; user-select:none; cursor:move;}
+      .preview-dragging{opacity:.85; outline:2px solid rgba(59,130,246,.7); outline-offset:2px;}
+    `;
+    document.head.appendChild(s);
+  }
+})();
+
+let __previewSortActive = null;
+document.addEventListener("pointerup", (e) => {
+  const act = __previewSortActive;
+  if (!act) return;
+  const { container, from } = act;
+  __previewSortActive = null;
+
+  container?.querySelectorAll?.(".preview-dragging")
+    ?.forEach((el) => el.classList.remove("preview-dragging"));
+
+  const cfg = container && container.__previewSortableCfg;
+  if (!cfg) return;
+
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  const over = el?.closest?.("[data-sort-idx]");
+  if (!over || !container.contains(over)) return;
+
+  const to = Number(over.dataset.sortIdx);
+  if (Number.isNaN(to) || to === from) return;
+
+  const list = cfg.getItems();
+  const moved = list.splice(from, 1)[0];
+  list.splice(to, 0, moved);
+  cfg.setItems(list);
+  cfg.render();
+}, true);
+
+function bindPreviewSortable(container, cfg) {
+  if (!container) return;
+  container.__previewSortableCfg = cfg;
+  if (container.dataset.previewSortableBound) return;
+  container.dataset.previewSortableBound = "1";
+
+  container.addEventListener("pointerdown", (e) => {
+    const item = e.target.closest("[data-sort-idx]");
+    if (!item || !container.contains(item)) return;
+    if (e.target.closest("button")) return; // 點刪除鈕不拖曳
+    const from = Number(item.dataset.sortIdx);
+    if (Number.isNaN(from)) return;
+
+    item.classList.add("preview-dragging");
+    try { item.setPointerCapture(e.pointerId); } catch { }
+    __previewSortActive = { container, from };
+    e.preventDefault();
+  });
+}
+
+btnPick?.addEventListener("click", () => imgFiles.click());
+
+// 渲染預覽格子 + 刪除按鈕
+// ✅ 注意：不再在 render 時 createObjectURL（避免卡爆）
+function renderPreviews() {
+  fileCount.textContent = `已選 ${selectedFiles.length} / 5 張`;
+
+  imgPreview.innerHTML = selectedFiles
+    .map((it, i) => `
+    <div class="relative preview-sort-item" data-sort-idx="${i}">
+      <img class="w-full aspect-square object-cover rounded-lg"
+           src="${it.url}"
+           alt="預覽"
+           decoding="async"
+           loading="lazy">
+      <button data-idx="${i}" class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button>
+    </div>
+  `)
+    .join("");
+
+  // 綁定刪除單張圖片（刪除時記得 revoke URL）
+  imgPreview.querySelectorAll("button[data-idx]").forEach((btn) =>
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const i = +btn.dataset.idx;
+      const [removed] = selectedFiles.splice(i, 1);
+      revokePreviewUrl(removed);
+      renderPreviews();
+    })
+  );
+}
+
+// 讓預覽縮圖支援拖曳排序（排序後上傳順序也會跟著變）
+bindPreviewSortable(imgPreview, {
+  getItems: () => [...selectedFiles],
+  setItems: (v) => { selectedFiles = v; },
+  render: renderPreviews,
+});
+
+// 檔案挑選後：合併並截斷到 5 張
+imgFiles?.addEventListener("change", () => {
+  const incoming = Array.from(imgFiles.files || []);
+  const incomingItems = incoming.map((file) => ({
+    file,
+    url: URL.createObjectURL(file),
+  }));
+
+  let next = selectedFiles.concat(incomingItems);
+
+  if (next.length > 5) {
+    Swal.fire({ icon: "warning", title: "最多 5 張照片" });
+    // 超過 5 張的預覽 URL 也要 revoke，避免記憶體暴增
+    next.slice(5).forEach(revokePreviewUrl);
+  }
+
+  selectedFiles = next.slice(0, 5);
+  renderPreviews();
+  enhanceThumbnails();
+  imgFiles.value = ""; // 清空 input，避免重複選取不到
+});
+
+    // ===============================
     // 捲到最上方（保險版）
     // ===============================
     function forceScrollTop() {
@@ -1254,6 +1100,7 @@
         // 重置表單與選擇圖片（先做，避免 DOM 還在變動導致 smooth scroll 卡住）
         e.target.reset();
         imgPreview.innerHTML = "";
+        revokeAllPreviewUrls();
         selectedFiles = [];
         fileCount.textContent = "已選 0 / 5 張";
         syncBreedSelectors();
