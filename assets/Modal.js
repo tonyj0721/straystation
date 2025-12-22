@@ -327,15 +327,29 @@ async function openDialog(id) {
   setEditSpecies(p.species || '貓');
   syncEditBreedSelectors();
 
-  if (p.breedType) {
-    document.getElementById("editBreedType").value = p.breedType;
+  if (p.breedType || p.breed) {
+    // 允許舊資料：breedType 沒存，但 breed 是 "米克斯/xxx"
+    let breedType = p.breedType || "";
+    let breedValue = p.breed || "";
+
+    if (!breedType && /^米克斯(\/|$)/.test(breedValue)) {
+      breedType = "米克斯";
+    }
+
+    // ✅ 米克斯：右側下拉只放「毛色」，所以要去掉 "米克斯/"
+    if (breedType === "米克斯") {
+      breedValue = breedValue.replace(/^米克斯\/?/, ""); // "米克斯/黑白色" -> "黑白色"
+    }
+
+    document.getElementById("editBreedType").value = breedType;
     buildEditBreedOptions();
     updateEditBreedLabel();
 
-    if (p.breed) {
-      document.getElementById("editBreed").disabled = false;
-      document.getElementById("editBreed").value = p.breed;
-    }
+    const breedSel = document.getElementById("editBreed");
+    breedSel.disabled = false;
+
+    // 如果是 "米克斯"（沒選毛色）會是空字串，剛好讓它停在「請選擇」
+    breedSel.value = breedValue;
   }
 
   renderEditImages(imgs);
