@@ -805,85 +805,124 @@
 
     // iPhone 友善排序：Pointer Events + 直接移動 DOM（拖曳時不重畫）
     function enablePointerSort(container, getItems, setItems) {
-      if (!container || container.dataset.sortBound) return;
-      container.dataset.sortBound = "1";
+  if (!container || container.dataset.sortBound) return;
+  container.dataset.sortBound = "1";
 
-      let dragEl = null;
-      let pid = null;
-      let sx = 0, sy = 0;
-      let moved = false;
-      const TH = 6; // tap vs drag 門檻
+  let dragEl = null;
+  let pid = null;
 
-      function finish() {
-        if (!dragEl) return;
-        try { dragEl.releasePointerCapture(pid); } catch { }
+  // sx/sy 用來判斷是否超過「拖曳門檻」
+  let sx = 0, sy = 0;
 
-        dragEl.classList.remove("ring-2", "ring-blue-400", "z-10");
-        dragEl.style.transform = "";
-        dragEl.style.pointerEvents = "";
-        dragEl.style.willChange = "";
+  // lastX/lastY + tx/ty 用「累積位移」避免 reorder 後跳很遠（iOS Safari 常見）
+  let lastX = 0, lastY = 0;
+  let tx = 0, ty = 0;
 
-        if (moved) {
-          const keys = Array.from(container.querySelectorAll(".sortable-item"))
-            .map((el) => el.dataset.key);
+  let moved = false;
+  const TH = 6; // tap vs drag 門檻（px）
 
-          const map = new Map(getItems().map((it) => [it.key, it]));
-          const next = keys.map((k) => map.get(k)).filter(Boolean);
-          setItems(next);
-        }
+  function finish() {
+    if (!dragEl) return;
+    try { dragEl.releasePointerCapture(pid); } catch { }
 
-        dragEl = null;
-        pid = null;
-        moved = false;
-      }
+    dragEl.classList.remove("ring-2", "ring-blue-400", "z-10");
+    dragEl.style.transform = "";
+    dragEl.style.pointerEvents = "";
+    dragEl.style.willChange = "";
 
-      container.addEventListener("pointerdown", (e) => {
-        const item = e.target.closest?.(".sortable-item");
-        if (!item || item.parentElement !== container) return;
-        if (e.target.closest?.("button")) return;
+    if (moved) {
+      const keys = Array.from(container.querySelectorAll(".sortable-item"))
+        .map((el) => el.dataset.key);
 
-        dragEl = item;
-        pid = e.pointerId;
-        sx = e.clientX;
-        sy = e.clientY;
-        moved = false;
-
-        dragEl.setPointerCapture(pid);
-        dragEl.style.willChange = "transform";
-        dragEl.classList.add("ring-2", "ring-blue-400", "z-10");
-        e.preventDefault();
-      }, { passive: false });
-
-      container.addEventListener("pointermove", (e) => {
-        if (!dragEl || e.pointerId !== pid) return;
-
-        const dx = e.clientX - sx;
-        const dy = e.clientY - sy;
-
-        if (!moved) {
-          if (Math.hypot(dx, dy) < TH) return;
-          moved = true;
-        dragEl.style.pointerEvents = "none";
-        }
-
-        dragEl.style.transform = `translate(${dx}px, ${dy}px)`;
-
-        const el = document.elementFromPoint(e.clientX, e.clientY);
-        const over = el?.closest?.(".sortable-item");
-        if (!over || over === dragEl || over.parentElement !== container) return;
-
-        const r = over.getBoundingClientRect();
-        const before =
-          (e.clientY < r.top + r.height / 2) ||
-          (e.clientY >= r.top && e.clientY <= r.bottom && e.clientX < r.left + r.width / 2);
-
-        if (before) container.insertBefore(dragEl, over);
-        else container.insertBefore(dragEl, over.nextSibling);
-      }, { passive: false });
-
-      container.addEventListener("pointerup", finish);
-      container.addEventListener("pointercancel", finish);
+      const map = new Map(getItems().map((it) => [it.key, it]));
+      const next = keys.map((k) => map.get(k)).filter(Boolean);
+      setItems(next);
     }
+
+    dragEl = null;
+    pid = null;
+    moved = false;
+    tx = ty = 0;
+  }
+
+  container.addEventListener("pointerdown", (e) => {
+    const item = e.target.closest?.(".sortable-item");
+    if (!item || item.parentElement !== container) return;
+    if (e.target.closest?.("button")) return;
+
+    dragEl = item;
+    pid = e.pointerId;
+
+    sx = e.clientX;
+    sy = e.clientY;
+    lastX = sx;
+    lastY = sy;
+    tx = 0;
+    ty = 0;
+    moved = false;
+
+    dragEl.setPointerCapture(pid);
+    dragEl.style.willChange = "transform";
+    dragEl.classList.add("ring-2", "ring-blue-400", "z-10");
+    e.preventDefault();
+  }, { passive: false });
+
+  container.addEventListener("pointermove", (e) => {
+    if (!dragEl || e.pointerId !== pid) return;
+
+    const dx0 = e.clientX - sx;
+    const dy0 = e.clientY - sy;
+
+    if (!moved) {
+      if (Math.hypot(dx0, dy0) < TH) return;
+
+      moved = true;
+      // 讓 elementFromPoint 能抓到「下面那格」，不會永遠抓到自己
+      dragEl.style.pointerEvents = "none";
+
+      // 第一次進入拖曳：直接把目前位移當作 tx/ty
+      tx = dx0;
+      ty = dy0;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      e.preventDefault();
+    } else {
+      // 後續：用累積位移避免 reorder 後的基準點改變造成瞬移
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      tx += dx;
+      ty += dy;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      e.preventDefault();
+    }
+
+    dragEl.style.transform = `translate(${tx}px, ${ty}px)`;
+
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const over = el?.closest?.(".sortable-item");
+    if (!over || over === dragEl || over.parentElement !== container) return;
+
+    const r = over.getBoundingClientRect();
+    const before =
+      (e.clientY < r.top + r.height / 2) ||
+      (e.clientY >= r.top && e.clientY <= r.bottom && e.clientX < r.left + r.width / 2);
+
+    // reorder 會讓 dragEl 的「基準位置」改變，導致畫面瞬移
+    // 先記錄 reorder 前後的 rect，補回差值，讓拖曳手感連續
+    const rectBefore = dragEl.getBoundingClientRect();
+    if (before) container.insertBefore(dragEl, over);
+    else container.insertBefore(dragEl, over.nextSibling);
+    const rectAfter = dragEl.getBoundingClientRect();
+
+    tx += (rectBefore.left - rectAfter.left);
+    ty += (rectBefore.top - rectAfter.top);
+    dragEl.style.transform = `translate(${tx}px, ${ty}px)`;
+  }, { passive: false });
+
+  container.addEventListener("pointerup", finish);
+  container.addEventListener("pointercancel", finish);
+}
 
     // 只綁一次排序（render 時不重綁）
     enablePointerSort(imgPreview, () => selectedItems, (next) => { selectedItems = next; });
