@@ -722,7 +722,7 @@ async function onUnadopt() {
     await deleteAllUnder(`adopted/${currentDocId}`); // 清掉合照
     await updateDoc(doc(db, "pets", currentDocId), {
       status: "available",
-      adoptedAt: deleteField(),
+      adoptedAt: window.deleteField(),
       adoptedPhotos: [],
       showOnHome: false,
       showOnCats: true,
