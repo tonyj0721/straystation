@@ -757,207 +757,55 @@
     syncBreedSelectors(); // 初始化一次
 
     // ===============================
-// 新增：圖片選取/預覽（最多 5 張） + 拖曳排序（桌機/手機/DevTools 裝置模式）
-// ===============================
-const imgFiles = $("#imgFiles");
-const btnPick = $("#btnPick");
-const fileCount = $("#fileCount");
-const imgPreview = $("#imgPreview");
-let selectedFiles = []; // 暫存待上傳檔案（依照預覽排序）
+    // 新增：圖片選取/預覽（最多 5 張）
+    // ===============================
+    const imgFiles = $("#imgFiles");
+    const btnPick = $("#btnPick");
+    const fileCount = $("#fileCount");
+    const imgPreview = $("#imgPreview");
+    let selectedFiles = []; // 暫存待上傳檔案
 
-// ObjectURL 快取（避免反覆 re-render 造成記憶體累積）
-const __regFileKeyMap = new WeakMap();
-const __regFileUrlMap = new WeakMap();
-let __regSeq = 0;
+    btnPick?.addEventListener("click", () => imgFiles.click());
 
-const __regGetKey = (file) => {
-  if (!file) return "";
-  if (!__regFileKeyMap.has(file)) __regFileKeyMap.set(file, `rf${++__regSeq}`);
-  return __regFileKeyMap.get(file);
-};
+    // 渲染預覽格子 + 刪除按鈕
+    function renderPreviews() {
+      fileCount.textContent = `已選 ${selectedFiles.length} / 5 張`;
 
-const __regGetUrl = (file) => {
-  if (!file) return "";
-  if (!__regFileUrlMap.has(file)) __regFileUrlMap.set(file, URL.createObjectURL(file));
-  return __regFileUrlMap.get(file);
-};
-
-const __regRevokeUrl = (file) => {
-  const u = __regFileUrlMap.get(file);
-  if (u) {
-    URL.revokeObjectURL(u);
-    __regFileUrlMap.delete(file);
-  }
-};
-
-const __regMoveArrayItem = (arr, from, to) => {
-  if (!Array.isArray(arr)) return;
-  if (from === to) return;
-  if (from < 0 || to < 0) return;
-  if (from >= arr.length || to >= arr.length) return;
-  const [it] = arr.splice(from, 1);
-  arr.splice(to, 0, it);
-};
-
-const __regInstallSortable = (container, onMove) => {
-  if (!container || container.__sortableInstalled) return;
-  container.__sortableInstalled = true;
-
-  let draggingEl = null;
-  let pointerId = null;
-
-  const getChildren = () => Array.from(container.children).filter((el) => el?.dataset?.key);
-  const isInteractive = (target) => !!target.closest("button,a,input,textarea,select,label");
-
-  const start = (item, pid, preventDefaultFn) => {
-    draggingEl = item;
-    pointerId = pid;
-    if (preventDefaultFn) preventDefaultFn();
-    try {
-      if (pointerId != null && draggingEl.setPointerCapture) draggingEl.setPointerCapture(pointerId);
-    } catch (_) {}
-  };
-
-  const move = (x, y, preventDefaultFn) => {
-    if (!draggingEl) return;
-    if (preventDefaultFn) preventDefaultFn();
-
-    const over = document.elementFromPoint(x, y)?.closest("[data-key]");
-    if (!over || over === draggingEl || !container.contains(over)) return;
-
-    const children = getChildren();
-    const from = children.indexOf(draggingEl);
-    const to = children.indexOf(over);
-    if (from === -1 || to === -1 || from === to) return;
-
-    if (from < to) container.insertBefore(draggingEl, over.nextSibling);
-    else container.insertBefore(draggingEl, over);
-
-    if (typeof onMove === "function") onMove(from, to);
-  };
-
-  const end = () => {
-    if (!draggingEl) return;
-    try {
-      if (pointerId != null && draggingEl.releasePointerCapture) draggingEl.releasePointerCapture(pointerId);
-    } catch (_) {}
-    draggingEl = null;
-    pointerId = null;
-  };
-
-  if (window.PointerEvent) {
-    container.addEventListener(
-      "pointerdown",
-      (e) => {
-        const item = e.target.closest("[data-key]");
-        if (!item || !container.contains(item)) return;
-        if (isInteractive(e.target)) return;
-        start(item, e.pointerId, () => e.cancelable && e.preventDefault());
-      },
-      { passive: false }
-    );
-
-    container.addEventListener(
-      "pointermove",
-      (e) => {
-        if (!draggingEl) return;
-        if (pointerId != null && e.pointerId !== pointerId) return;
-        move(e.clientX, e.clientY, () => e.cancelable && e.preventDefault());
-      },
-      { passive: false }
-    );
-
-    container.addEventListener("pointerup", end);
-    container.addEventListener("pointercancel", end);
-  } else {
-    container.addEventListener(
-      "touchstart",
-      (e) => {
-        const item = e.target.closest("[data-key]");
-        if (!item || !container.contains(item)) return;
-        if (isInteractive(e.target)) return;
-        start(item, null, () => e.cancelable && e.preventDefault());
-      },
-      { passive: false }
-    );
-
-    container.addEventListener(
-      "touchmove",
-      (e) => {
-        if (!draggingEl) return;
-        const t = e.touches?.[0];
-        if (!t) return;
-        move(t.clientX, t.clientY, () => e.cancelable && e.preventDefault());
-      },
-      { passive: false }
-    );
-
-    container.addEventListener("touchend", end);
-    container.addEventListener("touchcancel", end);
-  }
-};
-
-btnPick?.addEventListener("click", () => imgFiles.click());
-
-// 刪除（事件代理，避免拖曳改序後 index 對不上）
-if (imgPreview && !imgPreview.__removeBound) {
-  imgPreview.__removeBound = true;
-  imgPreview.addEventListener("click", (e) => {
-    const btn = e.target.closest("button[data-remove-key]");
-    if (!btn) return;
-    e.preventDefault();
-    e.stopPropagation();
-
-    const key = btn.getAttribute("data-remove-key");
-    const idx = selectedFiles.findIndex((f) => __regGetKey(f) === key);
-    if (idx === -1) return;
-
-    __regRevokeUrl(selectedFiles[idx]);
-    selectedFiles.splice(idx, 1);
-    renderPreviews();
-  });
-
-  __regInstallSortable(imgPreview, (from, to) => __regMoveArrayItem(selectedFiles, from, to));
-}
-
-// 渲染預覽格子
-function renderPreviews() {
-  fileCount.textContent = `已選 ${selectedFiles.length} / 5 張`;
-
-  imgPreview.innerHTML = selectedFiles
-    .map((f) => {
-      const key = __regGetKey(f);
-      const u = __regGetUrl(f);
-      return `
-        <div class="relative" data-key="${key}" style="touch-action:none; user-select:none; -webkit-user-select:none;">
-          <img draggable="false" style="touch-action:none; -webkit-user-drag:none;" class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽">
-          <button type="button"
-                  data-remove-key="${key}"
-                  class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center"
-                  aria-label="刪除這張">✕</button>
+      imgPreview.innerHTML = selectedFiles
+        .map((f, i) => {
+          const u = URL.createObjectURL(f);
+          return `
+        <div class="relative">
+          <img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽">
+          <button data-idx="${i}" class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button>
         </div>
       `;
-    })
-    .join("");
-}
+        })
+        .join("");
 
-// 檔案挑選後：合併並截斷到 5 張
-imgFiles?.addEventListener("change", () => {
-  const incoming = Array.from(imgFiles.files || []);
-  const next = selectedFiles.concat(incoming);
+      // 綁定刪除單張圖片
+      imgPreview.querySelectorAll("button[data-idx]").forEach((btn) =>
+        btn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const i = +btn.dataset.idx;
+          selectedFiles.splice(i, 1);
+          renderPreviews();
+        })
+      );
+    }
 
-  if (next.length > 5) {
-    Swal.fire({ icon: "warning", title: "最多 5 張照片" });
-  }
-
-  // 若超過上限，釋放被截掉的 ObjectURL
-  const sliced = next.slice(0, 5);
-  next.slice(5).forEach((f) => __regRevokeUrl(f));
-  selectedFiles = sliced;
-
-  renderPreviews();
-  imgFiles.value = ""; // 清空 input，避免重複選取不到
-});
+    // 檔案挑選後：合併並截斷到 5 張
+    imgFiles?.addEventListener("change", () => {
+      const incoming = Array.from(imgFiles.files || []);
+      const next = selectedFiles.concat(incoming);
+      if (next.length > 5) {
+        Swal.fire({ icon: "warning", title: "最多 5 張照片" });
+      }
+      selectedFiles = next.slice(0, 5);
+      renderPreviews();
+      imgFiles.value = ""; // 清空 input，避免重複選取不到
+    });
 
     // ===============================
     // 捲到最上方（保險版）
@@ -1095,8 +943,6 @@ imgFiles?.addEventListener("change", () => {
 
         // 重置表單與選擇圖片（先做，避免 DOM 還在變動導致 smooth scroll 卡住）
         e.target.reset();
-        // 釋放 ObjectURL，避免長時間操作記憶體累積
-        try { selectedFiles.forEach((f) => __regRevokeUrl(f)); } catch (_) {}
         imgPreview.innerHTML = "";
         selectedFiles = [];
         fileCount.textContent = "已選 0 / 5 張";
