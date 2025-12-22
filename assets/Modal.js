@@ -523,6 +523,7 @@ async function saveEdit() {
     const { items, remove } = editImagesState;
     const newUrls = [];
 
+    // 上傳新增檔案
     for (const it of (items || [])) {
       if (it?.type === 'keep') {
         newUrls.push(it.url);
@@ -715,7 +716,7 @@ function paintEditPreview() {
   });
 }
 
-// 新增圖片（尊守上限 5）
+// 新增圖片（遵守上限 5）
 editFiles.addEventListener("change", () => {
   const incoming = Array.from(editFiles.files || []);
   const total = editImagesState.items.length + incoming.length;
