@@ -32,6 +32,7 @@ function enablePointerSort(container, getItems, setItems) {
 
     dragEl.classList.remove("ring-2", "ring-blue-400", "z-10");
     dragEl.style.transform = "";
+    dragEl.style.pointerEvents = "";
     dragEl.style.willChange = "";
 
     if (moved) {
@@ -74,6 +75,7 @@ function enablePointerSort(container, getItems, setItems) {
     if (!moved) {
       if (Math.hypot(dx, dy) < TH) return;
       moved = true;
+        dragEl.style.pointerEvents = "none";
     }
 
     dragEl.style.transform = `translate(${dx}px, ${dy}px)`;
