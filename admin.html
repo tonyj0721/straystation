@@ -765,6 +765,36 @@
     const imgPreview = $("#imgPreview");
     let selectedFiles = []; // 暫存待上傳檔案
 
+    // ✅ 讓預覽可以拖曳排序（含手機）：用 SortableJS + 為每張圖綁定穩定 uid
+    let imgSortable = null;
+    const ensureFileUid = (f) => {
+      if (!f.__uid) f.__uid = `f_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+      return f.__uid;
+    };
+    function ensureImgSortable() {
+      if (!window.Sortable || !imgPreview) return;
+      if (imgSortable) return;
+      imgSortable = new Sortable(imgPreview, {
+        animation: 150,
+        draggable: ".photo-item",
+        delay: 250,
+        delayOnTouchOnly: true,
+        touchStartThreshold: 5,
+        forceFallback: true,
+        fallbackOnBody: true,
+        fallbackTolerance: 3,
+        ghostClass: "opacity-40",
+        chosenClass: "ring-2 ring-gray-400",
+        filter: "button",
+        preventOnFilter: false,
+        onEnd: () => {
+          const uids = Array.from(imgPreview.children).map((el) => el.dataset.uid).filter(Boolean);
+          const map = new Map(selectedFiles.map((f) => [f.__uid, f]));
+          selectedFiles = uids.map((id) => map.get(id)).filter(Boolean);
+        },
+      });
+    }
+
     btnPick?.addEventListener("click", () => imgFiles.click());
 
     // 渲染預覽格子 + 刪除按鈕
@@ -772,27 +802,35 @@
       fileCount.textContent = `已選 ${selectedFiles.length} / 5 張`;
 
       imgPreview.innerHTML = selectedFiles
-        .map((f, i) => {
+        .map((f) => {
+          const uid = ensureFileUid(f);
           const u = URL.createObjectURL(f);
           return `
-        <div class="relative">
-          <img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽">
-          <button data-idx="${i}" class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button>
+        <div class="relative photo-item" data-uid="${uid}">
+          <img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽" draggable="false" style="touch-action: pan-y;">
+          <div class="drag-handle absolute bottom-1 left-1 bg-black/50 text-white rounded-full w-7 h-7 flex items-center justify-center"
+               style="touch-action:none; -webkit-user-select:none; user-select:none;" aria-label="拖曳排序">≡</div>
+          <button type="button" data-del="1" data-uid="${uid}"
+                  class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center"
+                  aria-label="刪除這張">✕</button>
         </div>
       `;
         })
         .join("");
 
-      // 綁定刪除單張圖片
-      imgPreview.querySelectorAll("button[data-idx]").forEach((btn) =>
+      // 綁定刪除單張圖片（用 uid，避免拖曳後 index 對不到）
+      imgPreview.querySelectorAll('button[data-del="1"]').forEach((btn) =>
         btn.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
-          const i = +btn.dataset.idx;
-          selectedFiles.splice(i, 1);
+          const uid = btn.dataset.uid;
+          const i = selectedFiles.findIndex((f) => f.__uid === uid);
+          if (i >= 0) selectedFiles.splice(i, 1);
           renderPreviews();
         })
       );
+
+      ensureImgSortable();
     }
 
     // 檔案挑選後：合併並截斷到 5 張
@@ -1314,6 +1352,7 @@
     loadPets();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
   <script src="assets/Modal.js"></script>
   <script src="assets/Lightbox.js"></script>
   <script>
