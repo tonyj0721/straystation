@@ -757,275 +757,123 @@
     syncBreedSelectors(); // 初始化一次
 
     // ===============================
-    // 新增：圖片選取/預覽（最多 5 張）＋ 拖曳排序（iPhone 不卡）
+    // 新增：圖片選取/預覽（最多 5 張）
     // ===============================
     const imgFiles = $("#imgFiles");
     const btnPick = $("#btnPick");
     const fileCount = $("#fileCount");
     const imgPreview = $("#imgPreview");
+        let selectedFiles = []; // [{id, file}] 暫存待上傳檔案（可拖曳排序）
 
-    // 狀態：用 key 維護順序；objectURL 只建立一次（拖曳時不重畫、不重新解碼）
-    let selectedItems = []; // [{ key, file, url }]
-    let _imgKeySeq = 0;
-
-    function makeKey(prefix = "img") {
-      _imgKeySeq += 1;
-      return `${prefix}_${Date.now()}_${_imgKeySeq}`;
-    }
-
-    function safeRevokeObjectURL(u) {
-      try { if (u) URL.revokeObjectURL(u); } catch { }
-    }
-
-    function revokeItem(it) {
-      safeRevokeObjectURL(it?.url);
-    }
-
-    function clearSelectedItems() {
-      selectedItems.forEach(revokeItem);
-      selectedItems = [];
-      if (imgPreview) imgPreview.innerHTML = "";
-      if (fileCount) fileCount.textContent = "已選 0 / 5 張";
-      if (imgFiles) imgFiles.value = "";
-    }
-
-    function renderPreviews() {
-      if (!imgPreview) return;
-      fileCount.textContent = `已選 ${selectedItems.length} / 5 張`;
-
-      imgPreview.innerHTML = selectedItems
-        .map((it) => `
-        <div class="relative sortable-item" data-key="${it.key}" style="touch-action:none;">
-          <img class="w-full aspect-square object-cover rounded-lg" src="${it.url}" alt="預覽" draggable="false" decoding="async">
-          <button type="button" data-delkey="${it.key}" class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center" aria-label="刪除這張">✕</button>
-        </div>
-      `)
-        .join("");
-    }
-
-    // iPhone 友善排序：Pointer Events + 直接移動 DOM（拖曳時不重畫）
-    function enablePointerSort(container, getItems, setItems) {
-  if (!container || container.dataset.sortBound) return;
-  container.dataset.sortBound = "1";
-
-  let dragEl = null;
-  let pid = null;
-
-  // sx/sy 用來判斷是否超過「拖曳門檻」
-  let sx = 0, sy = 0;
-
-  // lastX/lastY + tx/ty 用「累積位移」避免 reorder 後跳很遠（iOS Safari 常見）
-  let lastX = 0, lastY = 0;
-  let tx = 0, ty = 0;
-
-  let moved = false;
-  const TH = 6; // tap vs drag 門檻（px）
-
-  // ✅ 提升靈敏度：用「拖曳中縮圖的中心點」決定插入位置（不是手指點）
-  // 同時用「最近的那格」判定，避免手指落在 gap 時抓不到目標
-  let lastOverKey = null;
-  let lastBefore = null;
-
-  function getHitPoint() {
-    const r = dragEl.getBoundingClientRect(); // 含 transform 後的位置
-    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-  }
-
-  function findClosest(x, y) {
-    const els = Array.from(container.querySelectorAll(".sortable-item"))
-      .filter((el) => el !== dragEl);
-
-    let best = null;
-    let bestD = Infinity;
-
-    for (const el of els) {
-      const r = el.getBoundingClientRect();
-      const cx = r.left + r.width / 2;
-      const cy = r.top + r.height / 2;
-      const d = (x - cx) * (x - cx) + (y - cy) * (y - cy);
-      if (d < bestD) {
-        bestD = d;
-        best = { el, r, cx, cy };
-      }
-    }
-    return best;
-  }
-
-  function commitOrderFromDOM() {
-    const keys = Array.from(container.querySelectorAll(".sortable-item"))
-      .map((el) => el.dataset.key);
-
-    const map = new Map(getItems().map((it) => [it.key, it]));
-    const next = keys.map((k) => map.get(k)).filter(Boolean);
-    setItems(next);
-  }
-
-  function finish() {
-    if (!dragEl) return;
-    try { dragEl.releasePointerCapture(pid); } catch { }
-
-    dragEl.classList.remove("ring-2", "ring-blue-400", "z-10");
-    dragEl.style.transform = "";
-    dragEl.style.pointerEvents = "";
-    dragEl.style.willChange = "";
-
-    if (moved) commitOrderFromDOM();
-
-    dragEl = null;
-    pid = null;
-    moved = false;
-    tx = ty = 0;
-    lastOverKey = null;
-    lastBefore = null;
-  }
-
-  container.addEventListener("pointerdown", (e) => {
-    const item = e.target.closest?.(".sortable-item");
-    if (!item || item.parentElement !== container) return;
-    if (e.target.closest?.("button")) return;
-
-    dragEl = item;
-    pid = e.pointerId;
-
-    sx = e.clientX;
-    sy = e.clientY;
-    lastX = sx;
-    lastY = sy;
-    tx = 0;
-    ty = 0;
-    moved = false;
-    lastOverKey = null;
-    lastBefore = null;
-
-    dragEl.setPointerCapture(pid);
-    dragEl.style.willChange = "transform";
-    dragEl.classList.add("ring-2", "ring-blue-400", "z-10");
-    e.preventDefault();
-  }, { passive: false });
-
-  container.addEventListener("pointermove", (e) => {
-    if (!dragEl || e.pointerId !== pid) return;
-
-    const dx0 = e.clientX - sx;
-    const dy0 = e.clientY - sy;
-
-    if (!moved) {
-      if (Math.hypot(dx0, dy0) < TH) return;
-
-      moved = true;
-
-      // 避免任何點擊/hover 干擾（命中判斷改用 rect，不再依賴 elementFromPoint）
-      dragEl.style.pointerEvents = "none";
-
-      tx = dx0;
-      ty = dy0;
-      lastX = e.clientX;
-      lastY = e.clientY;
-      e.preventDefault();
-    } else {
-      const dx = e.clientX - lastX;
-      const dy = e.clientY - lastY;
-      tx += dx;
-      ty += dy;
-      lastX = e.clientX;
-      lastY = e.clientY;
-      e.preventDefault();
-    }
-
-    dragEl.style.transform = `translate(${tx}px, ${ty}px)`;
-
-    // 用拖曳元素的「中心點」找最近的目標格（更直覺也更靈敏）
-    const { x: hx, y: hy } = getHitPoint();
-    const hit = findClosest(hx, hy);
-    if (!hit) return;
-
-    const over = hit.el;
-    const r = hit.r;
-
-    // 在同一列附近用 x 判斷，跨列用 y 判斷（有一點容忍區避免抖動）
-    const biasY = r.height * 0.20;
-    let before;
-    if (hy < hit.cy - biasY) before = true;
-    else if (hy > hit.cy + biasY) before = false;
-    else before = hx < hit.cx;
-
-    const overKey = over.dataset.key;
-    if (overKey === lastOverKey && before === lastBefore) return;
-
-    // 若其實已經在正確相對位置，就不做無效 insert（減少抖動）
-    if (before) {
-      if (dragEl.nextSibling === over) {
-        lastOverKey = overKey; lastBefore = before;
-        return;
-      }
-    } else {
-      if (over.nextSibling === dragEl) {
-        lastOverKey = overKey; lastBefore = before;
-        return;
-      }
-    }
-
-    // reorder 前後補差值，避免瞬移
-    const rectBefore = dragEl.getBoundingClientRect();
-    if (before) container.insertBefore(dragEl, over);
-    else container.insertBefore(dragEl, over.nextSibling);
-    const rectAfter = dragEl.getBoundingClientRect();
-
-    tx += (rectBefore.left - rectAfter.left);
-    ty += (rectBefore.top - rectAfter.top);
-    dragEl.style.transform = `translate(${tx}px, ${ty}px)`;
-
-    lastOverKey = overKey;
-    lastBefore = before;
-  }, { passive: false });
-
-  container.addEventListener("pointerup", finish);
-  container.addEventListener("pointercancel", finish);
-}
-
-    // 只綁一次排序（render 時不重綁）
-    enablePointerSort(imgPreview, () => selectedItems, (next) => { selectedItems = next; });
+    const uid = () => (crypto?.randomUUID
+      ? crypto.randomUUID()
+      : (Date.now().toString(36) + Math.random().toString(36).slice(2)));
 
     btnPick?.addEventListener("click", () => imgFiles.click());
 
-    // 刪除（事件委派，避免重繪重綁）
-    imgPreview?.addEventListener("click", (e) => {
-      const btn = e.target.closest?.("button[data-delkey]");
-      if (!btn) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const key = btn.dataset.delkey;
+    // 依照 DOM 順序回寫 selectedFiles
+    function reorderSelectedFilesByDom(container) {
+      const order = Array.from(container.querySelectorAll("[data-id]")).map(el => el.dataset.id);
+      const map = new Map(selectedFiles.map(it => [it.id, it]));
+      selectedFiles = order.map(id => map.get(id)).filter(Boolean);
+    }
 
-      const idx = selectedItems.findIndex((x) => x.key === key);
-      if (idx >= 0) {
-        revokeItem(selectedItems[idx]);
-        selectedItems.splice(idx, 1);
-        renderPreviews();
-      }
-    });
+    // 讓縮圖區支援「滑鼠/觸控拖曳排序」（不靠 HTML5 drag&drop）
+    function enablePointerReorder(container) {
+      let dragging = null;
+      let pid = null;
 
-    // 檔案挑選後：疊加並限制最多 5 張（URL 只做一次）
+      const finish = () => {
+        if (!dragging) return;
+        dragging.style.opacity = "";
+        dragging.style.transform = "";
+        dragging = null;
+        pid = null;
+
+        reorderSelectedFilesByDom(container);
+        renderPreviews(); // 重新掛事件 & 更新刪除 idx
+      };
+
+      container.querySelectorAll("[data-id]").forEach((el) => {
+        el.addEventListener("pointerdown", (e) => {
+          if (e.target.closest("button")) return;
+          if (typeof e.button === "number" && e.button !== 0) return; // 只吃左鍵/觸控
+
+          dragging = el;
+          pid = e.pointerId;
+          try { el.setPointerCapture(pid); } catch {}
+          el.style.opacity = "0.6";
+          el.style.transform = "scale(0.98)";
+          e.preventDefault();
+        });
+
+        el.addEventListener("pointermove", (e) => {
+          if (!dragging || e.pointerId !== pid) return;
+
+          const over = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-id]");
+          if (!over || over === dragging || over.parentElement !== container) return;
+
+          const r = over.getBoundingClientRect();
+          const before = e.clientY < r.top + r.height / 2;
+          if (before) container.insertBefore(dragging, over);
+          else container.insertBefore(dragging, over.nextSibling);
+        });
+
+        el.addEventListener("pointerup", (e) => {
+          if (e.pointerId !== pid) return;
+          finish();
+        });
+
+        el.addEventListener("pointercancel", (e) => {
+          if (e.pointerId !== pid) return;
+          finish();
+        });
+      });
+    }
+
+    // 渲染預覽格子 + 刪除按鈕
+    function renderPreviews() {
+      fileCount.textContent = `已選 ${selectedFiles.length} / 5 張`;
+
+      imgPreview.innerHTML = selectedFiles
+        .map((it, i) => {
+          const u = URL.createObjectURL(it.file);
+          return `
+        <div class="relative cursor-grab select-none" style="touch-action:none;" data-id="${it.id}">
+          <img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽">
+          <button data-idx="${i}" class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button>
+        </div>
+      `;
+        })
+        .join("");
+
+      // 綁定刪除單張圖片
+      imgPreview.querySelectorAll("button[data-idx]").forEach((btn) =>
+        btn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const i = +btn.dataset.idx;
+          selectedFiles.splice(i, 1);
+          renderPreviews();
+        })
+      );
+
+      // ✅ 觸控/滑鼠拖曳排序
+      enablePointerReorder(imgPreview);
+    }
+
+    // 檔案挑選後：合併並截斷到 5 張
     imgFiles?.addEventListener("change", () => {
-      const incoming = Array.from(imgFiles.files || []);
-      const room = 5 - selectedItems.length;
-
-      if (incoming.length > room) {
+      const incoming = Array.from(imgFiles.files || []).map((f) => ({ id: uid(), file: f }));
+      const next = selectedFiles.concat(incoming);
+      if (next.length > 5) {
         Swal.fire({ icon: "warning", title: "最多 5 張照片" });
       }
-
-      const picked = incoming.slice(0, Math.max(0, room)).map((f) => ({
-        key: makeKey("add"),
-        file: f,
-        url: URL.createObjectURL(f),
-      }));
-
-      selectedItems = selectedItems.concat(picked);
+      selectedFiles = next.slice(0, 5);
       renderPreviews();
       imgFiles.value = ""; // 清空 input，避免重複選取不到
     });
-
-
-    // ===============================
+// ===============================
     // 捲到最上方（保險版）
     // ===============================
     function forceScrollTop() {
@@ -1134,7 +982,7 @@
 
         // 2) 逐張上傳圖片，取得 Storage URL
         const urls = [];
-        for (const it of selectedItems) {
+        for (const it of selectedFiles) {
           const f = it.file;
           const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
           const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
@@ -1162,7 +1010,9 @@
 
         // 重置表單與選擇圖片（先做，避免 DOM 還在變動導致 smooth scroll 卡住）
         e.target.reset();
-        clearSelectedItems();
+        imgPreview.innerHTML = "";
+        selectedFiles = [];
+        fileCount.textContent = "已選 0 / 5 張";
         syncBreedSelectors();
 
         // 先啟動重新載入列表（避免等到提示結束才開始抓資料）
