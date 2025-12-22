@@ -757,93 +757,257 @@
     syncBreedSelectors(); // 初始化一次
 
     // ===============================
-    // 新增：圖片選取/預覽（最多 5 張）
-    // ===============================
-    const imgFiles = $("#imgFiles");
-    const btnPick = $("#btnPick");
-    const fileCount = $("#fileCount");
-    const imgPreview = $("#imgPreview");
-    let selectedFiles = []; // 暫存待上傳檔案
+// 新增：圖片選取/預覽（最多 5 張）- 不卡頓版（縮圖/快取/手機拖曳排序）
+// ===============================
+const imgFiles = $("#imgFiles");
+const btnPick = $("#btnPick");
+const fileCount = $("#fileCount");
+const imgPreview = $("#imgPreview");
 
-    // ✅ 讓預覽可以拖曳排序（含手機）：用 SortableJS + 為每張圖綁定穩定 uid
-    let imgSortable = null;
-    const ensureFileUid = (f) => {
-      if (!f.__uid) f.__uid = `f_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-      return f.__uid;
-    };
-    function ensureImgSortable() {
-      if (!window.Sortable || !imgPreview) return;
-      if (imgSortable) return;
-      imgSortable = new Sortable(imgPreview, {
-        animation: 150,
-        draggable: ".photo-item",
-        delay: 250,
-        delayOnTouchOnly: true,
-        touchStartThreshold: 5,
-        forceFallback: true,
-        fallbackOnBody: true,
-        fallbackTolerance: 3,
-        ghostClass: "opacity-40",
-        chosenClass: "ring-2 ring-gray-400",
-        filter: "button",
-        preventOnFilter: false,
-        onEnd: () => {
-          const uids = Array.from(imgPreview.children).map((el) => el.dataset.uid).filter(Boolean);
-          const map = new Map(selectedFiles.map((f) => [f.__uid, f]));
-          selectedFiles = uids.map((id) => map.get(id)).filter(Boolean);
-        },
+const MAX_FILES = 5;
+const PREVIEW_MAX = 720;      // 預覽縮圖長邊上限（越小越順）
+const PREVIEW_QUALITY = 0.82; // JPEG 品質（0~1）
+
+let selectedFiles = []; // 待上傳檔案（順序 = 上傳順序）
+
+// File → 縮圖 objectURL（避免每次重畫都重新解碼）
+const thumbUrlCache = new Map();
+const thumbPromiseCache = new Map();
+// 同時跑 2 張縮圖（更快，但不會像全並發那麼容易卡）
+const THUMB_CONCURRENCY = 2;
+let thumbActive = 0;
+const thumbJobQueue = [];
+
+function runThumbQueue() {
+  while (thumbActive < THUMB_CONCURRENCY && thumbJobQueue.length) {
+    const job = thumbJobQueue.shift();
+    thumbActive++;
+
+    makeThumbURL(job.file)
+      .then(job.resolve, job.reject)
+      .finally(() => {
+        thumbActive--;
+        runThumbQueue();
       });
-    }
+  }
+}
 
-    btnPick?.addEventListener("click", () => imgFiles.click());
+const EMPTY_GIF = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 
-    // 渲染預覽格子 + 刪除按鈕
-    function renderPreviews() {
-      fileCount.textContent = `已選 ${selectedFiles.length} / 5 張`;
+btnPick?.addEventListener("click", () => imgFiles.click());
 
-      imgPreview.innerHTML = selectedFiles
-        .map((f) => {
-          const uid = ensureFileUid(f);
-          const u = URL.createObjectURL(f);
-          return `
-        <div class="relative photo-item" data-uid="${uid}">
-          <img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽" draggable="false" style="touch-action: pan-y;">
-          <div class="drag-handle absolute bottom-1 left-1 bg-black/50 text-white rounded-full w-7 h-7 flex items-center justify-center"
-               style="touch-action:none; -webkit-user-select:none; user-select:none;" aria-label="拖曳排序">≡</div>
-          <button type="button" data-del="1" data-uid="${uid}"
-                  class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center"
-                  aria-label="刪除這張">✕</button>
-        </div>
-      `;
-        })
-        .join("");
+function revokeThumb(file) {
+  const u = thumbUrlCache.get(file);
+  if (u) {
+    URL.revokeObjectURL(u);
+    thumbUrlCache.delete(file);
+  }
+  thumbPromiseCache.delete(file);
+}
 
-      // 綁定刪除單張圖片（用 uid，避免拖曳後 index 對不到）
-      imgPreview.querySelectorAll('button[data-del="1"]').forEach((btn) =>
-        btn.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          const uid = btn.dataset.uid;
-          const i = selectedFiles.findIndex((f) => f.__uid === uid);
-          if (i >= 0) selectedFiles.splice(i, 1);
-          renderPreviews();
-        })
-      );
+async function decodeToBitmap(file) {
+  // createImageBitmap 在大多數現代瀏覽器/手機上是非阻塞解碼
+  if (window.createImageBitmap) {
+    try { return await createImageBitmap(file); } catch (_) { /* fallback */ }
+  }
 
-      ensureImgSortable();
-    }
-
-    // 檔案挑選後：合併並截斷到 5 張
-    imgFiles?.addEventListener("change", () => {
-      const incoming = Array.from(imgFiles.files || []);
-      const next = selectedFiles.concat(incoming);
-      if (next.length > 5) {
-        Swal.fire({ icon: "warning", title: "最多 5 張照片" });
-      }
-      selectedFiles = next.slice(0, 5);
-      renderPreviews();
-      imgFiles.value = ""; // 清空 input，避免重複選取不到
+  // fallback：用 <img> 解碼（比較可能卡，但至少可用）
+  const raw = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => {
+      const im = new Image();
+      im.onload = () => res(im);
+      im.onerror = rej;
+      im.src = raw;
     });
+    const c = document.createElement("canvas");
+    c.width = img.naturalWidth;
+    c.height = img.naturalHeight;
+    const g = c.getContext("2d");
+    g.drawImage(img, 0, 0);
+    return await createImageBitmap(c);
+  } finally {
+    URL.revokeObjectURL(raw);
+  }
+}
+
+async function makeThumbURL(file) {
+  const bmp = await decodeToBitmap(file);
+  const W = bmp.width, H = bmp.height;
+  const scale = Math.min(1, PREVIEW_MAX / Math.max(W, H));
+  const w = Math.max(1, Math.round(W * scale));
+  const h = Math.max(1, Math.round(H * scale));
+
+  // 讓 UI 先喘口氣（避免「圖片顯示瞬間卡住」）
+  await new Promise((r) => requestAnimationFrame(r));
+
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const g = c.getContext("2d", { alpha: false, desynchronized: true });
+  g.drawImage(bmp, 0, 0, w, h);
+  bmp.close?.();
+
+  const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", PREVIEW_QUALITY));
+  return URL.createObjectURL(blob);
+}
+
+function ensureThumbURL(file) {
+  if (thumbUrlCache.has(file)) return Promise.resolve(thumbUrlCache.get(file));
+  if (thumbPromiseCache.has(file)) return thumbPromiseCache.get(file);
+
+  const p = new Promise((resolve, reject) => {
+    thumbJobQueue.push({ file, resolve, reject });
+    runThumbQueue();
+  })
+    .then((url) => {
+      thumbUrlCache.set(file, url);
+      thumbPromiseCache.delete(file);
+      return url;
+    })
+    .catch((err) => {
+      thumbPromiseCache.delete(file);
+      throw err;
+    });
+
+  thumbPromiseCache.set(file, p);
+  return p;
+}
+
+function renderPreviews() {
+  fileCount.textContent = `已選 ${selectedFiles.length} / ${MAX_FILES} 張`;
+
+  imgPreview.innerHTML = "";
+  const frag = document.createDocumentFragment();
+
+  selectedFiles.forEach((file, i) => {
+    const wrap = document.createElement("div");
+    wrap.className = "relative touch-none select-none";
+    wrap.dataset.idx = String(i);
+
+    const img = document.createElement("img");
+    img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+    img.alt = "預覽";
+    img.decoding = "async";
+    img.loading = "lazy";
+    img.src = EMPTY_GIF;
+
+    // 先顯示空白，再異步塞縮圖，避免解碼瞬間卡頓
+    ensureThumbURL(file)
+      .then((url) => { img.src = url; })
+      .catch(() => {
+        // 真的不行就退回原圖（至少有預覽）
+        try {
+          const raw = URL.createObjectURL(file);
+          img.src = raw;
+          setTimeout(() => URL.revokeObjectURL(raw), 2000);
+        } catch { }
+      });
+
+    const btn = document.createElement("button");
+    btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
+    btn.dataset.idx = String(i);
+    btn.type = "button";
+    btn.textContent = "✕";
+    btn.setAttribute("aria-label", "刪除這張");
+
+    wrap.appendChild(img);
+    wrap.appendChild(btn);
+    frag.appendChild(wrap);
+  });
+
+  imgPreview.appendChild(frag);
+}
+
+// 刪除（事件代理）
+imgPreview.addEventListener("click", (e) => {
+  const btn = e.target.closest?.("button[data-idx]");
+  if (!btn) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const i = +btn.dataset.idx;
+  const f = selectedFiles[i];
+  if (f) revokeThumb(f);
+  selectedFiles.splice(i, 1);
+  renderPreviews();
+});
+
+// 手機可用的拖曳排序（Pointer Events；只在放開時重排一次）
+let dragFrom = null;
+let dragOver = null;
+let dragEl = null;
+
+function clearDragUI() {
+  imgPreview.querySelectorAll("[data-idx]").forEach((el) => {
+    el.classList.remove("ring-2", "ring-brand-500", "ring-brand-300", "opacity-80");
+  });
+}
+
+imgPreview.addEventListener("pointerdown", (e) => {
+  // 點到刪除鈕就不要進入拖曳
+  if (e.target.closest?.("button")) return;
+
+  const tile = e.target.closest?.("[data-idx]");
+  if (!tile) return;
+
+  dragEl = tile;
+  dragFrom = +tile.dataset.idx;
+  dragOver = dragFrom;
+
+  tile.setPointerCapture?.(e.pointerId);
+  clearDragUI();
+  tile.classList.add("ring-2", "ring-brand-500", "opacity-80");
+
+  // 避免觸控滾動搶走手勢
+  e.preventDefault();
+});
+
+imgPreview.addEventListener("pointermove", (e) => {
+  if (dragFrom == null) return;
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  const tile = el?.closest?.("[data-idx]");
+  if (!tile || !imgPreview.contains(tile)) return;
+
+  const idx = +tile.dataset.idx;
+  if (idx === dragOver) return;
+
+  dragOver = idx;
+  clearDragUI();
+  if (dragEl) dragEl.classList.add("ring-2", "ring-brand-500", "opacity-80");
+  tile.classList.add("ring-2", "ring-brand-300");
+});
+
+function finishDrag() {
+  if (dragFrom == null) return;
+
+  const from = dragFrom;
+  const to = dragOver;
+
+  clearDragUI();
+  dragFrom = dragOver = null;
+  dragEl = null;
+
+  if (to == null || to === from) return;
+
+  const moved = selectedFiles.splice(from, 1)[0];
+  selectedFiles.splice(to, 0, moved);
+
+  renderPreviews();
+}
+
+imgPreview.addEventListener("pointerup", finishDrag);
+imgPreview.addEventListener("pointercancel", finishDrag);
+
+// 檔案挑選後：合併並截斷到 MAX_FILES 張
+imgFiles?.addEventListener("change", () => {
+  const incoming = Array.from(imgFiles.files || []);
+  const next = selectedFiles.concat(incoming);
+  if (next.length > MAX_FILES) {
+    Swal.fire({ icon: "warning", title: `最多 ${MAX_FILES} 張照片` });
+  }
+  selectedFiles = next.slice(0, MAX_FILES);
+  renderPreviews();
+  imgFiles.value = ""; // 清空 input，避免重複選取不到
+});
 
     // ===============================
     // 捲到最上方（保險版）
@@ -1352,7 +1516,6 @@
     loadPets();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
   <script src="assets/Modal.js"></script>
   <script src="assets/Lightbox.js"></script>
   <script>
