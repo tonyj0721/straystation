@@ -514,7 +514,7 @@
         <div id="adoptedUpload" class="hidden">
           <input id="adoptedFiles" type="file" accept="image/*" multiple class="sr-only" />
           <div class="flex items-center gap-3 mb-2">
-            <button id="btnPickAdopted" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
+            <button id="btnPickAdopted" type="button" class="px-3 py-2 rounded-lg border border-gray-300 bg-brand-500 text-white text-sm">
               選擇合照
             </button>
             <span id="adoptedCount" class="text-xs text-gray-500"></span>
@@ -554,7 +554,7 @@
     import {
       getFirestore, collection, getDocs, query, orderBy, where,
       doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp, limit as fbLimit,
-      getCountFromServer, Timestamp
+      getCountFromServer, Timestamp, deleteField,
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
     import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject, listAll, } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
     import {
@@ -589,6 +589,7 @@
       db, storage,
       collection, getDocs, query, orderBy, where,
       doc, getDoc, updateDoc, deleteDoc, serverTimestamp, fbLimit,
+      deleteField,
       sRef, uploadBytes, getDownloadURL, deleteObject, listAll,
     });
 
