@@ -757,343 +757,366 @@
     syncBreedSelectors(); // 初始化一次
 
     // ===============================
-    // 新增：圖片選取/預覽（最多 5 張）＋ 拖曳排序（iPhone 不卡）
+    // 新增：圖片選取/預覽（最多 5 張）
     // ===============================
     const imgFiles = $("#imgFiles");
     const btnPick = $("#btnPick");
     const fileCount = $("#fileCount");
     const imgPreview = $("#imgPreview");
+        let selectedFiles = []; // [{id, file}] 暫存待上傳檔案（可拖曳排序）
 
-    // 狀態：用 key 維護順序；objectURL 只建立一次（拖曳時不重畫、不重新解碼）
-    let selectedItems = []; // [{ key, file, url }]
-    let _imgKeySeq = 0;
-
-    function makeKey(prefix = "img") {
-      _imgKeySeq += 1;
-      return `${prefix}_${Date.now()}_${_imgKeySeq}`;
-    }
-
-    function safeRevokeObjectURL(u) {
-      try { if (u) URL.revokeObjectURL(u); } catch { }
-    }
-
-    function revokeItem(it) {
-      safeRevokeObjectURL(it?.url);
-    }
-
-    function clearSelectedItems() {
-      selectedItems.forEach(revokeItem);
-      selectedItems = [];
-      if (imgPreview) imgPreview.innerHTML = "";
-      if (fileCount) fileCount.textContent = "已選 0 / 5 張";
-      if (imgFiles) imgFiles.value = "";
-    }
-
-    function renderPreviews() {
-      if (!imgPreview) return;
-      fileCount.textContent = `已選 ${selectedItems.length} / 5 張`;
-
-      imgPreview.innerHTML = selectedItems
-        .map((it) => `
-        <div class="relative sortable-item" data-key="${it.key}" style="touch-action:none;">
-          <img class="w-full aspect-square object-cover rounded-lg" src="${it.url}" alt="預覽" draggable="false" decoding="async">
-          <button type="button" data-delkey="${it.key}" class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center" aria-label="刪除這張">✕</button>
-        </div>
-      `)
-        .join("");
-    }
-
-    // iPhone 友善排序：Pointer Events + 直接移動 DOM（拖曳時不重畫）
-    function enablePointerSort(container, getItems, setItems) {
-  if (!container || container.dataset.sortBound) return;
-  container.dataset.sortBound = "1";
-
-  let dragEl = null;
-  let placeholder = null;
-  let pid = null;
-
-  let sx = 0, sy = 0;
-  let dx = 0, dy = 0;
-  let moved = false;
-  const TH = 6;
-
-  let startRect = null;
-  let axisLock = "free"; // "x" | "y" | "free"
-  let startCol = 0, startRow = 0;
-  let rafId = 0;
-  let lastIdx = -1;
-
-  function median(nums) {
-    const a = nums.filter((n) => Number.isFinite(n)).slice().sort((a, b) => a - b);
-    if (!a.length) return NaN;
-    const mid = Math.floor(a.length / 2);
-    return a.length % 2 ? a[mid] : (a[mid - 1] + a[mid]) / 2;
-  }
-
-  function computeGrid() {
-    const els = Array.from(container.querySelectorAll(".sortable-item, .sortable-placeholder"))
-      .filter((el) => el !== dragEl);
-
-    const rects = els
-      .map((el) => ({ el, r: el.getBoundingClientRect() }))
-      .filter((x) => x.r.width > 0 && x.r.height > 0);
-
-    if (!rects.length) return null;
-
-    rects.sort((a, b) => (a.r.top - b.r.top) || (a.r.left - b.r.left));
-
-    const h = rects[0].r.height;
-    const rowTol = Math.max(8, h * 0.6);
-
-    const top0 = rects[0].r.top;
-    const firstRow = rects
-      .filter((x) => Math.abs(x.r.top - top0) < rowTol)
-      .sort((a, b) => a.r.left - b.r.left);
-
-    const cols = Math.max(1, firstRow.length);
-
-    const colCenters = firstRow.map((x) => x.r.left + x.r.width / 2);
-    let colStep = cols >= 2 ? median(colCenters.slice(1).map((v, i) => v - colCenters[i])) : firstRow[0].r.width;
-    if (!Number.isFinite(colStep) || colStep <= 0) colStep = firstRow[0].r.width;
-
-    // rows
-    const rowCenters = [];
-    let lastTop = null;
-    for (const x of rects) {
-      if (lastTop === null || Math.abs(x.r.top - lastTop) >= rowTol) {
-        rowCenters.push(x.r.top + x.r.height / 2);
-        lastTop = x.r.top;
-      }
-    }
-    let rowStep = rowCenters.length >= 2 ? median(rowCenters.slice(1).map((v, i) => v - rowCenters[i])) : rects[0].r.height;
-    if (!Number.isFinite(rowStep) || rowStep <= 0) rowStep = rects[0].r.height;
-
-    return {
-      cols,
-      colStep,
-      rowStep,
-      firstCenterX: colCenters[0],
-      firstCenterY: rowCenters[0],
-    };
-  }
-
-  function beginDrag() {
-    startRect = dragEl.getBoundingClientRect();
-
-    placeholder = document.createElement("div");
-    placeholder.className = "sortable-placeholder";
-    placeholder.style.width = `${startRect.width}px`;
-    placeholder.style.height = `${startRect.height}px`;
-    placeholder.style.borderRadius = "0.5rem";
-    placeholder.style.background = "rgba(0,0,0,0.04)";
-    placeholder.style.border = "2px dashed rgba(0,0,0,0.12)";
-    placeholder.style.boxSizing = "border-box";
-
-    container.insertBefore(placeholder, dragEl);
-
-    // 用 placeholder 佔位，拖曳元素改為 fixed（避免 reorder 時瘋狂亂跳）
-    dragEl.classList.add("ring-2", "ring-blue-400");
-    dragEl.style.position = "fixed";
-    dragEl.style.left = `${startRect.left}px`;
-    dragEl.style.top = `${startRect.top}px`;
-    dragEl.style.width = `${startRect.width}px`;
-    dragEl.style.height = `${startRect.height}px`;
-    dragEl.style.margin = "0";
-    dragEl.style.zIndex = "9999";
-    dragEl.style.pointerEvents = "none";
-    dragEl.style.willChange = "transform";
-    dragEl.style.transform = "translate3d(0,0,0)";
-    dragEl.style.boxShadow = "0 10px 28px rgba(0,0,0,0.18)";
-
-    const grid = computeGrid();
-    const cols = grid?.cols || 1;
-    const kids = Array.from(container.children).filter((el) => el !== dragEl);
-    const startIndex = Math.max(0, kids.indexOf(placeholder));
-    startCol = startIndex % cols;
-    startRow = Math.floor(startIndex / cols);
-
-    lastIdx = -1;
-  }
-
-  function updatePlaceholder() {
-    if (!placeholder || !startRect) return;
-
-    const grid = computeGrid();
-    if (!grid) return;
-
-    const centerX = startRect.left + dx + startRect.width / 2;
-    const centerY = startRect.top + dy + startRect.height / 2;
-
-    let col = Math.floor((centerX - grid.firstCenterX + grid.colStep * 0.5) / grid.colStep);
-    let row = Math.floor((centerY - grid.firstCenterY + grid.rowStep * 0.5) / grid.rowStep);
-
-    if (!Number.isFinite(col)) col = 0;
-    if (!Number.isFinite(row)) row = 0;
-
-    col = Math.max(0, Math.min(grid.cols - 1, col));
-
-    // 方向鎖定：避免往上拖時，輕微左右抖動造成水平換位
-    if (axisLock === "y") col = startCol;
-    if (axisLock === "x") row = startRow;
-
-    const slotEls = Array.from(container.children).filter((el) => el !== dragEl);
-    const slotCount = slotEls.length; // 其他縮圖 + placeholder
-    let idx = row * grid.cols + col;
-    idx = Math.max(0, Math.min(slotCount - 1, idx));
-
-    if (idx === lastIdx) return;
-
-    const withoutPh = slotEls.filter((el) => el !== placeholder);
-    const ref = withoutPh[idx] || null; // idx==末端時 append
-    container.insertBefore(placeholder, ref);
-
-    lastIdx = idx;
-  }
-
-  function finish() {
-    if (!dragEl) return;
-    try { dragEl.releasePointerCapture(pid); } catch { }
-
-    if (rafId) cancelAnimationFrame(rafId);
-    rafId = 0;
-
-    if (placeholder) {
-      container.insertBefore(dragEl, placeholder);
-      placeholder.remove();
-      placeholder = null;
-    }
-
-    // 還原樣式
-    dragEl.classList.remove("ring-2", "ring-blue-400");
-    dragEl.style.position = "";
-    dragEl.style.left = "";
-    dragEl.style.top = "";
-    dragEl.style.width = "";
-    dragEl.style.height = "";
-    dragEl.style.margin = "";
-    dragEl.style.zIndex = "";
-    dragEl.style.pointerEvents = "";
-    dragEl.style.willChange = "";
-    dragEl.style.transform = "";
-    dragEl.style.boxShadow = "";
-
-    if (moved) {
-      const keys = Array.from(container.querySelectorAll(".sortable-item"))
-        .map((el) => el.dataset.key);
-
-      const map = new Map(getItems().map((it) => [it.key, it]));
-      const next = keys.map((k) => map.get(k)).filter(Boolean);
-      setItems(next);
-    }
-
-    dragEl = null;
-    pid = null;
-    moved = false;
-    dx = dy = 0;
-    startRect = null;
-    axisLock = "free";
-  }
-
-  container.addEventListener("pointerdown", (e) => {
-    const item = e.target.closest?.(".sortable-item");
-    if (!item || item.parentElement !== container) return;
-    if (e.target.closest?.("button")) return;
-
-    dragEl = item;
-    pid = e.pointerId;
-
-    sx = e.clientX;
-    sy = e.clientY;
-    dx = dy = 0;
-    moved = false;
-    startRect = null;
-    axisLock = "free";
-
-    dragEl.setPointerCapture(pid);
-    e.preventDefault();
-  }, { passive: false });
-
-  container.addEventListener("pointermove", (e) => {
-    if (!dragEl || e.pointerId !== pid) return;
-
-    const ddx = e.clientX - sx;
-    const ddy = e.clientY - sy;
-
-    if (!moved) {
-      if (Math.hypot(ddx, ddy) < TH) return;
-      moved = true;
-
-      // 一開始判斷主要方向（之後就固定），手感會穩很多
-      if (Math.abs(ddy) > Math.abs(ddx) * 1.2) axisLock = "y";
-      else if (Math.abs(ddx) > Math.abs(ddy) * 1.2) axisLock = "x";
-      else axisLock = "free";
-
-      beginDrag();
-    }
-
-    dx = ddx;
-    dy = ddy;
-
-    dragEl.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
-
-    if (!rafId) {
-      rafId = requestAnimationFrame(() => {
-        rafId = 0;
-        updatePlaceholder();
-      });
-    }
-
-    e.preventDefault();
-  }, { passive: false });
-
-  container.addEventListener("pointerup", finish);
-  container.addEventListener("pointercancel", finish);
-}
-
-
-    // 只綁一次排序（render 時不重綁）
-    enablePointerSort(imgPreview, () => selectedItems, (next) => { selectedItems = next; });
+    const uid = () => (crypto?.randomUUID
+      ? crypto.randomUUID()
+      : (Date.now().toString(36) + Math.random().toString(36).slice(2)));
 
     btnPick?.addEventListener("click", () => imgFiles.click());
 
-    // 刪除（事件委派，避免重繪重綁）
-    imgPreview?.addEventListener("click", (e) => {
-      const btn = e.target.closest?.("button[data-delkey]");
-      if (!btn) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const key = btn.dataset.delkey;
+    // 依照 DOM 順序回寫 selectedFiles
+    function reorderSelectedFilesByDom(container) {
+      const order = Array.from(container.querySelectorAll("[data-id]")).map(el => el.dataset.id);
+      const map = new Map(selectedFiles.map(it => [it.id, it]));
+      selectedFiles = order.map(id => map.get(id)).filter(Boolean);
+    }
 
-      const idx = selectedItems.findIndex((x) => x.key === key);
-      if (idx >= 0) {
-        revokeItem(selectedItems[idx]);
-        selectedItems.splice(idx, 1);
-        renderPreviews();
+    // 讓縮圖區支援「滑鼠/觸控拖曳排序」（不靠 HTML5 drag&drop）
+    // 改成 delegation + pointerEvents=none（解決 elementFromPoint 常常抓到自己、導致拖不動/不換位）
+    // 讓縮圖區支援「滑鼠/觸控拖曳排序」（Pointer Events；支援手機；避免亂跳）
+    // 做法：用「placeholder + 影子(ghost)」，拖曳時只移動 placeholder，不直接搬動原縮圖
+    function enablePointerReorder(container) {
+      if (!container || container.dataset.pointerReorderBound === "1") return;
+      container.dataset.pointerReorderBound = "1";
+
+      // 防止手機拖曳時被當成捲動
+      container.style.touchAction = "none";
+      container.style.userSelect = "none";
+      container.style.webkitUserSelect = "none";
+      container.style.overscrollBehavior = "contain";
+
+      let draggingEl = null;
+      let placeholder = null;
+      let ghost = null;
+      let pid = null;
+      let moved = false;
+      let startX = 0;
+      let startY = 0;
+      let offsetX = 0;
+      let offsetY = 0;
+      let raf = 0;
+      let lastX = 0;
+      let lastY = 0;
+
+      const TH = 4;   // 觸發拖曳門檻
+      const DZ = 8;   // 中線死區，避免在正中間抖動來回換位
+
+      function cleanup() {
+        if (raf) cancelAnimationFrame(raf);
+        raf = 0;
+        document.removeEventListener("pointermove", onMove, true);
+        document.removeEventListener("pointerup", onUp, true);
+        document.removeEventListener("pointercancel", onUp, true);
       }
-    });
 
-    // 檔案挑選後：疊加並限制最多 5 張（URL 只做一次）
+      function makePlaceholderFrom(el) {
+        const p = document.createElement("div");
+        p.className = el.className;
+        p.dataset.id = el.dataset.id;
+        p.dataset.placeholder = "1";
+        p.innerHTML = `
+          <div class="w-full aspect-square rounded-lg border-2 border-dashed border-gray-300 bg-gray-100/60"></div>
+        `;
+        return p;
+      }
+
+      function makeGhostFrom(el, rect) {
+        const g = el.cloneNode(true);
+        g.querySelectorAll?.("button")?.forEach?.((b) => b.remove());
+        g.style.position = "fixed";
+        g.style.left = rect.left + "px";
+        g.style.top = rect.top + "px";
+        g.style.width = rect.width + "px";
+        g.style.height = rect.height + "px";
+        g.style.margin = "0";
+        g.style.zIndex = "9999";
+        g.style.pointerEvents = "none";
+        g.style.opacity = "0.92";
+        g.style.transform = "scale(1.02)";
+        g.style.boxShadow = "0 10px 30px rgba(0,0,0,.18)";
+        g.style.borderRadius = "12px";
+        g.style.overflow = "hidden";
+        return g;
+      }
+
+      function getOverItem(x, y) {
+        const hit = document.elementFromPoint(x, y);
+        const over = hit?.closest?.("[data-id]");
+        if (!over || over.parentElement !== container) return null;
+        if (over.dataset.placeholder === "1") return null;
+        return over;
+      }
+
+      function placePlaceholder(over, x, y) {
+        if (!placeholder) return;
+
+        if (!over) {
+          if (container.lastElementChild !== placeholder) {
+            container.appendChild(placeholder);
+          }
+          return;
+        }
+
+        const r = over.getBoundingClientRect();
+        const xMid = r.left + r.width / 2;
+        const yMid = r.top + r.height / 2;
+
+        // 判斷要插在 over 的前/後；加死區避免一直翻轉
+        let before = true;
+        const sameRow = (y >= r.top && y <= r.bottom);
+
+        if (sameRow) {
+          if (x < xMid - DZ) before = true;
+          else if (x > xMid + DZ) before = false;
+          else return; // 在中線附近，先不要動，避免抖動
+        } else {
+          if (y < yMid - DZ) before = true;
+          else if (y > yMid + DZ) before = false;
+          else return;
+        }
+
+        // 已經在正確位置就不要再插一次（避免抖動）
+        if (before) {
+          if (placeholder.nextSibling === over) return;
+          container.insertBefore(placeholder, over);
+        } else {
+          if (over.nextSibling === placeholder) return;
+          container.insertBefore(placeholder, over.nextSibling);
+        }
+      }
+
+      function updateGhost(x, y) {
+        if (!ghost) return;
+        ghost.style.left = (x - offsetX) + "px";
+        ghost.style.top = (y - offsetY) + "px";
+      }
+
+      function tick() {
+        raf = 0;
+        if (!draggingEl) return;
+        updateGhost(lastX, lastY);
+
+        const over = getOverItem(lastX, lastY);
+        placePlaceholder(over, lastX, lastY);
+      }
+
+      function onMove(e) {
+        if (!draggingEl || e.pointerId !== pid) return;
+
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        if (!moved && (dx * dx + dy * dy) < (TH * TH)) return;
+
+        moved = true;
+        e.preventDefault();
+
+        lastX = e.clientX;
+        lastY = e.clientY;
+        if (!raf) raf = requestAnimationFrame(tick);
+      }
+
+      function finish(e) {
+        if (!draggingEl) return;
+        try { container.releasePointerCapture(pid); } catch {}
+
+        cleanup();
+
+        // 還原 DOM
+        if (placeholder && placeholder.parentElement) {
+          placeholder.replaceWith(draggingEl);
+        } else {
+          container.appendChild(draggingEl);
+        }
+        placeholder = null;
+
+        if (ghost && ghost.parentElement) ghost.remove();
+        ghost = null;
+
+        const didMove = moved;
+        draggingEl = null;
+        pid = null;
+        moved = false;
+
+        if (didMove) {
+          reorderSelectedFilesByDom(container);
+          renderPreviews();
+        }
+      }
+
+      function onUp(e) {
+        if (!draggingEl || e.pointerId !== pid) return;
+        finish(e);
+      }
+
+      container.addEventListener("pointerdown", (e) => {
+        const item = e.target.closest?.("[data-id]");
+        if (!item || item.parentElement !== container) return;
+        if (e.target.closest("button")) return;
+        if (typeof e.button === "number" && e.button !== 0) return;
+        if (container.querySelectorAll("[data-id]").length < 2) return;
+
+        const rect = item.getBoundingClientRect();
+        draggingEl = item;
+        pid = e.pointerId;
+        moved = false;
+        startX = e.clientX;
+        startY = e.clientY;
+        offsetX = e.clientX - rect.left;
+        offsetY = e.clientY - rect.top;
+        lastX = e.clientX;
+        lastY = e.clientY;
+
+        // placeholder 取代原本的位置，避免版面亂跳
+        placeholder = makePlaceholderFrom(item);
+        item.replaceWith(placeholder);
+
+        // ghost 跟著手指走
+        ghost = makeGhostFrom(item, rect);
+        document.body.appendChild(ghost);
+        updateGhost(lastX, lastY);
+
+        try { container.setPointerCapture(pid); } catch {}
+
+        document.addEventListener("pointermove", onMove, { passive: false, capture: true });
+        document.addEventListener("pointerup", onUp, { capture: true });
+        document.addEventListener("pointercancel", onUp, { capture: true });
+
+        e.preventDefault();
+      });
+    }
+        return best;
+      }
+
+      function cleanup() {
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup", onUp);
+        document.removeEventListener("pointercancel", onUp);
+      }
+
+      function finish() {
+        if (!dragging) return;
+        try { container.releasePointerCapture(pid); } catch {}
+
+        dragging.style.opacity = "";
+        dragging.style.transform = "";
+        dragging.style.pointerEvents = "";
+
+        const didMove = moved;
+        dragging = null;
+        pid = null;
+        moved = false;
+
+        cleanup();
+
+        if (didMove) {
+          reorderSelectedFilesByDom(container);
+          renderPreviews(); // 重新掛事件 & 更新刪除 idx
+        }
+      }
+
+      function onMove(e) {
+        if (!dragging || e.pointerId !== pid) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        if (!moved && (dx * dx + dy * dy) < (TH * TH)) return;
+        moved = true;
+        e.preventDefault();
+
+        const over = getOverItem(e.clientX, e.clientY);
+        if (!over || over === dragging) return;
+
+        const r = over.getBoundingClientRect();
+        const xMid = r.left + r.width / 2;
+        const yMid = r.top + r.height / 2;
+        const sameRow = (e.clientY >= r.top && e.clientY <= r.bottom);
+        const before = sameRow ? (e.clientX < xMid) : (e.clientY < yMid);
+
+        if (before) container.insertBefore(dragging, over);
+        else container.insertBefore(dragging, over.nextSibling);
+      }
+
+      function onUp(e) {
+        if (!dragging || e.pointerId !== pid) return;
+        finish();
+      }
+
+      container.addEventListener("pointerdown", (e) => {
+        const item = e.target.closest?.("[data-id]");
+        if (!item || item.parentElement !== container) return;
+        if (e.target.closest("button")) return;
+        if (typeof e.button === "number" && e.button !== 0) return;
+        if (container.querySelectorAll("[data-id]").length < 2) return;
+
+        dragging = item;
+        pid = e.pointerId;
+        moved = false;
+        startX = e.clientX;
+        startY = e.clientY;
+
+        // 讓 elementFromPoint 不會一直命中「自己」
+        dragging.style.pointerEvents = "none";
+        dragging.style.opacity = "0.6";
+        dragging.style.transform = "scale(0.98)";
+
+        try { container.setPointerCapture(pid); } catch {}
+
+        document.addEventListener("pointermove", onMove, { passive: false });
+        document.addEventListener("pointerup", onUp);
+        document.addEventListener("pointercancel", onUp);
+        e.preventDefault();
+      });
+    }
+
+    // 渲染預覽格子 + 刪除按鈕
+    function renderPreviews() {
+      fileCount.textContent = `已選 ${selectedFiles.length} / 5 張`;
+
+      imgPreview.innerHTML = selectedFiles
+        .map((it, i) => {
+          const u = URL.createObjectURL(it.file);
+          return `
+        <div class="relative cursor-grab select-none" style="touch-action:none;" data-id="${it.id}">
+          <img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽" draggable="false">
+          <button data-idx="${i}" class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button>
+        </div>
+      `;
+        })
+        .join("");
+
+      // 綁定刪除單張圖片
+      imgPreview.querySelectorAll("button[data-idx]").forEach((btn) =>
+        btn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const i = +btn.dataset.idx;
+          selectedFiles.splice(i, 1);
+          renderPreviews();
+        })
+      );
+
+      // ✅ 觸控/滑鼠拖曳排序
+      enablePointerReorder(imgPreview);
+    }
+
+    // 檔案挑選後：合併並截斷到 5 張
     imgFiles?.addEventListener("change", () => {
-      const incoming = Array.from(imgFiles.files || []);
-      const room = 5 - selectedItems.length;
-
-      if (incoming.length > room) {
+      const incoming = Array.from(imgFiles.files || []).map((f) => ({ id: uid(), file: f }));
+      const next = selectedFiles.concat(incoming);
+      if (next.length > 5) {
         Swal.fire({ icon: "warning", title: "最多 5 張照片" });
       }
-
-      const picked = incoming.slice(0, Math.max(0, room)).map((f) => ({
-        key: makeKey("add"),
-        file: f,
-        url: URL.createObjectURL(f),
-      }));
-
-      selectedItems = selectedItems.concat(picked);
+      selectedFiles = next.slice(0, 5);
       renderPreviews();
       imgFiles.value = ""; // 清空 input，避免重複選取不到
     });
-
-
-    // ===============================
+// ===============================
     // 捲到最上方（保險版）
     // ===============================
     function forceScrollTop() {
@@ -1202,7 +1225,7 @@
 
         // 2) 逐張上傳圖片，取得 Storage URL
         const urls = [];
-        for (const it of selectedItems) {
+        for (const it of selectedFiles) {
           const f = it.file;
           const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
           const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
@@ -1230,7 +1253,9 @@
 
         // 重置表單與選擇圖片（先做，避免 DOM 還在變動導致 smooth scroll 卡住）
         e.target.reset();
-        clearSelectedItems();
+        imgPreview.innerHTML = "";
+        selectedFiles = [];
+        fileCount.textContent = "已選 0 / 5 張";
         syncBreedSelectors();
 
         // 先啟動重新載入列表（避免等到提示結束才開始抓資料）

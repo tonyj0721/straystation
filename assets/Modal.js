@@ -1,279 +1,232 @@
 const q = (sel) => document.querySelector(sel);
 
-
-// ===============================
-// 縮圖排序（iPhone 不卡）：Pointer Events + 直接移動 DOM（拖曳時不重畫、不重新解碼）
-// ===============================
-function makeKey(prefix = "k") {
-  try {
-    return `${prefix}_${crypto.randomUUID()}`;
-  } catch {
-    return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-  }
+// 讓陣列元素在 from/to 之間移動（拖曳排序用）
+function arrayMove(arr, from, to) {
+  const item = arr.splice(from, 1)[0];
+  arr.splice(to, 0, item);
 }
 
-function safeRevokeObjectURL(u) {
-  try { if (u) URL.revokeObjectURL(u); } catch { }
+// 產生穩定的 id（拖曳排序用）
+const uid = () => (crypto?.randomUUID
+  ? crypto.randomUUID()
+  : (Date.now().toString(36) + Math.random().toString(36).slice(2)));
+
+function reorderByDom(container, items, setItems) {
+  const order = Array.from(container.querySelectorAll("[data-id]")).map(el => el.dataset.id);
+  const map = new Map(items.map(it => [it.id, it]));
+  setItems(order.map(id => map.get(id)).filter(Boolean));
 }
 
-function enablePointerSort(container, getItems, setItems) {
-  if (!container || container.dataset.sortBound) return;
-  container.dataset.sortBound = "1";
+// 讓縮圖區支援「滑鼠/觸控拖曳排序」（不靠 HTML5 drag&drop）
+// 這版改成 delegation + pointerEvents=none（避免 elementFromPoint 常常命中自己、導致拖不動/不換位）
+// 讓縮圖區支援「滑鼠/觸控拖曳排序」（Pointer Events；支援手機；避免亂跳）
+// 做法：用「placeholder + 影子(ghost)」，拖曳時只移動 placeholder，不直接搬動原縮圖
+function enablePointerReorder(container, getItems, setItems, rerender) {
+  if (!container || container.dataset.pointerReorderBound === "1") return;
+  container.dataset.pointerReorderBound = "1";
 
-  let dragEl = null;
+  // 防止手機拖曳時被當成捲動
+  container.style.touchAction = "none";
+  container.style.userSelect = "none";
+  container.style.webkitUserSelect = "none";
+  container.style.overscrollBehavior = "contain";
+
+  let draggingEl = null;
   let placeholder = null;
+  let ghost = null;
   let pid = null;
-
-  let sx = 0, sy = 0;
-  let dx = 0, dy = 0;
   let moved = false;
-  const TH = 6;
+  let startX = 0;
+  let startY = 0;
+  let offsetX = 0;
+  let offsetY = 0;
+  let raf = 0;
+  let lastX = 0;
+  let lastY = 0;
 
-  let startRect = null;
-  let axisLock = "free"; // "x" | "y" | "free"
-  let startCol = 0, startRow = 0;
-  let rafId = 0;
-  let lastIdx = -1;
+  const TH = 4;   // 觸發拖曳門檻
+  const DZ = 8;   // 中線死區，避免在正中間抖動來回換位
 
-  function median(nums) {
-    const a = nums.filter((n) => Number.isFinite(n)).slice().sort((a, b) => a - b);
-    if (!a.length) return NaN;
-    const mid = Math.floor(a.length / 2);
-    return a.length % 2 ? a[mid] : (a[mid - 1] + a[mid]) / 2;
+  function cleanup() {
+    if (raf) cancelAnimationFrame(raf);
+    raf = 0;
+    document.removeEventListener("pointermove", onMove, true);
+    document.removeEventListener("pointerup", onUp, true);
+    document.removeEventListener("pointercancel", onUp, true);
   }
 
-  function computeGrid() {
-    const els = Array.from(container.querySelectorAll(".sortable-item, .sortable-placeholder"))
-      .filter((el) => el !== dragEl);
+  function makePlaceholderFrom(el) {
+    const p = document.createElement("div");
+    p.className = el.className;
+    p.dataset.id = el.dataset.id;
+    p.dataset.placeholder = "1";
+    p.innerHTML = `
+      <div class="w-full aspect-square rounded-lg border-2 border-dashed border-gray-300 bg-gray-100/60"></div>
+    `;
+    return p;
+  }
 
-    const rects = els
-      .map((el) => ({ el, r: el.getBoundingClientRect() }))
-      .filter((x) => x.r.width > 0 && x.r.height > 0);
+  function makeGhostFrom(el, rect) {
+    const g = el.cloneNode(true);
+    g.querySelectorAll?.("button")?.forEach?.((b) => b.remove());
+    g.style.position = "fixed";
+    g.style.left = rect.left + "px";
+    g.style.top = rect.top + "px";
+    g.style.width = rect.width + "px";
+    g.style.height = rect.height + "px";
+    g.style.margin = "0";
+    g.style.zIndex = "9999";
+    g.style.pointerEvents = "none";
+    g.style.opacity = "0.92";
+    g.style.transform = "scale(1.02)";
+    g.style.boxShadow = "0 10px 30px rgba(0,0,0,.18)";
+    g.style.borderRadius = "12px";
+    g.style.overflow = "hidden";
+    return g;
+  }
 
-    if (!rects.length) return null;
+  function getOverItem(x, y) {
+    const hit = document.elementFromPoint(x, y);
+    const over = hit?.closest?.("[data-id]");
+    if (!over || over.parentElement !== container) return null;
+    if (over.dataset.placeholder === "1") return null;
+    return over;
+  }
 
-    rects.sort((a, b) => (a.r.top - b.r.top) || (a.r.left - b.r.left));
+  function placePlaceholder(over, x, y) {
+    if (!placeholder) return;
 
-    const h = rects[0].r.height;
-    const rowTol = Math.max(8, h * 0.6);
-
-    const top0 = rects[0].r.top;
-    const firstRow = rects
-      .filter((x) => Math.abs(x.r.top - top0) < rowTol)
-      .sort((a, b) => a.r.left - b.r.left);
-
-    const cols = Math.max(1, firstRow.length);
-
-    const colCenters = firstRow.map((x) => x.r.left + x.r.width / 2);
-    let colStep = cols >= 2 ? median(colCenters.slice(1).map((v, i) => v - colCenters[i])) : firstRow[0].r.width;
-    if (!Number.isFinite(colStep) || colStep <= 0) colStep = firstRow[0].r.width;
-
-    // rows
-    const rowCenters = [];
-    let lastTop = null;
-    for (const x of rects) {
-      if (lastTop === null || Math.abs(x.r.top - lastTop) >= rowTol) {
-        rowCenters.push(x.r.top + x.r.height / 2);
-        lastTop = x.r.top;
+    if (!over) {
+      if (container.lastElementChild !== placeholder) {
+        container.appendChild(placeholder);
       }
+      return;
     }
-    let rowStep = rowCenters.length >= 2 ? median(rowCenters.slice(1).map((v, i) => v - rowCenters[i])) : rects[0].r.height;
-    if (!Number.isFinite(rowStep) || rowStep <= 0) rowStep = rects[0].r.height;
 
-    return {
-      cols,
-      colStep,
-      rowStep,
-      firstCenterX: colCenters[0],
-      firstCenterY: rowCenters[0],
-    };
+    const r = over.getBoundingClientRect();
+    const xMid = r.left + r.width / 2;
+    const yMid = r.top + r.height / 2;
+
+    let before = true;
+    const sameRow = (y >= r.top && y <= r.bottom);
+
+    if (sameRow) {
+      if (x < xMid - DZ) before = true;
+      else if (x > xMid + DZ) before = false;
+      else return;
+    } else {
+      if (y < yMid - DZ) before = true;
+      else if (y > yMid + DZ) before = false;
+      else return;
+    }
+
+    if (before) {
+      if (placeholder.nextSibling === over) return;
+      container.insertBefore(placeholder, over);
+    } else {
+      if (over.nextSibling === placeholder) return;
+      container.insertBefore(placeholder, over.nextSibling);
+    }
   }
 
-  function beginDrag() {
-    startRect = dragEl.getBoundingClientRect();
-
-    placeholder = document.createElement("div");
-    placeholder.className = "sortable-placeholder";
-    placeholder.style.width = `${startRect.width}px`;
-    placeholder.style.height = `${startRect.height}px`;
-    placeholder.style.borderRadius = "0.5rem";
-    placeholder.style.background = "rgba(0,0,0,0.04)";
-    placeholder.style.border = "2px dashed rgba(0,0,0,0.12)";
-    placeholder.style.boxSizing = "border-box";
-
-    container.insertBefore(placeholder, dragEl);
-
-    // 用 placeholder 佔位，拖曳元素改為 fixed（避免 reorder 時瘋狂亂跳）
-    dragEl.classList.add("ring-2", "ring-blue-400");
-    dragEl.style.position = "fixed";
-    dragEl.style.left = `${startRect.left}px`;
-    dragEl.style.top = `${startRect.top}px`;
-    dragEl.style.width = `${startRect.width}px`;
-    dragEl.style.height = `${startRect.height}px`;
-    dragEl.style.margin = "0";
-    dragEl.style.zIndex = "9999";
-    dragEl.style.pointerEvents = "none";
-    dragEl.style.willChange = "transform";
-    dragEl.style.transform = "translate3d(0,0,0)";
-    dragEl.style.boxShadow = "0 10px 28px rgba(0,0,0,0.18)";
-
-    const grid = computeGrid();
-    const cols = grid?.cols || 1;
-    const kids = Array.from(container.children).filter((el) => el !== dragEl);
-    const startIndex = Math.max(0, kids.indexOf(placeholder));
-    startCol = startIndex % cols;
-    startRow = Math.floor(startIndex / cols);
-
-    lastIdx = -1;
+  function updateGhost(x, y) {
+    if (!ghost) return;
+    ghost.style.left = (x - offsetX) + "px";
+    ghost.style.top = (y - offsetY) + "px";
   }
 
-  function updatePlaceholder() {
-    if (!placeholder || !startRect) return;
+  function tick() {
+    raf = 0;
+    if (!draggingEl) return;
 
-    const grid = computeGrid();
-    if (!grid) return;
+    updateGhost(lastX, lastY);
 
-    const centerX = startRect.left + dx + startRect.width / 2;
-    const centerY = startRect.top + dy + startRect.height / 2;
+    const over = getOverItem(lastX, lastY);
+    placePlaceholder(over, lastX, lastY);
+  }
 
-    let col = Math.floor((centerX - grid.firstCenterX + grid.colStep * 0.5) / grid.colStep);
-    let row = Math.floor((centerY - grid.firstCenterY + grid.rowStep * 0.5) / grid.rowStep);
+  function onMove(e) {
+    if (!draggingEl || e.pointerId !== pid) return;
 
-    if (!Number.isFinite(col)) col = 0;
-    if (!Number.isFinite(row)) row = 0;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    if (!moved && (dx * dx + dy * dy) < (TH * TH)) return;
 
-    col = Math.max(0, Math.min(grid.cols - 1, col));
+    moved = true;
+    e.preventDefault();
 
-    // 方向鎖定：避免往上拖時，輕微左右抖動造成水平換位
-    if (axisLock === "y") col = startCol;
-    if (axisLock === "x") row = startRow;
-
-    const slotEls = Array.from(container.children).filter((el) => el !== dragEl);
-    const slotCount = slotEls.length; // 其他縮圖 + placeholder
-    let idx = row * grid.cols + col;
-    idx = Math.max(0, Math.min(slotCount - 1, idx));
-
-    if (idx === lastIdx) return;
-
-    const withoutPh = slotEls.filter((el) => el !== placeholder);
-    const ref = withoutPh[idx] || null; // idx==末端時 append
-    container.insertBefore(placeholder, ref);
-
-    lastIdx = idx;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    if (!raf) raf = requestAnimationFrame(tick);
   }
 
   function finish() {
-    if (!dragEl) return;
-    try { dragEl.releasePointerCapture(pid); } catch { }
+    if (!draggingEl) return;
+    try { container.releasePointerCapture(pid); } catch {}
 
-    if (rafId) cancelAnimationFrame(rafId);
-    rafId = 0;
+    cleanup();
 
-    if (placeholder) {
-      container.insertBefore(dragEl, placeholder);
-      placeholder.remove();
-      placeholder = null;
+    if (placeholder && placeholder.parentElement) {
+      placeholder.replaceWith(draggingEl);
+    } else {
+      container.appendChild(draggingEl);
     }
+    placeholder = null;
 
-    // 還原樣式
-    dragEl.classList.remove("ring-2", "ring-blue-400");
-    dragEl.style.position = "";
-    dragEl.style.left = "";
-    dragEl.style.top = "";
-    dragEl.style.width = "";
-    dragEl.style.height = "";
-    dragEl.style.margin = "";
-    dragEl.style.zIndex = "";
-    dragEl.style.pointerEvents = "";
-    dragEl.style.willChange = "";
-    dragEl.style.transform = "";
-    dragEl.style.boxShadow = "";
+    if (ghost && ghost.parentElement) ghost.remove();
+    ghost = null;
 
-    if (moved) {
-      const keys = Array.from(container.querySelectorAll(".sortable-item"))
-        .map((el) => el.dataset.key);
-
-      const map = new Map(getItems().map((it) => [it.key, it]));
-      const next = keys.map((k) => map.get(k)).filter(Boolean);
-      setItems(next);
-    }
-
-    dragEl = null;
+    const didMove = moved;
+    draggingEl = null;
     pid = null;
     moved = false;
-    dx = dy = 0;
-    startRect = null;
-    axisLock = "free";
+
+    if (didMove) {
+      reorderByDom(container, getItems(), setItems);
+      rerender();
+    }
+  }
+
+  function onUp(e) {
+    if (!draggingEl || e.pointerId !== pid) return;
+    finish();
   }
 
   container.addEventListener("pointerdown", (e) => {
-    const item = e.target.closest?.(".sortable-item");
+    const item = e.target.closest?.("[data-id]");
     if (!item || item.parentElement !== container) return;
-    if (e.target.closest?.("button")) return;
+    if (e.target.closest("button")) return;
+    if (typeof e.button === "number" && e.button !== 0) return;
+    if (container.querySelectorAll("[data-id]").length < 2) return;
 
-    dragEl = item;
+    const rect = item.getBoundingClientRect();
+    draggingEl = item;
     pid = e.pointerId;
-
-    sx = e.clientX;
-    sy = e.clientY;
-    dx = dy = 0;
     moved = false;
-    startRect = null;
-    axisLock = "free";
+    startX = e.clientX;
+    startY = e.clientY;
+    offsetX = e.clientX - rect.left;
+    offsetY = e.clientY - rect.top;
+    lastX = e.clientX;
+    lastY = e.clientY;
 
-    dragEl.setPointerCapture(pid);
-    e.preventDefault();
-  }, { passive: false });
+    placeholder = makePlaceholderFrom(item);
+    item.replaceWith(placeholder);
 
-  container.addEventListener("pointermove", (e) => {
-    if (!dragEl || e.pointerId !== pid) return;
+    ghost = makeGhostFrom(item, rect);
+    document.body.appendChild(ghost);
+    updateGhost(lastX, lastY);
 
-    const ddx = e.clientX - sx;
-    const ddy = e.clientY - sy;
+    try { container.setPointerCapture(pid); } catch {}
 
-    if (!moved) {
-      if (Math.hypot(ddx, ddy) < TH) return;
-      moved = true;
-
-      // 一開始判斷主要方向（之後就固定），手感會穩很多
-      if (Math.abs(ddy) > Math.abs(ddx) * 1.2) axisLock = "y";
-      else if (Math.abs(ddx) > Math.abs(ddy) * 1.2) axisLock = "x";
-      else axisLock = "free";
-
-      beginDrag();
-    }
-
-    dx = ddx;
-    dy = ddy;
-
-    dragEl.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
-
-    if (!rafId) {
-      rafId = requestAnimationFrame(() => {
-        rafId = 0;
-        updatePlaceholder();
-      });
-    }
+    document.addEventListener("pointermove", onMove, { passive: false, capture: true });
+    document.addEventListener("pointerup", onUp, { capture: true });
+    document.addEventListener("pointercancel", onUp, { capture: true });
 
     e.preventDefault();
-  }, { passive: false });
-
-  container.addEventListener("pointerup", finish);
-  container.addEventListener("pointercancel", finish);
+  });
 }
 
-
-// 讓拖曳中的縮圖視覺更明確（不影響效能）
-(() => {
-  if (!document.getElementById("sortablePreviewFix")) {
-    const s = document.createElement("style");
-    s.id = "sortablePreviewFix";
-    s.textContent = `.sortable-item{touch-action:none;}
-.sortable-item img{user-select:none;-webkit-user-drag:none;}
-.sortable-item.is-dragging{opacity:.75;}`;
-    document.head.appendChild(s);
-  }
-})();
 
 
 // ===============================
@@ -667,15 +620,18 @@ async function saveEdit() {
   const stopDots = startDots(txt, "儲存中");
 
   try {
-    // 依照目前排序計算出最終 images：keep（既有 URL）+ add（新檔案）
+    // 依照狀態計算出最終 images：依照「預覽排序」輸出最終順序，並刪掉 remove 的 Storage 物件
     const { items, remove } = editImagesState;
-    const keep = items.filter((it) => it.type === "keep").map((it) => it.url);
-    const add = items.filter((it) => it.type === "add").map((it) => it.file);
+    const newUrls = [];
 
-    const newUrls = [...keep];
+    // 依照 items 順序輸出：keep 直接帶 url；add 先上傳再取得 url
+    for (const item of items) {
+      if (item.type === "keep") {
+        newUrls.push(item.url);
+        continue;
+      }
+      const f = item.file;
 
-    // 上傳新增檔案
-    for (const f of add) {
       const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
       const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
       const base = f.name.replace(/\.[^.]+$/, '');
@@ -780,100 +736,82 @@ editBreedTypeSel.addEventListener("change", () => {
 });
 
 // ===============================
-// 編輯模式：圖片管理（預覽 + 增刪 + 拖曳排序）
+// 編輯模式：圖片管理（預覽 + 增刪）
 // ===============================
 const editFiles = q("#editFiles");
 const btnPickEdit = q("#btnPickEdit");
 const editPreview = q("#editPreview");
 const editCount = q("#editCount");
 
-// 狀態：items 有序（keep/url 與 add/file 混排）；remove 只存「被刪掉的既有 url」
+// 狀態：現存保留 keep、新增 add、要刪 remove
 let editImagesState = { items: [], remove: [] };
 
 btnPickEdit.addEventListener("click", () => editFiles.click());
 
 // 初始化編輯圖片列表
 function renderEditImages(urls) {
-  // 先清掉舊的新增縮圖 URL（避免 memory leak）
-  try {
-    editImagesState.items.forEach((it) => {
-      if (it.type === "add") safeRevokeObjectURL(it.previewUrl);
-    });
-  } catch { }
-
-  editImagesState.items = (urls || []).map((u) => ({
-    key: makeKey("keep"),
-    type: "keep",
-    url: u,
-  }));
+  // items: 依照目前順序保存（keep / add 混合）
+  editImagesState.items = (urls || []).map((u) => ({ id: `keep:${u}`, type: "keep", url: u }));
   editImagesState.remove = [];
   paintEditPreview();
 }
 
-// 依狀態重新畫縮圖（只在「新增/刪除」時重畫；拖曳排序時不重畫）
+// 依狀態重新畫縮圖（支援觸控/滑鼠拖曳排序）
 function paintEditPreview() {
   const total = editImagesState.items.length;
   editCount.textContent = `已選 ${total} / 5 張`;
 
-  editPreview.innerHTML = editImagesState.items
-    .map((it) => {
-      const src = it.type === "keep" ? it.url : it.previewUrl;
+  const current = editImagesState.items;
+
+  editPreview.innerHTML = current
+    .map((item, i) => {
+      const src = item.type === "keep" ? item.url : URL.createObjectURL(item.file);
       return `
-        <div class="relative sortable-item" data-key="${it.key}">
-          <img class="w-full aspect-square object-cover rounded-lg" src="${src}" alt="預覽" draggable="false" decoding="async"/>
-          <button type="button" data-delkey="${it.key}" class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center" aria-label="刪除這張">✕</button>
+        <div class="relative cursor-grab select-none" style="touch-action:none;" data-id="${item.id}">
+          <img class="w-full aspect-square object-cover rounded-lg" src="${src}" alt="預覽" draggable="false"/>
+          <button data-idx="${i}" class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center" aria-label="刪除這張">✕</button>
         </div>`;
     })
     .join("");
+
+  // 刪除：keep → 放入 remove；add → 直接刪 item
+  editPreview.querySelectorAll("button[data-idx]").forEach((btn) =>
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const i = +btn.dataset.idx;
+      const item = editImagesState.items[i];
+      if (!item) return;
+
+      if (item.type === "keep") {
+        editImagesState.remove.push(item.url);
+      }
+      editImagesState.items.splice(i, 1);
+      paintEditPreview();
+    })
+  );
+
+  // ✅ 觸控/滑鼠拖曳排序
+  enablePointerReorder(
+    editPreview,
+    () => editImagesState.items,
+    (next) => { editImagesState.items = next; },
+    paintEditPreview
+  );
 }
 
-// 刪除（事件委派，避免 paint 之後還要重綁）
-if (editPreview && !editPreview.dataset.delBound) {
-  editPreview.dataset.delBound = "1";
-  editPreview.addEventListener("click", (e) => {
-    const btn = e.target.closest?.("button[data-delkey]");
-    if (!btn) return;
-    e.preventDefault();
-    e.stopPropagation();
-
-    const key = btn.dataset.delkey;
-    const idx = editImagesState.items.findIndex((x) => x.key === key);
-    if (idx < 0) return;
-
-    const it = editImagesState.items[idx];
-    if (it.type === "keep") {
-      editImagesState.remove.push(it.url);
-    } else {
-      safeRevokeObjectURL(it.previewUrl);
-    }
-
-    editImagesState.items.splice(idx, 1);
-    paintEditPreview();
-  });
-}
-
-// 拖曳排序（只綁一次）
-enablePointerSort(editPreview, () => editImagesState.items, (next) => {
-  editImagesState.items = next;
-});
-
-// 新增圖片（尊守上限 5）
+// 新增圖片（遵守上限 5）
 editFiles.addEventListener("change", () => {
   const incoming = Array.from(editFiles.files || []);
-  const room = 5 - editImagesState.items.length;
-
-  if (incoming.length > room) {
+  const total = editImagesState.items.length + incoming.length;
+  if (total > 5) {
     swalInDialog({ icon: "warning", title: "最多 5 張照片" });
   }
 
-  const picked = incoming.slice(0, Math.max(0, room)).map((f) => ({
-    key: makeKey("add"),
-    type: "add",
-    file: f,
-    previewUrl: URL.createObjectURL(f), // 只建立一次
-  }));
+  const room = 5 - editImagesState.items.length;
+  const toAdd = incoming.slice(0, Math.max(0, room)).map((f) => ({ id: uid(), type: "add", file: f }));
+  editImagesState.items = editImagesState.items.concat(toAdd);
 
-  editImagesState.items = editImagesState.items.concat(picked);
   paintEditPreview();
   editFiles.value = "";
 });
@@ -882,8 +820,9 @@ editFiles.addEventListener("change", () => {
 // 送養流程：上傳合照 / 標記 / 撤回
 // ===============================
 
-// 狀態：已選擇的合照（可多次疊加；可拖曳排序）
-let adoptedSelected = []; // [{ key, file, url }]
+// 狀態：已選擇的合照（可多次疊加）
+let adoptedSelected = [];
+window.adoptedSelected = adoptedSelected;
 
 const adoptedFilesInput = document.getElementById("adoptedFiles");
 const btnPickAdopted = document.getElementById("btnPickAdopted");
@@ -893,78 +832,62 @@ const adoptedPreview = document.getElementById("adoptedPreview");
 // 打開檔案挑選
 btnPickAdopted.onclick = () => adoptedFilesInput.click();
 
-// 渲染縮圖（右上角刪除鈕；拖曳排序時不重畫）
+// 渲染縮圖（右上角刪除鈕）
 function renderAdoptedPreviews() {
   adoptedCount.textContent = `已選 ${adoptedSelected.length} / 5 張`;
   adoptedPreview.innerHTML = adoptedSelected
-    .map((it) => `
-        <div class="relative sortable-item" data-key="${it.key}">
-          <img class="w-full aspect-square object-cover rounded-lg" src="${it.url}" alt="預覽" draggable="false" decoding="async">
-          <button type="button" data-delkey="${it.key}"
+    .map((it, i) => {
+      const u = URL.createObjectURL(it.file);
+      return `
+        <div class="relative cursor-grab select-none" style="touch-action:none;" data-id="${it.id}">
+          <img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽" draggable="false">
+          <button data-idx="${i}"
                   class="absolute top-1 right-1 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center"
                   aria-label="刪除這張">✕</button>
         </div>
-      `)
+      `;
+    })
     .join("");
-}
 
-// 刪除（事件委派）
-if (adoptedPreview && !adoptedPreview.dataset.delBound) {
-  adoptedPreview.dataset.delBound = "1";
-  adoptedPreview.addEventListener("click", (e) => {
-    const btn = e.target.closest?.("button[data-delkey]");
-    if (!btn) return;
-    e.preventDefault();
-    e.stopPropagation();
-
-    const key = btn.dataset.delkey;
-    const idx = adoptedSelected.findIndex((x) => x.key === key);
-    if (idx >= 0) {
-      safeRevokeObjectURL(adoptedSelected[idx].url);
-      adoptedSelected.splice(idx, 1);
+  adoptedPreview.querySelectorAll("button[data-idx]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const i = +btn.dataset.idx;
+      adoptedSelected.splice(i, 1);
+      window.adoptedSelected = adoptedSelected;
       renderAdoptedPreviews();
-    }
+    });
   });
-}
 
-// 拖曳排序（只綁一次）
-enablePointerSort(adoptedPreview, () => adoptedSelected, (next) => {
-  adoptedSelected = next;
-  // 舊程式有用到 window.adoptedSelected，保留同步
-  window.adoptedSelected = adoptedSelected;
-});
+  // ✅ 觸控/滑鼠拖曳排序
+  enablePointerReorder(
+    adoptedPreview,
+    () => adoptedSelected,
+    (next) => { adoptedSelected = next; window.adoptedSelected = adoptedSelected; },
+    renderAdoptedPreviews
+  );
+}
 
 renderAdoptedPreviews();
 
-// 檔案變更：疊加並限制最多 5 張（URL 只做一次）
+// 檔案變更：疊加並限制最多 5 張
 adoptedFilesInput.addEventListener("change", () => {
-  const incoming = Array.from(adoptedFilesInput.files || []);
-  const room = 5 - adoptedSelected.length;
-
-  if (incoming.length > room) {
+  const incoming = Array.from(adoptedFilesInput.files || []).map((f) => ({ id: uid(), file: f }));
+  const next = adoptedSelected.concat(incoming);
+  if (next.length > 5) {
     swalInDialog({ icon: "warning", title: "最多 5 張照片" });
   }
-
-  const picked = incoming.slice(0, Math.max(0, room)).map((f) => ({
-    key: makeKey("adopted"),
-    file: f,
-    url: URL.createObjectURL(f),
-  }));
-
-  adoptedSelected = adoptedSelected.concat(picked);
-  window.adoptedSelected = adoptedSelected; // 相容
+  adoptedSelected = next.slice(0, 5);
+  window.adoptedSelected = adoptedSelected;
   renderAdoptedPreviews();
   adoptedFilesInput.value = ""; // 清空，允許再次選同一檔
 });
 
 // 清空（成功/取消後呼叫）
 function resetAdoptedSelection() {
-  try {
-    adoptedSelected.forEach((it) => safeRevokeObjectURL(it.url));
-  } catch { }
   adoptedSelected = [];
-  window.adoptedSelected = adoptedSelected; // 相容
-
+  window.adoptedSelected = adoptedSelected;
   adoptedPreview.innerHTML = "";
   adoptedCount.textContent = "已選 0 / 5 張";
   adoptedFilesInput.value = "";
@@ -979,7 +902,7 @@ async function onConfirmAdopted() {
   btn.setAttribute("aria-busy", "true");
   const stopDots = startDots(btn, "儲存中");
 
-  const files = adoptedSelected.map((it) => it.file).slice(0, 5);
+  const files = adoptedSelected.slice(0, 5).map((it) => it.file);
   const urls = [];
   try {
     for (const f of files) {
@@ -994,6 +917,7 @@ async function onConfirmAdopted() {
 
     await updateDoc(doc(db, "pets", currentDocId), {
       status: "adopted",
+      adoptedAt: serverTimestamp(),
       adoptedPhotos: urls,
       showOnHome: true,
       showOnCats: false,
