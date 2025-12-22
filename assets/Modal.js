@@ -1,72 +1,5 @@
 const q = (sel) => document.querySelector(sel);
 
-
-// ===============================
-// 預覽縮圖：拖曳更改順序（桌機 + 手機）
-// - 縮圖外層需有 data-sort-idx
-// - 點刪除鈕不會觸發拖曳
-// ===============================
-(() => {
-  if (!document.getElementById("previewSortableStyle")) {
-    const s = document.createElement("style");
-    s.id = "previewSortableStyle";
-    s.textContent = `
-      .preview-sort-item{touch-action:none; user-select:none; cursor:move;}
-      .preview-dragging{opacity:.85; outline:2px solid rgba(59,130,246,.7); outline-offset:2px;}
-    `;
-    document.head.appendChild(s);
-  }
-})();
-
-let __previewSortActive = null;
-
-document.addEventListener("pointerup", (e) => {
-  const act = __previewSortActive;
-  if (!act) return;
-  const { container, from } = act;
-  __previewSortActive = null;
-
-  container?.querySelectorAll?.(".preview-dragging")
-    ?.forEach((el) => el.classList.remove("preview-dragging"));
-
-  const cfg = container && container.__previewSortableCfg;
-  if (!cfg) return;
-
-  const el = document.elementFromPoint(e.clientX, e.clientY);
-  const over = el?.closest?.("[data-sort-idx]");
-  if (!over || !container.contains(over)) return;
-
-  const to = Number(over.dataset.sortIdx);
-  if (Number.isNaN(to) || to === from) return;
-
-  const list = cfg.getItems();
-  const moved = list.splice(from, 1)[0];
-  list.splice(to, 0, moved);
-  cfg.setItems(list);
-  cfg.render();
-}, true);
-
-function bindPreviewSortable(container, cfg) {
-  if (!container) return;
-  container.__previewSortableCfg = cfg;
-  if (container.dataset.previewSortableBound) return;
-  container.dataset.previewSortableBound = "1";
-
-  container.addEventListener("pointerdown", (e) => {
-    const item = e.target.closest("[data-sort-idx]");
-    if (!item || !container.contains(item)) return;
-    if (e.target.closest("button")) return; // 點刪除鈕不拖曳
-
-    const from = Number(item.dataset.sortIdx);
-    if (Number.isNaN(from)) return;
-
-    item.classList.add("preview-dragging");
-    try { item.setPointerCapture(e.pointerId); } catch { }
-    __previewSortActive = { container, from };
-    e.preventDefault();
-  });
-}
-
 // ===============================
 // 品種資料與「品種/毛色」連動邏輯
 // ===============================
@@ -458,26 +391,24 @@ async function saveEdit() {
   const stopDots = startDots(txt, "儲存中");
 
   try {
-    // 依照目前排序計算最終 images：keep 直接沿用；add 依序上傳插入
+    // 依照目前 items 順序計算出最終 images：
+    // - type === "keep" 的直接沿用原本 URL
+    // - type === "add" 的先上傳、再把新 URL 插入當下的位置
     const { items, remove } = editImagesState;
     const newUrls = [];
 
-    for (const it of (items || [])) {
-      if (!it) continue;
-      if (it.type === "keep") {
-        newUrls.push(it.url);
-        continue;
+    for (const item of items) {
+      if (item.type === "keep" && item.url) {
+        newUrls.push(item.url);
+      } else if (item.type === "add" && item.file) {
+        const wmBlob = await addWatermarkToFile(item.file); // 先加浮水印
+        const ext = wmBlob.type === "image/png" ? "png" : "jpg";
+        const base = item.file.name.replace(/\.[^.]+$/, "");
+        const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
+        const r = sRef(storage, path);
+        await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
+        newUrls.push(await getDownloadURL(r));
       }
-      if (it.type !== "add" || !it.file) continue;
-
-      const f = it.file;
-      const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
-      const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
-      const base = f.name.replace(/\.[^.]+$/, '');
-      const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
-      const r = sRef(storage, path);
-      await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
-      newUrls.push(await getDownloadURL(r));
     }
 
     // 刪除移除的檔案（忽略刪失敗）
@@ -575,22 +506,33 @@ editBreedTypeSel.addEventListener("change", () => {
 });
 
 // ===============================
-// 編輯模式：圖片管理（預覽 + 增刪）
+// 編輯模式：圖片管理（預覽 + 增刪 + 拖曳排序）
 // ===============================
 const editFiles = q("#editFiles");
 const btnPickEdit = q("#btnPickEdit");
 const editPreview = q("#editPreview");
 const editCount = q("#editCount");
 
-// 狀態：編輯圖片（items 代表最後順序；remove 只記錄要刪的舊圖 url）
-// items: { type:"keep", url } | { type:"add", file }
-let editImagesState = { items: [], remove: [] };
+// 狀態：items 維持目前顯示順序，remove 紀錄要刪掉的舊圖 URL
+let editImageSeed = 0;
+const newEditImageId = () => `edit-${Date.now()}-${editImageSeed++}`;
+
+let editImagesState = {
+  // 每個元素: { id, type: "keep" | "add", url?, file? }
+  items: [],
+  // 只放「原本就存在」但被刪掉的圖片 URL
+  remove: [],
+};
 
 btnPickEdit.addEventListener("click", () => editFiles.click());
 
-// 初始化編輯圖片列表
+// 初始化編輯圖片列表（從現有 images 進來）
 function renderEditImages(urls) {
-  editImagesState.items = (urls || []).map((u) => ({ type: "keep", url: u }));
+  editImagesState.items = (urls || []).map((u) => ({
+    id: newEditImageId(),
+    type: "keep",
+    url: u,
+  }));
   editImagesState.remove = [];
   paintEditPreview();
 }
@@ -601,53 +543,111 @@ function paintEditPreview() {
   editCount.textContent = `已選 ${total} / 5 張`;
 
   editPreview.innerHTML = editImagesState.items
-    .map((item, i) => {
+    .map((item, index) => {
       const src = item.type === "keep" ? item.url : URL.createObjectURL(item.file);
       return `
-        <div class="relative preview-sort-item" data-sort-idx="${i}">
+        <div class="relative cursor-move edit-thumb" draggable="true" data-id="${item.id}" data-index="${index}">
           <img class="w-full aspect-square object-cover rounded-lg" src="${src}"/>
-          <button data-del="${i}" class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button>
+          <button data-id="${item.id}"
+                  class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button>
         </div>`;
     })
     .join("");
 
-  // 刪除（keep → 放入 remove；add → 直接丟掉）
-  editPreview.querySelectorAll("button[data-del]").forEach((btn) =>
+  // 刪除圖片
+  editPreview.querySelectorAll("button[data-id]").forEach((btn) =>
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const i = +btn.dataset.del;
-      const it = editImagesState.items[i];
-      if (!it) return;
-      if (it.type === "keep") editImagesState.remove.push(it.url);
-      editImagesState.items.splice(i, 1);
+      const id = btn.getAttribute("data-id");
+      const idx = editImagesState.items.findIndex((it) => it.id === id);
+      if (idx === -1) return;
+
+      const item = editImagesState.items[idx];
+      if (item.type === "keep" && item.url) {
+        // 舊圖被刪除 → 放進 remove，稍後一起刪 Storage
+        editImagesState.remove.push(item.url);
+      }
+      editImagesState.items.splice(idx, 1);
       paintEditPreview();
     })
   );
-
-  // 啟用拖曳排序
-  bindPreviewSortable(editPreview, {
-    getItems: () => [...editImagesState.items],
-    setItems: (v) => { editImagesState.items = v; },
-    render: paintEditPreview,
-  });
 }
 
-// 新增圖片（尊守上限 5）
+// 新增圖片（遵守上限 5）
 editFiles.addEventListener("change", () => {
   const incoming = Array.from(editFiles.files || []);
-  const total = editImagesState.items.length + incoming.length;
-  if (total > 5) {
-    swalInDialog({ icon: "warning", title: "最多 5 張照片" });
-  }
-  const room = 5 - editImagesState.items.length;
-  const take = incoming
-    .slice(0, Math.max(0, room))
-    .map((f) => ({ type: "add", file: f }));
+  if (!incoming.length) return;
 
-  editImagesState.items = editImagesState.items.concat(take);
+  const room = 5 - editImagesState.items.length;
+  if (room <= 0) {
+    swalInDialog({ icon: "warning", title: "最多 5 張照片" });
+    editFiles.value = "";
+    return;
+  }
+
+  const sliced = incoming.slice(0, room);
+  editImagesState.items = editImagesState.items.concat(
+    sliced.map((f) => ({
+      id: newEditImageId(),
+      type: "add",
+      file: f,
+    }))
+  );
+
   paintEditPreview();
   editFiles.value = "";
+});
+
+// 拖曳排序：編輯模式縮圖
+let editDragId = null;
+
+editPreview.addEventListener("dragstart", (e) => {
+  const card = e.target.closest(".edit-thumb");
+  if (!card) return;
+  editDragId = card.dataset.id;
+  e.dataTransfer?.setData("text/plain", editDragId);
+  e.dataTransfer.effectAllowed = "move";
+  card.classList.add("ring-2", "ring-amber-400");
+});
+
+editPreview.addEventListener("dragover", (e) => {
+  if (!editDragId) return;
+  const card = e.target.closest(".edit-thumb");
+  if (!card) return;
+  e.preventDefault();
+});
+
+editPreview.addEventListener("drop", (e) => {
+  if (!editDragId) return;
+  e.preventDefault();
+  const target = e.target.closest(".edit-thumb");
+  if (!target) {
+    editDragId = null;
+    return;
+  }
+
+  const fromIndex = editImagesState.items.findIndex((it) => it.id === editDragId);
+  const toId = target.dataset.id;
+  const toIndex = editImagesState.items.findIndex((it) => it.id === toId);
+
+  if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) {
+    editDragId = null;
+    return;
+  }
+
+  const [moved] = editImagesState.items.splice(fromIndex, 1);
+  editImagesState.items.splice(toIndex, 0, moved);
+
+  editDragId = null;
+  paintEditPreview();
+});
+
+editPreview.addEventListener("dragend", () => {
+  editDragId = null;
+  editPreview.querySelectorAll(".edit-thumb").forEach((el) =>
+    el.classList.remove("ring-2", "ring-amber-400")
+  );
 });
 
 // ===============================
@@ -672,9 +672,9 @@ function renderAdoptedPreviews() {
     .map((f, i) => {
       const u = URL.createObjectURL(f);
       return `
-        <div class="relative preview-sort-item" data-sort-idx="${i}">
+        <div class="relative cursor-move adopted-thumb" draggable="true" data-index="${i}">
           <img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽">
-          <button data-del="${i}"
+          <button data-idx="${i}"
                   class="absolute top-1 right-1 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center"
                   aria-label="刪除這張">✕</button>
         </div>
@@ -682,23 +682,63 @@ function renderAdoptedPreviews() {
     })
     .join("");
 
-  adoptedPreview.querySelectorAll("button[data-del]").forEach((btn) => {
+  adoptedPreview.querySelectorAll("button[data-idx]").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const i = +btn.dataset.del;
+      const i = +btn.dataset.idx;
       adoptedSelected.splice(i, 1);
       renderAdoptedPreviews();
     });
   });
-
-  // 啟用拖曳排序
-  bindPreviewSortable(adoptedPreview, {
-    getItems: () => [...adoptedSelected],
-    setItems: (v) => { adoptedSelected = v; },
-    render: renderAdoptedPreviews,
-  });
 }
+
+// 拖曳排序：已送養合照
+let adoptedDragIndex = null;
+
+adoptedPreview.addEventListener("dragstart", (e) => {
+  const card = e.target.closest(".adopted-thumb");
+  if (!card) return;
+  adoptedDragIndex = Number(card.dataset.index);
+  e.dataTransfer?.setData("text/plain", String(adoptedDragIndex));
+  e.dataTransfer.effectAllowed = "move";
+  card.classList.add("ring-2", "ring-amber-400");
+});
+
+adoptedPreview.addEventListener("dragover", (e) => {
+  if (adoptedDragIndex == null) return;
+  const card = e.target.closest(".adopted-thumb");
+  if (!card) return;
+  e.preventDefault();
+});
+
+adoptedPreview.addEventListener("drop", (e) => {
+  if (adoptedDragIndex == null) return;
+  e.preventDefault();
+  const card = e.target.closest(".adopted-thumb");
+  if (!card) {
+    adoptedDragIndex = null;
+    return;
+  }
+  const toIndex = Number(card.dataset.index);
+  if (Number.isNaN(toIndex) || toIndex === adoptedDragIndex) {
+    adoptedDragIndex = null;
+    return;
+  }
+
+  const [moved] = adoptedSelected.splice(adoptedDragIndex, 1);
+  adoptedSelected.splice(toIndex, 0, moved);
+
+  adoptedDragIndex = null;
+  renderAdoptedPreviews();
+});
+
+adoptedPreview.addEventListener("dragend", () => {
+  adoptedDragIndex = null;
+  adoptedPreview.querySelectorAll(".adopted-thumb").forEach((el) =>
+    el.classList.remove("ring-2", "ring-amber-400")
+  );
+});
 
 renderAdoptedPreviews();
 
@@ -803,6 +843,7 @@ async function onUnadopt() {
     await deleteAllUnder(`adopted/${currentDocId}`); // 清掉合照
     await updateDoc(doc(db, "pets", currentDocId), {
       status: "available",
+      adoptedAt: deleteField(),
       adoptedPhotos: [],
       showOnHome: false,
       showOnCats: true,

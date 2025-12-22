@@ -760,207 +760,99 @@
     // 新增：圖片選取/預覽（最多 5 張）
     // ===============================
     const imgFiles = $("#imgFiles");
-const btnPick = $("#btnPick");
-const fileCount = $("#fileCount");
-const imgPreview = $("#imgPreview");
+    const btnPick = $("#btnPick");
+    const fileCount = $("#fileCount");
+    const imgPreview = $("#imgPreview");
+    let selectedFiles = []; // 暫存待上傳檔案
 
-// ✅ 改成「快取預覽 URL」：避免每次 render 都重新 createObjectURL（會讓大圖反覆解碼、超慢）
-// selectedFiles: [{ file: File, url: string }]
-let selectedFiles = [];
+    btnPick?.addEventListener("click", () => imgFiles.click());
 
-const revokePreviewUrl = (item) => {
-  try { if (item?.url) URL.revokeObjectURL(item.url); } catch { }
-};
-const revokeAllPreviewUrls = () => {
-  selectedFiles.forEach(revokePreviewUrl);
-};
+    // 渲染預覽格子 + 刪除按鈕
+    function renderPreviews() {
+      fileCount.textContent = `已選 ${selectedFiles.length} / 5 張`;
 
-// ✅ 進一步加速：用 createImageBitmap 產生小縮圖（非同步），避免大圖解碼/重繪把頁面卡住
-const __canThumb = typeof createImageBitmap === 'function';
-let __thumbGenRunning = false;
+      imgPreview.innerHTML = selectedFiles
+        .map((f, i) => {
+          const u = URL.createObjectURL(f);
+          return `
+        <div class="relative cursor-move new-thumb" draggable="true" data-index="${i}">
+          <img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽">
+          <button data-idx="${i}" class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button>
+        </div>
+      `;
+        })
+        .join("");
 
-async function __makeThumbBlob(file, maxSide = 900, quality = 0.78) {
-  if (!__canThumb) return null;
-  const bmp = await createImageBitmap(file);
-  const w = bmp.width || 0;
-  const h = bmp.height || 0;
-  if (!w || !h) { try { bmp.close?.(); } catch { } return null; }
-
-  const scale = Math.min(1, maxSide / Math.max(w, h));
-  const tw = Math.max(1, Math.round(w * scale));
-  const th = Math.max(1, Math.round(h * scale));
-
-  const canvas = document.createElement('canvas');
-  canvas.width = tw;
-  canvas.height = th;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(bmp, 0, 0, tw, th);
-  try { bmp.close?.(); } catch { }
-
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
-  return blob || null;
-}
-
-async function enhanceThumbnails() {
-  if (__thumbGenRunning) return;
-  __thumbGenRunning = true;
-  try {
-    // 先讓瀏覽器把 DOM 先畫出來，再開始縮圖
-    await new Promise((r) => requestAnimationFrame(() => r()));
-
-    for (const it of selectedFiles) {
-      if (!it?.file || it.__thumbReady) continue;
-      // 小檔案直接略過（通常不會卡）
-      if ((it.file.size || 0) < 1200_000) { it.__thumbReady = true; continue; }
-
-      let blob = null;
-      try { blob = await __makeThumbBlob(it.file); } catch (e) { blob = null; }
-      it.__thumbReady = true;
-      if (!blob) continue;
-
-      // 使用者可能在縮圖過程中刪掉/改順序：確認還在列表裡
-      if (!selectedFiles.includes(it)) continue;
-
-      const oldUrl = it.url;
-      const thumbUrl = URL.createObjectURL(blob);
-      it.url = thumbUrl;
-      try { if (oldUrl) URL.revokeObjectURL(oldUrl); } catch { }
-
-      // 更新 UI（只有 5 張，重畫一次成本可接受）
-      renderPreviews();
-
-      // 讓出主執行緒，避免連續縮圖造成卡頓
-      await new Promise((r) => setTimeout(r, 0));
+      // 綁定刪除單張圖片（原本的邏輯保留）
+      imgPreview.querySelectorAll("button[data-idx]").forEach((btn) =>
+        btn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const i = +btn.dataset.idx;
+          selectedFiles.splice(i, 1);
+          renderPreviews();
+        })
+      );
     }
-  } finally {
-    __thumbGenRunning = false;
-  }
-}
 
+    // 拖曳排序：新增模式縮圖
+    let newDragIndex = null;
 
-// 讓「新增照片」預覽可以拖曳換順序（桌機 + 手機）
-// - 縮圖外層需有 data-sort-idx
-// - 點刪除鈕不會觸發拖曳
-(() => {
-  if (!document.getElementById("previewSortableStyle")) {
-    const s = document.createElement("style");
-    s.id = "previewSortableStyle";
-    s.textContent = `
-      .preview-sort-item{touch-action:none; user-select:none; cursor:move;}
-      .preview-dragging{opacity:.85; outline:2px solid rgba(59,130,246,.7); outline-offset:2px;}
-    `;
-    document.head.appendChild(s);
-  }
-})();
+    imgPreview.addEventListener("dragstart", (e) => {
+      const card = e.target.closest(".new-thumb");
+      if (!card) return;
+      newDragIndex = Number(card.dataset.index);
+      e.dataTransfer?.setData("text/plain", String(newDragIndex));
+      e.dataTransfer.effectAllowed = "move";
+      card.classList.add("ring-2", "ring-amber-400");
+    });
 
-let __previewSortActive = null;
-document.addEventListener("pointerup", (e) => {
-  const act = __previewSortActive;
-  if (!act) return;
-  const { container, from } = act;
-  __previewSortActive = null;
+    imgPreview.addEventListener("dragover", (e) => {
+      if (newDragIndex == null) return;
+      const card = e.target.closest(".new-thumb");
+      if (!card) return;
+      e.preventDefault(); // 允許 drop
+    });
 
-  container?.querySelectorAll?.(".preview-dragging")
-    ?.forEach((el) => el.classList.remove("preview-dragging"));
-
-  const cfg = container && container.__previewSortableCfg;
-  if (!cfg) return;
-
-  const el = document.elementFromPoint(e.clientX, e.clientY);
-  const over = el?.closest?.("[data-sort-idx]");
-  if (!over || !container.contains(over)) return;
-
-  const to = Number(over.dataset.sortIdx);
-  if (Number.isNaN(to) || to === from) return;
-
-  const list = cfg.getItems();
-  const moved = list.splice(from, 1)[0];
-  list.splice(to, 0, moved);
-  cfg.setItems(list);
-  cfg.render();
-}, true);
-
-function bindPreviewSortable(container, cfg) {
-  if (!container) return;
-  container.__previewSortableCfg = cfg;
-  if (container.dataset.previewSortableBound) return;
-  container.dataset.previewSortableBound = "1";
-
-  container.addEventListener("pointerdown", (e) => {
-    const item = e.target.closest("[data-sort-idx]");
-    if (!item || !container.contains(item)) return;
-    if (e.target.closest("button")) return; // 點刪除鈕不拖曳
-    const from = Number(item.dataset.sortIdx);
-    if (Number.isNaN(from)) return;
-
-    item.classList.add("preview-dragging");
-    try { item.setPointerCapture(e.pointerId); } catch { }
-    __previewSortActive = { container, from };
-    e.preventDefault();
-  });
-}
-
-btnPick?.addEventListener("click", () => imgFiles.click());
-
-// 渲染預覽格子 + 刪除按鈕
-// ✅ 注意：不再在 render 時 createObjectURL（避免卡爆）
-function renderPreviews() {
-  fileCount.textContent = `已選 ${selectedFiles.length} / 5 張`;
-
-  imgPreview.innerHTML = selectedFiles
-    .map((it, i) => `
-    <div class="relative preview-sort-item" data-sort-idx="${i}">
-      <img class="w-full aspect-square object-cover rounded-lg"
-           src="${it.url}"
-           alt="預覽"
-           decoding="async"
-           loading="lazy">
-      <button data-idx="${i}" class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button>
-    </div>
-  `)
-    .join("");
-
-  // 綁定刪除單張圖片（刪除時記得 revoke URL）
-  imgPreview.querySelectorAll("button[data-idx]").forEach((btn) =>
-    btn.addEventListener("click", (e) => {
+    imgPreview.addEventListener("drop", (e) => {
+      if (newDragIndex == null) return;
       e.preventDefault();
-      e.stopPropagation();
-      const i = +btn.dataset.idx;
-      const [removed] = selectedFiles.splice(i, 1);
-      revokePreviewUrl(removed);
+      const card = e.target.closest(".new-thumb");
+      if (!card) {
+        newDragIndex = null;
+        return;
+      }
+      const toIndex = Number(card.dataset.index);
+      if (Number.isNaN(toIndex) || toIndex === newDragIndex) {
+        newDragIndex = null;
+        return;
+      }
+
+      const [moved] = selectedFiles.splice(newDragIndex, 1);
+      selectedFiles.splice(toIndex, 0, moved);
+
+      newDragIndex = null;
+      renderPreviews(); // 重新依新順序畫縮圖
+    });
+
+    imgPreview.addEventListener("dragend", () => {
+      newDragIndex = null;
+      imgPreview.querySelectorAll(".new-thumb").forEach((el) =>
+        el.classList.remove("ring-2", "ring-amber-400")
+      );
+    });
+
+    // 檔案挑選後：合併並截斷到 5 張
+    imgFiles?.addEventListener("change", () => {
+      const incoming = Array.from(imgFiles.files || []);
+      const next = selectedFiles.concat(incoming);
+      if (next.length > 5) {
+        Swal.fire({ icon: "warning", title: "最多 5 張照片" });
+      }
+      selectedFiles = next.slice(0, 5);
       renderPreviews();
-    })
-  );
-}
-
-// 讓預覽縮圖支援拖曳排序（排序後上傳順序也會跟著變）
-bindPreviewSortable(imgPreview, {
-  getItems: () => [...selectedFiles],
-  setItems: (v) => { selectedFiles = v; },
-  render: renderPreviews,
-});
-
-// 檔案挑選後：合併並截斷到 5 張
-imgFiles?.addEventListener("change", () => {
-  const incoming = Array.from(imgFiles.files || []);
-  const incomingItems = incoming.map((file) => ({
-    file,
-    url: URL.createObjectURL(file),
-  }));
-
-  let next = selectedFiles.concat(incomingItems);
-
-  if (next.length > 5) {
-    Swal.fire({ icon: "warning", title: "最多 5 張照片" });
-    // 超過 5 張的預覽 URL 也要 revoke，避免記憶體暴增
-    next.slice(5).forEach(revokePreviewUrl);
-  }
-
-  selectedFiles = next.slice(0, 5);
-  renderPreviews();
-  enhanceThumbnails();
-  imgFiles.value = ""; // 清空 input，避免重複選取不到
-});
+      imgFiles.value = ""; // 清空 input，避免重複選取不到
+    });
 
     // ===============================
     // 捲到最上方（保險版）
@@ -1071,8 +963,7 @@ imgFiles?.addEventListener("change", () => {
 
         // 2) 逐張上傳圖片，取得 Storage URL
         const urls = [];
-        for (const it of selectedFiles) {
-          const f = it.file;
+        for (const f of selectedFiles) {
           const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
           const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
           const base = f.name.replace(/\.[^.]+$/, '');
@@ -1100,7 +991,6 @@ imgFiles?.addEventListener("change", () => {
         // 重置表單與選擇圖片（先做，避免 DOM 還在變動導致 smooth scroll 卡住）
         e.target.reset();
         imgPreview.innerHTML = "";
-        revokeAllPreviewUrls();
         selectedFiles = [];
         fileCount.textContent = "已選 0 / 5 張";
         syncBreedSelectors();
