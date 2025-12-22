@@ -1,137 +1,121 @@
 const q = (sel) => document.querySelector(sel);
 
-
 // ===============================
-// 共用：縮圖拖曳排序（支援手機/桌機 Pointer Events）
-// - 縮圖外層：加 .js-sort-item + data-sort-key（render 時的索引）
-// - 會依 DOM 新順序回寫到對應 state（getList/setList），再呼叫 render()
+// 小工具：拖曳排序（桌機 + 手機）
 // ===============================
-function bindSortablePreviewGrid(container, { getList, setList, render, itemSelector = ".js-sort-item", ignoreSelector = "button" }) {
-  if (!container || container.dataset.sortableBound) return;
-  container.dataset.sortableBound = "1";
+const __uid = (() => {
+  let n = 0;
+  return () => `id_${Date.now()}_${n++}_${Math.random().toString(16).slice(2)}`;
+})();
 
-  let dragItem = null;
-  let placeholder = null;
-  let ghost = null;
-  let pointerId = null;
-  let offsetX = 0, offsetY = 0;
-  let snapshot = null;
-  let suppressClickUntil = 0;
-
-  // 剛拖完那一下避免誤點到刪除鈕
-  container.addEventListener("click", (e) => {
-    if (Date.now() < suppressClickUntil) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  }, true);
-
-  function cleanup() {
-    if (ghost?.parentNode) ghost.parentNode.removeChild(ghost);
-    ghost = null;
-    if (placeholder?.parentNode) placeholder.parentNode.removeChild(placeholder);
-    placeholder = null;
-    if (dragItem) dragItem.style.visibility = "";
-    dragItem = null;
-    pointerId = null;
-    snapshot = null;
+function ensureFileUid(file) {
+  if (!file) return __uid();
+  if (file.__uid) return file.__uid;
+  try {
+    Object.defineProperty(file, "__uid", { value: __uid(), enumerable: false });
+  } catch (_) {
+    file.__uid = __uid();
   }
+  return file.__uid;
+}
 
-  function onMove(e) {
-    if (!ghost || e.pointerId !== pointerId) return;
+// container：縮圖 grid
+// onSorted(keys)：排序完成後回傳目前 DOM 的 data-key 順序
+function attachSortableGrid(container, onSorted, {
+  itemSelector = ".sortable-item",
+  handleSelector = ".drag-handle",
+  threshold = 6,
+} = {}) {
+  if (!container) return;
 
-    ghost.style.left = (e.clientX - offsetX) + "px";
-    ghost.style.top = (e.clientY - offsetY) + "px";
+  // 每次重畫可能都會傳新的 callback
+  container.__sortableOnSorted = onSorted;
 
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    const over = el && el.closest(itemSelector);
+  if (container.__sortableAttached) return;
+  container.__sortableAttached = true;
 
-    if (over && over !== dragItem && container.contains(over)) {
-      const r = over.getBoundingClientRect();
-      const after = (e.clientY - r.top) > (r.height / 2) || (e.clientX - r.left) > (r.width / 2);
-      container.insertBefore(placeholder, after ? over.nextSibling : over);
-    } else {
-      const cr = container.getBoundingClientRect();
-      if (e.clientY > cr.bottom || e.clientX > cr.right) container.appendChild(placeholder);
-      if (e.clientY < cr.top || e.clientX < cr.left) container.insertBefore(placeholder, container.firstChild);
-    }
-  }
+  let draggingEl = null;
+  let activePointerId = null;
+  let startX = 0, startY = 0;
+  let started = false;
 
-  function onUp(e) {
-    if (e.pointerId !== pointerId) return;
-    e.preventDefault();
+  const getItem = (t) => t?.closest?.(itemSelector);
+  const getHandle = (t) => t?.closest?.(handleSelector);
 
-    suppressClickUntil = Date.now() + 250;
+  function finish() {
+    if (!draggingEl) return;
 
-    if (placeholder && dragItem) placeholder.replaceWith(dragItem);
-    if (dragItem) dragItem.style.visibility = "";
+    draggingEl.classList.remove("opacity-60");
+    container.classList.remove("ring-2", "ring-sky-300");
 
     const keys = Array.from(container.querySelectorAll(itemSelector))
-      .map(el => parseInt(el.dataset.sortKey, 10))
-      .filter(n => Number.isFinite(n));
+      .map(el => el.dataset.key)
+      .filter(Boolean);
 
-    if (snapshot && typeof setList === "function") {
-      const next = keys.map(k => snapshot[k]).filter(Boolean);
-      setList(next);
-    }
+    draggingEl = null;
+    activePointerId = null;
+    started = false;
 
-    cleanup();
-    if (typeof render === "function") render();
-
-    window.removeEventListener("pointermove", onMove, true);
-    window.removeEventListener("pointerup", onUp, true);
-    window.removeEventListener("pointercancel", onUp, true);
+    const cb = container.__sortableOnSorted;
+    if (typeof cb === "function") cb(keys);
   }
 
   container.addEventListener("pointerdown", (e) => {
-    const item = e.target.closest(itemSelector);
-    if (!item || !container.contains(item)) return;
-    if (ignoreSelector && e.target.closest(ignoreSelector)) return;
-    if (e.button !== undefined && e.button !== 0) return;
+    const handle = getHandle(e.target);
+    if (!handle) return; // 只允許從把手拖曳（避免影響滾動）
+    if (e.button != null && e.button !== 0) return;
 
-    const list = (typeof getList === "function" ? getList() : []) || [];
-    if (list.length <= 1) return;
+    const item = getItem(handle);
+    if (!item || !container.contains(item)) return;
+
+    activePointerId = e.pointerId;
+    draggingEl = item;
+    startX = e.clientX;
+    startY = e.clientY;
+    started = false;
+
+    try { handle.setPointerCapture(activePointerId); } catch (_) { }
+    e.preventDefault();
+  });
+
+  container.addEventListener("pointermove", (e) => {
+    if (activePointerId == null || e.pointerId !== activePointerId || !draggingEl) return;
+
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    if (!started) {
+      if (Math.hypot(dx, dy) < threshold) return;
+      started = true;
+      draggingEl.classList.add("opacity-60");
+      container.classList.add("ring-2", "ring-sky-300");
+    }
 
     e.preventDefault();
 
-    snapshot = list.slice();
-    dragItem = item;
-    pointerId = e.pointerId;
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const target = getItem(el);
+    if (!target || target === draggingEl || !container.contains(target)) return;
 
-    const rect = dragItem.getBoundingClientRect();
-    offsetX = e.clientX - rect.left;
-    offsetY = e.clientY - rect.top;
+    const items = Array.from(container.querySelectorAll(itemSelector));
+    const dragIndex = items.indexOf(draggingEl);
+    const targetIndex = items.indexOf(target);
+    if (dragIndex < 0 || targetIndex < 0) return;
 
-    placeholder = document.createElement("div");
-    placeholder.className = "js-sort-placeholder";
-    placeholder.style.width = rect.width + "px";
-    placeholder.style.height = rect.height + "px";
-    placeholder.style.border = "2px dashed rgba(148,163,184,.9)";
-    placeholder.style.borderRadius = "0.75rem";
-    placeholder.style.boxSizing = "border-box";
-    placeholder.style.background = "rgba(241,245,249,.6)";
-    dragItem.after(placeholder);
+    if (dragIndex < targetIndex) {
+      container.insertBefore(draggingEl, target.nextSibling);
+    } else {
+      container.insertBefore(draggingEl, target);
+    }
+  });
 
-    ghost = dragItem.cloneNode(true);
-    ghost.style.position = "fixed";
-    ghost.style.left = rect.left + "px";
-    ghost.style.top = rect.top + "px";
-    ghost.style.width = rect.width + "px";
-    ghost.style.height = rect.height + "px";
-    ghost.style.pointerEvents = "none";
-    ghost.style.zIndex = "2147483646";
-    ghost.style.opacity = "0.9";
-    ghost.style.transform = "scale(1.02)";
-    document.body.appendChild(ghost);
-
-    dragItem.style.visibility = "hidden";
-    try { dragItem.setPointerCapture(pointerId); } catch (_) {}
-
-    window.addEventListener("pointermove", onMove, true);
-    window.addEventListener("pointerup", onUp, true);
-    window.addEventListener("pointercancel", onUp, true);
-  }, { passive: false });
+  container.addEventListener("pointerup", (e) => {
+    if (e.pointerId === activePointerId) finish();
+  });
+  container.addEventListener("pointercancel", (e) => {
+    if (e.pointerId === activePointerId) finish();
+  });
 }
+
 
 // ===============================
 // 品種資料與「品種/毛色」連動邏輯
@@ -524,34 +508,29 @@ async function saveEdit() {
   const stopDots = startDots(txt, "儲存中");
 
   try {
-    // 依照狀態計算出最終 images：依照畫面順序 order（keep/add 混排），最後刪掉 remove 的 Storage 物件
-    const { order, remove } = editImagesState;
+    // 依照目前順序計算出最終 images（含舊圖 + 新增圖；順序以預覽為準）
+    const { items, remove } = editImagesState;
     const newUrls = [];
 
-    // 先依「目前順序」組出 newUrls（新增的檔案會依位置上傳）
-    for (const item of (order || [])) {
-      if (!item) continue;
-
-      if (item.type === "keep") {
-        if (item.url) newUrls.push(item.url);
+    // 依序處理：遇到新檔案就上傳，遇到舊 url 就直接保留
+    for (const item of items) {
+      if (item?.kind === "url" && item.url) {
+        newUrls.push(item.url);
         continue;
       }
-
-      if (item.type === "add" && item.file) {
+      if (item?.kind === "file" && item.file) {
         const f = item.file;
-        const wmBlob = await addWatermarkToFile(f);       // 先加浮水印
+        const wmBlob = await addWatermarkToFile(f);       // ← 先加浮水印
         const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
-        const safeName = (f.name || 'image').replace(/\s+/g, "_");
-        const baseName = safeName.replace(/\.[a-z0-9]+$/i, "");
-        const storageRef = sRef(storage, `pets/${currentDocId}/${Date.now()}_${baseName}.${ext}`);
-
-        await uploadBytes(storageRef, wmBlob, { contentType: wmBlob.type });
-        const url = await getDownloadURL(storageRef);
-        newUrls.push(url);
+        const base = f.name.replace(/\.[^.]+$/, '');
+        const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
+        const r = sRef(storage, path);
+        await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
+        newUrls.push(await getDownloadURL(r));
       }
     }
 
-    // 刪除移除的檔案（忽略刪失敗）
+    // 刪除移除的舊圖（忽略刪失敗）
     for (const url of remove) {
       try {
         const path = url.split("/o/")[1].split("?")[0];
@@ -560,8 +539,7 @@ async function saveEdit() {
         // 靜默忽略
       }
     }
-
-    newData.images = newUrls;
+newData.images = newUrls;
 
     // ③ 寫回 Firestore
     await updateDoc(doc(db, "pets", currentDocId), newData);
@@ -646,78 +624,87 @@ editBreedTypeSel.addEventListener("change", () => {
 });
 
 // ===============================
-// 編輯模式：圖片管理（預覽 + 增刪）
+// 編輯模式：圖片管理（預覽 + 增刪 + 拖曳排序）
 // ===============================
 const editFiles = q("#editFiles");
 const btnPickEdit = q("#btnPickEdit");
 const editPreview = q("#editPreview");
 const editCount = q("#editCount");
 
-// 狀態：依畫面順序的圖片清單（最多 5 張）
-// - keep: 已存在的 url
-// - add : 新增的 File
-let editImagesState = { order: [], remove: [] };
+// 狀態：items（有序）、remove（要刪掉的現有 url）
+let editImagesState = { items: [], remove: [] };
 
 btnPickEdit.addEventListener("click", () => editFiles.click());
 
-// 初始化編輯圖片列表（依既有順序）
+// 初始化編輯圖片列表
 function renderEditImages(urls) {
-  editImagesState.order = (urls || []).map((u) => ({ type: "keep", url: u }));
+  editImagesState.items = (urls || []).map((u) => ({ id: __uid(), kind: "url", url: u }));
   editImagesState.remove = [];
   paintEditPreview();
 }
 
-// 依狀態重新畫縮圖
+// 依狀態重新畫縮圖（可拖曳排序：桌機 + 手機）
 function paintEditPreview() {
-  const total = editImagesState.order.length;
+  const total = editImagesState.items.length;
   editCount.textContent = `已選 ${total} / 5 張`;
 
-  editPreview.innerHTML = editImagesState.order
-    .map((item, pos) => {
-      const src = item.type === "keep" ? item.url : URL.createObjectURL(item.file);
+  const keyMap = new Map();
+
+  editPreview.innerHTML = editImagesState.items
+    .map((item) => {
+      keyMap.set(item.id, item);
+      const src = item.kind === "url" ? item.url : URL.createObjectURL(item.file);
       return `
-        <div class="relative js-sort-item cursor-grab active:cursor-grabbing select-none" data-sort-key="${pos}" style="touch-action:none;">
-          <img class="w-full aspect-square object-cover rounded-lg" src="${src}" alt="預覽" draggable="false"/>
-          <button data-pos="${pos}" class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center" aria-label="刪除這張">✕</button>
+        <div class="relative sortable-item" data-key="${item.id}">
+          <img class="w-full aspect-square object-cover rounded-lg" src="${src}"/>
+          <div class="drag-handle absolute bottom-1 left-1 bg-black/60 text-white rounded px-2 py-1 text-xs leading-none select-none"
+               style="touch-action:none;cursor:grab" aria-label="拖曳排序" title="拖曳排序">⠿</div>
+          <button data-del="${item.id}" class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button>
         </div>`;
     })
     .join("");
 
-  // 刪除單張（keep → 丟進 remove；add → 直接刪）
-  editPreview.querySelectorAll("button[data-pos]").forEach((btn) =>
+  // 保存 key → item 對照表，供排序回寫
+  editPreview.__keyMap = keyMap;
+
+  // 刪除：現有 url → 放進 remove；新檔案 → 直接移除
+  editPreview.querySelectorAll("button[data-del]").forEach((btn) =>
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const pos = +btn.dataset.pos;
-      const item = editImagesState.order[pos];
-      if (!item) return;
-      if (item.type === "keep" && item.url) editImagesState.remove.push(item.url);
-      editImagesState.order.splice(pos, 1);
+      const id = btn.getAttribute("data-del");
+      const idx = editImagesState.items.findIndex((x) => x.id === id);
+      if (idx < 0) return;
+      const [removed] = editImagesState.items.splice(idx, 1);
+      if (removed?.kind === "url") editImagesState.remove.push(removed.url);
       paintEditPreview();
     })
   );
+
+  // 拖曳排序（手機可用：Pointer Events）
+  attachSortableGrid(editPreview, (keys) => {
+    const map = editPreview.__keyMap || new Map();
+    editImagesState.items = keys.map((k) => map.get(k)).filter(Boolean);
+    paintEditPreview(); // 重新畫一次，讓刪除鈕與 DOM 同步
+  });
 }
 
 // 新增圖片（尊守上限 5）
 editFiles.addEventListener("change", () => {
   const incoming = Array.from(editFiles.files || []);
-  const room = Math.max(0, 5 - editImagesState.order.length);
-
-  if (incoming.length > room) {
-    swalInDialog({ icon: "warning", title: "最多 5 張照片", text: `你還能再選 ${room} 張` });
+  const total = editImagesState.items.length + incoming.length;
+  if (total > 5) {
+    swalInDialog({ icon: "warning", title: "最多 5 張照片" });
   }
-
-  incoming.slice(0, room).forEach((f) => editImagesState.order.push({ type: "add", file: f }));
+  const room = 5 - editImagesState.items.length;
+  const picked = incoming.slice(0, Math.max(0, room));
+  for (const f of picked) {
+    editImagesState.items.push({ id: __uid(), kind: "file", file: f });
+  }
   paintEditPreview();
   editFiles.value = "";
 });
 
-// 啟用拖曳排序（手機也可用）
-bindSortablePreviewGrid(editPreview, {
-  getList: () => editImagesState.order,
-  setList: (arr) => (editImagesState.order = arr),
-  render: paintEditPreview,
-});
 
 // ===============================
 // 送養流程：上傳合照 / 標記 / 撤回
@@ -731,26 +718,26 @@ const btnPickAdopted = document.getElementById("btnPickAdopted");
 const adoptedCount = document.getElementById("adoptedCount");
 const adoptedPreview = document.getElementById("adoptedPreview");
 
-// 啟用拖曳排序（手機也可用）
-bindSortablePreviewGrid(adoptedPreview, {
-  getList: () => adoptedSelected,
-  setList: (arr) => (adoptedSelected = arr),
-  render: renderAdoptedPreviews,
-});
-
 // 打開檔案挑選
 btnPickAdopted.onclick = () => adoptedFilesInput.click();
 
 // 渲染縮圖（右上角刪除鈕）
 function renderAdoptedPreviews() {
   adoptedCount.textContent = `已選 ${adoptedSelected.length} / 5 張`;
+
+  const keyMap = new Map();
+
   adoptedPreview.innerHTML = adoptedSelected
-    .map((f, i) => {
+    .map((f) => {
+      const key = ensureFileUid(f);
+      keyMap.set(key, f);
       const u = URL.createObjectURL(f);
       return `
-        <div class="relative js-sort-item cursor-grab active:cursor-grabbing select-none" data-sort-key="${i}" style="touch-action:none;">
-          <img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽" draggable="false">
-          <button data-idx="${i}"
+        <div class="relative sortable-item" data-key="${key}">
+          <img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽">
+          <div class="drag-handle absolute bottom-1 left-1 bg-black/60 text-white rounded px-2 py-1 text-xs leading-none select-none"
+               style="touch-action:none;cursor:grab" aria-label="拖曳排序" title="拖曳排序">⠿</div>
+          <button data-key="${key}"
                   class="absolute top-1 right-1 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center"
                   aria-label="刪除這張">✕</button>
         </div>
@@ -758,16 +745,27 @@ function renderAdoptedPreviews() {
     })
     .join("");
 
-  adoptedPreview.querySelectorAll("button[data-idx]").forEach((btn) => {
+  adoptedPreview.__keyMap = keyMap;
+
+  adoptedPreview.querySelectorAll("button[data-key]").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const i = +btn.dataset.idx;
-      adoptedSelected.splice(i, 1);
+      const key = btn.dataset.key;
+      const idx = adoptedSelected.findIndex((f) => ensureFileUid(f) === key);
+      if (idx >= 0) adoptedSelected.splice(idx, 1);
       renderAdoptedPreviews();
     });
   });
+
+  // 拖曳排序（手機可用：Pointer Events）
+  attachSortableGrid(adoptedPreview, (keys) => {
+    const map = adoptedPreview.__keyMap || new Map();
+    adoptedSelected = keys.map((k) => map.get(k)).filter(Boolean);
+    renderAdoptedPreviews();
+  });
 }
+
 
 renderAdoptedPreviews();
 
