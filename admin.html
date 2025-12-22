@@ -766,8 +766,16 @@
     let selectedFiles = []; // 暫存待上傳檔案
 
     btnPick?.addEventListener("click", () => imgFiles.click());
+    // 小工具：陣列移動元素（拖曳排序用）
+    function moveArrayItem(arr, from, to) {
+      if (!Array.isArray(arr)) return;
+      if (from === to) return;
+      if (from < 0 || to < 0 || from >= arr.length || to >= arr.length) return;
+      const [it] = arr.splice(from, 1);
+      arr.splice(to, 0, it);
+    }
 
-    // 渲染預覽格子 + 刪除按鈕
+    // 渲染預覽格子 + 刪除 + 拖曳排序
     function renderPreviews() {
       fileCount.textContent = `已選 ${selectedFiles.length} / 5 張`;
 
@@ -775,24 +783,96 @@
         .map((f, i) => {
           const u = URL.createObjectURL(f);
           return `
-        <div class="relative">
-          <img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽">
-          <button data-idx="${i}" class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button>
+        <div class="relative cursor-move" data-sort="${i}" draggable="true" style="touch-action:none">
+          <img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽" draggable="false">
+          <button data-del="${i}" class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center" aria-label="刪除這張">✕</button>
         </div>
       `;
         })
         .join("");
 
-      // 綁定刪除單張圖片
-      imgPreview.querySelectorAll("button[data-idx]").forEach((btn) =>
+      // 綁定刪除
+      imgPreview.querySelectorAll("button[data-del]").forEach((btn) =>
         btn.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
-          const i = +btn.dataset.idx;
+          const i = +btn.dataset.del;
           selectedFiles.splice(i, 1);
           renderPreviews();
         })
       );
+
+      // 綁定拖曳排序（desktop：HTML5 drag；mobile：pointer drag）
+      let dragFrom = null;
+      let pointerState = null; // { from, to, pid, el }
+
+      imgPreview.querySelectorAll("[data-sort]").forEach((wrap) => {
+        // --- HTML5 Drag (Desktop) ---
+        wrap.addEventListener("dragstart", (e) => {
+          if (e.target.closest("button")) { e.preventDefault(); return; }
+          dragFrom = +wrap.dataset.sort;
+          if (e.dataTransfer) {
+            e.dataTransfer.effectAllowed = "move";
+            try { e.dataTransfer.setData("text/plain", String(dragFrom)); } catch (_) { }
+          }
+          wrap.classList.add("opacity-70");
+        });
+
+        wrap.addEventListener("dragend", () => {
+          wrap.classList.remove("opacity-70");
+          dragFrom = null;
+        });
+
+        wrap.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+        });
+
+        wrap.addEventListener("drop", (e) => {
+          e.preventDefault();
+          const from = (dragFrom != null)
+            ? dragFrom
+            : parseInt((e.dataTransfer?.getData("text/plain") || ""), 10);
+          const to = +wrap.dataset.sort;
+          if (Number.isFinite(from) && Number.isFinite(to) && from !== to) {
+            moveArrayItem(selectedFiles, from, to);
+            renderPreviews();
+          }
+          dragFrom = null;
+        });
+
+        // --- Pointer Drag (Mobile/Touch) ---
+        wrap.addEventListener("pointerdown", (e) => {
+          if (e.pointerType === "mouse") return;
+          if (e.target.closest("button")) return;
+          pointerState = { from: +wrap.dataset.sort, to: +wrap.dataset.sort, pid: e.pointerId, el: wrap };
+          try { wrap.setPointerCapture(e.pointerId); } catch (_) { }
+          wrap.classList.add("opacity-70");
+        });
+
+        wrap.addEventListener("pointermove", (e) => {
+          if (!pointerState || pointerState.pid !== e.pointerId) return;
+          const el = document.elementFromPoint(e.clientX, e.clientY);
+          const over = el?.closest?.("[data-sort]");
+          if (over && over.parentElement === imgPreview) {
+            pointerState.to = +over.dataset.sort;
+          }
+        });
+
+        const endPointer = (e) => {
+          if (!pointerState || pointerState.pid !== e.pointerId) return;
+          const { from, to, el } = pointerState;
+          pointerState = null;
+          el?.classList?.remove?.("opacity-70");
+          if (Number.isFinite(from) && Number.isFinite(to) && from !== to) {
+            moveArrayItem(selectedFiles, from, to);
+            renderPreviews();
+          }
+        };
+
+        wrap.addEventListener("pointerup", endPointer);
+        wrap.addEventListener("pointercancel", endPointer);
+      });
     }
 
     // 檔案挑選後：合併並截斷到 5 張
