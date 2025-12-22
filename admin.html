@@ -765,31 +765,151 @@
     const imgPreview = $("#imgPreview");
     let selectedFiles = []; // 暫存待上傳檔案
 
-    // ✅ 讓預覽可以拖曳排序（含手機）：用 SortableJS + 為每張圖綁定穩定 uid
-    let imgSortable = null;
-    const ensureFileUid = (f) => {
-      if (!f.__uid) f.__uid = `f_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-      return f.__uid;
-    };
-    function ensureImgSortable() {
-      if (!window.Sortable || !imgPreview) return;
-      if (imgSortable) return;
-      imgSortable = new Sortable(imgPreview, {
-        animation: 150,
-        draggable: ".photo-item",
-        handle: "img",
-        delay: 150,
-        delayOnTouchOnly: true,
-        ghostClass: "opacity-40",
-        chosenClass: "ring-2 ring-gray-400",
-        filter: "button",
-        preventOnFilter: false,
-        onEnd: () => {
-          const uids = Array.from(imgPreview.children).map((el) => el.dataset.uid).filter(Boolean);
-          const map = new Map(selectedFiles.map((f) => [f.__uid, f]));
-          selectedFiles = uids.map((id) => map.get(id)).filter(Boolean);
-        },
-      });
+
+    // ===============================
+    // 拖曳排序（照片預覽：手機可用）
+    // ===============================
+    function bindPointerSortableGrid(container, {
+      getList,
+      setList,
+      rerender,
+      itemSelector = ".js-sort-item",
+      ignoreSelector = "button",
+      threshold = 6,
+    } = {}) {
+      if (!container || container.dataset.pointerSortableBound) return;
+      container.dataset.pointerSortableBound = "1";
+
+      // Inject minimal styles once
+      if (!document.getElementById("pointerSortableStyle")) {
+        const s = document.createElement("style");
+        s.id = "pointerSortableStyle";
+        s.textContent = `
+          .js-sort-placeholder{
+            border:2px dashed rgba(148,163,184,.9);
+            border-radius:12px;
+            box-sizing:border-box;
+            background:rgba(248,250,252,.6);
+          }
+          .js-sort-item.is-dragging{
+            opacity:.9;
+            transform:scale(1.03);
+            filter:drop-shadow(0 10px 14px rgba(0,0,0,.10));
+          }
+        `;
+        document.head.appendChild(s);
+      }
+
+      let st = null;
+
+      function startDrag() {
+        if (!st || st.dragging) return;
+        const rect = st.item.getBoundingClientRect();
+        st.offsetX = st.startX - rect.left;
+        st.offsetY = st.startY - rect.top;
+
+        const ph = document.createElement("div");
+        ph.className = "js-sort-placeholder";
+        ph.style.width = rect.width + "px";
+        ph.style.height = rect.height + "px";
+        st.placeholder = ph;
+
+        container.replaceChild(ph, st.item);
+        document.body.appendChild(st.item);
+
+        st.item.classList.add("is-dragging");
+        Object.assign(st.item.style, {
+          position: "fixed",
+          zIndex: 999999,
+          left: (st.startX - st.offsetX) + "px",
+          top: (st.startY - st.offsetY) + "px",
+          width: rect.width + "px",
+          height: rect.height + "px",
+          pointerEvents: "none",
+        });
+
+        st.dragging = true;
+      }
+
+      function onMove(e) {
+        if (!st) return;
+        if (e.pointerType !== "mouse") e.preventDefault();
+
+        if (!st.dragging) {
+          const dx = e.clientX - st.startX;
+          const dy = e.clientY - st.startY;
+          if (Math.hypot(dx, dy) < threshold) return;
+          startDrag();
+        }
+
+        st.item.style.left = (e.clientX - st.offsetX) + "px";
+        st.item.style.top = (e.clientY - st.offsetY) + "px";
+
+        const el = document.elementFromPoint(e.clientX, e.clientY);
+        const over = el?.closest?.(itemSelector);
+        if (!over || !container.contains(over) || over === st.placeholder) return;
+
+        const r = over.getBoundingClientRect();
+        const yRatio = (e.clientY - r.top) / Math.max(1, r.height);
+        const xRatio = (e.clientX - r.left) / Math.max(1, r.width);
+        const before = (yRatio < 0.45) || (yRatio <= 0.55 && xRatio < 0.5);
+
+        if (before) container.insertBefore(st.placeholder, over);
+        else container.insertBefore(st.placeholder, over.nextSibling);
+      }
+
+      function onUp() {
+        window.removeEventListener("pointermove", onMove);
+        if (!st) return;
+
+        if (!st.dragging) { st = null; return; }
+
+        const to = Array.from(container.children).indexOf(st.placeholder);
+        const from = st.from;
+
+        const list = Array.from(getList?.() || []);
+        if (
+          Number.isFinite(from) && Number.isFinite(to) &&
+          from >= 0 && to >= 0 &&
+          from < list.length && to < list.length &&
+          from !== to
+        ) {
+          const [moved] = list.splice(from, 1);
+          list.splice(to, 0, moved);
+          setList?.(list);
+        }
+
+        try { st.item.remove(); } catch (_) {}
+        try { st.placeholder.remove(); } catch (_) {}
+        st = null;
+
+        rerender?.();
+      }
+
+      container.addEventListener("pointerdown", (e) => {
+        const item = e.target?.closest?.(itemSelector);
+        if (!item || !container.contains(item)) return;
+        if (ignoreSelector && e.target.closest(ignoreSelector)) return;
+        if (e.pointerType === "mouse" && e.button !== 0) return;
+
+        e.preventDefault();
+
+        const idx = Number(item.dataset.sortIdx);
+        st = {
+          item,
+          from: Number.isFinite(idx) ? idx : Array.from(container.querySelectorAll(itemSelector)).indexOf(item),
+          startX: e.clientX,
+          startY: e.clientY,
+          dragging: false,
+          placeholder: null,
+          offsetX: 0,
+          offsetY: 0,
+        };
+
+        window.addEventListener("pointermove", onMove, { passive: false });
+        window.addEventListener("pointerup", onUp, { passive: false, once: true });
+        window.addEventListener("pointercancel", onUp, { passive: false, once: true });
+      }, { passive: false });
     }
 
     btnPick?.addEventListener("click", () => imgFiles.click());
@@ -799,33 +919,34 @@
       fileCount.textContent = `已選 ${selectedFiles.length} / 5 張`;
 
       imgPreview.innerHTML = selectedFiles
-        .map((f) => {
-          const uid = ensureFileUid(f);
+        .map((f, i) => {
           const u = URL.createObjectURL(f);
           return `
-        <div class="relative photo-item" data-uid="${uid}">
+        <div class="relative js-sort-item" data-sort-idx="${i}">
           <img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽">
-          <button type="button" data-del="1" data-uid="${uid}"
-                  class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center"
-                  aria-label="刪除這張">✕</button>
+          <button data-idx="${i}" class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button>
         </div>
       `;
         })
         .join("");
 
-      // 綁定刪除單張圖片（用 uid，避免拖曳後 index 對不到）
-      imgPreview.querySelectorAll('button[data-del="1"]').forEach((btn) =>
+      // 綁定刪除單張圖片
+      imgPreview.querySelectorAll("button[data-idx]").forEach((btn) =>
         btn.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
-          const uid = btn.dataset.uid;
-          const i = selectedFiles.findIndex((f) => f.__uid === uid);
-          if (i >= 0) selectedFiles.splice(i, 1);
+          const i = +btn.dataset.idx;
+          selectedFiles.splice(i, 1);
           renderPreviews();
         })
       );
 
-      ensureImgSortable();
+      // 拖曳排序（手機可用）
+      bindPointerSortableGrid(imgPreview, {
+        getList: () => selectedFiles,
+        setList: (list) => { selectedFiles = list; },
+        rerender: renderPreviews,
+      });
     }
 
     // 檔案挑選後：合併並截斷到 5 張
@@ -1347,7 +1468,6 @@
     loadPets();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
   <script src="assets/Modal.js"></script>
   <script src="assets/Lightbox.js"></script>
   <script>
