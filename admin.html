@@ -774,6 +774,125 @@
       arr.splice(to, 0, x);
     }
 
+function ensureFileKey(file) {
+      if (!file) return "";
+      if (!file.__sortKey) {
+        const uuid = (self.crypto && self.crypto.randomUUID) ? self.crypto.randomUUID() : `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+        file.__sortKey = uuid;
+      }
+      return file.__sortKey;
+    }
+
+    function reorderArrayByKeys(arr, keys, keyFn) {
+      const map = new Map(arr.map((x) => [keyFn(x), x]));
+      arr.length = 0;
+      keys.forEach((k) => {
+        const v = map.get(k);
+        if (v) arr.push(v);
+      });
+    }
+
+    function setupPointerSort(container) {
+      if (!container || container.__pointerSortInited) return;
+      container.__pointerSortInited = true;
+      container.style.touchAction = "none";
+
+      let draggingEl = null;
+      let placeholderEl = null;
+      let offsetX = 0;
+      let offsetY = 0;
+
+      const getItem = (el) => {
+        const item = el && el.closest ? el.closest("[data-sort-key]") : null;
+        return item && container.contains(item) ? item : null;
+      };
+
+      const resetDraggingStyle = (el) => {
+        if (!el) return;
+        el.style.opacity = "";
+        el.style.position = "";
+        el.style.left = "";
+        el.style.top = "";
+        el.style.width = "";
+        el.style.height = "";
+        el.style.zIndex = "";
+        el.style.pointerEvents = "";
+        el.style.cursor = "grab";
+      };
+
+      container.addEventListener("pointerdown", (e) => {
+        const item = getItem(e.target);
+        if (!item) return;
+        if (e.target && e.target.closest && e.target.closest("button")) return; // delete button
+        e.preventDefault();
+
+        draggingEl = item;
+
+        const rect = draggingEl.getBoundingClientRect();
+        offsetX = e.clientX - rect.left;
+        offsetY = e.clientY - rect.top;
+
+        placeholderEl = document.createElement("div");
+        placeholderEl.className = draggingEl.className;
+        placeholderEl.style.width = rect.width + "px";
+        placeholderEl.style.height = rect.height + "px";
+        placeholderEl.style.visibility = "hidden";
+        draggingEl.after(placeholderEl);
+
+        draggingEl.style.opacity = "0.6";
+        draggingEl.style.position = "fixed";
+        draggingEl.style.left = rect.left + "px";
+        draggingEl.style.top = rect.top + "px";
+        draggingEl.style.width = rect.width + "px";
+        draggingEl.style.height = rect.height + "px";
+        draggingEl.style.zIndex = "9999";
+        draggingEl.style.pointerEvents = "none";
+        draggingEl.style.cursor = "grabbing";
+
+        const moveAt = (x, y) => {
+          draggingEl.style.left = (x - offsetX) + "px";
+          draggingEl.style.top = (y - offsetY) + "px";
+        };
+        moveAt(e.clientX, e.clientY);
+
+        const onMove = (ev) => {
+          if (!draggingEl) return;
+          moveAt(ev.clientX, ev.clientY);
+
+          const elBelow = document.elementFromPoint(ev.clientX, ev.clientY);
+          const over = getItem(elBelow);
+          if (!over || over === draggingEl) return;
+
+          const overRect = over.getBoundingClientRect();
+          const before = ev.clientY < (overRect.top + overRect.height / 2);
+          if (before) container.insertBefore(placeholderEl, over);
+          else container.insertBefore(placeholderEl, over.nextSibling);
+        };
+
+        const onUp = () => {
+          if (!draggingEl) return;
+
+          resetDraggingStyle(draggingEl);
+          container.insertBefore(draggingEl, placeholderEl);
+          if (placeholderEl) placeholderEl.remove();
+          placeholderEl = null;
+
+          const keys = Array.from(container.querySelectorAll("[data-sort-key]")).map((el) => el.dataset.sortKey);
+          if (typeof container.__onSortDrop === "function") container.__onSortDrop(keys);
+
+          draggingEl = null;
+          window.removeEventListener("pointermove", onMove);
+          window.removeEventListener("pointerup", onUp);
+          window.removeEventListener("pointercancel", onUp);
+        };
+
+        window.addEventListener("pointermove", onMove);
+        window.addEventListener("pointerup", onUp);
+        window.addEventListener("pointercancel", onUp);
+      });
+    }
+
+
     function bindDragSort(container, onMove) {
       let fromIdx = null;
       container.querySelectorAll("[data-sort-idx]").forEach((el) => {
@@ -808,10 +927,11 @@
       imgPreview.innerHTML = selectedFiles
         .map((f, i) => {
           const u = URL.createObjectURL(f);
+          const key = ensureFileKey(f);
           return `
-        <div class="relative" data-sort-idx="${i}" draggable="true" style="cursor: grab;">
+        <div class="relative" data-sort-key="${key}" draggable="false" style="cursor: grab;">
           <img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽" draggable="false">
-          <button data-idx="${i}" draggable="false" class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button>
+          <button data-idx="${i}" draggable="false" class="absolute top-1 right-1 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button>
         </div>
       `;
         })
@@ -828,11 +948,12 @@
         })
       );
 
-      // 允許拖曳縮圖更改順序
-      bindDragSort(imgPreview, (from, to) => {
-        moveArrayItem(selectedFiles, from, to);
+      // Pointer Drag Sort（支援手機/桌機）
+      setupPointerSort(imgPreview);
+      imgPreview.__onSortDrop = (keys) => {
+        reorderArrayByKeys(selectedFiles, keys, ensureFileKey);
         renderPreviews();
-      });
+      };
     }
 
     // 檔案挑選後：合併並截斷到 5 張
