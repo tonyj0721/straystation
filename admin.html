@@ -765,154 +765,136 @@
     const imgPreview = $("#imgPreview");
     let selectedFiles = []; // 暫存待上傳檔案
 
+    btnPick?.addEventListener("click", () => imgFiles.click());
 
-    // ===============================
-    // 拖曳排序（照片預覽：手機可用）
-    // ===============================
-    function bindPointerSortableGrid(container, {
-      getList,
-      setList,
-      rerender,
-      itemSelector = ".js-sort-item",
-      ignoreSelector = "button",
-      threshold = 6,
-    } = {}) {
-      if (!container || container.dataset.pointerSortableBound) return;
-      container.dataset.pointerSortableBound = "1";
+    // --- 縮圖拖曳排序（支援手機/桌機 Pointer Events）---
+    // 用法：每個縮圖外層加上 .js-sort-item + data-sort-key（原本索引），即可在預覽時拖曳換順序
+    function bindSortablePreviewGrid(container, { getList, setList, render, itemSelector = ".js-sort-item", ignoreSelector = "button" }) {
+      if (!container || container.dataset.sortableBound) return;
+      container.dataset.sortableBound = "1";
 
-      // Inject minimal styles once
-      if (!document.getElementById("pointerSortableStyle")) {
-        const s = document.createElement("style");
-        s.id = "pointerSortableStyle";
-        s.textContent = `
-          .js-sort-placeholder{
-            border:2px dashed rgba(148,163,184,.9);
-            border-radius:12px;
-            box-sizing:border-box;
-            background:rgba(248,250,252,.6);
-          }
-          .js-sort-item.is-dragging{
-            opacity:.9;
-            transform:scale(1.03);
-            filter:drop-shadow(0 10px 14px rgba(0,0,0,.10));
-          }
-        `;
-        document.head.appendChild(s);
-      }
+      let dragItem = null;
+      let placeholder = null;
+      let ghost = null;
+      let pointerId = null;
+      let offsetX = 0, offsetY = 0;
+      let snapshot = null;
+      let suppressClickUntil = 0;
 
-      let st = null;
+      container.addEventListener("click", (e) => {
+        if (Date.now() < suppressClickUntil) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }, true);
 
-      function startDrag() {
-        if (!st || st.dragging) return;
-        const rect = st.item.getBoundingClientRect();
-        st.offsetX = st.startX - rect.left;
-        st.offsetY = st.startY - rect.top;
-
-        const ph = document.createElement("div");
-        ph.className = "js-sort-placeholder";
-        ph.style.width = rect.width + "px";
-        ph.style.height = rect.height + "px";
-        st.placeholder = ph;
-
-        container.replaceChild(ph, st.item);
-        document.body.appendChild(st.item);
-
-        st.item.classList.add("is-dragging");
-        Object.assign(st.item.style, {
-          position: "fixed",
-          zIndex: 999999,
-          left: (st.startX - st.offsetX) + "px",
-          top: (st.startY - st.offsetY) + "px",
-          width: rect.width + "px",
-          height: rect.height + "px",
-          pointerEvents: "none",
-        });
-
-        st.dragging = true;
+      function cleanup() {
+        if (ghost?.parentNode) ghost.parentNode.removeChild(ghost);
+        ghost = null;
+        if (placeholder?.parentNode) placeholder.parentNode.removeChild(placeholder);
+        placeholder = null;
+        if (dragItem) dragItem.style.visibility = "";
+        dragItem = null;
+        pointerId = null;
+        snapshot = null;
       }
 
       function onMove(e) {
-        if (!st) return;
-        if (e.pointerType !== "mouse") e.preventDefault();
-
-        if (!st.dragging) {
-          const dx = e.clientX - st.startX;
-          const dy = e.clientY - st.startY;
-          if (Math.hypot(dx, dy) < threshold) return;
-          startDrag();
-        }
-
-        st.item.style.left = (e.clientX - st.offsetX) + "px";
-        st.item.style.top = (e.clientY - st.offsetY) + "px";
+        if (!ghost || e.pointerId !== pointerId) return;
+        ghost.style.left = (e.clientX - offsetX) + "px";
+        ghost.style.top = (e.clientY - offsetY) + "px";
 
         const el = document.elementFromPoint(e.clientX, e.clientY);
-        const over = el?.closest?.(itemSelector);
-        if (!over || !container.contains(over) || over === st.placeholder) return;
-
-        const r = over.getBoundingClientRect();
-        const yRatio = (e.clientY - r.top) / Math.max(1, r.height);
-        const xRatio = (e.clientX - r.left) / Math.max(1, r.width);
-        const before = (yRatio < 0.45) || (yRatio <= 0.55 && xRatio < 0.5);
-
-        if (before) container.insertBefore(st.placeholder, over);
-        else container.insertBefore(st.placeholder, over.nextSibling);
+        const over = el && el.closest(itemSelector);
+        if (over && over !== dragItem && container.contains(over)) {
+          const r = over.getBoundingClientRect();
+          const after = (e.clientY - r.top) > (r.height / 2) || (e.clientX - r.left) > (r.width / 2);
+          container.insertBefore(placeholder, after ? over.nextSibling : over);
+        } else {
+          const cr = container.getBoundingClientRect();
+          if (e.clientY > cr.bottom || e.clientX > cr.right) container.appendChild(placeholder);
+          if (e.clientY < cr.top || e.clientX < cr.left) container.insertBefore(placeholder, container.firstChild);
+        }
       }
 
-      function onUp() {
-        window.removeEventListener("pointermove", onMove);
-        if (!st) return;
+      function onUp(e) {
+        if (e.pointerId !== pointerId) return;
+        e.preventDefault();
 
-        if (!st.dragging) { st = null; return; }
+        suppressClickUntil = Date.now() + 250;
 
-        const to = Array.from(container.children).indexOf(st.placeholder);
-        const from = st.from;
+        // 放回原位（以 placeholder 當落點）
+        if (placeholder && dragItem) placeholder.replaceWith(dragItem);
+        if (dragItem) dragItem.style.visibility = "";
 
-        const list = Array.from(getList?.() || []);
-        if (
-          Number.isFinite(from) && Number.isFinite(to) &&
-          from >= 0 && to >= 0 &&
-          from < list.length && to < list.length &&
-          from !== to
-        ) {
-          const [moved] = list.splice(from, 1);
-          list.splice(to, 0, moved);
-          setList?.(list);
+        // 依 DOM 新順序重排 state
+        const keys = Array.from(container.querySelectorAll(itemSelector))
+          .map(el => parseInt(el.dataset.sortKey, 10))
+          .filter(n => Number.isFinite(n));
+
+        if (snapshot && typeof setList === "function") {
+          const next = keys.map(k => snapshot[k]).filter(Boolean);
+          setList(next);
         }
 
-        try { st.item.remove(); } catch (_) {}
-        try { st.placeholder.remove(); } catch (_) {}
-        st = null;
+        cleanup();
+        if (typeof render === "function") render();
 
-        rerender?.();
+        window.removeEventListener("pointermove", onMove, true);
+        window.removeEventListener("pointerup", onUp, true);
+        window.removeEventListener("pointercancel", onUp, true);
       }
 
       container.addEventListener("pointerdown", (e) => {
-        const item = e.target?.closest?.(itemSelector);
+        const item = e.target.closest(itemSelector);
         if (!item || !container.contains(item)) return;
         if (ignoreSelector && e.target.closest(ignoreSelector)) return;
-        if (e.pointerType === "mouse" && e.button !== 0) return;
+        if (e.button !== undefined && e.button !== 0) return;
+
+        const list = (typeof getList === "function" ? getList() : []) || [];
+        if (list.length <= 1) return;
 
         e.preventDefault();
 
-        const idx = Number(item.dataset.sortIdx);
-        st = {
-          item,
-          from: Number.isFinite(idx) ? idx : Array.from(container.querySelectorAll(itemSelector)).indexOf(item),
-          startX: e.clientX,
-          startY: e.clientY,
-          dragging: false,
-          placeholder: null,
-          offsetX: 0,
-          offsetY: 0,
-        };
+        snapshot = list.slice();
+        dragItem = item;
+        pointerId = e.pointerId;
 
-        window.addEventListener("pointermove", onMove, { passive: false });
-        window.addEventListener("pointerup", onUp, { passive: false, once: true });
-        window.addEventListener("pointercancel", onUp, { passive: false, once: true });
+        const rect = dragItem.getBoundingClientRect();
+        offsetX = e.clientX - rect.left;
+        offsetY = e.clientY - rect.top;
+
+        placeholder = document.createElement("div");
+        placeholder.className = "js-sort-placeholder";
+        placeholder.style.width = rect.width + "px";
+        placeholder.style.height = rect.height + "px";
+        placeholder.style.border = "2px dashed rgba(148,163,184,.9)";
+        placeholder.style.borderRadius = "0.75rem";
+        placeholder.style.boxSizing = "border-box";
+        placeholder.style.background = "rgba(241,245,249,.6)";
+        dragItem.after(placeholder);
+
+        ghost = dragItem.cloneNode(true);
+        ghost.style.position = "fixed";
+        ghost.style.left = rect.left + "px";
+        ghost.style.top = rect.top + "px";
+        ghost.style.width = rect.width + "px";
+        ghost.style.height = rect.height + "px";
+        ghost.style.pointerEvents = "none";
+        ghost.style.zIndex = "2147483646";
+        ghost.style.opacity = "0.9";
+        ghost.style.transform = "scale(1.02)";
+        document.body.appendChild(ghost);
+
+        dragItem.style.visibility = "hidden";
+        try { dragItem.setPointerCapture(pointerId); } catch (_) {}
+
+        window.addEventListener("pointermove", onMove, true);
+        window.addEventListener("pointerup", onUp, true);
+        window.addEventListener("pointercancel", onUp, true);
       }, { passive: false });
     }
 
-    btnPick?.addEventListener("click", () => imgFiles.click());
 
     // 渲染預覽格子 + 刪除按鈕
     function renderPreviews() {
@@ -922,8 +904,8 @@
         .map((f, i) => {
           const u = URL.createObjectURL(f);
           return `
-        <div class="relative js-sort-item" data-sort-idx="${i}">
-          <img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽">
+        <div class="relative js-sort-item cursor-grab active:cursor-grabbing select-none" data-sort-key="${i}" style="touch-action:none;">
+          <img class="w-full aspect-square object-cover rounded-lg" draggable="false" src="${u}" alt="預覽">
           <button data-idx="${i}" class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button>
         </div>
       `;
@@ -940,14 +922,15 @@
           renderPreviews();
         })
       );
-
-      // 拖曳排序（手機可用）
-      bindPointerSortableGrid(imgPreview, {
-        getList: () => selectedFiles,
-        setList: (list) => { selectedFiles = list; },
-        rerender: renderPreviews,
-      });
     }
+
+    // 啟用拖曳排序（手機也可用）
+    bindSortablePreviewGrid(imgPreview, {
+      getList: () => selectedFiles,
+      setList: (arr) => (selectedFiles = arr),
+      render: renderPreviews,
+    });
+
 
     // 檔案挑選後：合併並截斷到 5 張
     imgFiles?.addEventListener("change", () => {
