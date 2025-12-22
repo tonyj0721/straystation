@@ -265,15 +265,12 @@ function bindDialogActions() {
     document.getElementById("adoptedFiles").click();
 
   document.getElementById("btnConfirmAdopted").onclick = onConfirmAdopted;
-  const btnCancelAdopted = document.getElementById("btnCancelAdopted");
-  if (btnCancelAdopted) {
-    btnCancelAdopted.onclick = (e) => {
-      e.preventDefault();
-      resetAdoptedSelection();
-      document.getElementById("adoptedUpload")?.classList.add("hidden");
-      scrollDialogTop();
-    };
-  }
+  document.getElementById("btnCancelAdopted").onclick = async (e) => {
+    e.preventDefault();
+    await openDialog(currentDocId);   // 一定要 await，等內容重畫完
+    resetAdoptedSelection();
+    scrollDialogTop();
+  };
   document.getElementById("btnSave").onclick = saveEdit;
 
   // 取消編輯：回到瀏覽模式內容 + 回頂端
