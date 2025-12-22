@@ -543,18 +543,18 @@
         <div id="adoptedUpload" class="hidden">
           <input id="adoptedFiles" type="file" accept="image/*" multiple class="sr-only" />
           <div class="flex items-center gap-3 mb-2">
-            <button id="btnPickAdopted" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
+            <button id="btnPickAdopted" type="button" class="px-3 py-2 rounded-lg border border-gray-300 bg-brand-600 text-white text-sm">
               選擇合照
             </button>
             <span id="adoptedCount" class="text-xs text-gray-500"></span>
             <span class="text-sm text-gray-400">最多 5 張</span>
           </div>
           <div id="adoptedPreview" class="mt-1 grid grid-cols-3 gap-2"></div>
-          <button id="btnConfirmAdopted" class="mt-3 px-4 py-2 rounded-xl bg-gray-900 text-white text-sm">
+          <button id="btnConfirmAdopted" class="mt-3 px-3 py-2 rounded-lg bg-gray-900 text-white text-sm">
             儲存領養資訊
           </button>
           <button id="btnCancelAdopted" type="button"
-            class="px-3 py-2 rounded-lg bg-gray-200 text-gray-900 hover:bg-gray-300">
+            class="px-3 py-2 rounded-lg bg-gray-200 text-gray-900 hover:bg-gray-300 text-sm">
             取消
           </button>
         </div>
@@ -767,159 +767,6 @@
 
     btnPick?.addEventListener("click", () => imgFiles.click());
 
-    // 拖曳排序小工具（HTML5 Drag & Drop）
-    function moveArrayItem(arr, from, to) {
-      if (from === to) return;
-      const [x] = arr.splice(from, 1);
-      arr.splice(to, 0, x);
-    }
-
-function ensureFileKey(file) {
-      if (!file) return "";
-      if (!file.__sortKey) {
-        const uuid = (self.crypto && self.crypto.randomUUID) ? self.crypto.randomUUID() : `${Date.now()}_${Math.random().toString(16).slice(2)}`;
-        file.__sortKey = uuid;
-      }
-      return file.__sortKey;
-    }
-
-    function reorderArrayByKeys(arr, keys, keyFn) {
-      const map = new Map(arr.map((x) => [keyFn(x), x]));
-      arr.length = 0;
-      keys.forEach((k) => {
-        const v = map.get(k);
-        if (v) arr.push(v);
-      });
-    }
-
-    function setupPointerSort(container) {
-      if (!container || container.__pointerSortInited) return;
-      container.__pointerSortInited = true;
-      container.style.touchAction = "none";
-
-      let draggingEl = null;
-      let placeholderEl = null;
-      let offsetX = 0;
-      let offsetY = 0;
-
-      const getItem = (el) => {
-        const item = el && el.closest ? el.closest("[data-sort-key]") : null;
-        return item && container.contains(item) ? item : null;
-      };
-
-      const resetDraggingStyle = (el) => {
-        if (!el) return;
-        el.style.opacity = "";
-        el.style.position = "";
-        el.style.left = "";
-        el.style.top = "";
-        el.style.width = "";
-        el.style.height = "";
-        el.style.zIndex = "";
-        el.style.pointerEvents = "";
-        el.style.cursor = "grab";
-      };
-
-      container.addEventListener("pointerdown", (e) => {
-        const item = getItem(e.target);
-        if (!item) return;
-        if (e.target && e.target.closest && e.target.closest("button")) return; // delete button
-        e.preventDefault();
-
-        draggingEl = item;
-
-        const rect = draggingEl.getBoundingClientRect();
-        offsetX = e.clientX - rect.left;
-        offsetY = e.clientY - rect.top;
-
-        placeholderEl = document.createElement("div");
-        placeholderEl.className = draggingEl.className;
-        placeholderEl.style.width = rect.width + "px";
-        placeholderEl.style.height = rect.height + "px";
-        placeholderEl.style.visibility = "hidden";
-        draggingEl.after(placeholderEl);
-
-        draggingEl.style.opacity = "0.6";
-        draggingEl.style.position = "fixed";
-        draggingEl.style.left = rect.left + "px";
-        draggingEl.style.top = rect.top + "px";
-        draggingEl.style.width = rect.width + "px";
-        draggingEl.style.height = rect.height + "px";
-        draggingEl.style.zIndex = "9999";
-        draggingEl.style.pointerEvents = "none";
-        draggingEl.style.cursor = "grabbing";
-
-        const moveAt = (x, y) => {
-          draggingEl.style.left = (x - offsetX) + "px";
-          draggingEl.style.top = (y - offsetY) + "px";
-        };
-        moveAt(e.clientX, e.clientY);
-
-        const onMove = (ev) => {
-          if (!draggingEl) return;
-          moveAt(ev.clientX, ev.clientY);
-
-          const elBelow = document.elementFromPoint(ev.clientX, ev.clientY);
-          const over = getItem(elBelow);
-          if (!over || over === draggingEl) return;
-
-          const overRect = over.getBoundingClientRect();
-          const before = ev.clientY < (overRect.top + overRect.height / 2);
-          if (before) container.insertBefore(placeholderEl, over);
-          else container.insertBefore(placeholderEl, over.nextSibling);
-        };
-
-        const onUp = () => {
-          if (!draggingEl) return;
-
-          resetDraggingStyle(draggingEl);
-          container.insertBefore(draggingEl, placeholderEl);
-          if (placeholderEl) placeholderEl.remove();
-          placeholderEl = null;
-
-          const keys = Array.from(container.querySelectorAll("[data-sort-key]")).map((el) => el.dataset.sortKey);
-          if (typeof container.__onSortDrop === "function") container.__onSortDrop(keys);
-
-          draggingEl = null;
-          window.removeEventListener("pointermove", onMove);
-          window.removeEventListener("pointerup", onUp);
-          window.removeEventListener("pointercancel", onUp);
-        };
-
-        window.addEventListener("pointermove", onMove);
-        window.addEventListener("pointerup", onUp);
-        window.addEventListener("pointercancel", onUp);
-      });
-    }
-
-
-    function bindDragSort(container, onMove) {
-      let fromIdx = null;
-      container.querySelectorAll("[data-sort-idx]").forEach((el) => {
-        el.addEventListener("dragstart", (e) => {
-          fromIdx = +el.dataset.sortIdx;
-          el.style.opacity = "0.6";
-          try { e.dataTransfer.effectAllowed = "move"; } catch (_) { }
-          try { e.dataTransfer.setData("text/plain", String(fromIdx)); } catch (_) { }
-        });
-        el.addEventListener("dragend", () => {
-          el.style.opacity = "";
-          fromIdx = null;
-        });
-        el.addEventListener("dragover", (e) => {
-          e.preventDefault();
-          try { e.dataTransfer.dropEffect = "move"; } catch (_) { }
-        });
-        el.addEventListener("drop", (e) => {
-          e.preventDefault();
-          const toIdx = +el.dataset.sortIdx;
-          const from = (fromIdx ?? parseInt(e.dataTransfer?.getData?.("text/plain") || "", 10));
-          if (!Number.isFinite(from) || !Number.isFinite(toIdx) || from === toIdx) return;
-          onMove(from, toIdx);
-        });
-      });
-    }
-
     // 渲染預覽格子 + 刪除按鈕
     function renderPreviews() {
       fileCount.textContent = `已選 ${selectedFiles.length} / 5 張`;
@@ -927,11 +774,10 @@ function ensureFileKey(file) {
       imgPreview.innerHTML = selectedFiles
         .map((f, i) => {
           const u = URL.createObjectURL(f);
-          const key = ensureFileKey(f);
           return `
-        <div class="relative" data-sort-key="${key}" draggable="false" style="cursor: grab;">
-          <img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽" draggable="false">
-          <button data-idx="${i}" draggable="false" class="absolute top-1 right-1 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button>
+        <div class="relative">
+          <img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽">
+          <button data-idx="${i}" class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button>
         </div>
       `;
         })
@@ -947,13 +793,6 @@ function ensureFileKey(file) {
           renderPreviews();
         })
       );
-
-      // Pointer Drag Sort（支援手機/桌機）
-      setupPointerSort(imgPreview);
-      imgPreview.__onSortDrop = (keys) => {
-        reorderArrayByKeys(selectedFiles, keys, ensureFileKey);
-        renderPreviews();
-      };
     }
 
     // 檔案挑選後：合併並截斷到 5 張

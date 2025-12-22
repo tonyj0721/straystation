@@ -391,19 +391,12 @@ async function saveEdit() {
   const stopDots = startDots(txt, "儲存中");
 
   try {
-    // 依照狀態計算出最終 images：依照縮圖順序（keep / add 混排），逐一組出 images
-    const { items, remove } = editImagesState;
-    const newUrls = [];
+    // 依照狀態計算出最終 images：先保留 keep，再把 add 上傳，最後刪掉 remove 的 Storage 物件
+    const { keep, add, remove } = editImagesState;
+    const newUrls = [...keep];
 
-    // 依序處理：keep 直接保留，add 先上傳再插入
-    for (const item of items) {
-      if (item?.type === "keep") {
-        newUrls.push(item.url);
-        continue;
-      }
-      const f = item?.file;
-      if (!f) continue;
-
+    // 上傳新增檔案
+    for (const f of add) {
       const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
       const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
       const base = f.name.replace(/\.[^.]+$/, '');
@@ -508,240 +501,77 @@ editBreedTypeSel.addEventListener("change", () => {
 });
 
 // ===============================
-// 編輯模式：圖片管理（預覽 + 增刪 + 拖曳排序）
+// 編輯模式：圖片管理（預覽 + 增刪）
 // ===============================
 const editFiles = q("#editFiles");
 const btnPickEdit = q("#btnPickEdit");
 const editPreview = q("#editPreview");
 const editCount = q("#editCount");
 
-// 拖曳排序小工具（HTML5 Drag & Drop）
-function moveArrayItem(arr, from, to) {
-  if (from === to) return;
-  const [x] = arr.splice(from, 1);
-  arr.splice(to, 0, x);
-}
-
-function ensureFileKey(file) {
-  if (!file) return "";
-  if (!file.__sortKey) {
-const uuid = (self.crypto && self.crypto.randomUUID) ? self.crypto.randomUUID() : `${Date.now()}_${Math.random().toString(16).slice(2)}`;
-file.__sortKey = uuid;
-  }
-  return file.__sortKey;
-}
-
-function ensureEditItemKey(item) {
-  if (!item) return "";
-  if (!item.__sortKey) {
-    if (item.type === "keep") item.__sortKey = "keep:" + item.url;
-    else item.__sortKey = "add:" + ensureFileKey(item.file);
-  }
-  return item.__sortKey;
-}
-
-function reorderArrayByKeys(arr, keys, keyFn) {
-  const map = new Map(arr.map((x) => [keyFn(x), x]));
-  arr.length = 0;
-  keys.forEach((k) => {
-const v = map.get(k);
-if (v) arr.push(v);
-  });
-}
-
-function setupPointerSort(container) {
-  if (!container || container.__pointerSortInited) return;
-  container.__pointerSortInited = true;
-  container.style.touchAction = "none";
-
-  let draggingEl = null;
-  let placeholderEl = null;
-  let offsetX = 0;
-  let offsetY = 0;
-
-  const getItem = (el) => {
-const item = el && el.closest ? el.closest("[data-sort-key]") : null;
-return item && container.contains(item) ? item : null;
-  };
-
-  const resetDraggingStyle = (el) => {
-if (!el) return;
-el.style.opacity = "";
-el.style.position = "";
-el.style.left = "";
-el.style.top = "";
-el.style.width = "";
-el.style.height = "";
-el.style.zIndex = "";
-el.style.pointerEvents = "";
-el.style.cursor = "grab";
-  };
-
-  container.addEventListener("pointerdown", (e) => {
-const item = getItem(e.target);
-if (!item) return;
-if (e.target && e.target.closest && e.target.closest("button")) return; // delete button
-e.preventDefault();
-
-draggingEl = item;
-
-const rect = draggingEl.getBoundingClientRect();
-offsetX = e.clientX - rect.left;
-offsetY = e.clientY - rect.top;
-
-placeholderEl = document.createElement("div");
-placeholderEl.className = draggingEl.className;
-placeholderEl.style.width = rect.width + "px";
-placeholderEl.style.height = rect.height + "px";
-placeholderEl.style.visibility = "hidden";
-draggingEl.after(placeholderEl);
-
-draggingEl.style.opacity = "0.6";
-draggingEl.style.position = "fixed";
-draggingEl.style.left = rect.left + "px";
-draggingEl.style.top = rect.top + "px";
-draggingEl.style.width = rect.width + "px";
-draggingEl.style.height = rect.height + "px";
-draggingEl.style.zIndex = "9999";
-draggingEl.style.pointerEvents = "none";
-draggingEl.style.cursor = "grabbing";
-
-const moveAt = (x, y) => {
-  draggingEl.style.left = (x - offsetX) + "px";
-  draggingEl.style.top = (y - offsetY) + "px";
-};
-moveAt(e.clientX, e.clientY);
-
-const onMove = (ev) => {
-  if (!draggingEl) return;
-  moveAt(ev.clientX, ev.clientY);
-
-  const elBelow = document.elementFromPoint(ev.clientX, ev.clientY);
-  const over = getItem(elBelow);
-  if (!over || over === draggingEl) return;
-
-  const overRect = over.getBoundingClientRect();
-  const before = ev.clientY < (overRect.top + overRect.height / 2);
-  if (before) container.insertBefore(placeholderEl, over);
-  else container.insertBefore(placeholderEl, over.nextSibling);
-};
-
-const onUp = () => {
-  if (!draggingEl) return;
-
-  resetDraggingStyle(draggingEl);
-  container.insertBefore(draggingEl, placeholderEl);
-  if (placeholderEl) placeholderEl.remove();
-  placeholderEl = null;
-
-  const keys = Array.from(container.querySelectorAll("[data-sort-key]")).map((el) => el.dataset.sortKey);
-  if (typeof container.__onSortDrop === "function") container.__onSortDrop(keys);
-
-  draggingEl = null;
-  window.removeEventListener("pointermove", onMove);
-  window.removeEventListener("pointerup", onUp);
-  window.removeEventListener("pointercancel", onUp);
-};
-
-window.addEventListener("pointermove", onMove);
-window.addEventListener("pointerup", onUp);
-window.addEventListener("pointercancel", onUp);
-  });
-}
-
-
-function bindDragSort(container, onMove) {
-  let fromIdx = null;
-  container.querySelectorAll("[data-sort-idx]").forEach((el) => {
-    el.addEventListener("dragstart", (e) => {
-      fromIdx = +el.dataset.sortIdx;
-      el.style.opacity = "0.6";
-      try { e.dataTransfer.effectAllowed = "move"; } catch (_) { }
-      try { e.dataTransfer.setData("text/plain", String(fromIdx)); } catch (_) { }
-    });
-    el.addEventListener("dragend", () => {
-      el.style.opacity = "";
-      fromIdx = null;
-    });
-    el.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      try { e.dataTransfer.dropEffect = "move"; } catch (_) { }
-    });
-    el.addEventListener("drop", (e) => {
-      e.preventDefault();
-      const toIdx = +el.dataset.sortIdx;
-      const from = (fromIdx ?? parseInt(e.dataTransfer?.getData?.("text/plain") || "", 10));
-      if (!Number.isFinite(from) || !Number.isFinite(toIdx) || from === toIdx) return;
-      onMove(from, toIdx);
-    });
-  });
-}
-
-// 狀態：混排 items（keep/add），以及要刪掉的舊圖 remove
-let editImagesState = { items: [], remove: [] };
+// 狀態：現存保留 keep、新增 add、要刪 remove
+let editImagesState = { keep: [], add: [], remove: [] };
 
 btnPickEdit.addEventListener("click", () => editFiles.click());
 
 // 初始化編輯圖片列表
 function renderEditImages(urls) {
-  editImagesState.items = (Array.isArray(urls) ? urls : []).map((u) => ({ type: "keep", url: u }));
+  editImagesState.keep = [...urls];
+  editImagesState.add = [];
   editImagesState.remove = [];
   paintEditPreview();
 }
 
 // 依狀態重新畫縮圖
 function paintEditPreview() {
-  const total = editImagesState.items.length;
+  const total = editImagesState.keep.length + editImagesState.add.length;
   editCount.textContent = `已選 ${total} / 5 張`;
 
-  editPreview.innerHTML = editImagesState.items
-    .map((item, i) => {
-      const key = ensureEditItemKey(item);
+  const current = [
+    ...editImagesState.keep.map((u, i) => ({ type: "keep", url: u, idx: i })),
+    ...editImagesState.add.map((f, i) => ({ type: "add", file: f, idx: i })),
+  ];
+
+  editPreview.innerHTML = current
+    .map((item) => {
       const src = item.type === "keep" ? item.url : URL.createObjectURL(item.file);
+      const data = item.type === "keep" ? `data-keep="${item.idx}"` : `data-add="${item.idx}"`;
       return `
-        <div class="relative" data-sort-key="${key}" draggable="false" style="cursor: grab;">
-          <img class="w-full aspect-square object-cover rounded-lg" src="${src}" alt="預覽" draggable="false"/>
-          <button data-del-idx="${i}" draggable="false"
-                  class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center"
-                  aria-label="刪除這張">✕</button>
+        <div class="relative">
+          <img class="w-full aspect-square object-cover rounded-lg" src="${src}"/>
+          <button ${data} class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button>
         </div>`;
     })
     .join("");
 
-  // 刪除單張圖片
-  editPreview.querySelectorAll("button[data-del-idx]").forEach((btn) =>
-    btn.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const i = +btn.getAttribute("data-del-idx");
-      const item = editImagesState.items[i];
-      if (!item) return;
-
-      if (item.type === "keep") editImagesState.remove.push(item.url);
-      editImagesState.items.splice(i, 1);
+  // 移除 keep → 放入 remove
+  editPreview.querySelectorAll("button[data-keep]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const i = +btn.getAttribute("data-keep");
+      editImagesState.remove.push(editImagesState.keep[i]);
+      editImagesState.keep.splice(i, 1);
       paintEditPreview();
     })
   );
 
-  // Pointer Drag Sort（支援手機/桌機）
-  setupPointerSort(editPreview);
-  editPreview.__onSortDrop = (keys) => {
-    reorderArrayByKeys(editImagesState.items, keys, ensureEditItemKey);
-    paintEditPreview();
-  };
+  // 移除 add → 直接從 add 陣列刪除
+  editPreview.querySelectorAll("button[data-add]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const i = +btn.getAttribute("data-add");
+      editImagesState.add.splice(i, 1);
+      paintEditPreview();
+    })
+  );
 }
 
 // 新增圖片（尊守上限 5）
 editFiles.addEventListener("change", () => {
   const incoming = Array.from(editFiles.files || []);
-  const total = editImagesState.items.length + incoming.length;
+  const total = editImagesState.keep.length + editImagesState.add.length + incoming.length;
   if (total > 5) {
     swalInDialog({ icon: "warning", title: "最多 5 張照片" });
   }
-  const room = 5 - editImagesState.items.length;
-  incoming.slice(0, Math.max(0, room)).forEach((f) => {
-    editImagesState.items.push({ type: "add", file: f });
-  });
+  const room = 5 - (editImagesState.keep.length + editImagesState.add.length);
+  editImagesState.add = editImagesState.add.concat(incoming.slice(0, Math.max(0, room)));
   paintEditPreview();
   editFiles.value = "";
 });
@@ -767,11 +597,10 @@ function renderAdoptedPreviews() {
   adoptedPreview.innerHTML = adoptedSelected
     .map((f, i) => {
       const u = URL.createObjectURL(f);
-      const key = ensureFileKey(f);
       return `
-        <div class="relative" data-sort-key="${key}" draggable="false" style="cursor: grab;">
-          <img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽" draggable="false">
-          <button data-del-idx="${i}" draggable="false"
+        <div class="relative">
+          <img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽">
+          <button data-idx="${i}"
                   class="absolute top-1 right-1 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center"
                   aria-label="刪除這張">✕</button>
         </div>
@@ -779,22 +608,15 @@ function renderAdoptedPreviews() {
     })
     .join("");
 
-  adoptedPreview.querySelectorAll("button[data-del-idx]").forEach((btn) => {
+  adoptedPreview.querySelectorAll("button[data-idx]").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const i = +btn.dataset.delIdx;
+      const i = +btn.dataset.idx;
       adoptedSelected.splice(i, 1);
       renderAdoptedPreviews();
     });
   });
-
-  // Pointer Drag Sort（支援手機/桌機）
-  setupPointerSort(adoptedPreview);
-  adoptedPreview.__onSortDrop = (keys) => {
-    reorderArrayByKeys(adoptedSelected, keys, ensureFileKey);
-    renderAdoptedPreviews();
-  };
 }
 
 renderAdoptedPreviews();
@@ -843,6 +665,7 @@ async function onConfirmAdopted() {
 
     await updateDoc(doc(db, "pets", currentDocId), {
       status: "adopted",
+      adoptedAt: serverTimestamp(),
       adoptedPhotos: urls,
       showOnHome: true,
       showOnCats: false,
@@ -899,6 +722,7 @@ async function onUnadopt() {
     await deleteAllUnder(`adopted/${currentDocId}`); // 清掉合照
     await updateDoc(doc(db, "pets", currentDocId), {
       status: "available",
+      adoptedAt: deleteField(),
       adoptedPhotos: [],
       showOnHome: false,
       showOnCats: true,
