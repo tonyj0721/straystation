@@ -392,12 +392,22 @@ async function saveEdit() {
 
   try {
     // 依照狀態計算出最終 images：先保留 keep，再把 add 上傳，最後刪掉 remove 的 Storage 物件
-    const { keep, add, remove } = editImagesState;
-    const newUrls = [...keep];
+    const { add, remove, order } = editImagesState;
+    const addMap = new Map(add.map(({ uid, file }) => [uid, file]));
+    const newUrls = [];
 
-    // 上傳新增檔案
-    for (const f of add) {
-      const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+    // 依拖曳後順序逐一組合：keep 直接放 URL；add 先上傳再放回 URL
+    for (const it of (order || [])) {
+      if (it?.type === "keep") {
+        newUrls.push(it.key);
+        continue;
+      }
+      if (it?.type !== "add") continue;
+
+      const f = addMap.get(it.key);
+      if (!f) continue;
+
+      const wmBlob = await addWatermarkToFile(f);       // ← 先加浮水印
       const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
       const base = f.name.replace(/\.[^.]+$/, '');
       const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
@@ -508,70 +518,119 @@ const btnPickEdit = q("#btnPickEdit");
 const editPreview = q("#editPreview");
 const editCount = q("#editCount");
 
-// 狀態：現存保留 keep、新增 add、要刪 remove
-let editImagesState = { keep: [], add: [], remove: [] };
+// 狀態：保留 keep（url）、新增 add（{uid,file}）、要刪 remove（url）、顯示順序 order（keep/add 可交錯）
+let editImagesState = { keep: [], add: [], remove: [], order: [] };
+
+// ✅ 拖曳排序（含手機）：SortableJS
+let editSortable = null;
+const makeUid = (p = "u") => `${p}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+
+function ensureEditSortable() {
+  if (!window.Sortable || !editPreview) return;
+  if (editSortable) return;
+
+  editSortable = new Sortable(editPreview, {
+    animation: 150,
+    draggable: ".photo-item",
+    handle: "img",
+    delay: 150,
+    delayOnTouchOnly: true,
+    ghostClass: "opacity-40",
+    chosenClass: "ring-2 ring-gray-400",
+    filter: "button",
+    preventOnFilter: false,
+    onEnd: () => {
+      // 依 DOM 目前排序回寫到 state（讓儲存/上傳順序一致）
+      editImagesState.order = Array.from(editPreview.children)
+        .map((el) => ({ type: el.dataset.type, key: el.dataset.key }))
+        .filter((x) => x.type && x.key);
+    },
+  });
+}
 
 btnPickEdit.addEventListener("click", () => editFiles.click());
 
 // 初始化編輯圖片列表
 function renderEditImages(urls) {
-  editImagesState.keep = [...urls];
+  const list = Array.isArray(urls) ? urls : [];
+  editImagesState.keep = [...list];
   editImagesState.add = [];
   editImagesState.remove = [];
+  editImagesState.order = list.map((u) => ({ type: "keep", key: u }));
   paintEditPreview();
 }
 
 // 依狀態重新畫縮圖
 function paintEditPreview() {
-  const total = editImagesState.keep.length + editImagesState.add.length;
+  // 清掉 order 中已不存在的 add
+  const addMap = new Map(editImagesState.add.map(({ uid, file }) => [uid, file]));
+  const cleaned = [];
+  for (const it of editImagesState.order) {
+    if (it.type === "keep") cleaned.push(it);
+    else if (it.type === "add" && addMap.has(it.key)) cleaned.push(it);
+  }
+  if (cleaned.length !== editImagesState.order.length) editImagesState.order = cleaned;
+
+  const total = editImagesState.order.length;
   editCount.textContent = `已選 ${total} / 5 張`;
 
-  const current = [
-    ...editImagesState.keep.map((u, i) => ({ type: "keep", url: u, idx: i })),
-    ...editImagesState.add.map((f, i) => ({ type: "add", file: f, idx: i })),
-  ];
-
-  editPreview.innerHTML = current
-    .map((item) => {
-      const src = item.type === "keep" ? item.url : URL.createObjectURL(item.file);
-      const data = item.type === "keep" ? `data-keep="${item.idx}"` : `data-add="${item.idx}"`;
+  editPreview.innerHTML = editImagesState.order
+    .map((it) => {
+      const src = it.type === "keep"
+        ? it.key
+        : URL.createObjectURL(addMap.get(it.key));
       return `
-        <div class="relative">
-          <img class="w-full aspect-square object-cover rounded-lg" src="${src}"/>
-          <button ${data} class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center">✕</button>
+        <div class="relative photo-item" data-type="${it.type}" data-key="${it.key}">
+          <img class="w-full aspect-square object-cover rounded-lg" src="${src}" alt="預覽"/>
+          <button type="button" data-del="1"
+                  class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center"
+                  aria-label="刪除這張">✕</button>
         </div>`;
     })
     .join("");
 
-  // 移除 keep → 放入 remove
-  editPreview.querySelectorAll("button[data-keep]").forEach((btn) =>
+  // 刪除：用 data-type + data-key，避免拖曳後 index 對不到
+  editPreview.querySelectorAll('button[data-del="1"]').forEach((btn) =>
     btn.addEventListener("click", () => {
-      const i = +btn.getAttribute("data-keep");
-      editImagesState.remove.push(editImagesState.keep[i]);
-      editImagesState.keep.splice(i, 1);
+      const wrap = btn.closest?.(".photo-item");
+      if (!wrap) return;
+      const type = wrap.dataset.type;
+      const key = wrap.dataset.key;
+      if (!type || !key) return;
+
+      // 從 order 移除
+      editImagesState.order = editImagesState.order.filter((x) => !(x.type === type && x.key === key));
+
+      if (type === "keep") {
+        editImagesState.remove.push(key);
+        editImagesState.keep = editImagesState.keep.filter((u) => u !== key);
+      } else if (type === "add") {
+        editImagesState.add = editImagesState.add.filter((x) => x.uid !== key);
+      }
+
       paintEditPreview();
     })
   );
 
-  // 移除 add → 直接從 add 陣列刪除
-  editPreview.querySelectorAll("button[data-add]").forEach((btn) =>
-    btn.addEventListener("click", () => {
-      const i = +btn.getAttribute("data-add");
-      editImagesState.add.splice(i, 1);
-      paintEditPreview();
-    })
-  );
+  ensureEditSortable();
 }
 
 // 新增圖片（尊守上限 5）
 editFiles.addEventListener("change", () => {
   const incoming = Array.from(editFiles.files || []);
-  const total = editImagesState.keep.length + editImagesState.add.length + incoming.length;
+  const total = editImagesState.order.length + incoming.length;
   if (total > 5) {
     swalInDialog({ icon: "warning", title: "最多 5 張照片" });
   }
-  const room = 5 - (editImagesState.keep.length + editImagesState.add.length);
-  editImagesState.add = editImagesState.add.concat(incoming.slice(0, Math.max(0, room)));
+  const room = 5 - editImagesState.order.length;
+  const picked = incoming.slice(0, Math.max(0, room));
+
+  for (const f of picked) {
+    const uid = makeUid("add");
+    editImagesState.add.push({ uid, file: f });
+    editImagesState.order.push({ type: "add", key: uid });
+  }
+
   paintEditPreview();
   editFiles.value = "";
 });
@@ -583,6 +642,13 @@ editFiles.addEventListener("change", () => {
 // 狀態：已選擇的合照（可多次疊加）
 let adoptedSelected = [];
 
+// ✅ 拖曳排序（含手機）：SortableJS + 穩定 uid
+let adoptedSortable = null;
+const ensureAdoptUid = (f) => {
+  if (!f.__uid) f.__uid = `ad_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  return f.__uid;
+};
+
 const adoptedFilesInput = document.getElementById("adoptedFiles");
 const btnPickAdopted = document.getElementById("btnPickAdopted");
 const adoptedCount = document.getElementById("adoptedCount");
@@ -591,16 +657,39 @@ const adoptedPreview = document.getElementById("adoptedPreview");
 // 打開檔案挑選
 btnPickAdopted.onclick = () => adoptedFilesInput.click();
 
+function ensureAdoptedSortable() {
+  if (!window.Sortable || !adoptedPreview) return;
+  if (adoptedSortable) return;
+
+  adoptedSortable = new Sortable(adoptedPreview, {
+    animation: 150,
+    draggable: ".photo-item",
+    handle: "img",
+    delay: 150,
+    delayOnTouchOnly: true,
+    ghostClass: "opacity-40",
+    chosenClass: "ring-2 ring-gray-400",
+    filter: "button",
+    preventOnFilter: false,
+    onEnd: () => {
+      const uids = Array.from(adoptedPreview.children).map((el) => el.dataset.uid).filter(Boolean);
+      const map = new Map(adoptedSelected.map((f) => [f.__uid, f]));
+      adoptedSelected = uids.map((id) => map.get(id)).filter(Boolean);
+    },
+  });
+}
+
 // 渲染縮圖（右上角刪除鈕）
 function renderAdoptedPreviews() {
   adoptedCount.textContent = `已選 ${adoptedSelected.length} / 5 張`;
   adoptedPreview.innerHTML = adoptedSelected
-    .map((f, i) => {
+    .map((f) => {
+      const uid = ensureAdoptUid(f);
       const u = URL.createObjectURL(f);
       return `
-        <div class="relative">
+        <div class="relative photo-item" data-uid="${uid}">
           <img class="w-full aspect-square object-cover rounded-lg" src="${u}" alt="預覽">
-          <button data-idx="${i}"
+          <button type="button" data-del="1" data-uid="${uid}"
                   class="absolute top-1 right-1 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center"
                   aria-label="刪除這張">✕</button>
         </div>
@@ -608,15 +697,18 @@ function renderAdoptedPreviews() {
     })
     .join("");
 
-  adoptedPreview.querySelectorAll("button[data-idx]").forEach((btn) => {
+  adoptedPreview.querySelectorAll('button[data-del="1"]').forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const i = +btn.dataset.idx;
-      adoptedSelected.splice(i, 1);
+      const uid = btn.dataset.uid;
+      const i = adoptedSelected.findIndex((f) => f.__uid === uid);
+      if (i >= 0) adoptedSelected.splice(i, 1);
       renderAdoptedPreviews();
     });
   });
+
+  ensureAdoptedSortable();
 }
 
 renderAdoptedPreviews();
@@ -624,6 +716,7 @@ renderAdoptedPreviews();
 // 檔案變更：疊加並限制最多 5 張
 adoptedFilesInput.addEventListener("change", () => {
   const incoming = Array.from(adoptedFilesInput.files || []);
+  incoming.forEach(ensureAdoptUid);
   const next = adoptedSelected.concat(incoming);
   if (next.length > 5) {
     swalInDialog({ icon: "warning", title: "最多 5 張照片" });
