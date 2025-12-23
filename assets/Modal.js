@@ -19,7 +19,7 @@ function __unlockDialogScroll() {
 // 注意：不要在這裡綁 dialog 的 close/cancel 去 unlock，
 // 避免「開 Lightbox 時先關 dialog」的流程把鎖解太多層。
 // 解鎖統一在 Lightbox.js 裡的 dialog close 事件處理。
-})();
+
 
 
 // ===============================
