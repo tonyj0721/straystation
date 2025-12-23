@@ -1,8 +1,5 @@
 const $ = (sel) => document.querySelector(sel);
 
-history.scrollRestoration = "manual";
-window.scrollTo(0, 0);
-
 // ---- Modal + Lightbox 共用狀態 ----
 const dlg = document.getElementById('petDialog');
 const lb = document.getElementById("lightbox");
@@ -13,50 +10,94 @@ const lbClose = document.getElementById("lbClose");
 
 let lbImages = [];
 let lbIndex = 0;
-// 用來記住原本 scroll 狀態
-let oldHtmlOverflow = "";
-let oldBodyOverflow = "";
+
+// ===============================
+// 背景捲動鎖定（iOS/Android/桌機通用）
+// - body fixed 方式：避免 iOS 仍會「穿透/回彈」滑動背景
+// - idempotent：重複 lock/unlock 不會卡死
+// ===============================
+let __scrollLocked = false;
+let __scrollY = 0;
+let __savedScrollStyle = null;
 
 function lockScroll() {
-  oldHtmlOverflow = document.documentElement.style.overflow;
-  oldBodyOverflow = document.body.style.overflow;
+  if (__scrollLocked) return;
+  __scrollLocked = true;
+
+  __scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+  __savedScrollStyle = {
+    htmlOverflow: document.documentElement.style.overflow,
+    bodyOverflow: document.body.style.overflow,
+    bodyPosition: document.body.style.position,
+    bodyTop: document.body.style.top,
+    bodyLeft: document.body.style.left,
+    bodyRight: document.body.style.right,
+    bodyWidth: document.body.style.width,
+  };
+
   document.documentElement.style.overflow = "hidden";
   document.body.style.overflow = "hidden";
+
+  document.body.style.position = "fixed";
+  document.body.style.top = `-${__scrollY}px`;
+  document.body.style.left = "0";
+  document.body.style.right = "0";
+  document.body.style.width = "100%";
 }
 
 function unlockScroll() {
-  document.documentElement.style.overflow = oldHtmlOverflow;
-  document.body.style.overflow = oldBodyOverflow;
+  if (!__scrollLocked) return;
+  __scrollLocked = false;
+
+  if (__savedScrollStyle) {
+    document.documentElement.style.overflow = __savedScrollStyle.htmlOverflow;
+    document.body.style.overflow = __savedScrollStyle.bodyOverflow;
+    document.body.style.position = __savedScrollStyle.bodyPosition;
+    document.body.style.top = __savedScrollStyle.bodyTop;
+    document.body.style.left = __savedScrollStyle.bodyLeft;
+    document.body.style.right = __savedScrollStyle.bodyRight;
+    document.body.style.width = __savedScrollStyle.bodyWidth;
+  }
+  __savedScrollStyle = null;
+
+  // 回到鎖定前的位置
+  window.scrollTo(0, __scrollY);
 }
 
-// 鎖住 / 恢復背景捲動
-$('#dlgClose').addEventListener('click', () => {
-  dlg.close();
+// ===============================
+// Dialog 關閉（X / ESC / 點 backdrop）
+// ===============================
+$('#dlgClose')?.addEventListener('click', () => {
+  try { dlg.close(); } catch {}
   unlockScroll();
-  history.replaceState(null, '', location.pathname);
+  try { history.replaceState(null, '', location.pathname); } catch {}
   window.currentPetId = null;
 });
 
 // 防止使用者按 ESC 或點 backdrop 關掉時，背景卡死
-dlg.addEventListener('close', () => {
-  // 若是因 Lightbox 開啟而關掉 dialog → 不要清除 currentPetId
-  if (!lb.classList.contains("flex")) {
-    window.currentPetId = null;
-    history.replaceState(null, '', location.pathname);
-  }
+dlg?.addEventListener('close', () => {
+  // 若 Lightbox 正開著（我們是從 dialog 切到 lightbox），不要解鎖背景/清 state
+  const lightboxOpen = lb && !lb.classList.contains("hidden") && lb.classList.contains("flex");
+  if (lightboxOpen) return;
+
+  window.currentPetId = null;
+  try { history.replaceState(null, '', location.pathname); } catch {}
   unlockScroll();
 });
 
-// 🔥 開啟 Lightbox：完全關掉 dialog + 鎖定背景
+// ===============================
+// Lightbox 開關
+// ===============================
 function openLightbox(images, index = 0) {
-  lbImages = images;
-  lbIndex = index;
+  lbImages = images || [];
+  lbIndex = Math.max(0, Math.min(index, lbImages.length - 1));
+  if (!lbImages.length) return;
 
   lbImg.src = lbImages[lbIndex];
 
   // 建立縮圖列
   const lbThumbsInner = document.getElementById("lbThumbsInner");
-  lbThumbsInner.innerHTML = "";
+  if (lbThumbsInner) lbThumbsInner.innerHTML = "";
 
   lbImages.forEach((url, i) => {
     const t = document.createElement("img");
@@ -66,34 +107,33 @@ function openLightbox(images, index = 0) {
     t.addEventListener("click", () => {
       lbIndex = i;
       lbImg.src = lbImages[lbIndex];
-      lbThumbsInner.querySelectorAll("img").forEach(el => el.classList.remove("active"));
+      lbThumbsInner?.querySelectorAll("img")?.forEach(el => el.classList.remove("active"));
       t.classList.add("active");
     });
 
-    lbThumbsInner.appendChild(t);
+    lbThumbsInner?.appendChild(t);
   });
 
-  // ❶ 正確：關掉 Modal（移除 backdrop）
-  if (dlg.open) dlg.close();
+  // 確保背景鎖住
+  lockScroll();
 
-  // ❷ 正確：解除背景鎖定（避免 Lightbox 卡死）
-  unlockScroll();
-
-  // ❸ 顯示 Lightbox
+  // 先顯示 Lightbox（避免 dlg 的 close handler 誤判而 unlock）
   lb.classList.remove("hidden");
   lb.classList.add("flex");
+
+  // 關掉 dialog（移除 backdrop）
+  if (dlg?.open) dlg.close();
 }
 
-// 🔥 關閉 Lightbox：恢復背景 + 回到 dialog
 function closeLightbox() {
   // 隱藏 Lightbox
   lb.classList.add("hidden");
   lb.classList.remove("flex");
 
-  // 回到 Modal
-  dlg.showModal();
+  // 回到 Modal（背景仍然鎖住）
+  try { dlg.showModal(); } catch {}
 
-  // Modal 需要背景固定 → 再鎖一次
+  // Modal 顯示時也要鎖背景（如果剛好沒鎖到）
   lockScroll();
 }
 
@@ -104,60 +144,30 @@ function lbShow(delta) {
   lbImg.src = lbImages[lbIndex];
 
   const lbThumbsInner = document.getElementById("lbThumbsInner");
-  lbThumbsInner.querySelectorAll("img").forEach((el, i) => {
+  lbThumbsInner?.querySelectorAll("img")?.forEach((el, i) => {
     el.classList.toggle("active", i === lbIndex);
   });
 }
 
-lbPrev.addEventListener('click', (e) => {
+lbPrev?.addEventListener('click', (e) => {
   e.stopPropagation();
   lbShow(-1);
 });
 
-lbNext.addEventListener('click', (e) => {
+lbNext?.addEventListener('click', (e) => {
   e.stopPropagation();
   lbShow(1);
 });
 
-lbClose.addEventListener('click', (e) => {
+lbClose?.addEventListener("click", (e) => {
   e.stopPropagation();
   closeLightbox();
 });
 
-// 🔥 點黑幕關閉
-lb.addEventListener("click", (e) => {
-  if (e.target === lb) closeLightbox();
-});
+// 點背景關閉
+lb?.addEventListener("click", () => closeLightbox());
 
-// 🔥 ESC 關閉
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !lb.classList.contains("hidden")) {
-    closeLightbox();
-  }
-});
-
-// 🔥 手機滑動切換
-let touchStartX = 0;
-lb.addEventListener("touchstart", (e) => {
-  touchStartX = e.touches[0].clientX;
-}, { passive: true });
-
-lb.addEventListener("touchend", (e) => {
-  const diff = e.changedTouches[0].clientX - touchStartX;
-  if (diff > 50) lbShow(-1);
-  if (diff < -50) lbShow(1);
-}, { passive: true });
-
-// 🔥 完全阻止背景滑動（桌機 + 手機都有效）
-lb.addEventListener("wheel", (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-}, { passive: false });
-
-lb.addEventListener("touchmove", (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-}, { passive: false });
-
-const y = document.getElementById('year');
-if (y) y.textContent = new Date().getFullYear();
+// 讓其他檔案可用
+window.openLightbox = openLightbox;
+window.closeLightbox = closeLightbox;
+window.lbShow = lbShow;
