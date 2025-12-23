@@ -1,16 +1,6 @@
 const q = (sel) => document.querySelector(sel);
 
 // ===============================
-// Dialog 鎖背景捲動：統一交給 Lightbox.js（避免重複鎖/解鎖造成頁面卡死）
-// ===============================
-function __lockDialogScroll() {
-  try { if (typeof lockScroll === "function") lockScroll(); } catch { }
-}
-function __unlockDialogScroll() {
-  try { if (typeof unlockScroll === "function") unlockScroll(); } catch { }
-}
-
-// ===============================
 // 品種資料與「品種/毛色」連動邏輯
 // ===============================
 const BREEDS = {
@@ -243,12 +233,7 @@ async function openDialog(id) {
   }
 }
 
-// 關閉 Dialog
-document.getElementById("dlgClose").addEventListener("click", () => {
-  if (dlg.open) dlg.close();
-  document.documentElement.style.overflow = oldHtmlOverflow;
-});
-
+// 關閉 Dialog：由 Lightbox.js 統一處理（dlgClose + dialog close 事件會解鎖背景捲動）
 function scrollDialogTop() {
   const dlg = document.getElementById("petDialog");
   requestAnimationFrame(() => {
