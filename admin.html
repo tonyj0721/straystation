@@ -950,7 +950,7 @@ imgPreview.addEventListener("click", (e) => {
   renderPreviews();
 });
 
-// 手機可用的拖曳排序（Pointer Events；只在放開時重排一次）
+// 手機可用的拖曳交換（Pointer Events；放開時與目標交換）
 let dragFrom = null;
 let dragOver = null;
 let dragEl = null;
@@ -1007,8 +1007,9 @@ function finishDrag() {
 
   if (to == null || to === from) return;
 
-  const moved = selectedFiles.splice(from, 1)[0];
-  selectedFiles.splice(to, 0, moved);
+  const tmp = selectedFiles[from];
+  selectedFiles[from] = selectedFiles[to];
+  selectedFiles[to] = tmp;
 
   renderPreviews();
 }

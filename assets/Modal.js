@@ -63,12 +63,12 @@ const __pageScrollLock = (() => {
 function __lockDialogScroll() {
   try { __pageScrollLock.lock(); } catch { }
   // 舊版 shared.js 可能也有 lockScroll（留著不衝突）
-  try { if (typeof lockScroll === "function") __lockDialogScroll(); } catch { }
+  try { if (typeof lockScroll === "function") lockScroll(); } catch { }
 }
 
 function __unlockDialogScroll() {
   try { __pageScrollLock.unlock(); } catch { }
-  try { if (typeof unlockScroll === "function") un__lockDialogScroll(); } catch { }
+  try { if (typeof unlockScroll === "function") unlockScroll(); } catch { }
 }
 
 // 不論用 X / Esc / close() / 點遮罩等方式關閉，都解鎖背景
@@ -822,7 +822,7 @@ editPreview?.addEventListener("click", (e) => {
   paintEditPreview();
 });
 
-// 手機可用的拖曳排序（Pointer Events；只在放開時重排一次）
+// 手機可用的拖曳交換（Pointer Events；放開時與目標交換）
 let editDragFrom = null;
 let editDragOver = null;
 let editDragEl = null;
@@ -877,8 +877,9 @@ function finishEditDrag() {
 
   if (to == null || to === from) return;
 
-  const moved = editImagesState.items.splice(from, 1)[0];
-  editImagesState.items.splice(to, 0, moved);
+  const tmp = editImagesState.items[from];
+  editImagesState.items[from] = editImagesState.items[to];
+  editImagesState.items[to] = tmp;
   paintEditPreview();
 }
 
@@ -997,7 +998,7 @@ adoptedPreview.addEventListener("click", (e) => {
   renderAdoptedPreviews();
 });
 
-// 手機可用的拖曳排序（Pointer Events；只在放開時重排一次）
+// 手機可用的拖曳交換（Pointer Events；放開時與目標交換）
 let adoptedDragFrom = null;
 let adoptedDragOver = null;
 let adoptedDragEl = null;
@@ -1052,8 +1053,9 @@ function finishAdoptedDrag() {
 
   if (to == null || to === from) return;
 
-  const moved = adoptedSelected.splice(from, 1)[0];
-  adoptedSelected.splice(to, 0, moved);
+  const tmp = adoptedSelected[from];
+  adoptedSelected[from] = adoptedSelected[to];
+  adoptedSelected[to] = tmp;
   renderAdoptedPreviews();
 }
 
