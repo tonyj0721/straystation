@@ -32,8 +32,7 @@ function unlockScroll() {
 // 鎖住 / 恢復背景捲動
 $('#dlgClose').addEventListener('click', () => {
   dlg.close();
-  if (typeof __unlockDialogScroll === 'function') __unlockDialogScroll();
-  else unlockScroll();
+  unlockScroll();
   history.replaceState(null, '', location.pathname);
   window.currentPetId = null;
 });
@@ -88,14 +87,14 @@ function openLightbox(images, index = 0) {
 // 🔥 關閉 Lightbox：恢復背景 + 回到 dialog
 function closeLightbox() {
   // 隱藏 Lightbox
-  lb.classList.add('hidden');
-  lb.classList.remove('flex');
+  lb.classList.add("hidden");
+  lb.classList.remove("flex");
 
-  // 回到 Dialog 時，記得把背景再鎖住（避免背景穿透滑動）
-  if (typeof __lockDialogScroll === 'function') __lockDialogScroll();
-  else lockScroll();
+  // 回到 Modal
+  dlg.showModal();
 
-  if (dlg && !dlg.open) dlg.showModal();
+  // Modal 需要背景固定 → 再鎖一次
+  lockScroll();
 }
 
 // 🔥 左右切換

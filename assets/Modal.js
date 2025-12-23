@@ -1,79 +1,279 @@
 const q = (sel) => document.querySelector(sel);
-// ===============================
-// Dialog 開啟/關閉：鎖住背景捲動（支援手機、且不影響 dialog 內部捲動）
-// - 只擋「dialog / lightbox 之外」的 wheel / touchmove，避免背景穿透滑動
-// - 用 lock depth 避免 open/close 流程重複解鎖造成『關掉後不能滑』
-// ===============================
-let __dlgLockDepth = 0;
-let __scrollBlocker = null;
-let __oldHtmlOverscroll = null;
-let __oldBodyOverscroll = null;
 
-function __installScrollBlocker() {
-  if (__scrollBlocker) return;
-  __scrollBlocker = (e) => {
-    const dlgEl = document.getElementById('petDialog');
-    const lbEl = document.getElementById('lightbox');
-    const path = e.composedPath ? e.composedPath() : null;
-    const inDlg = dlgEl && (dlgEl === e.target || dlgEl.contains(e.target) || (path && path.includes(dlgEl)));
-    const inLb = lbEl && !lbEl.classList.contains('hidden') && (lbEl === e.target || lbEl.contains(e.target) || (path && path.includes(lbEl)));
-    if (inDlg || inLb) return;
-    try { e.preventDefault(); } catch { }
-    try { e.stopPropagation(); } catch { }
+// ===============================
+// 照片預覽加速 + 拖曳排序（桌機 + 手機）
+// - 預覽：用「縮圖 blob」而不是原圖（降低解碼/記憶體壓力）
+// - 拖曳：只移動 DOM、用 requestAnimationFrame 節流、結束時再同步狀態
+// - 手機：拖曳期間強制 preventDefault(touchmove/wheel) 避免背景滑動
+// ===============================
+const BLANK_IMG =
+  "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
+
+const makeId = () => {
+  try { return crypto.randomUUID(); } catch (_) {}
+  return "id_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+};
+
+async function makeThumbUrl(file, { maxSize = 360, type = "image/jpeg", quality = 0.78 } = {}) {
+  // 盡量用 createImageBitmap（通常解碼較不會卡主執行緒）
+  let bitmap = null;
+
+  if ("createImageBitmap" in window) {
+    try {
+      bitmap = await createImageBitmap(file);
+    } catch (_) {
+      bitmap = null;
+    }
+  }
+
+  // fallback：用 <img> 載入
+  let img = null;
+  let tmpUrl = "";
+  if (!bitmap) {
+    tmpUrl = URL.createObjectURL(file);
+    img = await new Promise((res, rej) => {
+      const im = new Image();
+      im.onload = () => res(im);
+      im.onerror = rej;
+      im.src = tmpUrl;
+    });
+  }
+
+  const W = bitmap ? bitmap.width : img.naturalWidth;
+  const H = bitmap ? bitmap.height : img.naturalHeight;
+
+  const scale = Math.min(1, maxSize / Math.max(W, H));
+  const w = Math.max(1, Math.round(W * scale));
+  const h = Math.max(1, Math.round(H * scale));
+
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const g = c.getContext("2d", { alpha: false });
+  g.drawImage(bitmap || img, 0, 0, w, h);
+
+  if (bitmap?.close) { try { bitmap.close(); } catch (_) {} }
+  if (tmpUrl) { try { URL.revokeObjectURL(tmpUrl); } catch (_) {} }
+
+  const blob = await new Promise((res) => c.toBlob(res, type, quality));
+  if (!blob) throw new Error("thumb toBlob failed");
+  return URL.createObjectURL(blob);
+}
+
+function queueThumbBuild(item, imgEl, opts) {
+  // 不要卡住 UI：丟到 idle / 下一個 tick
+  const run = async () => {
+    try {
+      const url = await makeThumbUrl(item.file, opts);
+      item.thumbUrl = url;
+      if (imgEl && imgEl.isConnected) imgEl.src = url;
+    } catch (_) {
+      // 失敗就退回原檔（至少能看到）
+      try {
+        const fallback = URL.createObjectURL(item.file);
+        item.thumbUrl = fallback;
+        if (imgEl && imgEl.isConnected) imgEl.src = fallback;
+      } catch (_) {}
+    }
   };
-  // capture: 先攔下來，避免背景先吃到捲動
-  document.addEventListener('wheel', __scrollBlocker, { passive: false, capture: true });
-  document.addEventListener('touchmove', __scrollBlocker, { passive: false, capture: true });
+
+  if ("requestIdleCallback" in window) {
+    requestIdleCallback(() => run(), { timeout: 800 });
+  } else {
+    setTimeout(run, 0);
+  }
 }
 
-function __removeScrollBlocker() {
-  if (!__scrollBlocker) return;
-  document.removeEventListener('wheel', __scrollBlocker, { capture: true });
-  document.removeEventListener('touchmove', __scrollBlocker, { capture: true });
-  __scrollBlocker = null;
+function reorderItemsFromDOM(container, items) {
+  const order = Array.from(container.querySelectorAll("[data-id]"))
+    .map((el) => el.getAttribute("data-id"))
+    .filter(Boolean);
+
+  const map = new Map((items || []).map((it) => [String(it.id), it]));
+  const next = order.map((id) => map.get(String(id))).filter(Boolean);
+
+  // 若有「DOM 沒出現」的（理論上不會），補回尾端
+  if (next.length !== (items || []).length) {
+    (items || []).forEach((it) => { if (!next.includes(it)) next.push(it); });
+  }
+  return next;
 }
 
-function __lockDialogScroll() {
-  __dlgLockDepth++;
-  if (__dlgLockDepth !== 1) return;
 
-  // 交給 shared 的 lockScroll/unlockScroll（維持你原本的方式）
-  try { if (typeof lockScroll === 'function') lockScroll(); } catch { }
+(function injectPreviewReorderStyles() {
+  if (document.getElementById("previewReorderStyles")) return;
+  const st = document.createElement("style");
+  st.id = "previewReorderStyles";
+  st.textContent = `
+#editPreview, #adoptedPreview { touch-action: pan-y; }
+#editPreview.is-sorting, #adoptedPreview.is-sorting { touch-action: none; }
 
-  // 再補一層：避免 iOS/部分瀏覽器『背景還是會滑』
-  try {
-    __oldHtmlOverscroll = document.documentElement.style.overscrollBehavior;
-    __oldBodyOverscroll = document.body.style.overscrollBehavior;
-    document.documentElement.style.overscrollBehavior = 'none';
-    document.body.style.overscrollBehavior = 'none';
-  } catch { }
-
-  __installScrollBlocker();
+/* iOS 長按可能出現「放大鏡/選單」：預覽縮圖禁用 */
+#editPreview, #adoptedPreview,
+#editPreview *, #adoptedPreview * {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
-
-function __unlockDialogScroll() {
-  if (__dlgLockDepth > 0) __dlgLockDepth--;
-  if (__dlgLockDepth !== 0) return;
-
-  __removeScrollBlocker();
-  try {
-    if (__oldHtmlOverscroll != null) document.documentElement.style.overscrollBehavior = __oldHtmlOverscroll;
-    if (__oldBodyOverscroll != null) document.body.style.overscrollBehavior = __oldBodyOverscroll;
-  } catch { }
-  __oldHtmlOverscroll = __oldBodyOverscroll = null;
-
-  try { if (typeof unlockScroll === 'function') unlockScroll(); } catch { }
-}
-
-// 綁一次：dialog 關閉/取消時一定解鎖（避免關掉後整頁不能滑）
-(function __bindDialogUnlockOnce(){
-  const dlgEl = document.getElementById('petDialog');
-  if (!dlgEl || dlgEl.dataset.__scrollUnlockBound) return;
-  dlgEl.addEventListener('close', __unlockDialogScroll);
-  dlgEl.addEventListener('cancel', __unlockDialogScroll);
-  dlgEl.dataset.__scrollUnlockBound = '1';
+#editPreview img, #adoptedPreview img { -webkit-user-drag: none; }
+`;
+  document.head.appendChild(st);
 })();
 
+function bindPointerReorder(container, getItems, setItems) {
+  if (!container || container.__boundPointerReorder) return;
+  container.__boundPointerReorder = true;
+
+  // 直接拖曳縮圖互換排序（不需把手、不中斷一般捲動）
+  const START_PX = 6;          // 超過這個移動距離才視為「想排序」
+  const SCROLL_CANCEL_PX = 20; // 垂直移動很明顯時，視為捲動而不是排序
+  const SCROLL_RATIO = 2.5;    // dy > dx * ratio 才取消（讓你仍可垂直拖曳排序）
+
+  let candidate = false;
+  let dragging = false;
+  let pid = null;
+  let dragEl = null;
+
+  let startX = 0;
+  let startY = 0;
+
+  let raf = 0;
+  let lastX = 0;
+  let lastY = 0;
+  let lastSwapTarget = null;
+
+  const preventScroll = (e) => {
+    if (!dragging) return;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const swapNodes = (a, b) => {
+    const p = a?.parentNode;
+    if (!p || p !== b?.parentNode) return;
+    // 用 placeholder 交換位置（互換）
+    const ph = document.createComment("swap");
+    p.insertBefore(ph, a);
+    p.insertBefore(a, b);
+    p.insertBefore(b, ph);
+    p.removeChild(ph);
+  };
+
+  const startDrag = () => {
+    if (!candidate || dragging || !dragEl) return;
+    dragging = true;
+    candidate = false;
+
+    dragEl.classList.add("opacity-60");
+    container.classList.add("is-sorting");
+    lastSwapTarget = null;
+
+    // 拖曳期間阻止背景滑動（尤其 iOS）
+    document.addEventListener("touchmove", preventScroll, { passive: false, capture: true });
+    document.addEventListener("wheel", preventScroll, { passive: false, capture: true });
+    document.addEventListener("scroll", preventScroll, { passive: false, capture: true });
+
+    try { container.setPointerCapture(pid); } catch (_) {}
+  };
+
+  const cleanup = () => {
+    candidate = false;
+
+    if (!dragging) {
+      pid = null;
+      dragEl = null;
+      return;
+    }
+
+    dragging = false;
+    container.classList.remove("is-sorting");
+    if (dragEl) dragEl.classList.remove("opacity-60");
+    dragEl = null;
+
+    try { container.releasePointerCapture(pid); } catch (_) {}
+    pid = null;
+
+    if (raf) cancelAnimationFrame(raf);
+    raf = 0;
+
+    document.removeEventListener("touchmove", preventScroll, true);
+    document.removeEventListener("wheel", preventScroll, true);
+    document.removeEventListener("scroll", preventScroll, true);
+
+    // 同步狀態（只做一次）
+    const items = getItems();
+    const next = reorderItemsFromDOM(container, items);
+    setItems(next);
+  };
+
+  const tick = () => {
+    raf = 0;
+    if (!dragging || !dragEl) return;
+
+    const el = document.elementFromPoint(lastX, lastY);
+    const over = el?.closest?.("[data-id]");
+    if (!over || !container.contains(over) || over === dragEl) return;
+
+    // 「互換」：拖到誰身上就跟誰交換一次
+    if (over === lastSwapTarget) return;
+    lastSwapTarget = over;
+    swapNodes(dragEl, over);
+  };
+
+  container.addEventListener("pointerdown", (e) => {
+    if (typeof e.button === "number" && e.button !== 0) return;
+    // 不要在刪除按鈕上開始排序
+    if (e.target?.closest?.("button")) return;
+
+    const item = e.target?.closest?.("[data-id]");
+    if (!item || !container.contains(item)) return;
+
+    pid = e.pointerId;
+    dragEl = item;
+
+    candidate = true;
+    startX = lastX = e.clientX;
+    startY = lastY = e.clientY;
+    lastSwapTarget = null;
+  });
+
+  container.addEventListener("pointermove", (e) => {
+    if (pid == null || e.pointerId !== pid) return;
+
+    lastX = e.clientX;
+    lastY = e.clientY;
+
+    if (!dragging) {
+      if (!candidate) return;
+
+      const dx = lastX - startX;
+      const dy = lastY - startY;
+      const adx = Math.abs(dx);
+      const ady = Math.abs(dy);
+
+      // 太小的移動：先當作點擊/捲動準備
+      if (adx < START_PX && ady < START_PX) return;
+
+      // 垂直捲動很明顯：取消排序（讓頁面可以順暢捲動）
+      if (ady > SCROLL_CANCEL_PX && ady > adx * SCROLL_RATIO) {
+        candidate = false;
+        pid = null;
+        dragEl = null;
+        return;
+      }
+
+      startDrag();
+    }
+
+    // 正在拖曳
+    e.preventDefault();
+    if (!raf) raf = requestAnimationFrame(tick);
+  }, { passive: false });
+
+  container.addEventListener("pointerup", cleanup);
+  container.addEventListener("pointercancel", cleanup);
+  container.addEventListener("lostpointercapture", cleanup);
+}
 // ===============================
 // 品種資料與「品種/毛色」連動邏輯
 // ===============================
@@ -141,112 +341,6 @@ async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {})
   } finally {
     URL.revokeObjectURL(url);
   }
-}
-
-// ===============================
-// 預覽縮圖：避免大圖解碼造成卡頓（支援手機）
-// ===============================
-const PREVIEW_EMPTY_GIF = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
-const PREVIEW_MAX = 720;       // 預覽縮圖長邊上限
-const PREVIEW_QUALITY = 0.82;  // JPEG 品質（0~1）
-
-// File → 縮圖 objectURL（避免每次重畫都重新解碼）
-const __thumbUrlCache = new Map();
-const __thumbPromiseCache = new Map();
-
-// 同時跑 2 張縮圖（更快，但不會像全並發那麼容易卡）
-const __THUMB_CONCURRENCY = 2;
-let __thumbActive = 0;
-const __thumbJobQueue = [];
-
-function __runThumbQueue() {
-  while (__thumbActive < __THUMB_CONCURRENCY && __thumbJobQueue.length) {
-    const job = __thumbJobQueue.shift();
-    __thumbActive++;
-
-    __makePreviewThumbURL(job.file)
-      .then(job.resolve, job.reject)
-      .finally(() => {
-        __thumbActive--;
-        __runThumbQueue();
-      });
-  }
-}
-
-function revokePreviewThumb(file) {
-  const u = __thumbUrlCache.get(file);
-  if (u) {
-    URL.revokeObjectURL(u);
-    __thumbUrlCache.delete(file);
-  }
-  __thumbPromiseCache.delete(file);
-}
-
-async function __decodeToBitmap(file) {
-  if (window.createImageBitmap) {
-    try { return await createImageBitmap(file); } catch (_) { /* fallback */ }
-  }
-
-  // fallback：用 <img> 解碼（比較可能卡，但至少可用）
-  const raw = URL.createObjectURL(file);
-  try {
-    const img = await new Promise((res, rej) => {
-      const im = new Image();
-      im.onload = () => res(im);
-      im.onerror = rej;
-      im.src = raw;
-    });
-    const c = document.createElement("canvas");
-    c.width = img.naturalWidth;
-    c.height = img.naturalHeight;
-    const g = c.getContext("2d");
-    g.drawImage(img, 0, 0);
-    return await createImageBitmap(c);
-  } finally {
-    URL.revokeObjectURL(raw);
-  }
-}
-
-async function __makePreviewThumbURL(file) {
-  const bmp = await __decodeToBitmap(file);
-  const W = bmp.width, H = bmp.height;
-  const scale = Math.min(1, PREVIEW_MAX / Math.max(W, H));
-  const w = Math.max(1, Math.round(W * scale));
-  const h = Math.max(1, Math.round(H * scale));
-
-  // 讓 UI 先喘口氣（避免「圖片顯示瞬間卡住」）
-  await new Promise((r) => requestAnimationFrame(r));
-
-  const c = document.createElement("canvas");
-  c.width = w; c.height = h;
-  const g = c.getContext("2d", { alpha: false, desynchronized: true });
-  g.drawImage(bmp, 0, 0, w, h);
-  bmp.close?.();
-
-  const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", PREVIEW_QUALITY));
-  return URL.createObjectURL(blob);
-}
-
-function ensurePreviewThumbURL(file) {
-  if (__thumbUrlCache.has(file)) return Promise.resolve(__thumbUrlCache.get(file));
-  if (__thumbPromiseCache.has(file)) return __thumbPromiseCache.get(file);
-
-  const p = new Promise((resolve, reject) => {
-    __thumbJobQueue.push({ file, resolve, reject });
-    __runThumbQueue();
-  })
-    .then((url) => {
-      __thumbUrlCache.set(file, url);
-      __thumbPromiseCache.delete(file);
-      return url;
-    })
-    .catch((err) => {
-      __thumbPromiseCache.delete(file);
-      throw err;
-    });
-
-  __thumbPromiseCache.set(file, p);
-  return p;
 }
 
 // ===============================
@@ -408,11 +502,16 @@ async function openDialog(id) {
 
   // 8. 打開 Dialog（shared.js 裡的 dlg / lockScroll）
   if (!dlg.open) {
-    __lockDialogScroll();
+    lockScroll();
     dlg.showModal();
   }
 }
 
+// 關閉 Dialog
+document.getElementById("dlgClose").addEventListener("click", () => {
+  if (dlg.open) dlg.close();
+  document.documentElement.style.overflow = oldHtmlOverflow;
+});
 
 function scrollDialogTop() {
   const dlg = document.getElementById("petDialog");
@@ -470,7 +569,7 @@ async function onDelete() {
     cancelButtonText: "取消",
   });
   if (!ok.isConfirmed) {
-    if (wasOpen) { __lockDialogScroll(); dlg.showModal(); }
+    if (wasOpen) { lockScroll(); dlg.showModal(); }
     return;
   }
 
@@ -484,7 +583,7 @@ async function onDelete() {
     await Swal.fire({ icon: "success", title: "刪除成功", showConfirmButton: false, timer: 1500, });
   } catch (err) {
     await Swal.fire({ icon: "error", title: "刪除失敗", text: err.message });
-    if (wasOpen) { __lockDialogScroll(); dlg.showModal(); }
+    if (wasOpen) { lockScroll(); dlg.showModal(); }
   }
 }
 
@@ -566,40 +665,37 @@ async function saveEdit() {
   const stopDots = startDots(txt, "儲存中");
 
   try {
-        // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
-        const { items, removeUrls } = editImagesState;
-        const newUrls = [];
+    // 依照「目前縮圖順序」產出最終 images（keep 直接用舊 url；add 先上傳再放入對應位置）
+    const { items, remove } = editImagesState;
+    const newUrls = [];
 
-        // 依序處理（保持順序）
-        for (const it of items) {
-          if (it.kind === "url") {
-            newUrls.push(it.url);
-            continue;
-          }
+    for (const item of items) {
+      if (item.type === "keep") {
+        newUrls.push(item.url);
+        continue;
+      }
+      const f = item.file;
 
-          if (it.kind === "file") {
-            const f = it.file;
-            const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
-            const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
-            const base = f.name.replace(/\.[^.]+$/, '');
-            const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
-            const r = sRef(storage, path);
-            await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
-            newUrls.push(await getDownloadURL(r));
-          }
-        }
+      const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+      const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
+      const base = f.name.replace(/\.[^.]+$/, '');
+      const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
+      const r = sRef(storage, path);
+      await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
+      newUrls.push(await getDownloadURL(r));
+    }
 
-        // 刪除被移除的舊圖（忽略刪失敗）
-        for (const url of (removeUrls || [])) {
-          try {
-            const path = url.split("/o/")[1].split("?")[0];
-            await deleteObject(sRef(storage, decodeURIComponent(path)));
-          } catch (e) {
-            // 靜默忽略
-          }
-        }
+    // 刪除移除的檔案（忽略刪失敗）
+    for (const url of remove) {
+      try {
+        const path = url.split("/o/")[1].split("?")[0];
+        await deleteObject(sRef(storage, decodeURIComponent(path)));
+      } catch (e) {
+        // 靜默忽略
+      }
+    }
 
-        newData.images = newUrls;
+    newData.images = newUrls;
 
     // ③ 寫回 Firestore
     await updateDoc(doc(db, "pets", currentDocId), newData);
@@ -616,7 +712,7 @@ async function saveEdit() {
     const wasOpen = dlg.open;
     if (wasOpen) dlg.close();
     await Swal.fire({ icon: "success", title: "已儲存", showConfirmButton: false, timer: 1500 });
-    if (wasOpen) { __lockDialogScroll(); dlg.showModal(); }
+    if (wasOpen) { lockScroll(); dlg.showModal(); }
 
     setEditMode(false);
     await openDialog(currentDocId);
@@ -684,753 +780,273 @@ editBreedTypeSel.addEventListener("change", () => {
 });
 
 // ===============================
-// 編輯模式：圖片管理（預覽 + 增刪）- 不卡頓版（縮圖/手機拖曳排序）
+// 編輯模式：圖片管理（預覽 + 增刪 + 排序）
+// - keep：既有 url
+// - add ：新選檔案（用縮圖 blob 預覽）
+// - remove：只記錄要刪的舊 url
 // ===============================
 const editFiles = q("#editFiles");
 const btnPickEdit = q("#btnPickEdit");
 const editPreview = q("#editPreview");
-if (editPreview) {
-  editPreview.style.touchAction = "pan-y";
-  editPreview.addEventListener("contextmenu", (e) => e.preventDefault());
-}
 const editCount = q("#editCount");
 
-const MAX_EDIT_FILES = 5;
+// 狀態：items 依「目前縮圖順序」保存；remove 只記要刪掉的舊 url
+let editImagesState = { items: [], remove: [] };
 
-// 狀態：依「目前畫面順序」維護（url=舊圖、file=新圖）
-let editImagesState = { items: [], removeUrls: [] };
+btnPickEdit.addEventListener("click", () => editFiles.click());
 
-btnPickEdit?.addEventListener("click", () => editFiles?.click());
-
-// 初始化編輯圖片列表（把舊的檔案縮圖快取清掉，避免記憶體累積）
-function renderEditImages(urls) {
-  for (const it of editImagesState.items) {
-    if (it?.kind === "file" && it.file) revokePreviewThumb(it.file);
-  }
-  editImagesState.items = (urls || []).map((u) => ({ kind: "url", url: u }));
-  editImagesState.removeUrls = [];
-  paintEditPreview();
+function updateEditCount() {
+  const total = editImagesState.items.length;
+  editCount.textContent = `已選 ${total} / 5 張`;
 }
 
-// 依狀態重新畫縮圖
-const __editTileMap = new Map(); // key -> tile element（保留 DOM，避免換順序閃爍）
-
-function __editKey(it) {
-  return it.kind === "url" ? `url:${it.url}` : it.file;
-}
-
-function __makeEditTile(it) {
-  const wrap = document.createElement("div");
-  wrap.className = "relative  select-none";
-  wrap.style.touchAction = "pan-y";
-  wrap.style.setProperty("-webkit-touch-callout", "none");
-  wrap.style.userSelect = "none";
-  wrap.addEventListener("contextmenu", (e) => e.preventDefault());
-
-  const img = document.createElement("img");
-  img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
-  img.alt = "預覽";
-  img.decoding = "async";
-  img.loading = "lazy";
-  img.draggable = false;
-  img.style.webkitUserDrag = "none";
-  img.style.webkitTouchCallout = "none";
-  img.addEventListener("contextmenu", (e) => e.preventDefault());
-
-  if (it.kind === "url") {
-    img.src = it.url;
-  } else {
-    img.src = PREVIEW_EMPTY_GIF;
-    ensurePreviewThumbURL(it.file)
-      .then((u) => { img.src = u; })
-      .catch(() => {
-        try {
-          const raw = URL.createObjectURL(it.file);
-          img.src = raw;
-          setTimeout(() => URL.revokeObjectURL(raw), 2000);
-        } catch { }
-      });
-  }
-
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
-  btn.textContent = "✕";
-  btn.setAttribute("aria-label", "刪除這張");
-
-  wrap.appendChild(img);
-  wrap.appendChild(btn);
-  return wrap;
-}
-
-function __setEditIdx(tile, idx) {
-  tile.dataset.idx = String(idx);
-  const btn = tile.querySelector("button");
-  if (btn) btn.dataset.idx = String(idx);
-}
-
-// 依狀態同步 DOM（不清空重畫，避免閃爍）
-function paintEditPreview() {
-  editCount.textContent = `已選 ${editImagesState.items.length} / ${MAX_EDIT_FILES} 張`;
-
-  const keys = editImagesState.items.map(__editKey);
-
-  for (const [k, el] of __editTileMap) {
-    if (!keys.includes(k)) {
-      // 移除 tile 時順便釋放縮圖
-      if (k && typeof k === "object") {
-        try { revokePreviewThumb(k); } catch { }
-      }
-      el.remove();
-      __editTileMap.delete(k);
-    }
-  }
-
-  editImagesState.items.forEach((it, i) => {
-    const key = __editKey(it);
-    let tile = __editTileMap.get(key);
-    if (!tile) {
-      tile = __makeEditTile(it);
-      __editTileMap.set(key, tile);
-    }
-    __setEditIdx(tile, i);
-    editPreview.appendChild(tile);
-  });
-}
-
-// 刪除（事件代理）
-editPreview?.addEventListener("click", (e) => {
-  const btn = e.target.closest?.("button[data-idx]");
-  if (!btn) return;
-
-  e.preventDefault();
-  e.stopPropagation();
-
-  const i = +btn.dataset.idx;
-  const it = editImagesState.items[i];
+function revokeItemThumb(it) {
   if (!it) return;
-
-  if (it.kind === "url") {
-    editImagesState.removeUrls.push(it.url);
-  } else if (it.kind === "file") {
-    revokePreviewThumb(it.file);
+  if (it.type === "add" && it.thumbUrl) {
+    try { URL.revokeObjectURL(it.thumbUrl); } catch (_) {}
+    it.thumbUrl = "";
   }
-
-  editImagesState.items.splice(i, 1);
-  paintEditPreview();
-});
-
-// 排序拖曳（交換 swap）
-// - 桌機：滑鼠拖曳（即時）
-// - 手機：長按後才進入拖曳 → 沒長按就可以正常上下捲動頁面
-//   （同時已關閉 iOS 的 touch-callout/右鍵選單，避免跳出「分享/儲存圖片」）
-let editDragFrom = null;
-let editDragOver = null;
-let editDragEl = null;
-
-// ===== 桌機（Pointer: mouse）=====
-let editPending = null; // { pointerId, startX, startY, tile }
-const editDRAG_THRESHOLD = 6;
-
-function editCancelPending() { editPending = null; }
-
-function clearEditDragUI() {
-  editPreview?.querySelectorAll?.("[data-idx]")?.forEach((el) => {
-    el.classList.remove("ring-2", "ring-brand-500", "ring-brand-300", "opacity-80");
-  });
 }
 
-function finishEditSwap(from, to) {
-  if (to == null || to === from) return;
-  const tmp = editImagesState.items[from];
-  editImagesState.items[from] = editImagesState.items[to];
-  editImagesState.items[to] = tmp;
+// 初始化編輯圖片列表（把現存 url 轉成 keep items）
+function renderEditImages(urls) {
+  // 先釋放上一輪 add 的縮圖 objectURL
+  try { (editImagesState.items || []).forEach(revokeItemThumb); } catch (_) {}
+
+  editImagesState.items = (urls || []).map((u) => ({ id: makeId(), type: "keep", url: u }));
+  editImagesState.remove = [];
   paintEditPreview();
 }
 
-function finishEditDrag() {
-  editCancelPending();
-  if (editDragFrom == null) return;
+// 依狀態畫縮圖（不在拖曳時重畫，拖曳只移 DOM）
+function paintEditPreview() {
+  editPreview.innerHTML = "";
+  (editImagesState.items || []).forEach((item) => {
+    const wrap = document.createElement("div");
+    wrap.className = "relative select-none cursor-grab";
+    wrap.setAttribute("data-id", String(item.id));
 
-  const from = editDragFrom;
-  const to = editDragOver;
+    const img = document.createElement("img");
+    img.draggable = false;
+    img.decoding = "async";
+    img.loading = "lazy";
+    img.className = "w-full aspect-square object-cover rounded-lg pointer-events-none bg-gray-100";
+    img.alt = "預覽";
 
-  // reset UI
-  clearEditDragUI();
-  editDragFrom = editDragOver = null;
-  editDragEl = null;
-
-  finishEditSwap(from, to);
-}
-
-editPreview?.addEventListener("pointerdown", (e) => {
-  if (e.pointerType && e.pointerType !== "mouse") return; // 觸控交給 touch 版
-  if (e.target.closest?.("button")) return; // 刪除鈕不拖
-
-  const tile = e.target.closest?.("[data-idx]");
-  if (!tile || !editPreview.contains(tile)) return;
-
-  editCancelPending();
-  editPending = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, tile };
-});
-
-editPreview?.addEventListener("pointermove", (e) => {
-  if (e.pointerType && e.pointerType !== "mouse") return;
-
-  if (editDragFrom == null) {
-    if (!editPending || editPending.pointerId !== e.pointerId) return;
-
-    const dx = e.clientX - editPending.startX;
-    const dy = e.clientY - editPending.startY;
-    if (Math.hypot(dx, dy) < editDRAG_THRESHOLD) return;
-
-    // start drag
-    editDragEl = editPending.tile;
-    editDragFrom = +editDragEl.dataset.idx;
-    editDragOver = editDragFrom;
-    try { editPreview.setPointerCapture?.(e.pointerId); } catch { }
-    clearEditDragUI();
-    editDragEl.classList.add("ring-2", "ring-brand-500", "opacity-80");
-    editPending = null;
-    return;
-  }
-
-  const el = document.elementFromPoint(e.clientX, e.clientY);
-  const tile = el?.closest?.("[data-idx]");
-  if (!tile || !editPreview.contains(tile)) return;
-
-  const idx = +tile.dataset.idx;
-  if (idx === editDragOver) return;
-
-  editDragOver = idx;
-  clearEditDragUI();
-  if (editDragEl) editDragEl.classList.add("ring-2", "ring-brand-500", "opacity-80");
-  tile.classList.add("ring-2", "ring-brand-300");
-});
-
-editPreview?.addEventListener("pointerup", finishEditDrag);
-editPreview?.addEventListener("pointercancel", finishEditDrag);
-
-// ===== 手機（Touch：長按啟動拖曳）=====
-const editLONGPRESS_MS = 280;     // 可自行調整
-const editTOUCH_CANCEL_DIST = 10; // 長按前移動超過這個距離 → 視為在捲動，不啟動拖曳
-
-let editTouchTimer = 0;
-let editTouchStartX = 0;
-let editTouchStartY = 0;
-let editTouchTile = null;
-let editTouchDragging = false;
-let editTouchFrom = null;
-let editTouchOver = null;
-
-function editTouchClearTimer() {
-  if (editTouchTimer) {
-    clearTimeout(editTouchTimer);
-    editTouchTimer = 0;
-  }
-}
-
-function editTouchResetTile() {
-  if (!editTouchTile) return;
-  editTouchTile.style.transform = "";
-  editTouchTile.style.transition = "";
-  editTouchTile.style.willChange = "";
-  editTouchTile.style.zIndex = "";
-  editTouchTile.style.pointerEvents = "";
-}
-
-function editTouchStartDrag() {
-  if (!editTouchTile) return;
-
-  editTouchDragging = true;
-  editTouchFrom = +editTouchTile.dataset.idx;
-  editTouchOver = editTouchFrom;
-
-  editDragEl = editTouchTile;
-  editDragFrom = editTouchFrom;
-  editDragOver = editTouchOver;
-
-  clearEditDragUI();
-  editTouchTile.classList.add("ring-2", "ring-brand-500", "opacity-80");
-
-  // 讓 tile 跟著手指走，並讓 elementFromPoint 能抓到「底下的 tile」
-  editTouchTile.style.transition = "none";
-  editTouchTile.style.willChange = "transform";
-  editTouchTile.style.zIndex = "1000";
-  editTouchTile.style.pointerEvents = "none";
-
-  try { navigator.vibrate?.(10); } catch { }
-}
-
-function editTouchMoveDragging(x, y, e) {
-  if (!editTouchDragging || !editTouchTile) return;
-
-  // 阻止頁面/Modal 捲動（只在真正拖曳時）
-  try { e.preventDefault(); } catch { }
-  try { e.stopPropagation(); } catch { }
-
-  const dx = x - editTouchStartX;
-  const dy = y - editTouchStartY;
-  editTouchTile.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
-
-  const el = document.elementFromPoint(x, y);
-  const tile = el?.closest?.("[data-idx]");
-  if (!tile || !editPreview.contains(tile)) return;
-
-  const idx = +tile.dataset.idx;
-  if (idx === editDragOver) return;
-
-  editDragOver = idx;
-  editTouchOver = idx;
-
-  clearEditDragUI();
-  // 拖曳中的 tile 本身仍高亮（即使 pointer-events: none）
-  if (editDragEl) editDragEl.classList.add("ring-2", "ring-brand-500", "opacity-80");
-  tile.classList.add("ring-2", "ring-brand-300");
-}
-
-function editTouchEnd(e) {
-  editTouchClearTimer();
-
-  if (!editTouchDragging) {
-    editTouchTile = null;
-    return;
-  }
-
-  // 結束拖曳：恢復樣式
-  editTouchResetTile();
-  clearEditDragUI();
-
-  const from = editTouchFrom;
-  const to = editTouchOver;
-
-  // reset state
-  editTouchDragging = false;
-  editTouchTile = null;
-  editTouchFrom = editTouchOver = null;
-
-  editDragFrom = editDragOver = null;
-  editDragEl = null;
-
-  finishEditSwap(from, to);
-
-  // 避免拖曳後觸發「點擊」
-  try { e.preventDefault(); } catch { }
-  try { e.stopPropagation(); } catch { }
-}
-
-editPreview?.addEventListener("touchstart", (e) => {
-  if (e.touches.length !== 1) return;
-  if (e.target.closest?.("button")) return;
-
-  const tile = e.target.closest?.("[data-idx]");
-  if (!tile || !editPreview.contains(tile)) return;
-
-  editTouchClearTimer();
-  editTouchDragging = false;
-  editTouchTile = tile;
-
-  editTouchStartX = e.touches[0].clientX;
-  editTouchStartY = e.touches[0].clientY;
-
-  editTouchTimer = setTimeout(() => {
-    editTouchTimer = 0;
-    editTouchStartDrag();
-  }, editLONGPRESS_MS);
-}, { passive: true });
-
-editPreview?.addEventListener("touchmove", (e) => {
-  if (!editTouchTile) return;
-
-  const x = e.touches[0].clientX;
-  const y = e.touches[0].clientY;
-
-  if (!editTouchDragging) {
-    // 長按尚未成立：手指移動太多 → 視為捲動，取消長按
-    const dx = x - editTouchStartX;
-    const dy = y - editTouchStartY;
-    if (Math.hypot(dx, dy) > editTOUCH_CANCEL_DIST) {
-      editTouchClearTimer();
-      editTouchTile = null;
+    if (item.type === "keep") {
+      img.src = item.url;
+    } else {
+      img.src = item.thumbUrl || BLANK_IMG;
+      if (!item.thumbUrl) queueThumbBuild(item, img, { maxSize: 360 });
     }
-    return;
-  }
 
-  editTouchMoveDragging(x, y, e);
-}, { passive: false });
+    const btn = document.createElement("button");
+    btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center cursor-pointer";
+    btn.textContent = "✕";
+    btn.setAttribute("data-rm-id", String(item.id));
 
-editPreview?.addEventListener("touchend", editTouchEnd, { passive: false });
-editPreview?.addEventListener("touchcancel", editTouchEnd, { passive: false });// 新增圖片（尊守上限 5）
-editFiles?.addEventListener("change", () => {
+    wrap.appendChild(img);
+    wrap.appendChild(btn);
+    editPreview.appendChild(wrap);
+  });
+
+  updateEditCount();
+}
+
+// 刪除（用事件代理，避免每次重畫都重綁 listener）
+if (!editPreview.__boundDelete) {
+  editPreview.__boundDelete = true;
+  editPreview.addEventListener("click", (e) => {
+    const btn = e.target?.closest?.("button[data-rm-id]");
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const id = btn.getAttribute("data-rm-id");
+    const idx = editImagesState.items.findIndex((it) => String(it.id) === String(id));
+    if (idx < 0) return;
+
+    const it = editImagesState.items[idx];
+    if (it.type === "keep") editImagesState.remove.push(it.url);
+    revokeItemThumb(it);
+
+    editImagesState.items.splice(idx, 1);
+
+    // 直接移除 DOM（比整個重畫更快）
+    const wrap = btn.closest("[data-id]");
+    if (wrap) wrap.remove();
+
+    updateEditCount();
+  }, { passive: false });
+}
+
+// 讓編輯預覽支援拖曳排序（含手機）
+// ※ 拖曳只移 DOM，結束時才同步 editImagesState.items 的順序
+bindPointerReorder(
+  editPreview,
+  () => editImagesState.items,
+  (next) => { editImagesState.items = next; }
+);
+
+// 新增圖片（遵守上限 5）
+// - 先插入 placeholder，縮圖生成後再更新 <img>（避免 UI 卡住）
+editFiles.addEventListener("change", () => {
   const incoming = Array.from(editFiles.files || []);
-  const room = MAX_EDIT_FILES - editImagesState.items.length;
+  const room = 5 - editImagesState.items.length;
 
-  if (editImagesState.items.length + incoming.length > MAX_EDIT_FILES) {
-    swalInDialog({ icon: "warning", title: `最多 ${MAX_EDIT_FILES} 張照片` });
+  if (incoming.length > room) {
+    swalInDialog({ icon: "warning", title: "最多 5 張照片" });
   }
 
   incoming.slice(0, Math.max(0, room)).forEach((f) => {
-    editImagesState.items.push({ kind: "file", file: f });
+    const item = { id: makeId(), type: "add", file: f, thumbUrl: "" };
+    editImagesState.items.push(item);
+
+    // 直接 append 一個 node（比整個重畫更順）
+    const wrap = document.createElement("div");
+    wrap.className = "relative select-none cursor-grab";
+    wrap.setAttribute("data-id", String(item.id));
+
+    const img = document.createElement("img");
+    img.draggable = false;
+    img.decoding = "async";
+    img.loading = "lazy";
+    img.className = "w-full aspect-square object-cover rounded-lg pointer-events-none bg-gray-100";
+    img.alt = "預覽";
+    img.src = BLANK_IMG;
+
+    const btn = document.createElement("button");
+    btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center cursor-pointer";
+    btn.textContent = "✕";
+    btn.setAttribute("data-rm-id", String(item.id));
+
+    wrap.appendChild(img);
+    wrap.appendChild(btn);
+    editPreview.appendChild(wrap);
+
+    queueThumbBuild(item, img, { maxSize: 360 });
   });
 
-  paintEditPreview();
+  updateEditCount();
   editFiles.value = "";
 });
+
 
 // ===============================
 // 送養流程：上傳合照 / 標記 / 撤回
 // ===============================
 
 // 狀態：已選擇的合照（可多次疊加）
+// [{ id, file, thumbUrl }]
 let adoptedSelected = [];
 
 const adoptedFilesInput = document.getElementById("adoptedFiles");
 const btnPickAdopted = document.getElementById("btnPickAdopted");
 const adoptedCount = document.getElementById("adoptedCount");
 const adoptedPreview = document.getElementById("adoptedPreview");
-if (adoptedPreview) {
-  adoptedPreview.style.touchAction = "pan-y";
-  adoptedPreview.addEventListener("contextmenu", (e) => e.preventDefault());
-}
 
 // 打開檔案挑選
 btnPickAdopted.onclick = () => adoptedFilesInput.click();
 
-// 渲染縮圖（不卡頓：縮圖/快取/手機拖曳排序）
-const __adoptedTileMap = new Map(); // File -> tile element（保留 DOM，避免換順序閃爍）
+function updateAdoptedCount() {
+  adoptedCount.textContent = `已選 ${adoptedSelected.length} / 5 張`;
+}
 
-function __makeAdoptedTile(file) {
+function revokeAdoptedThumb(it) {
+  if (it?.thumbUrl) {
+    try { URL.revokeObjectURL(it.thumbUrl); } catch (_) {}
+    it.thumbUrl = "";
+  }
+}
+
+// 加入一張縮圖 node（先 placeholder，縮圖生成後再更新）
+function appendAdoptedNode(item) {
   const wrap = document.createElement("div");
-  wrap.className = "relative  select-none";
-  wrap.style.touchAction = "pan-y";
-  wrap.style.setProperty("-webkit-touch-callout", "none");
-  wrap.style.userSelect = "none";
-  wrap.addEventListener("contextmenu", (e) => e.preventDefault());
+  wrap.className = "relative select-none cursor-grab";
+  wrap.setAttribute("data-id", String(item.id));
 
   const img = document.createElement("img");
-  img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
-  img.alt = "預覽";
+  img.draggable = false;
   img.decoding = "async";
   img.loading = "lazy";
-  img.draggable = false;
-  img.style.webkitUserDrag = "none";
-  img.style.webkitTouchCallout = "none";
-  img.addEventListener("contextmenu", (e) => e.preventDefault());
-  img.src = PREVIEW_EMPTY_GIF;
-
-  ensurePreviewThumbURL(file)
-    .then((u) => { img.src = u; })
-    .catch(() => {
-      try {
-        const raw = URL.createObjectURL(file);
-        img.src = raw;
-        setTimeout(() => URL.revokeObjectURL(raw), 2000);
-      } catch { }
-    });
+  img.className = "w-full aspect-square object-cover rounded-lg pointer-events-none bg-gray-100";
+  img.alt = "預覽";
+  img.src = item.thumbUrl || BLANK_IMG;
 
   const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "absolute top-1 right-1 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center";
+  btn.className = "absolute top-1 right-1 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center cursor-pointer";
   btn.textContent = "✕";
   btn.setAttribute("aria-label", "刪除這張");
+  btn.setAttribute("data-rm-id", String(item.id));
 
   wrap.appendChild(img);
   wrap.appendChild(btn);
-  return wrap;
+  adoptedPreview.appendChild(wrap);
+
+  if (!item.thumbUrl) queueThumbBuild(item, img, { maxSize: 360 });
 }
 
-function __setAdoptedIdx(tile, idx) {
-  tile.dataset.idx = String(idx);
-  const btn = tile.querySelector("button");
-  if (btn) btn.dataset.idx = String(idx);
+// 初次渲染
+function paintAdoptedPreview() {
+  adoptedPreview.innerHTML = "";
+  adoptedSelected.forEach(appendAdoptedNode);
+  updateAdoptedCount();
 }
-
-// 渲染縮圖（不清空重畫，避免閃爍）
-function renderAdoptedPreviews() {
-  adoptedCount.textContent = `已選 ${adoptedSelected.length} / 5 張`;
-
-  for (const [file, el] of __adoptedTileMap) {
-    if (!adoptedSelected.includes(file)) {
-      try { revokePreviewThumb(file); } catch { }
-      el.remove();
-      __adoptedTileMap.delete(file);
-    }
-  }
-
-  adoptedSelected.forEach((file, i) => {
-    let tile = __adoptedTileMap.get(file);
-    if (!tile) {
-      tile = __makeAdoptedTile(file);
-      __adoptedTileMap.set(file, tile);
-    }
-    __setAdoptedIdx(tile, i);
-    adoptedPreview.appendChild(tile);
-  });
-}
+paintAdoptedPreview();
 
 // 刪除（事件代理）
-adoptedPreview.addEventListener("click", (e) => {
-  const btn = e.target.closest?.("button[data-idx]");
-  if (!btn) return;
+if (!adoptedPreview.__boundDelete) {
+  adoptedPreview.__boundDelete = true;
+  adoptedPreview.addEventListener("click", (e) => {
+    const btn = e.target?.closest?.("button[data-rm-id]");
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
 
-  e.preventDefault();
-  e.stopPropagation();
+    const id = btn.getAttribute("data-rm-id");
+    const idx = adoptedSelected.findIndex((it) => String(it.id) === String(id));
+    if (idx < 0) return;
 
-  const i = +btn.dataset.idx;
-  const f = adoptedSelected[i];
-  if (f) revokePreviewThumb(f);
+    revokeAdoptedThumb(adoptedSelected[idx]);
+    adoptedSelected.splice(idx, 1);
 
-  adoptedSelected.splice(i, 1);
-  renderAdoptedPreviews();
-});
+    const wrap = btn.closest("[data-id]");
+    if (wrap) wrap.remove();
 
-// 排序拖曳（交換 swap）
-// - 桌機：滑鼠拖曳（即時）
-// - 手機：長按後才進入拖曳 → 沒長按就可以正常上下捲動頁面
-let adoptedDragFrom = null;
-let adoptedDragOver = null;
-let adoptedDragEl = null;
-
-// ===== 桌機（Pointer: mouse）=====
-let adoptedPending = null; // { pointerId, startX, startY, tile }
-const adoptedDRAG_THRESHOLD = 6;
-
-function adoptedCancelPending() { adoptedPending = null; }
-
-function clearAdoptedDragUI() {
-  adoptedPreview.querySelectorAll("[data-idx]").forEach((el) => {
-    el.classList.remove("ring-2", "ring-brand-500", "ring-brand-300", "opacity-80");
-  });
+    updateAdoptedCount();
+  }, { passive: false });
 }
 
-function finishAdoptedSwap(from, to) {
-  if (to == null || to === from) return;
-  const tmp = adoptedSelected[from];
-  adoptedSelected[from] = adoptedSelected[to];
-  adoptedSelected[to] = tmp;
-  renderAdoptedPreviews();
-}
-
-function finishAdoptedDrag() {
-  adoptedCancelPending();
-  if (adoptedDragFrom == null) return;
-
-  const from = adoptedDragFrom;
-  const to = adoptedDragOver;
-
-  clearAdoptedDragUI();
-  adoptedDragFrom = adoptedDragOver = null;
-  adoptedDragEl = null;
-
-  finishAdoptedSwap(from, to);
-}
-
-adoptedPreview.addEventListener("pointerdown", (e) => {
-  if (e.pointerType && e.pointerType !== "mouse") return; // 觸控交給 touch 版
-  if (e.target.closest?.("button")) return; // 刪除鈕不拖
-
-  const tile = e.target.closest?.("[data-idx]");
-  if (!tile || !adoptedPreview.contains(tile)) return;
-
-  adoptedCancelPending();
-  adoptedPending = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, tile };
-});
-
-adoptedPreview.addEventListener("pointermove", (e) => {
-  if (e.pointerType && e.pointerType !== "mouse") return;
-
-  if (adoptedDragFrom == null) {
-    if (!adoptedPending || adoptedPending.pointerId !== e.pointerId) return;
-
-    const dx = e.clientX - adoptedPending.startX;
-    const dy = e.clientY - adoptedPending.startY;
-    if (Math.hypot(dx, dy) < adoptedDRAG_THRESHOLD) return;
-
-    adoptedDragEl = adoptedPending.tile;
-    adoptedDragFrom = +adoptedDragEl.dataset.idx;
-    adoptedDragOver = adoptedDragFrom;
-    try { adoptedPreview.setPointerCapture?.(e.pointerId); } catch { }
-    clearAdoptedDragUI();
-    adoptedDragEl.classList.add("ring-2", "ring-brand-500", "opacity-80");
-    adoptedPending = null;
-    return;
-  }
-
-  const el = document.elementFromPoint(e.clientX, e.clientY);
-  const tile = el?.closest?.("[data-idx]");
-  if (!tile || !adoptedPreview.contains(tile)) return;
-
-  const idx = +tile.dataset.idx;
-  if (idx === adoptedDragOver) return;
-
-  adoptedDragOver = idx;
-  clearAdoptedDragUI();
-  if (adoptedDragEl) adoptedDragEl.classList.add("ring-2", "ring-brand-500", "opacity-80");
-  tile.classList.add("ring-2", "ring-brand-300");
-});
-
-adoptedPreview.addEventListener("pointerup", finishAdoptedDrag);
-adoptedPreview.addEventListener("pointercancel", finishAdoptedDrag);
-
-// ===== 手機（Touch：長按啟動拖曳）=====
-const adoptedLONGPRESS_MS = 280;
-const adoptedTOUCH_CANCEL_DIST = 10;
-
-let adoptedTouchTimer = 0;
-let adoptedTouchStartX = 0;
-let adoptedTouchStartY = 0;
-let adoptedTouchTile = null;
-let adoptedTouchDragging = false;
-let adoptedTouchFrom = null;
-let adoptedTouchOver = null;
-
-function adoptedTouchClearTimer() {
-  if (adoptedTouchTimer) {
-    clearTimeout(adoptedTouchTimer);
-    adoptedTouchTimer = 0;
-  }
-}
-
-function adoptedTouchResetTile() {
-  if (!adoptedTouchTile) return;
-  adoptedTouchTile.style.transform = "";
-  adoptedTouchTile.style.transition = "";
-  adoptedTouchTile.style.willChange = "";
-  adoptedTouchTile.style.zIndex = "";
-  adoptedTouchTile.style.pointerEvents = "";
-}
-
-function adoptedTouchStartDrag() {
-  if (!adoptedTouchTile) return;
-
-  adoptedTouchDragging = true;
-  adoptedTouchFrom = +adoptedTouchTile.dataset.idx;
-  adoptedTouchOver = adoptedTouchFrom;
-
-  adoptedDragEl = adoptedTouchTile;
-  adoptedDragFrom = adoptedTouchFrom;
-  adoptedDragOver = adoptedTouchOver;
-
-  clearAdoptedDragUI();
-  adoptedTouchTile.classList.add("ring-2", "ring-brand-500", "opacity-80");
-
-  adoptedTouchTile.style.transition = "none";
-  adoptedTouchTile.style.willChange = "transform";
-  adoptedTouchTile.style.zIndex = "1000";
-  adoptedTouchTile.style.pointerEvents = "none";
-
-  try { navigator.vibrate?.(10); } catch { }
-}
-
-function adoptedTouchMoveDragging(x, y, e) {
-  if (!adoptedTouchDragging || !adoptedTouchTile) return;
-
-  try { e.preventDefault(); } catch { }
-  try { e.stopPropagation(); } catch { }
-
-  const dx = x - adoptedTouchStartX;
-  const dy = y - adoptedTouchStartY;
-  adoptedTouchTile.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
-
-  const el = document.elementFromPoint(x, y);
-  const tile = el?.closest?.("[data-idx]");
-  if (!tile || !adoptedPreview.contains(tile)) return;
-
-  const idx = +tile.dataset.idx;
-  if (idx === adoptedDragOver) return;
-
-  adoptedDragOver = idx;
-  adoptedTouchOver = idx;
-
-  clearAdoptedDragUI();
-  if (adoptedDragEl) adoptedDragEl.classList.add("ring-2", "ring-brand-500", "opacity-80");
-  tile.classList.add("ring-2", "ring-brand-300");
-}
-
-function adoptedTouchEnd(e) {
-  adoptedTouchClearTimer();
-
-  if (!adoptedTouchDragging) {
-    adoptedTouchTile = null;
-    return;
-  }
-
-  adoptedTouchResetTile();
-  clearAdoptedDragUI();
-
-  const from = adoptedTouchFrom;
-  const to = adoptedTouchOver;
-
-  adoptedTouchDragging = false;
-  adoptedTouchTile = null;
-  adoptedTouchFrom = adoptedTouchOver = null;
-
-  adoptedDragFrom = adoptedDragOver = null;
-  adoptedDragEl = null;
-
-  finishAdoptedSwap(from, to);
-
-  try { e.preventDefault(); } catch { }
-  try { e.stopPropagation(); } catch { }
-}
-
-adoptedPreview.addEventListener("touchstart", (e) => {
-  if (e.touches.length !== 1) return;
-  if (e.target.closest?.("button")) return;
-
-  const tile = e.target.closest?.("[data-idx]");
-  if (!tile || !adoptedPreview.contains(tile)) return;
-
-  adoptedTouchClearTimer();
-  adoptedTouchDragging = false;
-  adoptedTouchTile = tile;
-
-  adoptedTouchStartX = e.touches[0].clientX;
-  adoptedTouchStartY = e.touches[0].clientY;
-
-  adoptedTouchTimer = setTimeout(() => {
-    adoptedTouchTimer = 0;
-    adoptedTouchStartDrag();
-  }, adoptedLONGPRESS_MS);
-}, { passive: true });
-
-adoptedPreview.addEventListener("touchmove", (e) => {
-  if (!adoptedTouchTile) return;
-
-  const x = e.touches[0].clientX;
-  const y = e.touches[0].clientY;
-
-  if (!adoptedTouchDragging) {
-    const dx = x - adoptedTouchStartX;
-    const dy = y - adoptedTouchStartY;
-    if (Math.hypot(dx, dy) > adoptedTOUCH_CANCEL_DIST) {
-      adoptedTouchClearTimer();
-      adoptedTouchTile = null;
-    }
-    return;
-  }
-
-  adoptedTouchMoveDragging(x, y, e);
-}, { passive: false });
-
-adoptedPreview.addEventListener("touchend", adoptedTouchEnd, { passive: false });
-adoptedPreview.addEventListener("touchcancel", adoptedTouchEnd, { passive: false });renderAdoptedPreviews();
+// 讓合照預覽支援拖曳排序（含手機）
+// ※ 拖曳只移 DOM，結束時才同步 adoptedSelected 的順序
+bindPointerReorder(
+  adoptedPreview,
+  () => adoptedSelected,
+  (next) => { adoptedSelected = next; }
+);
 
 // 檔案變更：疊加並限制最多 5 張
 adoptedFilesInput.addEventListener("change", () => {
   const incoming = Array.from(adoptedFilesInput.files || []);
-  const next = adoptedSelected.concat(incoming);
-  if (next.length > 5) {
+  const room = 5 - adoptedSelected.length;
+
+  if (incoming.length > room) {
     swalInDialog({ icon: "warning", title: "最多 5 張照片" });
   }
-  adoptedSelected = next.slice(0, 5);
-  renderAdoptedPreviews();
+
+  incoming.slice(0, Math.max(0, room)).forEach((f) => {
+    const item = { id: makeId(), file: f, thumbUrl: "" };
+    adoptedSelected.push(item);
+    appendAdoptedNode(item);
+  });
+
+  updateAdoptedCount();
   adoptedFilesInput.value = ""; // 清空，允許再次選同一檔
 });
 
 // 清空（成功/取消後呼叫）
 function resetAdoptedSelection() {
-  adoptedSelected.forEach((f) => revokePreviewThumb(f));
+  try { adoptedSelected.forEach(revokeAdoptedThumb); } catch (_) {}
   adoptedSelected = [];
   adoptedPreview.innerHTML = "";
   adoptedCount.textContent = "已選 0 / 5 張";
@@ -1446,7 +1062,7 @@ async function onConfirmAdopted() {
   btn.setAttribute("aria-busy", "true");
   const stopDots = startDots(btn, "儲存中");
 
-  const files = adoptedSelected.slice(0, 5);
+  const files = adoptedSelected.slice(0, 5).map((it) => it.file);
   const urls = [];
   try {
     for (const f of files) {
@@ -1510,7 +1126,7 @@ async function onUnadopt() {
   });
 
   if (!isConfirmed) {
-    if (wasOpen) { __lockDialogScroll(); dlg.showModal(); }
+    if (wasOpen) { lockScroll(); dlg.showModal(); }
     return;
   }
 
@@ -1531,7 +1147,7 @@ async function onUnadopt() {
   } catch (err) {
     await Swal.fire({ icon: "error", title: "撤回失敗", text: err.message });
   } finally {
-    if (wasOpen) { __lockDialogScroll(); dlg.showModal(); }
+    if (wasOpen) { lockScroll(); dlg.showModal(); }
     // 重新渲染讓按鈕狀態即時切換
     const p = pets.find((x) => x.id === currentDocId);
     if (p) await openDialog(p.id);
@@ -1570,10 +1186,6 @@ function swalInDialog(opts) {
       try {
         window.adoptedSelected = [];
         const adoptedPreview = document.getElementById("adoptedPreview");
-if (adoptedPreview) {
-  adoptedPreview.style.touchAction = "pan-y";
-  adoptedPreview.addEventListener("contextmenu", (e) => e.preventDefault());
-}
         const adoptedCount = document.getElementById("adoptedCount");
         const adoptedFilesInput = document.getElementById("adoptedFiles");
         if (adoptedPreview) adoptedPreview.innerHTML = "";
@@ -1603,7 +1215,10 @@ if (adoptedPreview) {
   mo.observe(dlg, { attributes: true, attributeFilter: ["open", "aria-hidden"] });
 
   // 4) 如果你有自訂右上角關閉鍵（#dlgClose），也補一下
-
+  document.getElementById("dlgClose")?.addEventListener("click", () => {
+    // 這裡不直接清空，交給 close 事件統一處理；若你的按鈕不是呼叫 close()，可手動加：
+    // resetAdoptedSelection();
+  });
 
   dlg.dataset.cleanupBound = "1";
 })();
@@ -1622,10 +1237,6 @@ if (adoptedPreview) {
       // 簡易後援：確保清乾淨
       if (window.adoptedSelected) window.adoptedSelected.length = 0;
       const adoptedPreview = document.getElementById("adoptedPreview");
-if (adoptedPreview) {
-  adoptedPreview.style.touchAction = "pan-y";
-  adoptedPreview.addEventListener("contextmenu", (e) => e.preventDefault());
-}
       const adoptedCount = document.getElementById("adoptedCount");
       const adoptedFilesInput = document.getElementById("adoptedFiles");
       if (adoptedPreview) adoptedPreview.innerHTML = "";
