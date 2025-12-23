@@ -13,50 +13,20 @@ const lbClose = document.getElementById("lbClose");
 
 let lbImages = [];
 let lbIndex = 0;
-// 用來記住原本 scroll 狀態（支援巢狀呼叫，iOS 也不會漏掉背景滑動）
-let __scrollLockCount = 0;
-let __scrollLockY = 0;
-let __oldHtmlOverflow = "";
-let __oldBodyOverflow = "";
-let __oldBodyPosition = "";
-let __oldBodyTop = "";
-let __oldBodyWidth = "";
+// 用來記住原本 scroll 狀態
+let oldHtmlOverflow = "";
+let oldBodyOverflow = "";
 
 function lockScroll() {
-  // 可重入：避免多個彈窗/流程重複 lock 導致 unlock 邏輯亂掉
-  __scrollLockCount += 1;
-  if (__scrollLockCount > 1) return;
-
-  __scrollLockY = window.scrollY || document.documentElement.scrollTop || 0;
-
-  __oldHtmlOverflow = document.documentElement.style.overflow;
-  __oldBodyOverflow = document.body.style.overflow;
-  __oldBodyPosition = document.body.style.position;
-  __oldBodyTop = document.body.style.top;
-  __oldBodyWidth = document.body.style.width;
-
-  // 基本：隱藏滾動條
+  oldHtmlOverflow = document.documentElement.style.overflow;
+  oldBodyOverflow = document.body.style.overflow;
   document.documentElement.style.overflow = "hidden";
   document.body.style.overflow = "hidden";
-
-  // iOS/Safari：overflow hidden 有時擋不住「慣性背景滑動」→ 用 position:fixed
-  document.body.style.position = "fixed";
-  document.body.style.top = `-${__scrollLockY}px`;
-  document.body.style.width = "100%";
 }
 
 function unlockScroll() {
-  if (__scrollLockCount <= 0) return;
-  __scrollLockCount -= 1;
-  if (__scrollLockCount > 0) return;
-
-  document.documentElement.style.overflow = __oldHtmlOverflow;
-  document.body.style.overflow = __oldBodyOverflow;
-  document.body.style.position = __oldBodyPosition;
-  document.body.style.top = __oldBodyTop;
-  document.body.style.width = __oldBodyWidth;
-
-  window.scrollTo(0, __scrollLockY);
+  document.documentElement.style.overflow = oldHtmlOverflow;
+  document.body.style.overflow = oldBodyOverflow;
 }
 
 // 鎖住 / 恢復背景捲動
