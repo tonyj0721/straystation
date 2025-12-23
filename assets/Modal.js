@@ -1,279 +1,91 @@
 const q = (sel) => document.querySelector(sel);
 
 // ===============================
-// 照片預覽加速 + 拖曳排序（桌機 + 手機）
-// - 預覽：用「縮圖 blob」而不是原圖（降低解碼/記憶體壓力）
-// - 拖曳：只移動 DOM、用 requestAnimationFrame 節流、結束時再同步狀態
-// - 手機：拖曳期間強制 preventDefault(touchmove/wheel) 避免背景滑動
+// Dialog 開啟時鎖背景捲動（iOS/Android/桌機皆可）
 // ===============================
-const BLANK_IMG =
-  "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
+const __pageScrollLock = (() => {
+  let st = null;
 
-const makeId = () => {
-  try { return crypto.randomUUID(); } catch (_) {}
-  return "id_" + Date.now() + "_" + Math.random().toString(16).slice(2);
-};
+  function lock() {
+    if (st) return;
+    const html = document.documentElement;
+    const body = document.body;
+    const scrollY = window.scrollY || html.scrollTop || body.scrollTop || 0;
 
-async function makeThumbUrl(file, { maxSize = 360, type = "image/jpeg", quality = 0.78 } = {}) {
-  // 盡量用 createImageBitmap（通常解碼較不會卡主執行緒）
-  let bitmap = null;
+    // 桌機：避免 overflow hidden 造成版面左右抖動
+    const gap = Math.max(0, window.innerWidth - html.clientWidth);
 
-  if ("createImageBitmap" in window) {
-    try {
-      bitmap = await createImageBitmap(file);
-    } catch (_) {
-      bitmap = null;
-    }
+    st = {
+      scrollY,
+      htmlOverflow: html.style.overflow,
+      bodyPos: body.style.position,
+      bodyTop: body.style.top,
+      bodyLeft: body.style.left,
+      bodyRight: body.style.right,
+      bodyWidth: body.style.width,
+      bodyOverflow: body.style.overflow,
+      bodyPaddingRight: body.style.paddingRight,
+    };
+
+    if (gap) body.style.paddingRight = `${gap}px`;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+
+    // iOS：用 fixed body 才能真正鎖住背景
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
   }
 
-  // fallback：用 <img> 載入
-  let img = null;
-  let tmpUrl = "";
-  if (!bitmap) {
-    tmpUrl = URL.createObjectURL(file);
-    img = await new Promise((res, rej) => {
-      const im = new Image();
-      im.onload = () => res(im);
-      im.onerror = rej;
-      im.src = tmpUrl;
-    });
+  function unlock() {
+    if (!st) return;
+    const html = document.documentElement;
+    const body = document.body;
+    const y = st.scrollY || 0;
+
+    html.style.overflow = st.htmlOverflow || "";
+    body.style.position = st.bodyPos || "";
+    body.style.top = st.bodyTop || "";
+    body.style.left = st.bodyLeft || "";
+    body.style.right = st.bodyRight || "";
+    body.style.width = st.bodyWidth || "";
+    body.style.overflow = st.bodyOverflow || "";
+    body.style.paddingRight = st.bodyPaddingRight || "";
+
+    st = null;
+    window.scrollTo(0, y);
   }
 
-  const W = bitmap ? bitmap.width : img.naturalWidth;
-  const H = bitmap ? bitmap.height : img.naturalHeight;
-
-  const scale = Math.min(1, maxSize / Math.max(W, H));
-  const w = Math.max(1, Math.round(W * scale));
-  const h = Math.max(1, Math.round(H * scale));
-
-  const c = document.createElement("canvas");
-  c.width = w;
-  c.height = h;
-  const g = c.getContext("2d", { alpha: false });
-  g.drawImage(bitmap || img, 0, 0, w, h);
-
-  if (bitmap?.close) { try { bitmap.close(); } catch (_) {} }
-  if (tmpUrl) { try { URL.revokeObjectURL(tmpUrl); } catch (_) {} }
-
-  const blob = await new Promise((res) => c.toBlob(res, type, quality));
-  if (!blob) throw new Error("thumb toBlob failed");
-  return URL.createObjectURL(blob);
-}
-
-function queueThumbBuild(item, imgEl, opts) {
-  // 不要卡住 UI：丟到 idle / 下一個 tick
-  const run = async () => {
-    try {
-      const url = await makeThumbUrl(item.file, opts);
-      item.thumbUrl = url;
-      if (imgEl && imgEl.isConnected) imgEl.src = url;
-    } catch (_) {
-      // 失敗就退回原檔（至少能看到）
-      try {
-        const fallback = URL.createObjectURL(item.file);
-        item.thumbUrl = fallback;
-        if (imgEl && imgEl.isConnected) imgEl.src = fallback;
-      } catch (_) {}
-    }
-  };
-
-  if ("requestIdleCallback" in window) {
-    requestIdleCallback(() => run(), { timeout: 800 });
-  } else {
-    setTimeout(run, 0);
-  }
-}
-
-function reorderItemsFromDOM(container, items) {
-  const order = Array.from(container.querySelectorAll("[data-id]"))
-    .map((el) => el.getAttribute("data-id"))
-    .filter(Boolean);
-
-  const map = new Map((items || []).map((it) => [String(it.id), it]));
-  const next = order.map((id) => map.get(String(id))).filter(Boolean);
-
-  // 若有「DOM 沒出現」的（理論上不會），補回尾端
-  if (next.length !== (items || []).length) {
-    (items || []).forEach((it) => { if (!next.includes(it)) next.push(it); });
-  }
-  return next;
-}
-
-
-(function injectPreviewReorderStyles() {
-  if (document.getElementById("previewReorderStyles")) return;
-  const st = document.createElement("style");
-  st.id = "previewReorderStyles";
-  st.textContent = `
-#editPreview, #adoptedPreview { touch-action: pan-y; }
-#editPreview.is-sorting, #adoptedPreview.is-sorting { touch-action: none; }
-
-/* iOS 長按可能出現「放大鏡/選單」：預覽縮圖禁用 */
-#editPreview, #adoptedPreview,
-#editPreview *, #adoptedPreview * {
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  user-select: none;
-}
-#editPreview img, #adoptedPreview img { -webkit-user-drag: none; }
-`;
-  document.head.appendChild(st);
+  return { lock, unlock };
 })();
 
-function bindPointerReorder(container, getItems, setItems) {
-  if (!container || container.__boundPointerReorder) return;
-  container.__boundPointerReorder = true;
-
-  // 直接拖曳縮圖互換排序（不需把手、不中斷一般捲動）
-  const START_PX = 6;          // 超過這個移動距離才視為「想排序」
-  const SCROLL_CANCEL_PX = 20; // 垂直移動很明顯時，視為捲動而不是排序
-  const SCROLL_RATIO = 2.5;    // dy > dx * ratio 才取消（讓你仍可垂直拖曳排序）
-
-  let candidate = false;
-  let dragging = false;
-  let pid = null;
-  let dragEl = null;
-
-  let startX = 0;
-  let startY = 0;
-
-  let raf = 0;
-  let lastX = 0;
-  let lastY = 0;
-  let lastSwapTarget = null;
-
-  const preventScroll = (e) => {
-    if (!dragging) return;
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const swapNodes = (a, b) => {
-    const p = a?.parentNode;
-    if (!p || p !== b?.parentNode) return;
-    // 用 placeholder 交換位置（互換）
-    const ph = document.createComment("swap");
-    p.insertBefore(ph, a);
-    p.insertBefore(a, b);
-    p.insertBefore(b, ph);
-    p.removeChild(ph);
-  };
-
-  const startDrag = () => {
-    if (!candidate || dragging || !dragEl) return;
-    dragging = true;
-    candidate = false;
-
-    dragEl.classList.add("opacity-60");
-    container.classList.add("is-sorting");
-    lastSwapTarget = null;
-
-    // 拖曳期間阻止背景滑動（尤其 iOS）
-    document.addEventListener("touchmove", preventScroll, { passive: false, capture: true });
-    document.addEventListener("wheel", preventScroll, { passive: false, capture: true });
-    document.addEventListener("scroll", preventScroll, { passive: false, capture: true });
-
-    try { container.setPointerCapture(pid); } catch (_) {}
-  };
-
-  const cleanup = () => {
-    candidate = false;
-
-    if (!dragging) {
-      pid = null;
-      dragEl = null;
-      return;
-    }
-
-    dragging = false;
-    container.classList.remove("is-sorting");
-    if (dragEl) dragEl.classList.remove("opacity-60");
-    dragEl = null;
-
-    try { container.releasePointerCapture(pid); } catch (_) {}
-    pid = null;
-
-    if (raf) cancelAnimationFrame(raf);
-    raf = 0;
-
-    document.removeEventListener("touchmove", preventScroll, true);
-    document.removeEventListener("wheel", preventScroll, true);
-    document.removeEventListener("scroll", preventScroll, true);
-
-    // 同步狀態（只做一次）
-    const items = getItems();
-    const next = reorderItemsFromDOM(container, items);
-    setItems(next);
-  };
-
-  const tick = () => {
-    raf = 0;
-    if (!dragging || !dragEl) return;
-
-    const el = document.elementFromPoint(lastX, lastY);
-    const over = el?.closest?.("[data-id]");
-    if (!over || !container.contains(over) || over === dragEl) return;
-
-    // 「互換」：拖到誰身上就跟誰交換一次
-    if (over === lastSwapTarget) return;
-    lastSwapTarget = over;
-    swapNodes(dragEl, over);
-  };
-
-  container.addEventListener("pointerdown", (e) => {
-    if (typeof e.button === "number" && e.button !== 0) return;
-    // 不要在刪除按鈕上開始排序
-    if (e.target?.closest?.("button")) return;
-
-    const item = e.target?.closest?.("[data-id]");
-    if (!item || !container.contains(item)) return;
-
-    pid = e.pointerId;
-    dragEl = item;
-
-    candidate = true;
-    startX = lastX = e.clientX;
-    startY = lastY = e.clientY;
-    lastSwapTarget = null;
-  });
-
-  container.addEventListener("pointermove", (e) => {
-    if (pid == null || e.pointerId !== pid) return;
-
-    lastX = e.clientX;
-    lastY = e.clientY;
-
-    if (!dragging) {
-      if (!candidate) return;
-
-      const dx = lastX - startX;
-      const dy = lastY - startY;
-      const adx = Math.abs(dx);
-      const ady = Math.abs(dy);
-
-      // 太小的移動：先當作點擊/捲動準備
-      if (adx < START_PX && ady < START_PX) return;
-
-      // 垂直捲動很明顯：取消排序（讓頁面可以順暢捲動）
-      if (ady > SCROLL_CANCEL_PX && ady > adx * SCROLL_RATIO) {
-        candidate = false;
-        pid = null;
-        dragEl = null;
-        return;
-      }
-
-      startDrag();
-    }
-
-    // 正在拖曳
-    e.preventDefault();
-    if (!raf) raf = requestAnimationFrame(tick);
-  }, { passive: false });
-
-  container.addEventListener("pointerup", cleanup);
-  container.addEventListener("pointercancel", cleanup);
-  container.addEventListener("lostpointercapture", cleanup);
+function __lockDialogScroll() {
+  try { __pageScrollLock.lock(); } catch { }
+  // 舊版 shared.js 可能也有 lockScroll（留著不衝突）
+  try { if (typeof lockScroll === "function") lockScroll(); } catch { }
 }
+
+function __unlockDialogScroll() {
+  try { __pageScrollLock.unlock(); } catch { }
+  try { if (typeof unlockScroll === "function") unlockScroll(); } catch { }
+}
+
+// 不論用 X / Esc / close() / 點遮罩等方式關閉，都解鎖背景
+(function __bindDialogScrollLock() {
+  function bind() {
+    const dlgEl = document.getElementById("petDialog");
+    if (!dlgEl || dlgEl.dataset.scrollLockBound) return;
+    dlgEl.addEventListener("close", __unlockDialogScroll);
+    dlgEl.addEventListener("cancel", __unlockDialogScroll);
+    dlgEl.dataset.scrollLockBound = "1";
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bind);
+  else bind();
+})();
+
+
 // ===============================
 // 品種資料與「品種/毛色」連動邏輯
 // ===============================
@@ -341,6 +153,112 @@ async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {})
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+// ===============================
+// 預覽縮圖：避免大圖解碼造成卡頓（支援手機）
+// ===============================
+const PREVIEW_EMPTY_GIF = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+const PREVIEW_MAX = 720;       // 預覽縮圖長邊上限
+const PREVIEW_QUALITY = 0.82;  // JPEG 品質（0~1）
+
+// File → 縮圖 objectURL（避免每次重畫都重新解碼）
+const __thumbUrlCache = new Map();
+const __thumbPromiseCache = new Map();
+
+// 同時跑 2 張縮圖（更快，但不會像全並發那麼容易卡）
+const __THUMB_CONCURRENCY = 2;
+let __thumbActive = 0;
+const __thumbJobQueue = [];
+
+function __runThumbQueue() {
+  while (__thumbActive < __THUMB_CONCURRENCY && __thumbJobQueue.length) {
+    const job = __thumbJobQueue.shift();
+    __thumbActive++;
+
+    __makePreviewThumbURL(job.file)
+      .then(job.resolve, job.reject)
+      .finally(() => {
+        __thumbActive--;
+        __runThumbQueue();
+      });
+  }
+}
+
+function revokePreviewThumb(file) {
+  const u = __thumbUrlCache.get(file);
+  if (u) {
+    URL.revokeObjectURL(u);
+    __thumbUrlCache.delete(file);
+  }
+  __thumbPromiseCache.delete(file);
+}
+
+async function __decodeToBitmap(file) {
+  if (window.createImageBitmap) {
+    try { return await createImageBitmap(file); } catch (_) { /* fallback */ }
+  }
+
+  // fallback：用 <img> 解碼（比較可能卡，但至少可用）
+  const raw = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => {
+      const im = new Image();
+      im.onload = () => res(im);
+      im.onerror = rej;
+      im.src = raw;
+    });
+    const c = document.createElement("canvas");
+    c.width = img.naturalWidth;
+    c.height = img.naturalHeight;
+    const g = c.getContext("2d");
+    g.drawImage(img, 0, 0);
+    return await createImageBitmap(c);
+  } finally {
+    URL.revokeObjectURL(raw);
+  }
+}
+
+async function __makePreviewThumbURL(file) {
+  const bmp = await __decodeToBitmap(file);
+  const W = bmp.width, H = bmp.height;
+  const scale = Math.min(1, PREVIEW_MAX / Math.max(W, H));
+  const w = Math.max(1, Math.round(W * scale));
+  const h = Math.max(1, Math.round(H * scale));
+
+  // 讓 UI 先喘口氣（避免「圖片顯示瞬間卡住」）
+  await new Promise((r) => requestAnimationFrame(r));
+
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const g = c.getContext("2d", { alpha: false, desynchronized: true });
+  g.drawImage(bmp, 0, 0, w, h);
+  bmp.close?.();
+
+  const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", PREVIEW_QUALITY));
+  return URL.createObjectURL(blob);
+}
+
+function ensurePreviewThumbURL(file) {
+  if (__thumbUrlCache.has(file)) return Promise.resolve(__thumbUrlCache.get(file));
+  if (__thumbPromiseCache.has(file)) return __thumbPromiseCache.get(file);
+
+  const p = new Promise((resolve, reject) => {
+    __thumbJobQueue.push({ file, resolve, reject });
+    __runThumbQueue();
+  })
+    .then((url) => {
+      __thumbUrlCache.set(file, url);
+      __thumbPromiseCache.delete(file);
+      return url;
+    })
+    .catch((err) => {
+      __thumbPromiseCache.delete(file);
+      throw err;
+    });
+
+  __thumbPromiseCache.set(file, p);
+  return p;
 }
 
 // ===============================
@@ -473,15 +391,29 @@ async function openDialog(id) {
   setEditSpecies(p.species || '貓');
   syncEditBreedSelectors();
 
-  if (p.breedType) {
-    document.getElementById("editBreedType").value = p.breedType;
+  if (p.breedType || p.breed) {
+    // 允許舊資料：breedType 沒存，但 breed 是 "米克斯/xxx"
+    let breedType = p.breedType || "";
+    let breedValue = p.breed || "";
+
+    if (!breedType && /^米克斯(\/|$)/.test(breedValue)) {
+      breedType = "米克斯";
+    }
+
+    // ✅ 米克斯：右側下拉只放「毛色」，所以要去掉 "米克斯/"
+    if (breedType === "米克斯") {
+      breedValue = breedValue.replace(/^米克斯\/?/, ""); // "米克斯/黑白色" -> "黑白色"
+    }
+
+    document.getElementById("editBreedType").value = breedType;
     buildEditBreedOptions();
     updateEditBreedLabel();
 
-    if (p.breed) {
-      document.getElementById("editBreed").disabled = false;
-      document.getElementById("editBreed").value = p.breed;
-    }
+    const breedSel = document.getElementById("editBreed");
+    breedSel.disabled = false;
+
+    // 如果是 "米克斯"（沒選毛色）會是空字串，剛好讓它停在「請選擇」
+    breedSel.value = breedValue;
   }
 
   renderEditImages(imgs);
@@ -502,7 +434,7 @@ async function openDialog(id) {
 
   // 8. 打開 Dialog（shared.js 裡的 dlg / lockScroll）
   if (!dlg.open) {
-    lockScroll();
+    __lockDialogScroll();
     dlg.showModal();
   }
 }
@@ -510,9 +442,7 @@ async function openDialog(id) {
 // 關閉 Dialog
 document.getElementById("dlgClose").addEventListener("click", () => {
   if (dlg.open) dlg.close();
-  document.documentElement.style.overflow = oldHtmlOverflow;
 });
-
 function scrollDialogTop() {
   const dlg = document.getElementById("petDialog");
   requestAnimationFrame(() => {
@@ -569,7 +499,7 @@ async function onDelete() {
     cancelButtonText: "取消",
   });
   if (!ok.isConfirmed) {
-    if (wasOpen) { lockScroll(); dlg.showModal(); }
+    if (wasOpen) { __lockDialogScroll(); dlg.showModal(); }
     return;
   }
 
@@ -583,7 +513,7 @@ async function onDelete() {
     await Swal.fire({ icon: "success", title: "刪除成功", showConfirmButton: false, timer: 1500, });
   } catch (err) {
     await Swal.fire({ icon: "error", title: "刪除失敗", text: err.message });
-    if (wasOpen) { lockScroll(); dlg.showModal(); }
+    if (wasOpen) { __lockDialogScroll(); dlg.showModal(); }
   }
 }
 
@@ -665,28 +595,31 @@ async function saveEdit() {
   const stopDots = startDots(txt, "儲存中");
 
   try {
-    // 依照「目前縮圖順序」產出最終 images（keep 直接用舊 url；add 先上傳再放入對應位置）
-    const { items, remove } = editImagesState;
+    // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
+    const { items, removeUrls } = editImagesState;
     const newUrls = [];
 
-    for (const item of items) {
-      if (item.type === "keep") {
-        newUrls.push(item.url);
+    // 依序處理（保持順序）
+    for (const it of items) {
+      if (it.kind === "url") {
+        newUrls.push(it.url);
         continue;
       }
-      const f = item.file;
 
-      const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
-      const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
-      const base = f.name.replace(/\.[^.]+$/, '');
-      const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
-      const r = sRef(storage, path);
-      await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
-      newUrls.push(await getDownloadURL(r));
+      if (it.kind === "file") {
+        const f = it.file;
+        const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+        const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
+        const base = f.name.replace(/\.[^.]+$/, '');
+        const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
+        const r = sRef(storage, path);
+        await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
+        newUrls.push(await getDownloadURL(r));
+      }
     }
 
-    // 刪除移除的檔案（忽略刪失敗）
-    for (const url of remove) {
+    // 刪除被移除的舊圖（忽略刪失敗）
+    for (const url of (removeUrls || [])) {
       try {
         const path = url.split("/o/")[1].split("?")[0];
         await deleteObject(sRef(storage, decodeURIComponent(path)));
@@ -712,7 +645,7 @@ async function saveEdit() {
     const wasOpen = dlg.open;
     if (wasOpen) dlg.close();
     await Swal.fire({ icon: "success", title: "已儲存", showConfirmButton: false, timer: 1500 });
-    if (wasOpen) { lockScroll(); dlg.showModal(); }
+    if (wasOpen) { __lockDialogScroll(); dlg.showModal(); }
 
     setEditMode(false);
     await openDialog(currentDocId);
@@ -780,164 +713,216 @@ editBreedTypeSel.addEventListener("change", () => {
 });
 
 // ===============================
-// 編輯模式：圖片管理（預覽 + 增刪 + 排序）
-// - keep：既有 url
-// - add ：新選檔案（用縮圖 blob 預覽）
-// - remove：只記錄要刪的舊 url
+// 編輯模式：圖片管理（預覽 + 增刪）- 不卡頓版（縮圖/手機拖曳排序）
 // ===============================
 const editFiles = q("#editFiles");
 const btnPickEdit = q("#btnPickEdit");
 const editPreview = q("#editPreview");
 const editCount = q("#editCount");
 
-// 狀態：items 依「目前縮圖順序」保存；remove 只記要刪掉的舊 url
-let editImagesState = { items: [], remove: [] };
+const MAX_EDIT_FILES = 5;
 
-btnPickEdit.addEventListener("click", () => editFiles.click());
+// 狀態：依「目前畫面順序」維護（url=舊圖、file=新圖）
+let editImagesState = { items: [], removeUrls: [] };
 
-function updateEditCount() {
-  const total = editImagesState.items.length;
-  editCount.textContent = `已選 ${total} / 5 張`;
-}
+btnPickEdit?.addEventListener("click", () => editFiles?.click());
 
-function revokeItemThumb(it) {
-  if (!it) return;
-  if (it.type === "add" && it.thumbUrl) {
-    try { URL.revokeObjectURL(it.thumbUrl); } catch (_) {}
-    it.thumbUrl = "";
-  }
-}
-
-// 初始化編輯圖片列表（把現存 url 轉成 keep items）
+// 初始化編輯圖片列表（把舊的檔案縮圖快取清掉，避免記憶體累積）
 function renderEditImages(urls) {
-  // 先釋放上一輪 add 的縮圖 objectURL
-  try { (editImagesState.items || []).forEach(revokeItemThumb); } catch (_) {}
-
-  editImagesState.items = (urls || []).map((u) => ({ id: makeId(), type: "keep", url: u }));
-  editImagesState.remove = [];
+  for (const it of editImagesState.items) {
+    if (it?.kind === "file" && it.file) revokePreviewThumb(it.file);
+  }
+  editImagesState.items = (urls || []).map((u) => ({ kind: "url", url: u }));
+  editImagesState.removeUrls = [];
   paintEditPreview();
 }
 
-// 依狀態畫縮圖（不在拖曳時重畫，拖曳只移 DOM）
+// 依狀態重新畫縮圖
+const __editTileMap = new Map(); // key -> tile element（保留 DOM，避免換順序閃爍）
+
+function __editKey(it) {
+  return it.kind === "url" ? `url:${it.url}` : it.file;
+}
+
+function __makeEditTile(it) {
+  const wrap = document.createElement("div");
+  wrap.className = "relative touch-none select-none";
+
+  const img = document.createElement("img");
+  img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+  img.alt = "預覽";
+  img.decoding = "async";
+  img.loading = "lazy";
+
+  if (it.kind === "url") {
+    img.src = it.url;
+  } else {
+    img.src = PREVIEW_EMPTY_GIF;
+    ensurePreviewThumbURL(it.file)
+      .then((u) => { img.src = u; })
+      .catch(() => {
+        try {
+          const raw = URL.createObjectURL(it.file);
+          img.src = raw;
+          setTimeout(() => URL.revokeObjectURL(raw), 2000);
+        } catch { }
+      });
+  }
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
+  btn.textContent = "✕";
+  btn.setAttribute("aria-label", "刪除這張");
+
+  wrap.appendChild(img);
+  wrap.appendChild(btn);
+  return wrap;
+}
+
+function __setEditIdx(tile, idx) {
+  tile.dataset.idx = String(idx);
+  const btn = tile.querySelector("button");
+  if (btn) btn.dataset.idx = String(idx);
+}
+
+// 依狀態同步 DOM（不清空重畫，避免閃爍）
 function paintEditPreview() {
-  editPreview.innerHTML = "";
-  (editImagesState.items || []).forEach((item) => {
-    const wrap = document.createElement("div");
-    wrap.className = "relative select-none cursor-grab";
-    wrap.setAttribute("data-id", String(item.id));
+  editCount.textContent = `已選 ${editImagesState.items.length} / ${MAX_EDIT_FILES} 張`;
 
-    const img = document.createElement("img");
-    img.draggable = false;
-    img.decoding = "async";
-    img.loading = "lazy";
-    img.className = "w-full aspect-square object-cover rounded-lg pointer-events-none bg-gray-100";
-    img.alt = "預覽";
+  const keys = editImagesState.items.map(__editKey);
 
-    if (item.type === "keep") {
-      img.src = item.url;
-    } else {
-      img.src = item.thumbUrl || BLANK_IMG;
-      if (!item.thumbUrl) queueThumbBuild(item, img, { maxSize: 360 });
+  for (const [k, el] of __editTileMap) {
+    if (!keys.includes(k)) {
+      // 移除 tile 時順便釋放縮圖
+      if (k && typeof k === "object") {
+        try { revokePreviewThumb(k); } catch { }
+      }
+      el.remove();
+      __editTileMap.delete(k);
     }
+  }
 
-    const btn = document.createElement("button");
-    btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center cursor-pointer";
-    btn.textContent = "✕";
-    btn.setAttribute("data-rm-id", String(item.id));
-
-    wrap.appendChild(img);
-    wrap.appendChild(btn);
-    editPreview.appendChild(wrap);
+  editImagesState.items.forEach((it, i) => {
+    const key = __editKey(it);
+    let tile = __editTileMap.get(key);
+    if (!tile) {
+      tile = __makeEditTile(it);
+      __editTileMap.set(key, tile);
+    }
+    __setEditIdx(tile, i);
+    editPreview.appendChild(tile);
   });
-
-  updateEditCount();
 }
 
-// 刪除（用事件代理，避免每次重畫都重綁 listener）
-if (!editPreview.__boundDelete) {
-  editPreview.__boundDelete = true;
-  editPreview.addEventListener("click", (e) => {
-    const btn = e.target?.closest?.("button[data-rm-id]");
-    if (!btn) return;
-    e.preventDefault();
-    e.stopPropagation();
+// 刪除（事件代理）
+editPreview?.addEventListener("click", (e) => {
+  const btn = e.target.closest?.("button[data-idx]");
+  if (!btn) return;
 
-    const id = btn.getAttribute("data-rm-id");
-    const idx = editImagesState.items.findIndex((it) => String(it.id) === String(id));
-    if (idx < 0) return;
+  e.preventDefault();
+  e.stopPropagation();
 
-    const it = editImagesState.items[idx];
-    if (it.type === "keep") editImagesState.remove.push(it.url);
-    revokeItemThumb(it);
+  const i = +btn.dataset.idx;
+  const it = editImagesState.items[i];
+  if (!it) return;
 
-    editImagesState.items.splice(idx, 1);
+  if (it.kind === "url") {
+    editImagesState.removeUrls.push(it.url);
+  } else if (it.kind === "file") {
+    revokePreviewThumb(it.file);
+  }
 
-    // 直接移除 DOM（比整個重畫更快）
-    const wrap = btn.closest("[data-id]");
-    if (wrap) wrap.remove();
+  editImagesState.items.splice(i, 1);
+  paintEditPreview();
+});
 
-    updateEditCount();
-  }, { passive: false });
+// 手機可用的拖曳交換（Pointer Events；放開時與目標交換）
+let editDragFrom = null;
+let editDragOver = null;
+let editDragEl = null;
+
+function clearEditDragUI() {
+  editPreview?.querySelectorAll?.("[data-idx]")?.forEach((el) => {
+    el.classList.remove("ring-2", "ring-brand-500", "ring-brand-300", "opacity-80");
+  });
 }
 
-// 讓編輯預覽支援拖曳排序（含手機）
-// ※ 拖曳只移 DOM，結束時才同步 editImagesState.items 的順序
-bindPointerReorder(
-  editPreview,
-  () => editImagesState.items,
-  (next) => { editImagesState.items = next; }
-);
+editPreview?.addEventListener("pointerdown", (e) => {
+  if (e.target.closest?.("button")) return; // 點到刪除鈕就不要拖
+
+  const tile = e.target.closest?.("[data-idx]");
+  if (!tile) return;
+
+  editDragEl = tile;
+  editDragFrom = +tile.dataset.idx;
+  editDragOver = editDragFrom;
+
+  tile.setPointerCapture?.(e.pointerId);
+  clearEditDragUI();
+  tile.classList.add("ring-2", "ring-brand-500", "opacity-80");
+  e.preventDefault();
+});
+
+editPreview?.addEventListener("pointermove", (e) => {
+  if (editDragFrom == null) return;
+
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  const tile = el?.closest?.("[data-idx]");
+  if (!tile || !editPreview.contains(tile)) return;
+
+  const idx = +tile.dataset.idx;
+  if (idx === editDragOver) return;
+
+  editDragOver = idx;
+  clearEditDragUI();
+  if (editDragEl) editDragEl.classList.add("ring-2", "ring-brand-500", "opacity-80");
+  tile.classList.add("ring-2", "ring-brand-300");
+});
+
+function finishEditDrag() {
+  if (editDragFrom == null) return;
+
+  const from = editDragFrom;
+  const to = editDragOver;
+
+  clearEditDragUI();
+  editDragFrom = editDragOver = null;
+  editDragEl = null;
+
+  if (to == null || to === from) return;
+
+  const tmp = editImagesState.items[from];
+  editImagesState.items[from] = editImagesState.items[to];
+  editImagesState.items[to] = tmp;
+  paintEditPreview();
+}
+
+editPreview?.addEventListener("pointerup", finishEditDrag);
+editPreview?.addEventListener("pointercancel", finishEditDrag);
 
 // 新增圖片（遵守上限 5）
-// - 先插入 placeholder，縮圖生成後再更新 <img>（避免 UI 卡住）
-editFiles.addEventListener("change", () => {
+editFiles?.addEventListener("change", () => {
   const incoming = Array.from(editFiles.files || []);
-  const room = 5 - editImagesState.items.length;
+  const room = MAX_EDIT_FILES - editImagesState.items.length;
 
-  if (incoming.length > room) {
-    swalInDialog({ icon: "warning", title: "最多 5 張照片" });
+  if (editImagesState.items.length + incoming.length > MAX_EDIT_FILES) {
+    swalInDialog({ icon: "warning", title: `最多 ${MAX_EDIT_FILES} 張照片` });
   }
 
   incoming.slice(0, Math.max(0, room)).forEach((f) => {
-    const item = { id: makeId(), type: "add", file: f, thumbUrl: "" };
-    editImagesState.items.push(item);
-
-    // 直接 append 一個 node（比整個重畫更順）
-    const wrap = document.createElement("div");
-    wrap.className = "relative select-none cursor-grab";
-    wrap.setAttribute("data-id", String(item.id));
-
-    const img = document.createElement("img");
-    img.draggable = false;
-    img.decoding = "async";
-    img.loading = "lazy";
-    img.className = "w-full aspect-square object-cover rounded-lg pointer-events-none bg-gray-100";
-    img.alt = "預覽";
-    img.src = BLANK_IMG;
-
-    const btn = document.createElement("button");
-    btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center cursor-pointer";
-    btn.textContent = "✕";
-    btn.setAttribute("data-rm-id", String(item.id));
-
-    wrap.appendChild(img);
-    wrap.appendChild(btn);
-    editPreview.appendChild(wrap);
-
-    queueThumbBuild(item, img, { maxSize: 360 });
+    editImagesState.items.push({ kind: "file", file: f });
   });
 
-  updateEditCount();
+  paintEditPreview();
   editFiles.value = "";
 });
-
 
 // ===============================
 // 送養流程：上傳合照 / 標記 / 撤回
 // ===============================
 
 // 狀態：已選擇的合照（可多次疊加）
-// [{ id, file, thumbUrl }]
 let adoptedSelected = [];
 
 const adoptedFilesInput = document.getElementById("adoptedFiles");
@@ -948,105 +933,167 @@ const adoptedPreview = document.getElementById("adoptedPreview");
 // 打開檔案挑選
 btnPickAdopted.onclick = () => adoptedFilesInput.click();
 
-function updateAdoptedCount() {
-  adoptedCount.textContent = `已選 ${adoptedSelected.length} / 5 張`;
-}
+// 渲染縮圖（不卡頓：縮圖/快取/手機拖曳排序）
+const __adoptedTileMap = new Map(); // File -> tile element（保留 DOM，避免換順序閃爍）
 
-function revokeAdoptedThumb(it) {
-  if (it?.thumbUrl) {
-    try { URL.revokeObjectURL(it.thumbUrl); } catch (_) {}
-    it.thumbUrl = "";
-  }
-}
-
-// 加入一張縮圖 node（先 placeholder，縮圖生成後再更新）
-function appendAdoptedNode(item) {
+function __makeAdoptedTile(file) {
   const wrap = document.createElement("div");
-  wrap.className = "relative select-none cursor-grab";
-  wrap.setAttribute("data-id", String(item.id));
+  wrap.className = "relative touch-none select-none";
 
   const img = document.createElement("img");
-  img.draggable = false;
+  img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+  img.alt = "預覽";
   img.decoding = "async";
   img.loading = "lazy";
-  img.className = "w-full aspect-square object-cover rounded-lg pointer-events-none bg-gray-100";
-  img.alt = "預覽";
-  img.src = item.thumbUrl || BLANK_IMG;
+  img.src = PREVIEW_EMPTY_GIF;
+
+  ensurePreviewThumbURL(file)
+    .then((u) => { img.src = u; })
+    .catch(() => {
+      try {
+        const raw = URL.createObjectURL(file);
+        img.src = raw;
+        setTimeout(() => URL.revokeObjectURL(raw), 2000);
+      } catch { }
+    });
 
   const btn = document.createElement("button");
-  btn.className = "absolute top-1 right-1 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center cursor-pointer";
+  btn.type = "button";
+  btn.className = "absolute top-1 right-1 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center";
   btn.textContent = "✕";
   btn.setAttribute("aria-label", "刪除這張");
-  btn.setAttribute("data-rm-id", String(item.id));
 
   wrap.appendChild(img);
   wrap.appendChild(btn);
-  adoptedPreview.appendChild(wrap);
-
-  if (!item.thumbUrl) queueThumbBuild(item, img, { maxSize: 360 });
+  return wrap;
 }
 
-// 初次渲染
-function paintAdoptedPreview() {
-  adoptedPreview.innerHTML = "";
-  adoptedSelected.forEach(appendAdoptedNode);
-  updateAdoptedCount();
+function __setAdoptedIdx(tile, idx) {
+  tile.dataset.idx = String(idx);
+  const btn = tile.querySelector("button");
+  if (btn) btn.dataset.idx = String(idx);
 }
-paintAdoptedPreview();
+
+// 渲染縮圖（不清空重畫，避免閃爍）
+function renderAdoptedPreviews() {
+  adoptedCount.textContent = `已選 ${adoptedSelected.length} / 5 張`;
+
+  for (const [file, el] of __adoptedTileMap) {
+    if (!adoptedSelected.includes(file)) {
+      try { revokePreviewThumb(file); } catch { }
+      el.remove();
+      __adoptedTileMap.delete(file);
+    }
+  }
+
+  adoptedSelected.forEach((file, i) => {
+    let tile = __adoptedTileMap.get(file);
+    if (!tile) {
+      tile = __makeAdoptedTile(file);
+      __adoptedTileMap.set(file, tile);
+    }
+    __setAdoptedIdx(tile, i);
+    adoptedPreview.appendChild(tile);
+  });
+}
 
 // 刪除（事件代理）
-if (!adoptedPreview.__boundDelete) {
-  adoptedPreview.__boundDelete = true;
-  adoptedPreview.addEventListener("click", (e) => {
-    const btn = e.target?.closest?.("button[data-rm-id]");
-    if (!btn) return;
-    e.preventDefault();
-    e.stopPropagation();
+adoptedPreview.addEventListener("click", (e) => {
+  const btn = e.target.closest?.("button[data-idx]");
+  if (!btn) return;
 
-    const id = btn.getAttribute("data-rm-id");
-    const idx = adoptedSelected.findIndex((it) => String(it.id) === String(id));
-    if (idx < 0) return;
+  e.preventDefault();
+  e.stopPropagation();
 
-    revokeAdoptedThumb(adoptedSelected[idx]);
-    adoptedSelected.splice(idx, 1);
+  const i = +btn.dataset.idx;
+  const f = adoptedSelected[i];
+  if (f) revokePreviewThumb(f);
 
-    const wrap = btn.closest("[data-id]");
-    if (wrap) wrap.remove();
+  adoptedSelected.splice(i, 1);
+  renderAdoptedPreviews();
+});
 
-    updateAdoptedCount();
-  }, { passive: false });
+// 手機可用的拖曳交換（Pointer Events；放開時與目標交換）
+let adoptedDragFrom = null;
+let adoptedDragOver = null;
+let adoptedDragEl = null;
+
+function clearAdoptedDragUI() {
+  adoptedPreview.querySelectorAll("[data-idx]").forEach((el) => {
+    el.classList.remove("ring-2", "ring-brand-500", "ring-brand-300", "opacity-80");
+  });
 }
 
-// 讓合照預覽支援拖曳排序（含手機）
-// ※ 拖曳只移 DOM，結束時才同步 adoptedSelected 的順序
-bindPointerReorder(
-  adoptedPreview,
-  () => adoptedSelected,
-  (next) => { adoptedSelected = next; }
-);
+adoptedPreview.addEventListener("pointerdown", (e) => {
+  if (e.target.closest?.("button")) return;
+
+  const tile = e.target.closest?.("[data-idx]");
+  if (!tile) return;
+
+  adoptedDragEl = tile;
+  adoptedDragFrom = +tile.dataset.idx;
+  adoptedDragOver = adoptedDragFrom;
+
+  tile.setPointerCapture?.(e.pointerId);
+  clearAdoptedDragUI();
+  tile.classList.add("ring-2", "ring-brand-500", "opacity-80");
+  e.preventDefault();
+});
+
+adoptedPreview.addEventListener("pointermove", (e) => {
+  if (adoptedDragFrom == null) return;
+
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  const tile = el?.closest?.("[data-idx]");
+  if (!tile || !adoptedPreview.contains(tile)) return;
+
+  const idx = +tile.dataset.idx;
+  if (idx === adoptedDragOver) return;
+
+  adoptedDragOver = idx;
+  clearAdoptedDragUI();
+  if (adoptedDragEl) adoptedDragEl.classList.add("ring-2", "ring-brand-500", "opacity-80");
+  tile.classList.add("ring-2", "ring-brand-300");
+});
+
+function finishAdoptedDrag() {
+  if (adoptedDragFrom == null) return;
+
+  const from = adoptedDragFrom;
+  const to = adoptedDragOver;
+
+  clearAdoptedDragUI();
+  adoptedDragFrom = adoptedDragOver = null;
+  adoptedDragEl = null;
+
+  if (to == null || to === from) return;
+
+  const tmp = adoptedSelected[from];
+  adoptedSelected[from] = adoptedSelected[to];
+  adoptedSelected[to] = tmp;
+  renderAdoptedPreviews();
+}
+
+adoptedPreview.addEventListener("pointerup", finishAdoptedDrag);
+adoptedPreview.addEventListener("pointercancel", finishAdoptedDrag);
+
+renderAdoptedPreviews();
 
 // 檔案變更：疊加並限制最多 5 張
 adoptedFilesInput.addEventListener("change", () => {
   const incoming = Array.from(adoptedFilesInput.files || []);
-  const room = 5 - adoptedSelected.length;
-
-  if (incoming.length > room) {
+  const next = adoptedSelected.concat(incoming);
+  if (next.length > 5) {
     swalInDialog({ icon: "warning", title: "最多 5 張照片" });
   }
-
-  incoming.slice(0, Math.max(0, room)).forEach((f) => {
-    const item = { id: makeId(), file: f, thumbUrl: "" };
-    adoptedSelected.push(item);
-    appendAdoptedNode(item);
-  });
-
-  updateAdoptedCount();
+  adoptedSelected = next.slice(0, 5);
+  renderAdoptedPreviews();
   adoptedFilesInput.value = ""; // 清空，允許再次選同一檔
 });
 
 // 清空（成功/取消後呼叫）
 function resetAdoptedSelection() {
-  try { adoptedSelected.forEach(revokeAdoptedThumb); } catch (_) {}
+  adoptedSelected.forEach((f) => revokePreviewThumb(f));
   adoptedSelected = [];
   adoptedPreview.innerHTML = "";
   adoptedCount.textContent = "已選 0 / 5 張";
@@ -1062,7 +1109,7 @@ async function onConfirmAdopted() {
   btn.setAttribute("aria-busy", "true");
   const stopDots = startDots(btn, "儲存中");
 
-  const files = adoptedSelected.slice(0, 5).map((it) => it.file);
+  const files = adoptedSelected.slice(0, 5);
   const urls = [];
   try {
     for (const f of files) {
@@ -1126,7 +1173,7 @@ async function onUnadopt() {
   });
 
   if (!isConfirmed) {
-    if (wasOpen) { lockScroll(); dlg.showModal(); }
+    if (wasOpen) { __lockDialogScroll(); dlg.showModal(); }
     return;
   }
 
@@ -1147,7 +1194,7 @@ async function onUnadopt() {
   } catch (err) {
     await Swal.fire({ icon: "error", title: "撤回失敗", text: err.message });
   } finally {
-    if (wasOpen) { lockScroll(); dlg.showModal(); }
+    if (wasOpen) { __lockDialogScroll(); dlg.showModal(); }
     // 重新渲染讓按鈕狀態即時切換
     const p = pets.find((x) => x.id === currentDocId);
     if (p) await openDialog(p.id);
