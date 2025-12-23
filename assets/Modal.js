@@ -713,6 +713,18 @@ editBreedTypeSel.addEventListener("change", () => {
   updateEditBreedLabel();
 });
 
+function syncSelectPlaceholderColor(sel) {
+  if (!sel) return;
+  sel.classList.toggle("text-gray-400", sel.value === "");
+}
+
+["gender", "editGender"].forEach((id) => {
+  const sel = document.getElementById(id);
+  if (!sel) return;
+  syncSelectPlaceholderColor(sel); // 初始：空值就灰
+  sel.addEventListener("change", () => syncSelectPlaceholderColor(sel));
+});
+
 // ===============================
 // 編輯模式：圖片管理（預覽 + 增刪）- 不卡頓版（縮圖/手機拖曳排序）
 // ===============================
