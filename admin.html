@@ -288,8 +288,8 @@
             </div>
             <div>
               <label class="block text-sm font-medium mb-1">性別</label>
-              <select id="gender" class="w-full rounded-xl border border-gray-300 bg-white p-2 text-sm">
-                <option value="">請選擇</option>
+              <select id="gender" class="w-full rounded-xl border border-gray-300 p-2">
+                <option value="">未設定</option>
                 <option value="男生">男生</option>
                 <option value="女生">女生</option>
               </select>
@@ -453,13 +453,13 @@
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-sm font-medium mb-1">品種</label>
-              <select id="editBreedType" class="w-full rounded-xl border border-gray-300 bg-white p-2 text-sm">
+              <select id="editBreedType" class="w-full rounded-xl border border-gray-300 p-2">
                 <option value="">請選擇</option>
               </select>
             </div>
             <div>
               <label id="editBreedLabel" class="block text-sm font-medium mb-1">品種/毛色</label>
-              <select id="editBreed" class="w-full rounded-xl border border-gray-300 bg-white p-2 text-sm" disabled>
+              <select id="editBreed" class="w-full rounded-xl border border-gray-300 p-2" disabled>
                 <option value="">請先選擇品種</option>
               </select>
             </div>
@@ -472,8 +472,8 @@
             </div>
             <div>
               <label class="block text-sm font-medium mb-1">性別</label>
-              <select id="editGender" class="w-full rounded-xl border border-gray-300 bg-white p-2 text-sm">
-                <option value="">請選擇</option>
+              <select id="editGender" class="w-full rounded-xl border border-gray-300 p-2">
+                <option value="">未設定</option>
                 <option value="男生">男生</option>
                 <option value="女生">女生</option>
               </select>
@@ -514,7 +514,7 @@
         </div>
 
         <!-- 動作列 -->
-        <div id="actionBar" class="pt-2 flex flex-col sm:flex-row gap-3 hidden">
+        <div id="actionBar" class="pt-2 flex flex-col sm:flex-row gap-3 ">
           <button id="btnEdit" class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm">
             編輯
           </button>
@@ -543,8 +543,7 @@
         <div id="adoptedUpload" class="hidden">
           <input id="adoptedFiles" type="file" accept="image/*" multiple class="sr-only" />
           <div class="flex items-center gap-3 mb-2">
-            <button id="btnPickAdopted" type="button"
-              class="px-3 py-2 rounded-lg border border-gray-300 bg-brand-600 text-white text-sm">
+            <button id="btnPickAdopted" type="button" class="px-3 py-2 rounded-lg border border-gray-300 bg-brand-600 text-white text-sm">
               選擇合照
             </button>
             <span id="adoptedCount" class="text-xs text-gray-500"></span>
@@ -601,7 +600,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
     import {
       getFirestore, collection, getDocs, query, orderBy, where,
-      doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp, limit as fbLimit, deleteField,
+      doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp, limit as fbLimit,
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
     import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject, listAll, } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
     import {
@@ -619,7 +618,6 @@
       db, storage,
       collection, getDocs, query, orderBy, where,
       doc, getDoc, updateDoc, deleteDoc, serverTimestamp, fbLimit,
-      deleteField,
       sRef, uploadBytes, getDownloadURL, deleteObject, listAll,
     });
 
@@ -759,279 +757,258 @@
     syncBreedSelectors(); // 初始化一次
 
     // ===============================
-    // 新增：圖片選取/預覽（最多 5 張）- 不卡頓版（縮圖/快取/手機拖曳排序）
+    // 新增：圖片選取/預覽（最多 5 張）＋可拖曳排序（手機可用、無把手）
     // ===============================
     const imgFiles = $("#imgFiles");
     const btnPick = $("#btnPick");
     const fileCount = $("#fileCount");
     const imgPreview = $("#imgPreview");
+    let selectedFiles = []; // 暫存待上傳檔案（File[]）
 
-    const MAX_FILES = 5;
-    const PREVIEW_MAX = 720;      // 預覽縮圖長邊上限（越小越順）
-    const PREVIEW_QUALITY = 0.82; // JPEG 品質（0~1）
+    // 為 File 建立穩定 key（用 WeakMap，不污染 File 物件）
+    const _fileUid = new WeakMap();
+    const _urlCache = new Map(); // uid -> objectURL
+    const _makeUid = () =>
+      (window.crypto?.randomUUID?.() ||
+        `f_${Date.now()}_${Math.random().toString(16).slice(2)}`);
 
-    let selectedFiles = []; // 待上傳檔案（順序 = 上傳順序）
-
-    // File → 縮圖 objectURL（避免每次重畫都重新解碼）
-    const thumbUrlCache = new Map();
-    const thumbPromiseCache = new Map();
-    // 同時跑 2 張縮圖（更快，但不會像全並發那麼容易卡）
-    const THUMB_CONCURRENCY = 2;
-    let thumbActive = 0;
-    const thumbJobQueue = [];
-
-    function runThumbQueue() {
-      while (thumbActive < THUMB_CONCURRENCY && thumbJobQueue.length) {
-        const job = thumbJobQueue.shift();
-        thumbActive++;
-
-        makeThumbURL(job.file)
-          .then(job.resolve, job.reject)
-          .finally(() => {
-            thumbActive--;
-            runThumbQueue();
-          });
+    function fileUid(f) {
+      let id = _fileUid.get(f);
+      if (!id) {
+        id = _makeUid();
+        _fileUid.set(f, id);
       }
+      return id;
     }
 
-    const EMPTY_GIF = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+    function fileUrl(f) {
+      const id = fileUid(f);
+      if (!_urlCache.has(id)) _urlCache.set(id, URL.createObjectURL(f));
+      return _urlCache.get(id);
+    }
+
+    function cleanupPreviewUrls() {
+      const live = new Set(selectedFiles.map(fileUid));
+      for (const [id, url] of _urlCache.entries()) {
+        if (!live.has(id)) {
+          try { URL.revokeObjectURL(url); } catch (e) {}
+          _urlCache.delete(id);
+        }
+      }
+    }
 
     btnPick?.addEventListener("click", () => imgFiles.click());
 
-    function revokeThumb(file) {
-      const u = thumbUrlCache.get(file);
-      if (u) {
-        URL.revokeObjectURL(u);
-        thumbUrlCache.delete(file);
-      }
-      thumbPromiseCache.delete(file);
+    // 手機可用的拖曳排序：拖圖片本身（手機長按 0.25s 啟動；桌機移動超過門檻啟動）
+    function attachDragReorder(container, opts = {}) {
+      if (!container || container.dataset.dragInit) return;
+      container.dataset.dragInit = "1";
+
+      const itemSelector = opts.itemSelector || ".photo-item";
+      const delayTouch = Number.isFinite(opts.delayTouch) ? opts.delayTouch : 250;
+      const threshold = Number.isFinite(opts.threshold) ? opts.threshold : 6;
+      const onReorder = typeof opts.onReorder === "function" ? opts.onReorder : () => {};
+
+      let pressTimer = null;
+      let active = null; // { item, placeholder, pointerId, offsetX, offsetY }
+
+      const clearTimer = () => {
+        if (pressTimer) {
+          clearTimeout(pressTimer);
+          pressTimer = null;
+        }
+      };
+
+      const startDrag = (e, item) => {
+        if (active) return;
+        clearTimer();
+
+        const rect = item.getBoundingClientRect();
+        const ph = document.createElement("div");
+        ph.className = "drag-placeholder";
+        ph.style.width = rect.width + "px";
+        ph.style.height = rect.height + "px";
+        ph.style.borderRadius = "0.5rem";
+        ph.style.border = "2px dashed rgba(0,0,0,.25)";
+        ph.style.boxSizing = "border-box";
+
+        item.parentNode.insertBefore(ph, item.nextSibling);
+
+        item.classList.add("dragging");
+        item.style.width = rect.width + "px";
+        item.style.height = rect.height + "px";
+        item.style.position = "fixed";
+        item.style.left = "0px";
+        item.style.top = "0px";
+        item.style.zIndex = "9999";
+        item.style.pointerEvents = "none";
+        item.style.margin = "0";
+        item.style.transform = `translate(${rect.left}px, ${rect.top}px)`;
+
+        const offsetX = e.clientX - rect.left;
+        const offsetY = e.clientY - rect.top;
+
+        active = { item, placeholder: ph, pointerId: e.pointerId, offsetX, offsetY };
+
+        try { item.setPointerCapture(e.pointerId); } catch (err) {}
+      };
+
+      const stopDrag = () => {
+        if (!active) return;
+        const { item, placeholder } = active;
+
+        // 放回 placeholder 位置
+        container.insertBefore(item, placeholder);
+        placeholder.remove();
+
+        // 還原樣式
+        item.classList.remove("dragging");
+        item.style.removeProperty("width");
+        item.style.removeProperty("height");
+        item.style.removeProperty("position");
+        item.style.removeProperty("left");
+        item.style.removeProperty("top");
+        item.style.removeProperty("z-index");
+        item.style.removeProperty("pointer-events");
+        item.style.removeProperty("margin");
+        item.style.removeProperty("transform");
+
+        active = null;
+
+        const keys = Array.from(container.querySelectorAll(itemSelector)).map((el) => el.dataset.key).filter(Boolean);
+        onReorder(keys);
+      };
+
+      const onPointerDown = (e) => {
+        const btn = e.target.closest("button");
+        if (btn) return; // 刪除按鈕不要觸發拖曳
+        const item = e.target.closest(itemSelector);
+        if (!item || !container.contains(item)) return;
+        if (e.button != null && e.button !== 0) return;
+
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const pointerType = e.pointerType || "mouse";
+
+        clearTimer();
+
+        // 觸控：長按才啟動，避免影響滑動
+        if (pointerType !== "mouse") {
+          pressTimer = setTimeout(() => startDrag(e, item), delayTouch);
+        }
+
+        const onMove = (ev) => {
+          if (ev.pointerId !== e.pointerId) return;
+
+          const dx = ev.clientX - startX;
+          const dy = ev.clientY - startY;
+
+          // 尚未啟動拖曳：mouse → 移動超過門檻啟動；touch → 移動超過門檻取消（讓它滑動）
+          if (!active) {
+            if (pointerType === "mouse" && Math.hypot(dx, dy) > threshold) {
+              startDrag(ev, item);
+            } else if (pointerType !== "mouse" && Math.hypot(dx, dy) > threshold) {
+              clearTimer();
+              cleanup();
+            }
+            return;
+          }
+
+          ev.preventDefault();
+
+          const { item: dragItem, placeholder, offsetX, offsetY } = active;
+          dragItem.style.transform = `translate(${ev.clientX - offsetX}px, ${ev.clientY - offsetY}px)`;
+
+          const el = document.elementFromPoint(ev.clientX, ev.clientY);
+          const over = el?.closest(itemSelector);
+          if (!over || over === dragItem || over === placeholder) return;
+
+          const r = over.getBoundingClientRect();
+          const before = (ev.clientY < r.top + r.height / 2) || (Math.abs(ev.clientY - (r.top + r.height / 2)) < r.height * 0.25 && ev.clientX < r.left + r.width / 2);
+
+          if (before) container.insertBefore(placeholder, over);
+          else container.insertBefore(placeholder, over.nextSibling);
+        };
+
+        const onUp = (ev) => {
+          if (ev.pointerId !== e.pointerId) return;
+          clearTimer();
+          cleanup();
+          if (active) stopDrag();
+        };
+
+        const cleanup = () => {
+          window.removeEventListener("pointermove", onMove, { passive: false });
+          window.removeEventListener("pointerup", onUp, { passive: true });
+          window.removeEventListener("pointercancel", onUp, { passive: true });
+        };
+
+        window.addEventListener("pointermove", onMove, { passive: false });
+        window.addEventListener("pointerup", onUp, { passive: true });
+        window.addEventListener("pointercancel", onUp, { passive: true });
+      };
+
+      container.addEventListener("pointerdown", onPointerDown, { passive: true });
+      container.style.webkitTouchCallout = "none";
+      container.style.userSelect = "none";
     }
 
-    async function decodeToBitmap(file) {
-      // createImageBitmap 在大多數現代瀏覽器/手機上是非阻塞解碼
-      if (window.createImageBitmap) {
-        try { return await createImageBitmap(file); } catch (_) { /* fallback */ }
-      }
-
-      // fallback：用 <img> 解碼（比較可能卡，但至少可用）
-      const raw = URL.createObjectURL(file);
-      try {
-        const img = await new Promise((res, rej) => {
-          const im = new Image();
-          im.onload = () => res(im);
-          im.onerror = rej;
-          im.src = raw;
-        });
-        const c = document.createElement("canvas");
-        c.width = img.naturalWidth;
-        c.height = img.naturalHeight;
-        const g = c.getContext("2d");
-        g.drawImage(img, 0, 0);
-        return await createImageBitmap(c);
-      } finally {
-        URL.revokeObjectURL(raw);
-      }
-    }
-
-    async function makeThumbURL(file) {
-      const bmp = await decodeToBitmap(file);
-      const W = bmp.width, H = bmp.height;
-      const scale = Math.min(1, PREVIEW_MAX / Math.max(W, H));
-      const w = Math.max(1, Math.round(W * scale));
-      const h = Math.max(1, Math.round(H * scale));
-
-      // 讓 UI 先喘口氣（避免「圖片顯示瞬間卡住」）
-      await new Promise((r) => requestAnimationFrame(r));
-
-      const c = document.createElement("canvas");
-      c.width = w; c.height = h;
-      const g = c.getContext("2d", { alpha: false, desynchronized: true });
-      g.drawImage(bmp, 0, 0, w, h);
-      bmp.close?.();
-
-      const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", PREVIEW_QUALITY));
-      return URL.createObjectURL(blob);
-    }
-
-    function ensureThumbURL(file) {
-      if (thumbUrlCache.has(file)) return Promise.resolve(thumbUrlCache.get(file));
-      if (thumbPromiseCache.has(file)) return thumbPromiseCache.get(file);
-
-      const p = new Promise((resolve, reject) => {
-        thumbJobQueue.push({ file, resolve, reject });
-        runThumbQueue();
-      })
-        .then((url) => {
-          thumbUrlCache.set(file, url);
-          thumbPromiseCache.delete(file);
-          return url;
-        })
-        .catch((err) => {
-          thumbPromiseCache.delete(file);
-          throw err;
-        });
-
-      thumbPromiseCache.set(file, p);
-      return p;
-    }
-
-    const __previewTileMap = new Map(); // File -> tile element（保留 DOM，避免重畫閃爍）
-
-    function __makePreviewTile(file) {
-      const wrap = document.createElement("div");
-      wrap.className = "relative touch-none select-none";
-
-      const img = document.createElement("img");
-      img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
-      img.alt = "預覽";
-      img.decoding = "async";
-      img.loading = "lazy";
-      img.src = EMPTY_GIF;
-
-      // 先顯示空白，再異步塞縮圖，避免解碼瞬間卡頓
-      ensureThumbURL(file)
-        .then((url) => { img.src = url; })
-        .catch(() => {
-          // 真的不行就退回原圖（至少有預覽）
-          try {
-            const raw = URL.createObjectURL(file);
-            img.src = raw;
-            setTimeout(() => URL.revokeObjectURL(raw), 2000);
-          } catch { }
-        });
-
-      const btn = document.createElement("button");
-      btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
-      btn.type = "button";
-      btn.textContent = "✕";
-      btn.setAttribute("aria-label", "刪除這張");
-
-      wrap.appendChild(img);
-      wrap.appendChild(btn);
-      return wrap;
-    }
-
-    function __setPreviewIdx(tile, idx) {
-      tile.dataset.idx = String(idx);
-      const btn = tile.querySelector("button");
-      if (btn) btn.dataset.idx = String(idx);
-    }
-
+    // 渲染預覽格子 + 刪除按鈕
     function renderPreviews() {
-      fileCount.textContent = `已選 ${selectedFiles.length} / ${MAX_FILES} 張`;
+      cleanupPreviewUrls();
+      fileCount.textContent = `已選 ${selectedFiles.length} / 5 張`;
 
-      // 不整個清空重畫：只搬動既有 DOM，避免「換順序閃一下」
-      for (const [file, el] of __previewTileMap) {
-        if (!selectedFiles.includes(file)) {
-          el.remove();
-          __previewTileMap.delete(file);
-        }
-      }
+      imgPreview.innerHTML = selectedFiles
+        .map((f, i) => {
+          const key = fileUid(f);
+          const u = fileUrl(f);
+          return `
+        <div class="relative photo-item" data-key="${key}">
+          <img class="w-full aspect-square object-cover rounded-lg"
+               src="${u}" alt="預覽" draggable="false"
+               style="-webkit-user-drag:none; -webkit-touch-callout:none;">
+          <button type="button" data-idx="${i}"
+                  class="absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center"
+                  aria-label="刪除這張">✕</button>
+        </div>
+      `;
+        })
+        .join("");
 
-      selectedFiles.forEach((file, i) => {
-        let tile = __previewTileMap.get(file);
-        if (!tile) {
-          tile = __makePreviewTile(file);
-          __previewTileMap.set(file, tile);
-        }
-        __setPreviewIdx(tile, i);
-        imgPreview.appendChild(tile); // appendChild 會把既有節點移動到正確位置
+      // 綁定刪除單張圖片
+      imgPreview.querySelectorAll("button[data-idx]").forEach((btn) =>
+        btn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const i = +btn.dataset.idx;
+          selectedFiles.splice(i, 1);
+          renderPreviews();
+        })
+      );
+
+      // 拖曳排序（無把手）：拖圖片本身（手機長按）
+      attachDragReorder(imgPreview, {
+        itemSelector: ".photo-item",
+        onReorder: (keys) => {
+          const map = new Map(selectedFiles.map((f) => [fileUid(f), f]));
+          selectedFiles = keys.map((k) => map.get(k)).filter(Boolean);
+          renderPreviews();
+        },
       });
     }
 
-    // 刪除（事件代理）
-    imgPreview.addEventListener("click", (e) => {
-      const btn = e.target.closest?.("button[data-idx]");
-      if (!btn) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const i = +btn.dataset.idx;
-      const f = selectedFiles[i];
-      if (f) revokeThumb(f);
-      selectedFiles.splice(i, 1);
-      renderPreviews();
-    });
-
-    // 手機可用的拖曳交換（Pointer Events；放開時與目標交換）
-    let dragFrom = null;
-    let dragOver = null;
-    let dragEl = null;
-
-    function clearDragUI() {
-      imgPreview.querySelectorAll("[data-idx]").forEach((el) => {
-        el.classList.remove("ring-2", "ring-brand-500", "ring-brand-300", "opacity-80");
-      });
-    }
-
-    imgPreview.addEventListener("pointerdown", (e) => {
-      // 點到刪除鈕就不要進入拖曳
-      if (e.target.closest?.("button")) return;
-
-      const tile = e.target.closest?.("[data-idx]");
-      if (!tile) return;
-
-      dragEl = tile;
-      dragFrom = +tile.dataset.idx;
-      dragOver = dragFrom;
-
-      tile.setPointerCapture?.(e.pointerId);
-      clearDragUI();
-      tile.classList.add("ring-2", "ring-brand-500", "opacity-80");
-
-      // 避免觸控滾動搶走手勢
-      e.preventDefault();
-    });
-
-    imgPreview.addEventListener("pointermove", (e) => {
-      if (dragFrom == null) return;
-      const el = document.elementFromPoint(e.clientX, e.clientY);
-      const tile = el?.closest?.("[data-idx]");
-      if (!tile || !imgPreview.contains(tile)) return;
-
-      const idx = +tile.dataset.idx;
-      if (idx === dragOver) return;
-
-      dragOver = idx;
-      clearDragUI();
-      if (dragEl) dragEl.classList.add("ring-2", "ring-brand-500", "opacity-80");
-      tile.classList.add("ring-2", "ring-brand-300");
-    });
-
-    function finishDrag() {
-      if (dragFrom == null) return;
-
-      const from = dragFrom;
-      const to = dragOver;
-
-      clearDragUI();
-      dragFrom = dragOver = null;
-      dragEl = null;
-
-      if (to == null || to === from) return;
-
-      const tmp = selectedFiles[from];
-      selectedFiles[from] = selectedFiles[to];
-      selectedFiles[to] = tmp;
-
-      renderPreviews();
-    }
-
-    imgPreview.addEventListener("pointerup", finishDrag);
-    imgPreview.addEventListener("pointercancel", finishDrag);
-
-    // 檔案挑選後：合併並截斷到 MAX_FILES 張
+    // 檔案挑選後：合併並截斷到 5 張
     imgFiles?.addEventListener("change", () => {
       const incoming = Array.from(imgFiles.files || []);
       const next = selectedFiles.concat(incoming);
-      if (next.length > MAX_FILES) {
-        Swal.fire({ icon: "warning", title: `最多 ${MAX_FILES} 張照片` });
+      if (next.length > 5) {
+        Swal.fire({ icon: "warning", title: "最多 5 張照片" });
       }
-      selectedFiles = next.slice(0, MAX_FILES);
+      selectedFiles = next.slice(0, 5);
       renderPreviews();
       imgFiles.value = ""; // 清空 input，避免重複選取不到
     });
-
-    // ===============================
+// ===============================
     // 捲到最上方（保險版）
     // ===============================
     function forceScrollTop() {
@@ -1169,6 +1146,7 @@
         e.target.reset();
         imgPreview.innerHTML = "";
         selectedFiles = [];
+        cleanupPreviewUrls();
         fileCount.textContent = "已選 0 / 5 張";
         syncBreedSelectors();
 
