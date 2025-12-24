@@ -375,7 +375,6 @@ async function openDialog(id) {
   }
 }
 
-
 function scrollDialogTop() {
   const dlg = document.getElementById("petDialog");
   requestAnimationFrame(() => {
@@ -644,6 +643,20 @@ editBreedTypeSel.addEventListener("change", () => {
   buildEditBreedOptions();
   updateEditBreedLabel();
 });
+
+function bindSelectPlaceholderColor(sel) {
+  if (!sel) return;
+  const update = () => {
+    const empty = !sel.value;
+    sel.classList.toggle("text-gray-400", empty);
+    sel.classList.toggle("text-gray-900", !empty);
+  };
+  sel.addEventListener("change", update);
+  update(); // 初始化
+}
+
+bindSelectPlaceholderColor(document.getElementById("gender"));
+bindSelectPlaceholderColor(document.getElementById("editGender")); // 編輯表單也一起套用（如果你也想）
 
 // ===============================
 // 編輯模式：圖片管理（預覽 + 增刪）- 不卡頓版（縮圖/手機拖曳排序）
