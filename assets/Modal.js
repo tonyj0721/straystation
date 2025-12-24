@@ -1,88 +1,25 @@
 const q = (sel) => document.querySelector(sel);
 // ===============================
-// Dialog 開啟時鎖背景捲動（iOS/Android/桌機皆可）
+// Dialog 開啟時鎖背景捲動（交給 Lightbox.js 的 lockScroll / unlockScroll）
 // ===============================
-const __pageScrollLock = (() => {
-  let st = null;
-
-  function lock() {
-    if (st) return;
-    const html = document.documentElement;
-    const body = document.body;
-    const scrollY = window.scrollY || html.scrollTop || body.scrollTop || 0;
-
-    // 桌機：避免 overflow hidden 造成版面左右抖動
-    const gap = Math.max(0, window.innerWidth - html.clientWidth);
-
-    st = {
-      scrollY,
-      htmlOverflow: html.style.overflow,
-      bodyPos: body.style.position,
-      bodyTop: body.style.top,
-      bodyLeft: body.style.left,
-      bodyRight: body.style.right,
-      bodyWidth: body.style.width,
-      bodyOverflow: body.style.overflow,
-      bodyPaddingRight: body.style.paddingRight,
-    };
-
-    if (gap) body.style.paddingRight = `${gap}px`;
-    html.style.overflow = "hidden";
-    body.style.overflow = "hidden";
-
-    // iOS：用 fixed body 才能真正鎖住背景
-    body.style.position = "fixed";
-    body.style.top = `-${scrollY}px`;
-    body.style.left = "0";
-    body.style.right = "0";
-    body.style.width = "100%";
-  }
-
-  function unlock() {
-    if (!st) return;
-    const html = document.documentElement;
-    const body = document.body;
-    const y = st.scrollY || 0;
-
-    html.style.overflow = st.htmlOverflow || "";
-    body.style.position = st.bodyPos || "";
-    body.style.top = st.bodyTop || "";
-    body.style.left = st.bodyLeft || "";
-    body.style.right = st.bodyRight || "";
-    body.style.width = st.bodyWidth || "";
-    body.style.overflow = st.bodyOverflow || "";
-    body.style.paddingRight = st.bodyPaddingRight || "";
-
-    st = null;
-    window.scrollTo(0, y);
-  }
-
-  return { lock, unlock };
-})();
+//
+// 之前這裡用「fixed body」鎖背景（iOS 常見作法），但會讓 dialog 內部的
+// 水平/垂直可捲動區塊（例如縮圖列 overflow-x-auto）在手機上變成「滑不動」。
+// 所以改為：統一由 shared 的 Lightbox.js（你說的 shared.js）負責捲動鎖定。
+// （Lightbox.js 內已做「只擋背景、不擋 dialog/lightbox 內部」與巢狀鎖定。）
 
 function __lockDialogScroll() {
-  try { __pageScrollLock.lock(); } catch { }
-  // 舊版 shared.js 可能也有 lockScroll（留著不衝突）
   try { if (typeof lockScroll === "function") lockScroll(); } catch { }
 }
 
 function __unlockDialogScroll() {
-  try { __pageScrollLock.unlock(); } catch { }
   try { if (typeof unlockScroll === "function") unlockScroll(); } catch { }
 }
 
-// 不論用 X / Esc / close() / 點遮罩等方式關閉，都解鎖背景
-(function __bindDialogScrollLock() {
-  function bind() {
-    const dlgEl = document.getElementById("petDialog");
-    if (!dlgEl || dlgEl.dataset.scrollLockBound) return;
-    dlgEl.addEventListener("close", __unlockDialogScroll);
-    dlgEl.addEventListener("cancel", __unlockDialogScroll);
-    dlgEl.dataset.scrollLockBound = "1";
-  }
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bind);
-  else bind();
-})();
+// 注意：不要在這裡綁 dialog 的 close/cancel 去 unlock，
+// 避免「開 Lightbox 時先關 dialog」的流程把鎖解太多層。
+// 解鎖統一在 Lightbox.js 裡的 dialog close 事件處理。
+;
 
 
 // ===============================
@@ -424,10 +361,7 @@ async function openDialog(id) {
   }
 }
 
-// 關閉 Dialog
-document.getElementById("dlgClose").addEventListener("click", () => {
-  if (dlg.open) dlg.close();
-});
+
 function scrollDialogTop() {
   const dlg = document.getElementById("petDialog");
   requestAnimationFrame(() => {
@@ -703,6 +637,10 @@ editBreedTypeSel.addEventListener("change", () => {
 const editFiles = q("#editFiles");
 const btnPickEdit = q("#btnPickEdit");
 const editPreview = q("#editPreview");
+if (editPreview) {
+  editPreview.style.touchAction = "none";
+  editPreview.addEventListener("contextmenu", (e) => e.preventDefault());
+}
 const editCount = q("#editCount");
 
 const MAX_EDIT_FILES = 5;
@@ -731,13 +669,21 @@ function __editKey(it) {
 
 function __makeEditTile(it) {
   const wrap = document.createElement("div");
-  wrap.className = "relative touch-none select-none";
+  wrap.className = "relative  select-none";
+  wrap.style.touchAction = "none";
+  wrap.style.setProperty("-webkit-touch-callout", "none");
+  wrap.style.userSelect = "none";
+  wrap.addEventListener("contextmenu", (e) => e.preventDefault());
 
   const img = document.createElement("img");
   img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
   img.alt = "預覽";
   img.decoding = "async";
   img.loading = "lazy";
+  img.draggable = false;
+  img.style.webkitUserDrag = "none";
+  img.style.webkitTouchCallout = "none";
+  img.addEventListener("contextmenu", (e) => e.preventDefault());
 
   if (it.kind === "url") {
     img.src = it.url;
@@ -822,10 +768,30 @@ editPreview?.addEventListener("click", (e) => {
   paintEditPreview();
 });
 
-// 手機可用的拖曳交換（Pointer Events；放開時與目標交換）
+// 手機可用的拖曳交換（Pointer Events；「移動超過門檻」才進入拖曳；放開時與目標交換）
+// - 不用長按（避免 iOS 長按跳出分享）
+// - 不用把手（維持原本外觀）
+// - 仍保留 swap 交換排序
 let editDragFrom = null;
 let editDragOver = null;
 let editDragEl = null;
+
+let editPending = null; // { pointerId, startX, startY, tile }
+const editDRAG_THRESHOLD = 6;
+
+function editCancelPending() { editPending = null; }
+
+function editBeginDrag(e, tile) {
+  editDragEl = tile;
+  editDragFrom = +tile.dataset.idx;
+  editDragOver = editDragFrom;
+
+  try { tile.setPointerCapture?.(e.pointerId); } catch {}
+  clearEditDragUI();
+  tile.classList.add("ring-2", "ring-brand-500", "opacity-80");
+  // 進入拖曳後才阻止預設（避免一開始就擋住頁面/Modal 捲動）
+  try { e.preventDefault(); } catch {}
+}
 
 function clearEditDragUI() {
   editPreview?.querySelectorAll?.("[data-idx]")?.forEach((el) => {
@@ -834,24 +800,31 @@ function clearEditDragUI() {
 }
 
 editPreview?.addEventListener("pointerdown", (e) => {
-  if (e.target.closest?.("button")) return; // 點到刪除鈕就不要拖
+  // 刪除鈕不拖
+  if (e.target.closest?.("button")) return;
 
   const tile = e.target.closest?.("[data-idx]");
-  if (!tile) return;
+  if (!tile || !editPreview.contains(tile)) return;
 
-  editDragEl = tile;
-  editDragFrom = +tile.dataset.idx;
-  editDragOver = editDragFrom;
-
-  tile.setPointerCapture?.(e.pointerId);
-  clearEditDragUI();
-  tile.classList.add("ring-2", "ring-brand-500", "opacity-80");
-  e.preventDefault();
+  editCancelPending();
+  editPending = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, tile };
 });
 
 editPreview?.addEventListener("pointermove", (e) => {
-  if (editDragFrom == null) return;
+  // 還沒進入拖曳：移動超過門檻才開始（避免點一下就鎖住捲動/點擊）
+  if (editDragFrom == null) {
+    if (!editPending || editPending.pointerId !== e.pointerId) return;
 
+    const dx = e.clientX - editPending.startX;
+    const dy = e.clientY - editPending.startY;
+    if (Math.hypot(dx, dy) < editDRAG_THRESHOLD) return;
+
+    editBeginDrag(e, editPending.tile);
+    editPending = null;
+    return;
+  }
+
+  try { e.preventDefault(); } catch {}
   const el = document.elementFromPoint(e.clientX, e.clientY);
   const tile = el?.closest?.("[data-idx]");
   if (!tile || !editPreview.contains(tile)) return;
@@ -866,6 +839,7 @@ editPreview?.addEventListener("pointermove", (e) => {
 });
 
 function finishEditDrag() {
+  editCancelPending();
   if (editDragFrom == null) return;
 
   const from = editDragFrom;
@@ -914,6 +888,10 @@ const adoptedFilesInput = document.getElementById("adoptedFiles");
 const btnPickAdopted = document.getElementById("btnPickAdopted");
 const adoptedCount = document.getElementById("adoptedCount");
 const adoptedPreview = document.getElementById("adoptedPreview");
+if (adoptedPreview) {
+  adoptedPreview.style.touchAction = "none";
+  adoptedPreview.addEventListener("contextmenu", (e) => e.preventDefault());
+}
 
 // 打開檔案挑選
 btnPickAdopted.onclick = () => adoptedFilesInput.click();
@@ -923,13 +901,21 @@ const __adoptedTileMap = new Map(); // File -> tile element（保留 DOM，避�
 
 function __makeAdoptedTile(file) {
   const wrap = document.createElement("div");
-  wrap.className = "relative touch-none select-none";
+  wrap.className = "relative  select-none";
+  wrap.style.touchAction = "none";
+  wrap.style.setProperty("-webkit-touch-callout", "none");
+  wrap.style.userSelect = "none";
+  wrap.addEventListener("contextmenu", (e) => e.preventDefault());
 
   const img = document.createElement("img");
   img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
   img.alt = "預覽";
   img.decoding = "async";
   img.loading = "lazy";
+  img.draggable = false;
+  img.style.webkitUserDrag = "none";
+  img.style.webkitTouchCallout = "none";
+  img.addEventListener("contextmenu", (e) => e.preventDefault());
   img.src = PREVIEW_EMPTY_GIF;
 
   ensurePreviewThumbURL(file)
@@ -998,10 +984,28 @@ adoptedPreview.addEventListener("click", (e) => {
   renderAdoptedPreviews();
 });
 
-// 手機可用的拖曳交換（Pointer Events；放開時與目標交換）
+// 手機可用的拖曳交換（Pointer Events；「移動超過門檻」才進入拖曳；放開時與目標交換）
+// - 不用長按（避免 iOS 長按跳出分享）
+// - 不用把手（維持原本外觀）
 let adoptedDragFrom = null;
 let adoptedDragOver = null;
 let adoptedDragEl = null;
+
+let adoptedPending = null; // { pointerId, startX, startY, tile }
+const adoptedDRAG_THRESHOLD = 6;
+
+function adoptedCancelPending() { adoptedPending = null; }
+
+function adoptedBeginDrag(e, tile) {
+  adoptedDragEl = tile;
+  adoptedDragFrom = +tile.dataset.idx;
+  adoptedDragOver = adoptedDragFrom;
+
+  try { tile.setPointerCapture?.(e.pointerId); } catch {}
+  clearAdoptedDragUI();
+  tile.classList.add("ring-2", "ring-brand-500", "opacity-80");
+  try { e.preventDefault(); } catch {}
+}
 
 function clearAdoptedDragUI() {
   adoptedPreview.querySelectorAll("[data-idx]").forEach((el) => {
@@ -1010,24 +1014,30 @@ function clearAdoptedDragUI() {
 }
 
 adoptedPreview.addEventListener("pointerdown", (e) => {
+  // 刪除鈕不拖
   if (e.target.closest?.("button")) return;
 
   const tile = e.target.closest?.("[data-idx]");
-  if (!tile) return;
+  if (!tile || !adoptedPreview.contains(tile)) return;
 
-  adoptedDragEl = tile;
-  adoptedDragFrom = +tile.dataset.idx;
-  adoptedDragOver = adoptedDragFrom;
-
-  tile.setPointerCapture?.(e.pointerId);
-  clearAdoptedDragUI();
-  tile.classList.add("ring-2", "ring-brand-500", "opacity-80");
-  e.preventDefault();
+  adoptedCancelPending();
+  adoptedPending = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, tile };
 });
 
 adoptedPreview.addEventListener("pointermove", (e) => {
-  if (adoptedDragFrom == null) return;
+  if (adoptedDragFrom == null) {
+    if (!adoptedPending || adoptedPending.pointerId !== e.pointerId) return;
 
+    const dx = e.clientX - adoptedPending.startX;
+    const dy = e.clientY - adoptedPending.startY;
+    if (Math.hypot(dx, dy) < adoptedDRAG_THRESHOLD) return;
+
+    adoptedBeginDrag(e, adoptedPending.tile);
+    adoptedPending = null;
+    return;
+  }
+
+  try { e.preventDefault(); } catch {}
   const el = document.elementFromPoint(e.clientX, e.clientY);
   const tile = el?.closest?.("[data-idx]");
   if (!tile || !adoptedPreview.contains(tile)) return;
@@ -1042,6 +1052,7 @@ adoptedPreview.addEventListener("pointermove", (e) => {
 });
 
 function finishAdoptedDrag() {
+  adoptedCancelPending();
   if (adoptedDragFrom == null) return;
 
   const from = adoptedDragFrom;
@@ -1218,6 +1229,10 @@ function swalInDialog(opts) {
       try {
         window.adoptedSelected = [];
         const adoptedPreview = document.getElementById("adoptedPreview");
+if (adoptedPreview) {
+  adoptedPreview.style.touchAction = "none";
+  adoptedPreview.addEventListener("contextmenu", (e) => e.preventDefault());
+}
         const adoptedCount = document.getElementById("adoptedCount");
         const adoptedFilesInput = document.getElementById("adoptedFiles");
         if (adoptedPreview) adoptedPreview.innerHTML = "";
@@ -1247,10 +1262,7 @@ function swalInDialog(opts) {
   mo.observe(dlg, { attributes: true, attributeFilter: ["open", "aria-hidden"] });
 
   // 4) 如果你有自訂右上角關閉鍵（#dlgClose），也補一下
-  document.getElementById("dlgClose")?.addEventListener("click", () => {
-    // 這裡不直接清空，交給 close 事件統一處理；若你的按鈕不是呼叫 close()，可手動加：
-    // resetAdoptedSelection();
-  });
+
 
   dlg.dataset.cleanupBound = "1";
 })();
@@ -1269,6 +1281,10 @@ function swalInDialog(opts) {
       // 簡易後援：確保清乾淨
       if (window.adoptedSelected) window.adoptedSelected.length = 0;
       const adoptedPreview = document.getElementById("adoptedPreview");
+if (adoptedPreview) {
+  adoptedPreview.style.touchAction = "none";
+  adoptedPreview.addEventListener("contextmenu", (e) => e.preventDefault());
+}
       const adoptedCount = document.getElementById("adoptedCount");
       const adoptedFilesInput = document.getElementById("adoptedFiles");
       if (adoptedPreview) adoptedPreview.innerHTML = "";
