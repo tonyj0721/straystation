@@ -290,59 +290,49 @@
             </div>
             <div>
               <label class="block text-sm font-medium mb-1">性別</label>
-              <div class="relative w-full">
-                <select id="gender"
-                  class="w-full h-12 box-border rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm leading-5">
-                  <option value="" style="color:#9CA3AF;">請選擇</option>
-                  <option value="男生" style="color:#111827;">男生</option>
-                  <option value="女生" style="color:#111827;">女生</option>
-                </select>
-                <!-- 好看的下拉箭頭 -->
-                <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400"
-                  viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path fill-rule="evenodd"
-                    d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 10.94l3.71-3.71a.75.75 0 1 1 1.06 1.06l-4.24 4.24a.75.75 0 0 1-1.06 0L5.21 8.29a.75.75 0 0 1 .02-1.08z"
-                    clip-rule="evenodd" />
-                </svg>
+              <select id="gender"
+                class="w-full h-12 box-border rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm leading-5">
+                <option value="" style="color:#9CA3AF;">請選擇</option>
+                <option value="男生" style="color:#111827;">男生</option>
+                <option value="女生" style="color:#111827;">女生</option>
+              </select>
+            </div>
+            <!-- 健康 -->
+            <div>
+              <label class="block text-sm font-medium mb-1">健康</label>
+              <div class="flex items-center gap-6">
+                <label class="inline-flex items-center gap-2">
+                  <input id="neutered" type="checkbox" class="h-4 w-4">
+                  <span>結紮</span>
+                </label>
+                <label class="inline-flex items-center gap-2">
+                  <input id="vaccinated" type="checkbox" class="h-4 w-4">
+                  <span>預防針</span>
+                </label>
               </div>
             </div>
-          </div>
-          <!-- 健康 -->
-          <div>
-            <label class="block text-sm font-medium mb-1">健康</label>
-            <div class="flex items-center gap-6">
-              <label class="inline-flex items-center gap-2">
-                <input id="neutered" type="checkbox" class="h-4 w-4">
-                <span>結紮</span>
-              </label>
-              <label class="inline-flex items-center gap-2">
-                <input id="vaccinated" type="checkbox" class="h-4 w-4">
-                <span>預防針</span>
-              </label>
+            <div>
+              <label class="block text-sm font-medium mb-1">簡介</label>
+              <textarea id="desc" rows="4" class="w-full rounded-xl border border-gray-300 p-2"
+                placeholder="個性、習慣、背景故事、注意事項…"></textarea>
             </div>
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-1">簡介</label>
-            <textarea id="desc" rows="4" class="w-full rounded-xl border border-gray-300 p-2"
-              placeholder="個性、習慣、背景故事、注意事項…"></textarea>
-          </div>
-          <div>
-            <input id="imgFiles" type="file" accept="image/*" multiple class="sr-only" />
-            <div class="flex items-center gap-3">
-              <button id="btnPick" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
-                新增照片
+            <div>
+              <input id="imgFiles" type="file" accept="image/*" multiple class="sr-only" />
+              <div class="flex items-center gap-3">
+                <button id="btnPick" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
+                  新增照片
+                </button>
+                <span id="fileCount" class="text-xs text-gray-500">已選 0 / 5 張</span>
+                <span class="text-sm text-gray-400">最多 5 張</span>
+              </div>
+              <div id="imgPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
+            </div>
+            <div class="flex gap-3 pt-2">
+              <button id="submitBtn" type="submit"
+                class="px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-gray-800 flex items-center gap-2">
+                <span id="submitText">登錄</span>
               </button>
-              <span id="fileCount" class="text-xs text-gray-500">已選 0 / 5 張</span>
-              <span class="text-sm text-gray-400">最多 5 張</span>
             </div>
-            <div id="imgPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
-          </div>
-          <div class="flex gap-3 pt-2">
-            <button id="submitBtn" type="submit"
-              class="px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-gray-800 flex items-center gap-2">
-              <span id="submitText">登錄</span>
-            </button>
-          </div>
         </form>
       </section>
 
