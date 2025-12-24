@@ -18,9 +18,6 @@ let oldHtmlOverflow = "";
 let oldBodyOverflow = "";
 
 function lockScroll() {
-  if (typeof __lockDialogScroll === "function") return __lockDialogScroll();
-
-  // fallback（保留原本）
   oldHtmlOverflow = document.documentElement.style.overflow;
   oldBodyOverflow = document.body.style.overflow;
   document.documentElement.style.overflow = "hidden";
@@ -28,9 +25,6 @@ function lockScroll() {
 }
 
 function unlockScroll() {
-  if (typeof __unlockDialogScroll === "function") return __unlockDialogScroll();
-
-  // fallback（保留原本）
   document.documentElement.style.overflow = oldHtmlOverflow;
   document.body.style.overflow = oldBodyOverflow;
 }
