@@ -787,6 +787,20 @@
         .join("");
     }
 
+    function bindSelectPlaceholderColor(sel) {
+      if (!sel) return;
+      const update = () => {
+        const empty = !sel.value;
+        sel.classList.toggle("text-gray-400", empty);
+        sel.classList.toggle("text-gray-900", !empty);
+      };
+      sel.addEventListener("change", update);
+      update(); // 初始化
+    }
+
+    bindSelectPlaceholderColor(document.getElementById("gender"));
+    bindSelectPlaceholderColor(document.getElementById("editGender")); // 編輯表單也一起套用（如果你也想）
+
     // 綁定事件
     speciesInputs.forEach((i) => i.addEventListener("change", syncBreedSelectors));
     breedTypeSel.addEventListener("change", () => {
