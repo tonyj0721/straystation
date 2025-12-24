@@ -290,14 +290,16 @@
             </div>
             <div>
               <label class="block text-sm font-medium mb-1">性別</label>
-              <select id="gender"
-                class="w-full h-11 box-border appearance-none rounded-xl border border-gray-300 bg-white px-3 pr-10 py-0 text-sm leading-[44px]">
-                <option value="">請選擇</option>
-                <option value="男生">男生</option>
-                <option value="女生">女生</option>
-              </select>
-              <!-- 自己畫下拉箭頭（避免原生 select 箭頭造成尺寸差） -->
-              <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">⌄</span>
+              <div class="relative">
+                <select id="gender"
+                  class="w-full h-11 box-border appearance-none rounded-xl border border-gray-300 bg-white px-3 pr-10 py-0 text-sm leading-[44px]">
+                  <option value="">請選擇</option>
+                  <option value="男生">男生</option>
+                  <option value="女生">女生</option>
+                </select>
+                <!-- 自己畫下拉箭頭（避免原生 select 箭頭造成尺寸差） -->
+                <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">⌄</span>
+              </div>
             </div>
           </div>
           <!-- 健康 -->
