@@ -77,7 +77,7 @@ function openLightbox(images, index = 0) {
   if (dlg.open) dlg.close();
 
   // ❷ 正確：解除背景鎖定（避免 Lightbox 卡死）
-  unlockScroll();
+  /*unlockScroll();*/
 
   // ❸ 顯示 Lightbox
   lb.classList.remove("hidden");
