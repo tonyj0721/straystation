@@ -321,35 +321,50 @@ async function openDialog(id) {
   document.getElementById("editVaccinated").checked = !!p.vaccinated;
   document.getElementById("editName").value = p.name;
   document.getElementById("editAge").value = p.age;
-  document.getElementById("editGender").value = p.gender;
+
+  const gSel = document.getElementById("editGender");
+  const g = String(p.gender || "").trim();
+  gSel.value = (g === "男生" || g === "女生") ? g : "";  // 其他(含性別不詳)一律回到「請選擇」
+
   document.getElementById("editDesc").value = p.desc;
 
   setEditSpecies(p.species || '貓');
   syncEditBreedSelectors();
 
   if (p.breedType || p.breed) {
-    // 允許舊資料：breedType 沒存，但 breed 是 "米克斯/xxx"
-    let breedType = p.breedType || "";
-    let breedValue = p.breed || "";
+    let breedType = String(p.breedType || "").trim();
+    let breedValue = String(p.breed || "").trim();
 
+    // 把「品種不詳」視為沒選
+    if (breedValue === "品種不詳") breedValue = "";
+
+    // 舊資料：breedType 沒存，但 breed 是 "米克斯/xxx" 或 "米克斯"
     if (!breedType && /^米克斯(\/|$)/.test(breedValue)) {
       breedType = "米克斯";
     }
 
-    // ✅ 米克斯：右側下拉只放「毛色」，所以要去掉 "米克斯/"
+    // 米克斯：右側只放毛色，所以去掉前綴
     if (breedType === "米克斯") {
-      breedValue = breedValue.replace(/^米克斯\/?/, ""); // "米克斯/黑白色" -> "黑白色"
+      breedValue = breedValue.replace(/^米克斯\/?/, "");
     }
 
-    document.getElementById("editBreedType").value = breedType;
-    buildEditBreedOptions();
-    updateEditBreedLabel();
+    const btSel = document.getElementById("editBreedType");
+    const bSel = document.getElementById("editBreed");
 
-    const breedSel = document.getElementById("editBreed");
-    breedSel.disabled = false;
+    if (!breedType) {
+      // 沒選左邊：右邊保持 disabled +「請先選擇品種」
+      btSel.value = "";
+      resetEditBreedRight();       // 會塞入「請先選擇品種」並 disabled :contentReference[oaicite:8]{index=8}
+      updateEditBreedLabel();
+    } else {
+      btSel.value = breedType;
+      buildEditBreedOptions();     // 右邊會變成可選 + 第一個 option「請選擇」:contentReference[oaicite:9]{index=9}
+      updateEditBreedLabel();
 
-    // 如果是 "米克斯"（沒選毛色）會是空字串，剛好讓它停在「請選擇」
-    breedSel.value = breedValue;
+      // breedValue 不在選項裡就回到 placeholder，避免顯示空白
+      const has = Array.from(bSel.options).some(o => o.value === breedValue);
+      bSel.value = has ? breedValue : "";
+    }
   }
 
   renderEditImages(imgs);
