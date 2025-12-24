@@ -13,24 +13,20 @@ const lbClose = document.getElementById("lbClose");
 
 let lbImages = [];
 let lbIndex = 0;
-// 這個專案裡，背景捲動鎖定/解鎖的「單一真相」在 Modal.js：__lockDialogScroll / __unlockDialogScroll。
-// Lightbox 只要呼叫它們，避免和 Modal.js 的 __pageScrollLock 互相覆寫導致「關閉後不能滑動」。
-function lockScroll() {
-  if (typeof window.__lockDialogScroll === "function") {
-    window.__lockDialogScroll();
-    return;
-  }
-  // fallback（若沒載入 Modal.js）
+// 統一用 Modal.js 的 scroll lock（__pageScrollLock），避免雙重鎖定導致關閉後無法捲動
+function lockBg() {
+  try {
+    if (typeof __lockDialogScroll === "function") return __lockDialogScroll();
+  } catch { }
+  // fallback（若未載入 Modal.js）
   document.documentElement.style.overflow = "hidden";
   document.body.style.overflow = "hidden";
 }
 
-function unlockScroll() {
-  if (typeof window.__unlockDialogScroll === "function") {
-    window.__unlockDialogScroll();
-    return;
-  }
-  // fallback（若沒載入 Modal.js）
+function unlockBg() {
+  try {
+    if (typeof __unlockDialogScroll === "function") return __unlockDialogScroll();
+  } catch { }
   document.documentElement.style.overflow = "";
   document.body.style.overflow = "";
 }
@@ -38,8 +34,7 @@ function unlockScroll() {
 // 鎖住 / 恢復背景捲動
 $('#dlgClose').addEventListener('click', () => {
   dlg.close();
-  // 由 dialog 的 close/cancel 事件統一解鎖（Modal.js 也有綁定），這裡多呼叫一次也安全
-  unlockScroll();
+  unlockBg();
   history.replaceState(null, '', location.pathname);
   window.currentPetId = null;
 });
@@ -51,8 +46,7 @@ dlg.addEventListener('close', () => {
     window.currentPetId = null;
     history.replaceState(null, '', location.pathname);
   }
-  // 保險：避免某些瀏覽器/情境 close 事件沒被 Modal.js 綁到
-  unlockScroll();
+  unlockBg();
 });
 
 // 🔥 開啟 Lightbox：完全關掉 dialog + 鎖定背景
@@ -85,7 +79,7 @@ function openLightbox(images, index = 0) {
   if (dlg.open) dlg.close();
 
   // ❷ 正確：解除背景鎖定（避免 Lightbox 卡死）
-  unlockScroll();
+  unlockBg();
 
   // ❸ 顯示 Lightbox
   lb.classList.remove("hidden");
@@ -99,7 +93,7 @@ function closeLightbox() {
   lb.classList.remove("flex");
 
   // 回到 Modal
-  lockScroll();
+  lockBg();
   dlg.showModal();
 }
 

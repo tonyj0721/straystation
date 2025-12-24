@@ -62,10 +62,12 @@ const __pageScrollLock = (() => {
 })();
 
 function __lockDialogScroll() {
+  // ✅ 只用這個 lock，避免和 Lightbox.js 裡的 lockScroll/unlockScroll 衝突
   try { __pageScrollLock.lock(); } catch { }
 }
 
 function __unlockDialogScroll() {
+  // ✅ 只用這個 unlock，確保關閉後一定能恢復捲動
   try { __pageScrollLock.unlock(); } catch { }
 }
 
