@@ -62,13 +62,14 @@ const __pageScrollLock = (() => {
 })();
 
 function __lockDialogScroll() {
-  // ✅ 只用這個 lock，避免和 Lightbox.js 裡的 lockScroll/unlockScroll 衝突
   try { __pageScrollLock.lock(); } catch { }
+  // 舊版 shared.js 可能也有 lockScroll（留著不衝突）
+  try { if (typeof lockScroll === "function") lockScroll(); } catch { }
 }
 
 function __unlockDialogScroll() {
-  // ✅ 只用這個 unlock，確保關閉後一定能恢復捲動
   try { __pageScrollLock.unlock(); } catch { }
+  try { if (typeof unlockScroll === "function") unlockScroll(); } catch { }
 }
 
 // 不論用 X / Esc / close() / 點遮罩等方式關閉，都解鎖背景

@@ -13,28 +13,26 @@ const lbClose = document.getElementById("lbClose");
 
 let lbImages = [];
 let lbIndex = 0;
-// 統一用 Modal.js 的 scroll lock（__pageScrollLock），避免雙重鎖定導致關閉後無法捲動
-function lockBg() {
-  try {
-    if (typeof __lockDialogScroll === "function") return __lockDialogScroll();
-  } catch { }
-  // fallback（若未載入 Modal.js）
+// 用來記住原本 scroll 狀態
+let oldHtmlOverflow = "";
+let oldBodyOverflow = "";
+
+function lockScroll() {
+  oldHtmlOverflow = document.documentElement.style.overflow;
+  oldBodyOverflow = document.body.style.overflow;
   document.documentElement.style.overflow = "hidden";
   document.body.style.overflow = "hidden";
 }
 
-function unlockBg() {
-  try {
-    if (typeof __unlockDialogScroll === "function") return __unlockDialogScroll();
-  } catch { }
-  document.documentElement.style.overflow = "";
-  document.body.style.overflow = "";
+function unlockScroll() {
+  document.documentElement.style.overflow = oldHtmlOverflow;
+  document.body.style.overflow = oldBodyOverflow;
 }
 
 // 鎖住 / 恢復背景捲動
 $('#dlgClose').addEventListener('click', () => {
   dlg.close();
-  unlockBg();
+  unlockScroll();
   history.replaceState(null, '', location.pathname);
   window.currentPetId = null;
 });
@@ -46,7 +44,7 @@ dlg.addEventListener('close', () => {
     window.currentPetId = null;
     history.replaceState(null, '', location.pathname);
   }
-  unlockBg();
+  unlockScroll();
 });
 
 // 🔥 開啟 Lightbox：完全關掉 dialog + 鎖定背景
@@ -79,7 +77,7 @@ function openLightbox(images, index = 0) {
   if (dlg.open) dlg.close();
 
   // ❷ 正確：解除背景鎖定（避免 Lightbox 卡死）
-  unlockBg();
+  unlockScroll();
 
   // ❸ 顯示 Lightbox
   lb.classList.remove("hidden");
@@ -93,8 +91,10 @@ function closeLightbox() {
   lb.classList.remove("flex");
 
   // 回到 Modal
-  lockBg();
   dlg.showModal();
+
+  // Modal 需要背景固定 → 再鎖一次
+  lockScroll();
 }
 
 // 🔥 左右切換
