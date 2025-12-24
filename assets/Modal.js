@@ -327,15 +327,29 @@ async function openDialog(id) {
   setEditSpecies(p.species || '貓');
   syncEditBreedSelectors();
 
-  if (p.breedType) {
-    document.getElementById("editBreedType").value = p.breedType;
+  if (p.breedType || p.breed) {
+    // 允許舊資料：breedType 沒存，但 breed 是 "米克斯/xxx"
+    let breedType = p.breedType || "";
+    let breedValue = p.breed || "";
+
+    if (!breedType && /^米克斯(\/|$)/.test(breedValue)) {
+      breedType = "米克斯";
+    }
+
+    // ✅ 米克斯：右側下拉只放「毛色」，所以要去掉 "米克斯/"
+    if (breedType === "米克斯") {
+      breedValue = breedValue.replace(/^米克斯\/?/, ""); // "米克斯/黑白色" -> "黑白色"
+    }
+
+    document.getElementById("editBreedType").value = breedType;
     buildEditBreedOptions();
     updateEditBreedLabel();
 
-    if (p.breed) {
-      document.getElementById("editBreed").disabled = false;
-      document.getElementById("editBreed").value = p.breed;
-    }
+    const breedSel = document.getElementById("editBreed");
+    breedSel.disabled = false;
+
+    // 如果是 "米克斯"（沒選毛色）會是空字串，剛好讓它停在「請選擇」
+    breedSel.value = breedValue;
   }
 
   renderEditImages(imgs);
@@ -514,40 +528,40 @@ async function saveEdit() {
   const stopDots = startDots(txt, "儲存中");
 
   try {
-        // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
-        const { items, removeUrls } = editImagesState;
-        const newUrls = [];
+    // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
+    const { items, removeUrls } = editImagesState;
+    const newUrls = [];
 
-        // 依序處理（保持順序）
-        for (const it of items) {
-          if (it.kind === "url") {
-            newUrls.push(it.url);
-            continue;
-          }
+    // 依序處理（保持順序）
+    for (const it of items) {
+      if (it.kind === "url") {
+        newUrls.push(it.url);
+        continue;
+      }
 
-          if (it.kind === "file") {
-            const f = it.file;
-            const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
-            const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
-            const base = f.name.replace(/\.[^.]+$/, '');
-            const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
-            const r = sRef(storage, path);
-            await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
-            newUrls.push(await getDownloadURL(r));
-          }
-        }
+      if (it.kind === "file") {
+        const f = it.file;
+        const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+        const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
+        const base = f.name.replace(/\.[^.]+$/, '');
+        const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
+        const r = sRef(storage, path);
+        await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
+        newUrls.push(await getDownloadURL(r));
+      }
+    }
 
-        // 刪除被移除的舊圖（忽略刪失敗）
-        for (const url of (removeUrls || [])) {
-          try {
-            const path = url.split("/o/")[1].split("?")[0];
-            await deleteObject(sRef(storage, decodeURIComponent(path)));
-          } catch (e) {
-            // 靜默忽略
-          }
-        }
+    // 刪除被移除的舊圖（忽略刪失敗）
+    for (const url of (removeUrls || [])) {
+      try {
+        const path = url.split("/o/")[1].split("?")[0];
+        await deleteObject(sRef(storage, decodeURIComponent(path)));
+      } catch (e) {
+        // 靜默忽略
+      }
+    }
 
-        newData.images = newUrls;
+    newData.images = newUrls;
 
     // ③ 寫回 Firestore
     await updateDoc(doc(db, "pets", currentDocId), newData);
@@ -786,11 +800,11 @@ function editBeginDrag(e, tile) {
   editDragFrom = +tile.dataset.idx;
   editDragOver = editDragFrom;
 
-  try { tile.setPointerCapture?.(e.pointerId); } catch {}
+  try { tile.setPointerCapture?.(e.pointerId); } catch { }
   clearEditDragUI();
   tile.classList.add("ring-2", "ring-brand-500", "opacity-80");
   // 進入拖曳後才阻止預設（避免一開始就擋住頁面/Modal 捲動）
-  try { e.preventDefault(); } catch {}
+  try { e.preventDefault(); } catch { }
 }
 
 function clearEditDragUI() {
@@ -824,7 +838,7 @@ editPreview?.addEventListener("pointermove", (e) => {
     return;
   }
 
-  try { e.preventDefault(); } catch {}
+  try { e.preventDefault(); } catch { }
   const el = document.elementFromPoint(e.clientX, e.clientY);
   const tile = el?.closest?.("[data-idx]");
   if (!tile || !editPreview.contains(tile)) return;
@@ -860,7 +874,7 @@ function finishEditDrag() {
 editPreview?.addEventListener("pointerup", finishEditDrag);
 editPreview?.addEventListener("pointercancel", finishEditDrag);
 
-// 新增圖片（尊守上限 5）
+// 新增圖片（遵守上限 5）
 editFiles?.addEventListener("change", () => {
   const incoming = Array.from(editFiles.files || []);
   const room = MAX_EDIT_FILES - editImagesState.items.length;
@@ -1001,10 +1015,10 @@ function adoptedBeginDrag(e, tile) {
   adoptedDragFrom = +tile.dataset.idx;
   adoptedDragOver = adoptedDragFrom;
 
-  try { tile.setPointerCapture?.(e.pointerId); } catch {}
+  try { tile.setPointerCapture?.(e.pointerId); } catch { }
   clearAdoptedDragUI();
   tile.classList.add("ring-2", "ring-brand-500", "opacity-80");
-  try { e.preventDefault(); } catch {}
+  try { e.preventDefault(); } catch { }
 }
 
 function clearAdoptedDragUI() {
@@ -1037,7 +1051,7 @@ adoptedPreview.addEventListener("pointermove", (e) => {
     return;
   }
 
-  try { e.preventDefault(); } catch {}
+  try { e.preventDefault(); } catch { }
   const el = document.elementFromPoint(e.clientX, e.clientY);
   const tile = el?.closest?.("[data-idx]");
   if (!tile || !adoptedPreview.contains(tile)) return;
@@ -1229,10 +1243,10 @@ function swalInDialog(opts) {
       try {
         window.adoptedSelected = [];
         const adoptedPreview = document.getElementById("adoptedPreview");
-if (adoptedPreview) {
-  adoptedPreview.style.touchAction = "none";
-  adoptedPreview.addEventListener("contextmenu", (e) => e.preventDefault());
-}
+        if (adoptedPreview) {
+          adoptedPreview.style.touchAction = "none";
+          adoptedPreview.addEventListener("contextmenu", (e) => e.preventDefault());
+        }
         const adoptedCount = document.getElementById("adoptedCount");
         const adoptedFilesInput = document.getElementById("adoptedFiles");
         if (adoptedPreview) adoptedPreview.innerHTML = "";
