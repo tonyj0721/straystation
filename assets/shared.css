@@ -25,9 +25,11 @@ dialog::backdrop {
 #lightbox {
   position: fixed;
   inset: 0;
-  width: 100vw;
-  height: 100vh;
-  -webkit-backdrop-filter: none;
+}
+
+html.overlay-open,
+body.overlay-open {
+  background: #000;
 }
 
 #lbThumbs img {

@@ -16,6 +16,7 @@ let lbIndex = 0;
 // 用來記住原本 scroll 狀態
 let oldHtmlOverflow = "";
 let oldBodyOverflow = "";
+let closingForLightbox = false;
 
 function lockScroll() {
   oldHtmlOverflow = document.documentElement.style.overflow;
@@ -39,6 +40,7 @@ $('#dlgClose').addEventListener('click', () => {
 
 // 防止使用者按 ESC 或點 backdrop 關掉時，背景卡死
 dlg.addEventListener('close', () => {
+  if (closingForLightbox) return;
   // 若是因 Lightbox 開啟而關掉 dialog → 不要清除 currentPetId
   if (!lb.classList.contains("flex")) {
     window.currentPetId = null;
@@ -47,8 +49,14 @@ dlg.addEventListener('close', () => {
   unlockScroll();
 });
 
+function setOverlayTheme(on){
+  document.documentElement.classList.toggle('overlay-open', on);
+  document.body.classList.toggle('overlay-open', on);
+}
+
 // 🔥 開啟 Lightbox：完全關掉 dialog + 鎖定背景
 function openLightbox(images, index = 0) {
+  setOverlayTheme(true);
   lbImages = images;
   lbIndex = index;
 
@@ -74,10 +82,12 @@ function openLightbox(images, index = 0) {
   });
 
   // ❶ 正確：關掉 Modal（移除 backdrop）
+  closingForLightbox = true;
   if (dlg.open) dlg.close();
+  closingForLightbox = false;
 
   // ❷ 正確：解除背景鎖定（避免 Lightbox 卡死）
-  unlockScroll();
+  
 
   // ❸ 顯示 Lightbox
   lb.classList.remove("hidden");
