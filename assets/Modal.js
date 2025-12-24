@@ -1,12 +1,4 @@
 const q = (sel) => document.querySelector(sel);
-// ===============================
-// Dialog 開啟時鎖背景捲動（交給 Lightbox.js 的 lockScroll / unlockScroll）
-// ===============================
-//
-// 之前這裡用「fixed body」鎖背景（iOS 常見作法），但會讓 dialog 內部的
-// 水平/垂直可捲動區塊（例如縮圖列 overflow-x-auto）在手機上變成「滑不動」。
-// 所以改為：統一由 shared 的 Lightbox.js（你說的 shared.js）負責捲動鎖定。
-// （Lightbox.js 內已做「只擋背景、不擋 dialog/lightbox 內部」與巢狀鎖定。）
 
 function __lockDialogScroll() {
   try { if (typeof lockScroll === "function") lockScroll(); } catch { }
@@ -15,12 +7,6 @@ function __lockDialogScroll() {
 function __unlockDialogScroll() {
   try { if (typeof unlockScroll === "function") unlockScroll(); } catch { }
 }
-
-// 注意：不要在這裡綁 dialog 的 close/cancel 去 unlock，
-// 避免「開 Lightbox 時先關 dialog」的流程把鎖解太多層。
-// 解鎖統一在 Lightbox.js 裡的 dialog close 事件處理。
-;
-
 
 // ===============================
 // 品種資料與「品種/毛色」連動邏輯
@@ -307,7 +293,6 @@ async function openDialog(id) {
 
     dlgThumbs.appendChild(thumb);
   });
-
 
   // 5. 顯示用文字
   document.getElementById('dlgName').textContent = p.name;
@@ -659,20 +644,6 @@ editBreedTypeSel.addEventListener("change", () => {
   updateEditBreedLabel();
 });
 
-function bindSelectPlaceholderColor(sel) {
-  if (!sel) return;
-  const update = () => {
-    const empty = !sel.value;
-    sel.classList.toggle("text-gray-400", empty);
-    sel.classList.toggle("text-gray-900", !empty);
-  };
-  sel.addEventListener("change", update);
-  update(); // 初始化
-}
-
-bindSelectPlaceholderColor(document.getElementById("gender"));
-bindSelectPlaceholderColor(document.getElementById("editGender")); // 編輯表單也一起套用（如果你也想）
-
 // ===============================
 // 編輯模式：圖片管理（預覽 + 增刪）- 不卡頓版（縮圖/手機拖曳排序）
 // ===============================
@@ -811,8 +782,6 @@ editPreview?.addEventListener("click", (e) => {
 });
 
 // 手機可用的拖曳交換（Pointer Events；「移動超過門檻」才進入拖曳；放開時與目標交換）
-// - 不用長按（避免 iOS 長按跳出分享）
-// - 不用把手（維持原本外觀）
 // - 仍保留 swap 交換排序
 let editDragFrom = null;
 let editDragOver = null;
@@ -1027,8 +996,6 @@ adoptedPreview.addEventListener("click", (e) => {
 });
 
 // 手機可用的拖曳交換（Pointer Events；「移動超過門檻」才進入拖曳；放開時與目標交換）
-// - 不用長按（避免 iOS 長按跳出分享）
-// - 不用把手（維持原本外觀）
 let adoptedDragFrom = null;
 let adoptedDragOver = null;
 let adoptedDragEl = null;
@@ -1308,42 +1275,6 @@ function swalInDialog(opts) {
 
   dlg.dataset.cleanupBound = "1";
 })();
-
-// === 取消：事件委派，避免動態重繪導致沒綁到 ===
-/*document.addEventListener("click", (e) => {
-  const cancelBtn = e.target.closest?.("#btnCancel");
-  if (!cancelBtn) return;
-
-  e.preventDefault();
-
-  // 清空已領養選取（若專案內已有自訂版本會沿用）
-  try {
-    if (typeof resetAdoptedSelection === "function") resetAdoptedSelection();
-    else {
-      // 簡易後援：確保清乾淨
-      if (window.adoptedSelected) window.adoptedSelected.length = 0;
-      const adoptedPreview = document.getElementById("adoptedPreview");
-if (adoptedPreview) {
-  adoptedPreview.style.touchAction = "none";
-  adoptedPreview.addEventListener("contextmenu", (e) => e.preventDefault());
-}
-      const adoptedCount = document.getElementById("adoptedCount");
-      const adoptedFilesInput = document.getElementById("adoptedFiles");
-      if (adoptedPreview) adoptedPreview.innerHTML = "";
-      if (adoptedCount) adoptedCount.textContent = "已選 0 / 5 張";
-      if (adoptedFilesInput) adoptedFilesInput.value = "";
-    }
-  } catch { }
-
-  // 關閉 <dialog>
-  try {
-    const dlg = document.getElementById("petDialog");
-    if (dlg?.open) dlg.close();
-    // 若你不是用 close() 關 dialog，而是切 aria-hidden/open，也能配合這段：
-    // dlg?.removeAttribute?.("open");
-    // dlg?.setAttribute?.("aria-hidden", "true");
-  } catch { }
-});*/
 
 async function deleteAllUnder(path) {
   const folderRef = sRef(storage, path);

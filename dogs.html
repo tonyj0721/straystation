@@ -82,6 +82,24 @@
       cursor: not-allowed;
       background: transparent
     }
+
+    #breed:disabled {
+      color: #9CA3AF;
+      /* 灰色（Tailwind gray-400） */
+      -webkit-text-fill-color: #9CA3AF;
+      /* iOS Safari 常需要這個才會吃色 */
+      opacity: 1;
+      /* 避免 iOS 用 opacity 影響觀感 */
+    }
+
+    #editBreed:disabled {
+      color: #9CA3AF;
+      /* 灰色（Tailwind gray-400） */
+      -webkit-text-fill-color: #9CA3AF;
+      /* iOS Safari 常需要這個才會吃色 */
+      opacity: 1;
+      /* 避免 iOS 用 opacity 影響觀感 */
+    }
   </style>
 </head>
 
@@ -396,30 +414,55 @@
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-sm font-medium mb-1">品種</label>
-              <select id="editBreedType" class="w-full rounded-xl border border-gray-300 bg-white p-2 text-sm">
-                <option value="">請選擇</option>
-              </select>
+              <div class="relative">
+                <select id="editBreedType" class="w-full rounded-xl border border-gray-300 bg-white p-2 text-sm"
+                  style="-webkit-appearance:none;appearance:none;padding-right:44px;">
+                  <option value="">請選擇</option>
+                </select>
+                <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" width="18"
+                  height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
             </div>
             <div>
               <label id="editBreedLabel" class="block text-sm font-medium mb-1">品種/毛色</label>
-              <select id="editBreed" class="w-full rounded-xl border border-gray-300 bg-white p-2 text-sm" disabled>
-                <option value="">請先選擇品種</option>
-              </select>
+              <div class="relative">
+                <select id="editBreed" class="w-full rounded-xl border border-gray-300 bg-white p-2 text-sm"
+                  style="-webkit-appearance:none;appearance:none;padding-right:44px;" disabled>
+                  <option value="">請先選擇品種</option>
+                </select>
+                <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" width="18"
+                  height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
             </div>
           </div>
 
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-sm font-medium mb-1">年齡</label>
-              <input id="editAge" class="w-full rounded-xl border border-gray-300 p-2" placeholder="例：2 歲 或 8 個月" />
+              <input id="editAge" class="w-full rounded-xl border border-gray-300 bg-white p-2 text-sm"
+                placeholder="例：2 歲 或 8 個月" />
             </div>
             <div>
               <label class="block text-sm font-medium mb-1">性別</label>
-              <select id="editGender" class="w-full rounded-xl border border-gray-300 bg-white p-2 text-sm">
-                <option value="">請選擇</option>
-                <option value="男生">男生</option>
-                <option value="女生">女生</option>
-              </select>
+              <div class="relative">
+                <select id="editGender" class="w-full rounded-xl border border-gray-300 bg-white p-2 text-sm"
+                  style="-webkit-appearance:none;appearance:none;padding-right:44px;">
+                  <option value="">請選擇</option>
+                  <option value="男生">男生</option>
+                  <option value="女生">女生</option>
+                </select>
+                <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" width="18"
+                  height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
             </div>
           </div>
           <!-- 健康（編輯用） -->
@@ -757,7 +800,7 @@
 
     const BREED_DICT = {
       "品種犬": [
-        "博美", "貴賓", "梗犬", "吉娃娃", "臘腸犬", "馬爾濟斯", "柯基", "柴犬", "比熊犬", "狐狸犬", "雪納瑞", "米格魯", "哈士奇", "高山犬", "黃金獵犬", "藍斑位元犬", "邊境牧羊犬"
+        "博美", "貴賓", "梗犬", "吉娃娃", "臘腸犬", "馬爾濟斯", "柯基", "柴犬", "狐狸犬", "哈士奇", "高山犬", "黃金獵犬", "藍斑位元犬", "邊境牧羊犬"
       ],
       "米克斯": [
         "黑色", "白色", "黑白色", "黃色", "黑黃色", "白黃色", "米色", "棕色", "黑棕色", "虎斑", "花花"
