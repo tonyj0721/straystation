@@ -11,6 +11,9 @@ const __pageScrollLock = (() => {
     const body = document.body;
     const scrollY = window.scrollY || html.scrollTop || body.scrollTop || 0;
 
+    // 相容舊版 shared.js：讓 oldHtmlOverflow 永遠是「鎖住前」的值，避免解鎖後還被還原成 hidden
+    try { window.oldHtmlOverflow = html.style.overflow; } catch { }
+
     // 桌機：避免 overflow hidden 造成版面左右抖動
     const gap = Math.max(0, window.innerWidth - html.clientWidth);
 
@@ -45,6 +48,8 @@ const __pageScrollLock = (() => {
     const y = st.scrollY || 0;
 
     html.style.overflow = st.htmlOverflow || "";
+    // 相容舊版 shared.js
+    try { window.oldHtmlOverflow = html.style.overflow; } catch { }
     body.style.position = st.bodyPos || "";
     body.style.top = st.bodyTop || "";
     body.style.left = st.bodyLeft || "";
@@ -61,14 +66,12 @@ const __pageScrollLock = (() => {
 })();
 
 function __lockDialogScroll() {
+  // 只用這份的鎖定/解鎖，避免跟 shared.js 的 oldHtmlOverflow 互相踩到
   try { __pageScrollLock.lock(); } catch { }
-  // 舊版 shared.js 可能也有 lockScroll（留著不衝突）
-  try { if (typeof lockScroll === "function") lockScroll(); } catch { }
 }
 
 function __unlockDialogScroll() {
   try { __pageScrollLock.unlock(); } catch { }
-  try { if (typeof unlockScroll === "function") unlockScroll(); } catch { }
 }
 
 // 不論用 X / Esc / close() / 點遮罩等方式關閉，都解鎖背景
@@ -441,10 +444,10 @@ async function openDialog(id) {
 
 // 關閉 Dialog
 document.getElementById("dlgClose").addEventListener("click", () => {
-  if (dlg.open) {
-    __unlockDialogScroll();
-    dlg.close();
-  }
+  if (!dlg.open) return;
+  try { dlg.close(); } catch { }
+  // 保險：萬一 close 事件沒觸發（極少數奇怪情況），下一輪也會解鎖
+  setTimeout(__unlockDialogScroll, 0);
 });
 function scrollDialogTop() {
   const dlg = document.getElementById("petDialog");
