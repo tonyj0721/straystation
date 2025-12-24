@@ -63,13 +63,10 @@ const __pageScrollLock = (() => {
 
 function __lockDialogScroll() {
   try { __pageScrollLock.lock(); } catch { }
-  // 舊版 shared.js 可能也有 lockScroll（留著不衝突）
-  try { if (typeof lockScroll === "function") lockScroll(); } catch { }
 }
 
 function __unlockDialogScroll() {
   try { __pageScrollLock.unlock(); } catch { }
-  try { if (typeof unlockScroll === "function") unlockScroll(); } catch { }
 }
 
 // 不論用 X / Esc / close() / 點遮罩等方式關閉，都解鎖背景
