@@ -33,13 +33,7 @@ let __themeMeta = null;
 let __oldThemeColor = "";
 
 function __ensureThemeMeta() {
-  let m = document.querySelector('meta[name="theme-color"]');
-  if (!m) {
-    m = document.createElement("meta");
-    m.name = "theme-color";
-    document.head.appendChild(m);
-  }
-  return m;
+  return document.getElementById("themeColor");
 }
 
 // 讓 Lightbox / dialog backdrop 真的「蓋滿」含 safe-area（避免 100vh 缺口）
