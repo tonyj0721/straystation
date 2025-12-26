@@ -307,6 +307,13 @@ async function openDialog(id) {
   document.getElementById("editName").value = p.name;
   document.getElementById("editAge").value = p.age;
 
+  // ✅ 新增：預填後立刻跑一次「重複檢查」讓圖1也會直接顯示
+  requestAnimationFrame(() => {
+    document
+      .getElementById("editName")
+      ?.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+
   const gSel = document.getElementById("editGender");
   const g = String(p.gender || "").trim();
   gSel.value = (g === "男生" || g === "女生") ? g : "";  // 其他(含性別不詳)一律回到「請選擇」
@@ -1333,7 +1340,7 @@ async function deleteAllUnder(path) {
     if (!name) { clearState(); return; }
 
     // 只在「重複」時顯示紅字／紅框，其他保持靜默
-    const dup = await isNameTaken(name, window.currentDocId || window.currentDoc?.id || null);
+    const dup = await isNameTaken(name, currentDocId);
     if (dup) setBad(`「${name}」已被使用`);
     else clearState();
   });
