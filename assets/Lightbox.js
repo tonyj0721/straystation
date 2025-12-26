@@ -79,9 +79,12 @@ function lockScroll() {
 
   // 你想要的顏色（可改成你遮罩的顏色）
   __themeMetas = Array.from(document.querySelectorAll('meta[name="theme-color"]'))
-  .map(m => [m, m.getAttribute('content') || ""]);
+    .map(m => [m, m.getAttribute('content') || ""]);
 
-__themeMetas.forEach(([m]) => m.setAttribute("content", "#000000"));
+  __themeMetas.forEach(([m]) => m.setAttribute("content", "#000000"));
+
+  document.documentElement.style.backgroundColor = "#000";
+  document.body.style.backgroundColor = "#000";
 
   document.documentElement.style.overflow = "hidden";
   document.body.style.overflow = "hidden";
@@ -108,13 +111,16 @@ function unlockScroll() {
 
   // [新增] 還原 Safari UI 背後顏色 / theme-color
   __themeMetas.forEach(([m, c]) => {
-  if (c) m.setAttribute("content", c);
-  else m.removeAttribute("content");
-});
-__themeMetas = [];
+    if (c) m.setAttribute("content", c);
+    else m.removeAttribute("content");
+  });
+  __themeMetas = [];
 
   window.scrollTo(0, __savedScrollY);
 }
+
+document.documentElement.style.backgroundColor = __oldHtmlBg;
+document.body.style.backgroundColor = __oldBodyBg;
 
 // 鎖住 / 恢復背景捲動（交給 dialog 的 close 事件統一解鎖，避免 unlock 兩次）
 $('#dlgClose')?.addEventListener('click', () => {
