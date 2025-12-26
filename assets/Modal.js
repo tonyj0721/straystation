@@ -1,12 +1,4 @@
 const q = (sel) => document.querySelector(sel);
-// ===============================
-// Dialog 開啟時鎖背景捲動（交給 Lightbox.js 的 lockScroll / unlockScroll）
-// ===============================
-//
-// 之前這裡用「fixed body」鎖背景（iOS 常見作法），但會讓 dialog 內部的
-// 水平/垂直可捲動區塊（例如縮圖列 overflow-x-auto）在手機上變成「滑不動」。
-// 所以改為：統一由 shared 的 Lightbox.js（你說的 shared.js）負責捲動鎖定。
-// （Lightbox.js 內已做「只擋背景、不擋 dialog/lightbox 內部」與巢狀鎖定。）
 
 function __lockDialogScroll() {
   try { if (typeof lockScroll === "function") lockScroll(); } catch { }
@@ -15,12 +7,6 @@ function __lockDialogScroll() {
 function __unlockDialogScroll() {
   try { if (typeof unlockScroll === "function") unlockScroll(); } catch { }
 }
-
-// 注意：不要在這裡綁 dialog 的 close/cancel 去 unlock，
-// 避免「開 Lightbox 時先關 dialog」的流程把鎖解太多層。
-// 解鎖統一在 Lightbox.js 裡的 dialog close 事件處理。
-;
-
 
 // ===============================
 // 品種資料與「品種/毛色」連動邏輯
@@ -308,7 +294,6 @@ async function openDialog(id) {
     dlgThumbs.appendChild(thumb);
   });
 
-
   // 5. 顯示用文字
   document.getElementById('dlgName').textContent = p.name;
   document.getElementById('dlgDesc').textContent = p.desc;
@@ -321,20 +306,56 @@ async function openDialog(id) {
   document.getElementById("editVaccinated").checked = !!p.vaccinated;
   document.getElementById("editName").value = p.name;
   document.getElementById("editAge").value = p.age;
-  document.getElementById("editGender").value = p.gender;
+
+  // ✅ 新增：預填後立刻跑一次「重複檢查」讓圖1也會直接顯示
+  requestAnimationFrame(() => {
+    document
+      .getElementById("editName")
+      ?.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+
+  const gSel = document.getElementById("editGender");
+  const g = String(p.gender || "").trim();
+  gSel.value = (g === "男生" || g === "女生") ? g : "";  // 其他(含性別不詳)一律回到「請選擇」
+
   document.getElementById("editDesc").value = p.desc;
 
   setEditSpecies(p.species || '貓');
   syncEditBreedSelectors();
 
-  if (p.breedType) {
-    document.getElementById("editBreedType").value = p.breedType;
-    buildEditBreedOptions();
-    updateEditBreedLabel();
+  if (p.breedType || p.breed) {
+    let breedType = String(p.breedType || "").trim();
+    let breedValue = String(p.breed || "").trim();
 
-    if (p.breed) {
-      document.getElementById("editBreed").disabled = false;
-      document.getElementById("editBreed").value = p.breed;
+    // 把「品種不詳」視為沒選
+    if (breedValue === "品種不詳") breedValue = "";
+
+    // 舊資料：breedType 沒存，但 breed 是 "米克斯/xxx" 或 "米克斯"
+    if (!breedType && /^米克斯(\/|$)/.test(breedValue)) {
+      breedType = "米克斯";
+    }
+
+    // 米克斯：右側只放毛色，所以去掉前綴
+    if (breedType === "米克斯") {
+      breedValue = breedValue.replace(/^米克斯\/?/, "");
+    }
+
+    const btSel = document.getElementById("editBreedType");
+    const bSel = document.getElementById("editBreed");
+
+    if (!breedType) {
+      // 沒選左邊：右邊保持 disabled +「請先選擇品種」
+      btSel.value = "";
+      resetEditBreedRight();       // 會塞入「請先選擇品種」並 disabled :contentReference[oaicite:8]{index=8}
+      updateEditBreedLabel();
+    } else {
+      btSel.value = breedType;
+      buildEditBreedOptions();     // 右邊會變成可選 + 第一個 option「請選擇」:contentReference[oaicite:9]{index=9}
+      updateEditBreedLabel();
+
+      // breedValue 不在選項裡就回到 placeholder，避免顯示空白
+      const has = Array.from(bSel.options).some(o => o.value === breedValue);
+      bSel.value = has ? breedValue : "";
     }
   }
 
@@ -360,7 +381,6 @@ async function openDialog(id) {
     dlg.showModal();
   }
 }
-
 
 function scrollDialogTop() {
   const dlg = document.getElementById("petDialog");
@@ -514,40 +534,40 @@ async function saveEdit() {
   const stopDots = startDots(txt, "儲存中");
 
   try {
-        // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
-        const { items, removeUrls } = editImagesState;
-        const newUrls = [];
+    // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
+    const { items, removeUrls } = editImagesState;
+    const newUrls = [];
 
-        // 依序處理（保持順序）
-        for (const it of items) {
-          if (it.kind === "url") {
-            newUrls.push(it.url);
-            continue;
-          }
+    // 依序處理（保持順序）
+    for (const it of items) {
+      if (it.kind === "url") {
+        newUrls.push(it.url);
+        continue;
+      }
 
-          if (it.kind === "file") {
-            const f = it.file;
-            const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
-            const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
-            const base = f.name.replace(/\.[^.]+$/, '');
-            const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
-            const r = sRef(storage, path);
-            await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
-            newUrls.push(await getDownloadURL(r));
-          }
-        }
+      if (it.kind === "file") {
+        const f = it.file;
+        const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+        const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
+        const base = f.name.replace(/\.[^.]+$/, '');
+        const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
+        const r = sRef(storage, path);
+        await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
+        newUrls.push(await getDownloadURL(r));
+      }
+    }
 
-        // 刪除被移除的舊圖（忽略刪失敗）
-        for (const url of (removeUrls || [])) {
-          try {
-            const path = url.split("/o/")[1].split("?")[0];
-            await deleteObject(sRef(storage, decodeURIComponent(path)));
-          } catch (e) {
-            // 靜默忽略
-          }
-        }
+    // 刪除被移除的舊圖（忽略刪失敗）
+    for (const url of (removeUrls || [])) {
+      try {
+        const path = url.split("/o/")[1].split("?")[0];
+        await deleteObject(sRef(storage, decodeURIComponent(path)));
+      } catch (e) {
+        // 靜默忽略
+      }
+    }
 
-        newData.images = newUrls;
+    newData.images = newUrls;
 
     // ③ 寫回 Firestore
     await updateDoc(doc(db, "pets", currentDocId), newData);
@@ -769,8 +789,6 @@ editPreview?.addEventListener("click", (e) => {
 });
 
 // 手機可用的拖曳交換（Pointer Events；「移動超過門檻」才進入拖曳；放開時與目標交換）
-// - 不用長按（避免 iOS 長按跳出分享）
-// - 不用把手（維持原本外觀）
 // - 仍保留 swap 交換排序
 let editDragFrom = null;
 let editDragOver = null;
@@ -786,11 +804,11 @@ function editBeginDrag(e, tile) {
   editDragFrom = +tile.dataset.idx;
   editDragOver = editDragFrom;
 
-  try { tile.setPointerCapture?.(e.pointerId); } catch {}
+  try { tile.setPointerCapture?.(e.pointerId); } catch { }
   clearEditDragUI();
   tile.classList.add("ring-2", "ring-brand-500", "opacity-80");
   // 進入拖曳後才阻止預設（避免一開始就擋住頁面/Modal 捲動）
-  try { e.preventDefault(); } catch {}
+  try { e.preventDefault(); } catch { }
 }
 
 function clearEditDragUI() {
@@ -824,7 +842,7 @@ editPreview?.addEventListener("pointermove", (e) => {
     return;
   }
 
-  try { e.preventDefault(); } catch {}
+  try { e.preventDefault(); } catch { }
   const el = document.elementFromPoint(e.clientX, e.clientY);
   const tile = el?.closest?.("[data-idx]");
   if (!tile || !editPreview.contains(tile)) return;
@@ -860,7 +878,7 @@ function finishEditDrag() {
 editPreview?.addEventListener("pointerup", finishEditDrag);
 editPreview?.addEventListener("pointercancel", finishEditDrag);
 
-// 新增圖片（尊守上限 5）
+// 新增圖片（遵守上限 5）
 editFiles?.addEventListener("change", () => {
   const incoming = Array.from(editFiles.files || []);
   const room = MAX_EDIT_FILES - editImagesState.items.length;
@@ -985,8 +1003,6 @@ adoptedPreview.addEventListener("click", (e) => {
 });
 
 // 手機可用的拖曳交換（Pointer Events；「移動超過門檻」才進入拖曳；放開時與目標交換）
-// - 不用長按（避免 iOS 長按跳出分享）
-// - 不用把手（維持原本外觀）
 let adoptedDragFrom = null;
 let adoptedDragOver = null;
 let adoptedDragEl = null;
@@ -1001,10 +1017,10 @@ function adoptedBeginDrag(e, tile) {
   adoptedDragFrom = +tile.dataset.idx;
   adoptedDragOver = adoptedDragFrom;
 
-  try { tile.setPointerCapture?.(e.pointerId); } catch {}
+  try { tile.setPointerCapture?.(e.pointerId); } catch { }
   clearAdoptedDragUI();
   tile.classList.add("ring-2", "ring-brand-500", "opacity-80");
-  try { e.preventDefault(); } catch {}
+  try { e.preventDefault(); } catch { }
 }
 
 function clearAdoptedDragUI() {
@@ -1037,7 +1053,7 @@ adoptedPreview.addEventListener("pointermove", (e) => {
     return;
   }
 
-  try { e.preventDefault(); } catch {}
+  try { e.preventDefault(); } catch { }
   const el = document.elementFromPoint(e.clientX, e.clientY);
   const tile = el?.closest?.("[data-idx]");
   if (!tile || !adoptedPreview.contains(tile)) return;
@@ -1229,10 +1245,10 @@ function swalInDialog(opts) {
       try {
         window.adoptedSelected = [];
         const adoptedPreview = document.getElementById("adoptedPreview");
-if (adoptedPreview) {
-  adoptedPreview.style.touchAction = "none";
-  adoptedPreview.addEventListener("contextmenu", (e) => e.preventDefault());
-}
+        if (adoptedPreview) {
+          adoptedPreview.style.touchAction = "none";
+          adoptedPreview.addEventListener("contextmenu", (e) => e.preventDefault());
+        }
         const adoptedCount = document.getElementById("adoptedCount");
         const adoptedFilesInput = document.getElementById("adoptedFiles");
         if (adoptedPreview) adoptedPreview.innerHTML = "";
@@ -1266,42 +1282,6 @@ if (adoptedPreview) {
 
   dlg.dataset.cleanupBound = "1";
 })();
-
-// === 取消：事件委派，避免動態重繪導致沒綁到 ===
-/*document.addEventListener("click", (e) => {
-  const cancelBtn = e.target.closest?.("#btnCancel");
-  if (!cancelBtn) return;
-
-  e.preventDefault();
-
-  // 清空已領養選取（若專案內已有自訂版本會沿用）
-  try {
-    if (typeof resetAdoptedSelection === "function") resetAdoptedSelection();
-    else {
-      // 簡易後援：確保清乾淨
-      if (window.adoptedSelected) window.adoptedSelected.length = 0;
-      const adoptedPreview = document.getElementById("adoptedPreview");
-if (adoptedPreview) {
-  adoptedPreview.style.touchAction = "none";
-  adoptedPreview.addEventListener("contextmenu", (e) => e.preventDefault());
-}
-      const adoptedCount = document.getElementById("adoptedCount");
-      const adoptedFilesInput = document.getElementById("adoptedFiles");
-      if (adoptedPreview) adoptedPreview.innerHTML = "";
-      if (adoptedCount) adoptedCount.textContent = "已選 0 / 5 張";
-      if (adoptedFilesInput) adoptedFilesInput.value = "";
-    }
-  } catch { }
-
-  // 關閉 <dialog>
-  try {
-    const dlg = document.getElementById("petDialog");
-    if (dlg?.open) dlg.close();
-    // 若你不是用 close() 關 dialog，而是切 aria-hidden/open，也能配合這段：
-    // dlg?.removeAttribute?.("open");
-    // dlg?.setAttribute?.("aria-hidden", "true");
-  } catch { }
-});*/
 
 async function deleteAllUnder(path) {
   const folderRef = sRef(storage, path);
@@ -1360,7 +1340,7 @@ async function deleteAllUnder(path) {
     if (!name) { clearState(); return; }
 
     // 只在「重複」時顯示紅字／紅框，其他保持靜默
-    const dup = await isNameTaken(name, window.currentDocId || window.currentDoc?.id || null);
+    const dup = await isNameTaken(name, currentDocId);
     if (dup) setBad(`「${name}」已被使用`);
     else clearState();
   });
