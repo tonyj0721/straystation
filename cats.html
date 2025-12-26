@@ -988,7 +988,7 @@
       breedSel.disabled = false;
       breedSel.innerHTML =
         `<option value="">${label}</option>` +
-        options.map(b => `<option value="${b}">${b}</option>`).join('');
+        options.map(b => `<option value="${type === '米克斯' ? `米克斯/${b}` : b}">${b}</option>`).join('');
     }
 
     function getFilters() {
