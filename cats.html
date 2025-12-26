@@ -809,7 +809,14 @@
 
     function ageBucket(ageStr) {
       if (!ageStr) return "";
-      const s = ageStr.toString();
+      const raw = String(ageStr);
+      const s = raw.replace(/\s+/g, ""); // 去空白，方便比對
+
+      // ✅ 明確定義「不到 1 歲」：不到/未滿/小於/低於/< + 1(或一) + 歲
+      //    並排除「不到1歲半 / 不到1歲多」這種可能 >= 1 的寫法
+      if (/(?:不到|未滿|小於|低於|<)(?:1)歲/.test(s)) {
+        return "1以下";
+      }
 
       // 若寫「X月」或數值 < 1，皆歸「1以下」
       const numMatch = s.match(/(\d+(?:\.\d+)?)/);
