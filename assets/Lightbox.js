@@ -79,8 +79,22 @@ dlg?.addEventListener('close', () => {
   unlockScroll();
 });
 
+const __themeMeta = (() => {
+  let m = document.querySelector('meta[name="theme-color"]');
+  if (!m) {
+    m = document.createElement('meta');
+    m.setAttribute('name', 'theme-color');
+    document.head.appendChild(m);
+  }
+  return m;
+})();
+const __baseTheme = __themeMeta.getAttribute('content') || '#ffffff';
+const setTheme = (c) => __themeMeta.setAttribute('content', c);
+const restoreTheme = () => setTheme(__baseTheme);
+
 // 🔥 開啟 Lightbox：關掉 dialog + 維持背景鎖定
 function openLightbox(images, index = 0) {
+  setTheme('#0b0b0b');
   lbImages = images || [];
   lbIndex = Math.max(0, Math.min(index, lbImages.length - 1));
   lbReturnToDialog = !!(dlg && dlg.open);
@@ -120,6 +134,7 @@ function openLightbox(images, index = 0) {
 
 // 🔥 關閉 Lightbox：回到 dialog 或直接解鎖
 function closeLightbox() {
+  restoreTheme();
   if (lb) {
     lb.classList.add("hidden");
     lb.classList.remove("flex");
