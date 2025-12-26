@@ -26,6 +26,43 @@ let __oldBodyLeft = "";
 let __oldBodyRight = "";
 let __oldBodyWidth = "";
 
+// ===== iOS Safari 上下 UI 變白修正 =====
+let __oldHtmlBg = "";
+let __oldBodyBg = "";
+let __themeMeta = null;
+let __oldThemeColor = "";
+
+function __ensureThemeMeta() {
+  let m = document.querySelector('meta[name="theme-color"]');
+  if (!m) {
+    m = document.createElement("meta");
+    m.name = "theme-color";
+    document.head.appendChild(m);
+  }
+  return m;
+}
+
+// 讓 Lightbox / dialog backdrop 真的「蓋滿」含 safe-area（避免 100vh 缺口）
+(() => {
+  const style = document.createElement("style");
+  style.textContent = `
+    #lightbox{
+      position:fixed;
+      inset:0;
+      width:100vw;
+      height:100vh;
+      height:100dvh;
+      padding-top:env(safe-area-inset-top);
+      padding-bottom:env(safe-area-inset-bottom);
+    }
+    dialog::backdrop{
+      position:fixed;
+      inset:0;
+    }
+  `;
+  document.head.appendChild(style);
+})();
+
 function lockScroll() {
   __lockDepth++;
   if (__lockDepth > 1) return;
@@ -38,6 +75,17 @@ function lockScroll() {
   __oldBodyLeft = document.body.style.left;
   __oldBodyRight = document.body.style.right;
   __oldBodyWidth = document.body.style.width;
+
+  // [新增] 鎖背景期間，讓 Safari 上下 UI 背後不要變白
+  __themeMeta = __ensureThemeMeta();
+  __oldThemeColor = __themeMeta.getAttribute("content") || "";
+  __oldHtmlBg = document.documentElement.style.backgroundColor;
+  __oldBodyBg = document.body.style.backgroundColor;
+
+  // 你想要的顏色（可改成你遮罩的顏色）
+  document.documentElement.style.backgroundColor = "#000";
+  document.body.style.backgroundColor = "#000";
+  __themeMeta.setAttribute("content", "#000000");
 
   document.documentElement.style.overflow = "hidden";
   document.body.style.overflow = "hidden";
@@ -61,6 +109,15 @@ function unlockScroll() {
   document.body.style.left = __oldBodyLeft;
   document.body.style.right = __oldBodyRight;
   document.body.style.width = __oldBodyWidth;
+
+  // [新增] 還原 Safari UI 背後顏色 / theme-color
+  if (__themeMeta) {
+    if (__oldThemeColor) __themeMeta.setAttribute("content", __oldThemeColor);
+    else __themeMeta.removeAttribute("content");
+  }
+  document.documentElement.style.backgroundColor = __oldHtmlBg;
+  document.body.style.backgroundColor = __oldBodyBg;
+
   window.scrollTo(0, __savedScrollY);
 }
 
@@ -79,22 +136,8 @@ dlg?.addEventListener('close', () => {
   unlockScroll();
 });
 
-const __themeMeta = (() => {
-  let m = document.querySelector('meta[name="theme-color"]');
-  if (!m) {
-    m = document.createElement('meta');
-    m.setAttribute('name', 'theme-color');
-    document.head.appendChild(m);
-  }
-  return m;
-})();
-const __baseTheme = __themeMeta.getAttribute('content') || '#ffffff';
-const setTheme = (c) => __themeMeta.setAttribute('content', c);
-const restoreTheme = () => setTheme(__baseTheme);
-
 // 🔥 開啟 Lightbox：關掉 dialog + 維持背景鎖定
 function openLightbox(images, index = 0) {
-  setTheme('#0b0b0b');
   lbImages = images || [];
   lbIndex = Math.max(0, Math.min(index, lbImages.length - 1));
   lbReturnToDialog = !!(dlg && dlg.open);
@@ -125,6 +168,16 @@ function openLightbox(images, index = 0) {
     lb.classList.add("flex");
   }
 
+  if (lb) {
+    lb.style.position = "fixed";
+    lb.style.inset = "0";
+    lb.style.width = "100vw";
+    lb.style.height = "100vh";
+    lb.style.height = "100dvh"; // 支援就用 d/vh
+    lb.style.paddingTop = "env(safe-area-inset-top)";
+    lb.style.paddingBottom = "env(safe-area-inset-bottom)";
+  }
+
   // 關掉 Modal（移除 backdrop）
   if (dlg?.open) dlg.close();
 
@@ -134,7 +187,6 @@ function openLightbox(images, index = 0) {
 
 // 🔥 關閉 Lightbox：回到 dialog 或直接解鎖
 function closeLightbox() {
-  restoreTheme();
   if (lb) {
     lb.classList.add("hidden");
     lb.classList.remove("flex");
