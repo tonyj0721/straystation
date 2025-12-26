@@ -31,6 +31,7 @@ let __oldHtmlBg = "";
 let __oldBodyBg = "";
 let __themeMeta = null;
 let __oldThemeColor = "";
+let __themeMetas = [];
 
 function __ensureThemeMeta() {
   return document.getElementById("themeColor");
@@ -77,9 +78,10 @@ function lockScroll() {
   __oldBodyBg = document.body.style.backgroundColor;
 
   // 你想要的顏色（可改成你遮罩的顏色）
-  document.documentElement.style.backgroundColor = "#000";
-  document.body.style.backgroundColor = "#000";
-  __themeMeta.setAttribute("content", "#000000");
+  __themeMetas = Array.from(document.querySelectorAll('meta[name="theme-color"]'))
+  .map(m => [m, m.getAttribute('content') || ""]);
+
+__themeMetas.forEach(([m]) => m.setAttribute("content", "#000000"));
 
   document.documentElement.style.overflow = "hidden";
   document.body.style.overflow = "hidden";
@@ -105,12 +107,11 @@ function unlockScroll() {
   document.body.style.width = __oldBodyWidth;
 
   // [新增] 還原 Safari UI 背後顏色 / theme-color
-  if (__themeMeta) {
-    if (__oldThemeColor) __themeMeta.setAttribute("content", __oldThemeColor);
-    else __themeMeta.removeAttribute("content");
-  }
-  document.documentElement.style.backgroundColor = __oldHtmlBg;
-  document.body.style.backgroundColor = __oldBodyBg;
+  __themeMetas.forEach(([m, c]) => {
+  if (c) m.setAttribute("content", c);
+  else m.removeAttribute("content");
+});
+__themeMetas = [];
 
   window.scrollTo(0, __savedScrollY);
 }
