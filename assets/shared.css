@@ -1,5 +1,32 @@
+/* 讓圖片容器用同張圖做模糊延伸背景 */
+.blur-fit {
+  position: relative;
+  overflow: hidden;
+}
+
+.blur-fit::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--bg) center/cover no-repeat;
+  /* 這裡吃 inline style 的 --bg */
+  filter: blur(24px);
+  transform: scale(1.1);
+  /* 放大避免邊緣露白 */
+}
+
+.blur-fit>img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  z-index: 1;
+  /* 上層放原圖，保持比例 */
+}
+
 dialog::backdrop {
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.9);
 }
 
 /* 🔥 Modal 縮圖 */
@@ -50,40 +77,31 @@ dialog::backdrop {
   border: 2px solid white;
 }
 
-/* 讓圖片容器用同張圖做模糊延伸背景 */
-.blur-fit {
-  position: relative;
-  overflow: hidden;
+#lbPrev {
+  left: 0rem;
 }
 
-.blur-fit::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: var(--bg) center/cover no-repeat;
-  /* 這裡吃 inline style 的 --bg */
-  filter: blur(24px);
-  transform: scale(1.1);
-  /* 放大避免邊緣露白 */
+#lbNext {
+  right: 0rem;
 }
 
-.blur-fit>img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  z-index: 1;
-  /* 上層放原圖，保持比例 */
-}
-
-@media (max-width: 767.98px) {
-
-  input,
-  select,
-  textarea {
-    font-size: 16px;
+@media (min-width:768px) {
+  #lbPrev {
+    left: 2.5rem;
   }
+
+  #lbNext {
+    right: 2.5rem;
+  }
+}
+
+#editBreed:disabled {
+  color: #9CA3AF;
+  /* 灰色（Tailwind gray-400） */
+  -webkit-text-fill-color: #9CA3AF;
+  /* iOS Safari 常需要這個才會吃色 */
+  opacity: 1;
+  /* 避免 iOS 用 opacity 影響觀感 */
 }
 
 .swal2-confirm {
@@ -109,22 +127,4 @@ dialog::backdrop {
   font-size: 14px;
   font-weight: 600;
   border: none;
-}
-
-#lbPrev {
-  left: 0rem;
-}
-
-#lbNext {
-  right: 0rem;
-}
-
-@media (min-width:768px) {
-  #lbPrev {
-    left: 2.5rem;
-  }
-
-  #lbNext {
-    right: 2.5rem;
-  }
 }

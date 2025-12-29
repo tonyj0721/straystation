@@ -28,19 +28,6 @@
   <link rel="stylesheet" href="assets/tailwind.css">
   <link rel="stylesheet" href="assets/shared.css">
   <style>
-    /* 狗掌：單點回首頁、長按登入（避免 iOS 長按選字/呼叫選單） */
-    #GoogleLogin {
-      -webkit-user-select: none;
-      user-select: none;
-      -webkit-touch-callout: none;
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
-    }
-
-    #GoogleLogin img {
-      pointer-events: none;
-    }
-
     /* Pagination (match screenshot) */
     .pager {
       display: inline-flex;
@@ -83,24 +70,6 @@
       background: transparent
     }
 
-    #breed:disabled {
-      color: #9CA3AF;
-      /* 灰色（Tailwind gray-400） */
-      -webkit-text-fill-color: #9CA3AF;
-      /* iOS Safari 常需要這個才會吃色 */
-      opacity: 1;
-      /* 避免 iOS 用 opacity 影響觀感 */
-    }
-
-    #editBreed:disabled {
-      color: #9CA3AF;
-      /* 灰色（Tailwind gray-400） */
-      -webkit-text-fill-color: #9CA3AF;
-      /* iOS Safari 常需要這個才會吃色 */
-      opacity: 1;
-      /* 避免 iOS 用 opacity 影響觀感 */
-    }
-
     .swal2-popup {
       border-radius: 12px;
     }
@@ -109,6 +78,19 @@
     .swal2-backdrop-show {
       background: rgba(0, 0, 0, 0.25);
       backdrop-filter: blur(6px);
+    }
+
+    /* 狗掌：單點回首頁、長按登入（避免 iOS 長按選字/呼叫選單） */
+    #GoogleLogin {
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+
+    #GoogleLogin img {
+      pointer-events: none;
     }
   </style>
 </head>
@@ -566,8 +548,7 @@
       <button id="lbClose" class="absolute top-1 right-1 z-10 bg-black/60 hover:bg-black/70 text-white rounded-full p-2
            text-2xl leading-none select-none" aria-label="關閉">✕</button>
     </div>
-    <div id="lbThumbs"
-      class="absolute w-full flex justify-center px-4 py-2">
+    <div id="lbThumbs" class="absolute w-full flex justify-center px-4 py-2">
       <div id="lbThumbsInner" class="flex gap-3"></div>
     </div>
     <button id="lbPrev" class="absolute text-white text-4xl select-none">❮</button>

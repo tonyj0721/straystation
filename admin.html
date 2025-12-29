@@ -69,16 +69,16 @@
       background: transparent
     }
 
-    #breed:disabled {
-      color: #9CA3AF;
-      /* 灰色（Tailwind gray-400） */
-      -webkit-text-fill-color: #9CA3AF;
-      /* iOS Safari 常需要這個才會吃色 */
-      opacity: 1;
-      /* 避免 iOS 用 opacity 影響觀感 */
+    @media (max-width: 767.98px) {
+
+      input,
+      select,
+      textarea {
+        font-size: 16px;
+      }
     }
 
-    #editBreed:disabled {
+    #breed:disabled {
       color: #9CA3AF;
       /* 灰色（Tailwind gray-400） */
       -webkit-text-fill-color: #9CA3AF;
@@ -635,8 +635,7 @@
       <button id="lbClose" class="absolute top-1 right-1 z-10 bg-black/60 hover:bg-black/70 text-white rounded-full p-2
            text-2xl leading-none select-none" aria-label="關閉">✕</button>
     </div>
-    <div id="lbThumbs"
-      class="absolute w-full flex justify-center px-4 py-2">
+    <div id="lbThumbs" class="absolute w-full flex justify-center px-4 py-2">
       <div id="lbThumbsInner" class="flex gap-3"></div>
     </div>
     <button id="lbPrev" class="absolute text-white text-4xl select-none">❮</button>
