@@ -58,6 +58,16 @@
       opacity: 1;
       /* 避免 iOS 用 opacity 影響觀感 */
     }
+
+    .swal2-popup {
+      border-radius: 12px;
+    }
+
+    /* SweetAlert 背景遮罩模糊 */
+    .swal2-backdrop-show {
+      background: rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(6px);
+    }
   </style>
 </head>
 
@@ -989,22 +999,22 @@
 
       // ① 先顯示「認養條件與流程」(確認/取消)
       const precheckHTML = `
-      <div style="text-align:left;height:65vh;overflow:auto;padding:4px 2px; background-color: #fdecec;">
+      <div style="text-align:left;max-height:55vh;overflow:auto;padding:4px 2px;">
         <div style="font-weight:800;margin-bottom:24px;text-align:center;font-size:24px;">認養條件與流程</div>
-        <ol style="line-height:1.5;padding-left:1.45rem;margin:0; list-style: decimal;">
-          <li style="margin-bottom: 12px;">需年滿 20 歲，有穩定收入。</li>
-          <li style="margin-bottom: 12px;">需先了解認養人住家環境、是否有原養寵物。</li>
-          <li style="margin-bottom: 12px;">確認符合條件，小編篩選後，預約園區參訪。</li>
-          <li style="margin-bottom: 12px;">確認領養需準備身份證影印本及印章，並簽署認養同意書。</li>
-          <li style="margin-bottom: 12px;">需負擔結紮等相關費用。</li>
-          <li style="margin-bottom: 12px;">認養人需長期主動更新毛孩近況，並接受不定期居家訪視。</li>
+        <ol style="line-height:1.7;padding-left:1.25rem;margin:0; list-style: decimal;">
+          <li>需年滿 20 歲，有穩定收入。</li>
+          <li>需先了解認養人住家環境、是否有原養寵物。</li>
+          <li>確認符合條件，小編篩選後，預約園區參訪。</li>
+          <li>確認領養需準備身份證影印本及印章，並簽署認養同意書。</li>
+          <li>需負擔結紮等相關費用。</li>
+          <li>認養人需長期主動更新毛孩近況，並接受不定期居家訪視。</li>
         </ol>
       </div>
     `;
 
       Swal.fire({
         target: dlg,
-        backdrop: false,
+        backdrop: true,
         html: precheckHTML,
         showCancelButton: true,
         confirmButtonText: '我符合，繼續',
