@@ -26,7 +26,7 @@ dialog::backdrop {
   position: fixed;
   inset: 0;
   width: 100vw;
-  height: 100vh;
+  min-height: 100dvh;
   -webkit-backdrop-filter: none;
   background: rgba(0, 0, 0, 0.9);
 
