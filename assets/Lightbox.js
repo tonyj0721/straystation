@@ -112,7 +112,7 @@ function openLightbox(images, index = 0) {
   }
 
   // 關掉 Modal（移除 backdrop）
-  /*if (dlg?.open) dlg.close();*/
+  if (dlg?.open) dlg.close();
 
   // 確保背景鎖住（不要 unlock，避免 iOS 點頂端時背景被捲）
   if (__lockDepth === 0) lockScroll();
