@@ -31,6 +31,10 @@ dialog::backdrop {
   background: rgba(0, 0, 0, 0.5);
 }
 
+lightbox::backdrop {
+  background: rgba(0, 0, 0, 0.9);
+}
+
 #lbThumbs img {
   width: 60px;
   height: 60px;
