@@ -71,26 +71,41 @@
     }
 
     /* 標題 */
-    .adopt-precheck-title {
-      text-align: center;
-      font-size: 22px;
-      font-weight: 800;
-      margin-bottom: 20px;
-    }
+    .adopt-precheck {
+  max-height: 70vh;
+  overflow-y: auto;
 
-    /* 條件清單 */
-    .adopt-precheck-list {
-      margin: 0;
-      padding-left: 0.5rem;
-      list-style: decimal;
-      list-style-position: inside;
-      /* 關鍵：數字不被切 */
-    }
+  padding: 12px 14px;          /* 重點：左右要寬一點 */
+  font-size: 16px;
+  line-height: 1.8;
 
-    /* 單條條件 */
-    .adopt-precheck-list li {
-      margin-bottom: 10px;
-    }
+  text-align: left;            /* 強制左對齊 */
+  color: #374151;
+}
+
+/* 標題 OK，不動 */
+.adopt-precheck-title {
+  text-align: center;
+  font-size: 22px;
+  font-weight: 800;
+  margin-bottom: 20px;
+}
+
+/* 關鍵在這 */
+.adopt-precheck-list {
+  margin: 0;
+  padding-left: 1.6em;         /* 留給數字的空間 */
+  list-style: decimal;
+}
+
+/* 每一條 */
+.adopt-precheck-list li {
+  margin-bottom: 12px;
+
+  /* 關鍵：讓換行對齊文字而不是數字 */
+  text-indent: -1.6em;
+  padding-left: 1.6em;
+}
   </style>
 </head>
 
