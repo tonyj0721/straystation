@@ -100,6 +100,16 @@
       opacity: 1;
       /* 避免 iOS 用 opacity 影響觀感 */
     }
+
+    .swal2-popup {
+      border-radius: 12px;
+    }
+
+    /* SweetAlert 背景遮罩模糊 */
+    .swal2-backdrop-show {
+      background: rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(6px);
+    }
   </style>
 </head>
 
@@ -1075,7 +1085,7 @@
       const precheckHTML = `
       <div style="text-align:left;max-height:55vh;overflow:auto;padding:4px 2px;">
         <div style="font-weight:800;margin-bottom:24px;text-align:center;font-size:24px;">認養條件與流程</div>
-        <ol style="line-height:1.7;padding-left:1.25rem;margin:0; list-style: decimal;">
+        <ol style="line-height:1.7;padding-left:1.5rem;margin:0; list-style: decimal;">
           <li>需年滿 20 歲，有穩定收入。</li>
           <li>需先了解認養人住家環境、是否有原養寵物。</li>
           <li>確認符合條件，小編篩選後，預約園區參訪。</li>
@@ -1088,7 +1098,7 @@
 
       Swal.fire({
         target: dlg,
-        backdrop: false,
+        backdrop: true,
         html: precheckHTML,
         showCancelButton: true,
         confirmButtonText: '我符合，繼續',
