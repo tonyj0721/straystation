@@ -58,54 +58,6 @@
       opacity: 1;
       /* 避免 iOS 用 opacity 影響觀感 */
     }
-
-    /* 認養條件視窗 */
-    .adopt-precheck {
-      max-height: 70vh;
-      overflow-y: auto;
-      padding: 8px 6px;
-      font-size: 16px;
-      line-height: 1.75;
-      color: #374151;
-      /* gray-700 */
-    }
-
-    /* 標題 */
-    .adopt-precheck {
-  max-height: 70vh;
-  overflow-y: auto;
-
-  padding: 12px 14px;          /* 重點：左右要寬一點 */
-  font-size: 16px;
-  line-height: 1.8;
-
-  text-align: left;            /* 強制左對齊 */
-  color: #374151;
-}
-
-/* 標題 OK，不動 */
-.adopt-precheck-title {
-  text-align: center;
-  font-size: 22px;
-  font-weight: 800;
-  margin-bottom: 20px;
-}
-
-/* 關鍵在這 */
-.adopt-precheck-list {
-  margin: 0;
-  padding-left: 1.6em;         /* 留給數字的空間 */
-  list-style: decimal;
-}
-
-/* 每一條 */
-.adopt-precheck-list li {
-  margin-bottom: 12px;
-
-  /* 關鍵：讓換行對齊文字而不是數字 */
-  text-indent: -1.6em;
-  padding-left: 1.6em;
-}
   </style>
 </head>
 
@@ -1037,10 +989,9 @@
 
       // ① 先顯示「認養條件與流程」(確認/取消)
       const precheckHTML = `
-      <div class="adopt-precheck">
-        <h2 class="adopt-precheck-title">認養條件與流程</h2>
-
-        <ol class="adopt-precheck-list">
+      <div style="text-align:left;max-height:55vh;overflow:auto;padding:4px 2px;">
+        <div style="font-weight:800;margin-bottom:24px;text-align:center;font-size:24px;">認養條件與流程</div>
+        <ol style="line-height:1.7;padding-left:1.25rem;margin:0; list-style: decimal;">
           <li>需年滿 20 歲，有穩定收入。</li>
           <li>需先了解認養人住家環境、是否有原養寵物。</li>
           <li>確認符合條件，小編篩選後，預約園區參訪。</li>
