@@ -32,10 +32,7 @@ dialog::backdrop {
 
 #lbThumbs {
   /* 🔥 貼齊 iPhone 下方 UI */
-  bottom: env(safe-area-inset-bottom);
-
-  /* 給縮圖一點呼吸空間 */
-  padding-bottom: 8px;
+  bottom: calc(env(safe-area-inset-bottom) + 8px);
 }
 
 #lbThumbs img {
