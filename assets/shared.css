@@ -28,6 +28,7 @@
   width: 100vw;
   height: 100vh;
   -webkit-backdrop-filter: none;
+  background: rgba(0, 0, 0, 0.5);  
 }
 
 #lbThumbs img {
