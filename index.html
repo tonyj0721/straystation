@@ -235,7 +235,7 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 lg:py-20 grid lg:grid-cols-2 items-center gap-10">
       <div>
         <h1 class="text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight">讓牠們回家 🐾<br>找到命中注定的家人</h1>
-        <p class="mt-4 text-lg text-gray-600 dark:text-gray-300">在浪浪轉運站，我們與民間中途與收容所合作，為每一隻貓狗找到安全、穩定、充滿愛的家。</p>
+        <p class="mt-4 text-lg text-gray-600 dark:text-gray-300">在台中簡媽媽狗園，我們致力於<br>為每一隻貓狗找到安全、穩定、充滿愛的家。</p>
         <dl class="mt-8 grid grid-cols-3 gap-4 text-center">
           <div class="p-4 rounded-xl bg-white/70 border border-gray-200">
             <dt class="text-sm text-gray-500">已成功送養</dt>
@@ -831,9 +831,9 @@
           const eladopted = document.getElementById('statAdopted');
           const elCats = document.getElementById('statCats');
           const elDogs = document.getElementById('statDogs');
-          if (eladopted) eladopted.textContent = adopted.toLocaleString();
-          if (elCats) elCats.textContent = cats.toLocaleString();
-          if (elDogs) elDogs.textContent = dogs.toLocaleString();
+          if (eladopted) eladopted.textContent = `${adopted.toLocaleString()}+`;
+          if (elCats) elCats.textContent = `${cats.toLocaleString()}+`;
+          if (elDogs) elDogs.textContent = `${dogs.toLocaleString()}+`;
         } catch (err) {
           console.error('applyStats error:', err);
         }
