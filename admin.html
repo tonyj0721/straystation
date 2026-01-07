@@ -355,7 +355,7 @@
               placeholder="個性、習慣、背景故事、注意事項…"></textarea>
           </div>
           <div>
-            <input id="imgFiles" type="file" accept="image/*" multiple class="sr-only" />
+            <input id="imgFiles" type="file" accept="image/*,video/*" multiple class="sr-only" />
             <div class="flex items-center gap-3">
               <button id="btnPick" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
                 新增照片
@@ -945,33 +945,45 @@
       const wrap = document.createElement("div");
       wrap.className = "relative touch-none select-none";
 
-      const img = document.createElement("img");
-      img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
-      img.alt = "預覽";
-      img.decoding = "async";
-      img.loading = "lazy";
-      img.src = EMPTY_GIF;
+      let media;
 
-      // 先顯示空白，再異步塞縮圖，避免解碼瞬間卡頓
-      ensureThumbURL(file)
-        .then((url) => { img.src = url; })
-        .catch(() => {
-          // 真的不行就退回原圖（至少有預覽）
-          try {
+      if (file.type.startsWith("video/")) {
+        media = document.createElement("video");
+        media.src = URL.createObjectURL(file);
+        media.controls = true;
+        media.muted = true;
+        media.playsInline = true;
+        media.preload = "metadata";
+        media.className =
+          "w-full aspect-square object-cover rounded-lg bg-black";
+      } else {
+        media = document.createElement("img");
+        media.alt = "預覽";
+        media.decoding = "async";
+        media.loading = "lazy";
+        media.className =
+          "w-full aspect-square object-cover rounded-lg bg-gray-100";
+        media.src = EMPTY_GIF;
+
+        ensureThumbURL(file)
+          .then((url) => (media.src = url))
+          .catch(() => {
             const raw = URL.createObjectURL(file);
-            img.src = raw;
+            media.src = raw;
             setTimeout(() => URL.revokeObjectURL(raw), 2000);
-          } catch { }
-        });
+          });
+      }
 
       const btn = document.createElement("button");
-      btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
+      btn.className =
+        "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
       btn.type = "button";
       btn.textContent = "✕";
-      btn.setAttribute("aria-label", "刪除這張");
+      btn.setAttribute("aria-label", "刪除");
 
-      wrap.appendChild(img);
+      wrap.appendChild(media);
       wrap.appendChild(btn);
+
       return wrap;
     }
 
@@ -1205,7 +1217,9 @@
         // 2) 逐張上傳圖片，取得 Storage URL
         const urls = [];
         for (const f of selectedFiles) {
-          const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+          const wmBlob = f.type.startsWith("image/")
+            ? await addWatermarkToFile(f)
+            : f;
           const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
           const base = f.name.replace(/\.[^.]+$/, '');
           const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
