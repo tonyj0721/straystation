@@ -236,20 +236,6 @@
       <div>
         <h1 class="text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight">讓牠們回家 🐾<br>找到命中注定的家人</h1>
         <p class="mt-4 text-lg text-gray-600 dark:text-gray-300">在台中簡媽媽狗園，我們致力於<br>為每一隻貓狗找到安全、穩定、充滿愛的家。</p>
-        <dl class="mt-8 grid grid-cols-3 gap-4 text-center">
-          <div class="p-4 rounded-xl bg-white/70 border border-gray-200">
-            <dt class="text-sm text-gray-500">已成功送養</dt>
-            <dd class="text-xl font-semibold" id="statAdopted">0</dd>
-          </div>
-          <div class="p-4 rounded-xl bg-white/70 border border-gray-200">
-            <dt class="text-sm text-gray-500">待領養貓咪</dt>
-            <dd class="text-xl font-semibold" id="statCats">0</dd>
-          </div>
-          <div class="p-4 rounded-xl bg-white/70 border border-gray-200">
-            <dt class="text-sm text-gray-500">待領養狗狗</dt>
-            <dd class="text-xl font-semibold" id="statDogs">0</dd>
-          </div>
-        </dl>
       </div>
       <div class="relative">
         <div class="aspect-[4/3] rounded-3xl overflow-hidden shadow-soft ring-1 ring-gray-200">
@@ -324,19 +310,24 @@
     <div class="mt-6 grid md:grid-cols-2 gap-6">
       <details class="p-4 rounded-xl bg-white border border-gray-200">
         <summary class="font-medium cursor-pointer">認養流程需要多久？</summary>
-        <p class="mt-2 text-gray-600">通常 1–2 週，包含基本面談、家訪與試養期。我們會確保雙方都準備好。</p>
+        <p class="mt-2 text-gray-600">
+          通常 1 ～ 2 週內會完成基本訪談。<br><br>我們會將您的認養資料提交給理事長和簡媽審閱，並由他們選出最適合的認養人喔。<br><br>有意認養的朋友請耐心等候，我們非常感謝您的支持與愛心。
+        </p>
       </details>
       <details class="p-4 rounded-xl bg-white border border-gray-200">
-        <summary class="font-medium cursor-pointer">可以跨縣市認養嗎？</summary>
-        <p class="mt-2 text-gray-600">可以，但需評估交通與後續回診等安排，並視中途/機構規定調整。</p>
+        <summary class="font-medium cursor-pointer">我可以先到園區看狗狗/貓咪再決定認養嗎？</summary>
+        <p class="mt-2 text-gray-600">
+          若您都符合我們的認養條件也同意我們的認養要求，才會與您約時間和毛孩進行當面認養程序喔！<br><br>我們會確保雙方都準備好，再將毛孩託付給您。<br><br>互動當天若評估彼此不適合，可當場取消認養程序，雙方的契合度是我們最首要的考量。
+        </p>
       </details>
       <details class="p-4 rounded-xl bg-white border border-gray-200">
         <summary class="font-medium cursor-pointer">領養需要費用嗎？</summary>
-        <p class="mt-2 text-gray-600">視每隻動物的結紮、健康狀況而定。</p>
-      </details>
-      <details class="p-4 rounded-xl bg-white border border-gray-200">
-        <summary class="font-medium cursor-pointer">是否提供晶片登記與結紮補助？</summary>
-        <p class="mt-2 text-gray-600">部分合作機構提供，依地區不同，請聯繫我們了解詳情。</p>
+        <p class="mt-2 text-gray-600"><br>園區認養費用說明<br><br>
+          10 公斤以下&ensp;公犬 $4000&emsp;母犬 $5000<br>
+          皆包含結紮手術、四合一快篩、十合一疫苗、狂犬疫苗、體內外驅蟲、晶片移轉費<br>
+          （若體重超過 10 公斤之大型犬，因麻醉劑量需依體重調整，將酌收 1000 元之藥劑加價。）<br><br>
+          公貓 $4400&emsp;母貓 $5000<br>
+          皆包含結紮手術、三合一快篩（白血病/冠狀病毒/愛滋病）、四合一疫苗、體內外驅蟲、晶片轉移費</p>
       </details>
     </div>
   </section>
@@ -806,39 +797,11 @@
       });
     });
 
-    // 統計起始基數（已成功送養、待領養貓咪、待領養狗狗）
-    const STATS_BASE = { adopted: 1021, cats: 89, dogs: 743 };
     const pets = (window.pets ||= []);
     let currentPetId = null;
 
     const $ = (q) => document.querySelector(q);
     const $$ = (q) => document.querySelectorAll(q);
-
-    // 已成功送養、待領養貓咪、待領養狗狗
-    function applyStats() {
-      (async () => {
-        try {
-          const coll = collection(db, "pets");
-          const [adoptedSnap, catsSnap, dogsSnap] = await Promise.all([
-            getCountFromServer(query(coll, where("status", "==", "adopted"))),
-            getCountFromServer(query(coll, where("status", "==", "available"), where("species", "==", "貓"))),
-            getCountFromServer(query(coll, where("status", "==", "available"), where("species", "==", "狗")))
-          ]);
-          const adopted = (STATS_BASE.adopted || 0) + (adoptedSnap.data().count || 0);
-          const cats = (STATS_BASE.cats || 0) + (catsSnap.data().count || 0);
-          const dogs = (STATS_BASE.dogs || 0) + (dogsSnap.data().count || 0);
-
-          const eladopted = document.getElementById('statAdopted');
-          const elCats = document.getElementById('statCats');
-          const elDogs = document.getElementById('statDogs');
-          if (eladopted) eladopted.textContent = `${adopted.toLocaleString()}+`;
-          if (elCats) elCats.textContent = `${cats.toLocaleString()}+`;
-          if (elDogs) elDogs.textContent = `${dogs.toLocaleString()}+`;
-        } catch (err) {
-          console.error('applyStats error:', err);
-        }
-      })();
-    }
 
     function makePetUrl(id) {
       return `${location.origin}${location.pathname}?pet=${encodeURIComponent(id)}`;
@@ -946,7 +909,6 @@
 
       pets.length = 0;
       pets.push(...[...cats, ...dogs]);
-      applyStats();
 
       // 桌機版：3 排（每排 4 張）
       renderDesktopRows(cats, dogs);
