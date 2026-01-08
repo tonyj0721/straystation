@@ -7,11 +7,13 @@ window.scrollTo(0, 0);
 const dlg = document.getElementById('petDialog');
 const lb = document.getElementById("lightbox");
 const lbImg = document.getElementById("lbImg");
+const lbVideo = document.getElementById("lbVideo");
+const lbVideoWatermark = document.getElementById("lbVideoWatermark");
 const lbPrev = document.getElementById("lbPrev");
 const lbNext = document.getElementById("lbNext");
 const lbClose = document.getElementById("lbClose");
 
-let lbImages = [];
+let lbItems = [];
 let lbIndex = 0;
 let lbReturnToDialog = false;
 
@@ -80,27 +82,77 @@ dlg?.addEventListener('close', () => {
 });
 
 // 🔥 開啟 Lightbox：關掉 dialog + 維持背景鎖定
-function openLightbox(images, index = 0) {
-  lbImages = images || [];
-  lbIndex = Math.max(0, Math.min(index, lbImages.length - 1));
-  lbReturnToDialog = !!(dlg && dlg.open);
+function normalizeLightboxItems(items) {
+  const arr = Array.isArray(items) ? items : [];
+  return arr.map((x) => {
+    if (typeof x === "string") return { type: "image", url: x };
+    const url = x?.url || "";
+    const type = (x?.type === "video") ? "video" : "image";
+    return { type, url };
+  }).filter((x) => !!x.url);
+}
 
-  if (lbImg) lbImg.src = lbImages[lbIndex] || '';
+function showLightboxItem(idx) {
+  if (!lbItems.length) return;
+  lbIndex = (idx + lbItems.length) % lbItems.length;
+  const it = lbItems[lbIndex];
+
+  // reset
+  if (lbImg) lbImg.classList.add("hidden");
+  if (lbVideo) {
+    try { lbVideo.pause(); } catch { }
+    lbVideo.classList.add("hidden");
+  }
+  if (lbVideoWatermark) lbVideoWatermark.classList.add("hidden");
+
+  if (it.type === "video") {
+    if (lbVideo) {
+      lbVideo.classList.remove("hidden");
+      lbVideo.src = it.url;
+    }
+    // 影片硬浮水印由後端 ffmpeg 燒錄，前台不再疊加覆蓋層
+} else {
+    if (lbImg) {
+      lbImg.classList.remove("hidden");
+      lbImg.src = it.url;
+    }
+  }
+
+  // active
+  const lbThumbsInner = document.getElementById("lbThumbsInner");
+  if (lbThumbsInner) {
+    lbThumbsInner.querySelectorAll("[data-lb-idx]").forEach((el) => {
+      el.classList.toggle("active", +el.dataset.lbIdx === lbIndex);
+    });
+  }
+}
+
+// 🔥 開啟 Lightbox：關掉 dialog + 維持背景鎖定
+function openLightbox(items, index = 0) {
+  lbItems = normalizeLightboxItems(items);
+  lbIndex = Math.max(0, Math.min(index, lbItems.length - 1));
+  lbReturnToDialog = !!(dlg && dlg.open);
 
   // 建立縮圖列
   const lbThumbsInner = document.getElementById("lbThumbsInner");
   if (lbThumbsInner) {
     lbThumbsInner.innerHTML = "";
-    lbImages.forEach((url, i) => {
-      const t = document.createElement("img");
-      t.src = url;
+    lbItems.forEach((it, i) => {
+      const isV = it.type === "video";
+      const t = document.createElement(isV ? "video" : "img");
+      t.dataset.lbIdx = String(i);
       t.className = i === lbIndex ? "active" : "";
-      t.addEventListener("click", () => {
-        lbIndex = i;
-        if (lbImg) lbImg.src = lbImages[lbIndex] || '';
-        lbThumbsInner.querySelectorAll("img").forEach(el => el.classList.remove("active"));
-        t.classList.add("active");
-      });
+
+      if (isV) {
+        t.src = it.url;
+        t.muted = true;
+        t.playsInline = true;
+        t.preload = "metadata";
+      } else {
+        t.src = it.url;
+      }
+
+      t.addEventListener("click", () => showLightboxItem(i));
       lbThumbsInner.appendChild(t);
     });
   }
@@ -116,6 +168,8 @@ function openLightbox(images, index = 0) {
 
   // 確保背景鎖住（不要 unlock，避免 iOS 點頂端時背景被捲）
   if (__lockDepth === 0) lockScroll();
+
+  showLightboxItem(lbIndex);
 }
 
 // 🔥 關閉 Lightbox：回到 dialog 或直接解鎖
@@ -136,15 +190,8 @@ function closeLightbox() {
 
 // 🔥 左右切換
 function lbShow(delta) {
-  if (!lbImages.length) return;
-  lbIndex = (lbIndex + delta + lbImages.length) % lbImages.length;
-  if (lbImg) lbImg.src = lbImages[lbIndex] || '';
-  const lbThumbsInner = document.getElementById("lbThumbsInner");
-  if (lbThumbsInner) {
-    lbThumbsInner.querySelectorAll("img").forEach((el, i) => {
-      el.classList.toggle("active", i === lbIndex);
-    });
-  }
+  if (!lbItems.length) return;
+  showLightboxItem(lbIndex + delta);
 }
 
 lbPrev?.addEventListener('click', (e) => {
