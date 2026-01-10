@@ -445,7 +445,9 @@
           <img id="dlgImg" alt="毛孩照片"
             class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg">
 
-          <button id="dlgClose" class="absolute top-1 right-1 z-20 bg-black/60 text-white p-2 rounded-full leading-none"
+          
+          <video id="dlgVideo" class="relative z-10 block w-full h-full object-contain rounded-lg wm-playback hidden" controls playsinline></video>
+<button id="dlgClose" class="absolute top-1 right-1 z-20 bg-black/60 text-white p-2 rounded-full leading-none"
             aria-label="關閉">✕</button>
         </div>
       </div>
@@ -1238,32 +1240,34 @@
         // 1) 新增基本文件
         const docRef = await addDoc(collection(db, "pets"), payload);
 
-        // 2) 逐張上傳圖片，取得 Storage URL
+        // 2) 逐一上傳圖片/影片，取得 Storage URL
         const urls = [];
+        const vids = [];
         for (const f of selectedMedia) {
-  const isImage = f.type && f.type.startsWith("image/");
-  const isVideo = f.type && f.type.startsWith("video/");
-  if (isImage) {
-    const wmBlob = await addWatermarkToFile(f); // 圖片先加浮水印（前端 Canvas）
-    const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
-    const base = (f.name || 'image').replace(/\.[^.]+$/, '');
-    const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
-    const r = sRef(storage, path);
-    await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
-    urls.push(await getDownloadURL(r));
-  } else if (isVideo) {
-    const rawRef = sRef(storage, `raw-videos/pets/${docRef.id}/${Date.now()}_${(f.name || 'video')}`);
-    await uploadBytes(rawRef, f, {
-      contentType: f.type || "video/mp4",
-      customMetadata: { petId: docRef.id, watermarkText: "台中簡媽媽狗園" }
-    });
-    // 後端 Functions 會把浮水印轉檔結果寫回 Firestore
-  }
-}
+          const isImage = f.type && f.type.startsWith("image/");
+          const isVideo = f.type && f.type.startsWith("video/");
+          if (isImage) {
+            const wmBlob = await addWatermarkToFile(f); // 圖片先加浮水印（前端 Canvas）
+            const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
+            const base = (f.name || 'image').replace(/\.[^.]+$/, '');
+            const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
+            const r = sRef(storage, path);
+            await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
+            urls.push(await getDownloadURL(r));
+          } else if (isVideo) {
+            const vPath = `pets/${docRef.id}/videos/${Date.now()}_${(f.name || 'video')}`;
+            const vr = sRef(storage, vPath);
+            await uploadBytes(vr, f, { contentType: f.type || "video/mp4" });
+            vids.push(await getDownloadURL(vr));
+          }
+        }
 
-        // 3) 回寫 images 欄位
-        if (urls.length) {
-          await updateDoc(doc(db, "pets", docRef.id), { images: urls });
+        // 3) 回寫 images / videos 欄位
+        const updates = {};
+        if (urls.length) updates.images = urls;
+        if (vids.length) updates.videos = vids;
+        if (Object.keys(updates).length) {
+          await updateDoc(doc(db, "pets", docRef.id), updates);
         }
 
         // UI 收尾
