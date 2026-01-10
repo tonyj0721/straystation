@@ -35,8 +35,10 @@ jobs:
       # main：正式部署 Hosting + Functions
       - name: Deploy to Prod (main)
         if: github.event_name == 'push'
-        uses: w9jds/firebase-action@v13
+        uses: w9jds/firebase-action@v15.2.1   # 或至少用 v15
         with:
           args: deploy --only hosting,functions --project ${{ secrets.FIREBASE_PROJECT_ID }}
         env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          # 建議用服務帳戶金鑰（JSON）而不是舊的 FIREBASE_TOKEN
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+          PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
