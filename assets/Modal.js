@@ -1,11 +1,11 @@
 const q = (sel) => document.querySelector(sel);
 
 function __lockDialogScroll() {
-  try { if (typeof lockScroll === "function") lockScroll(); } catch (e) {}
+  try { if (typeof lockScroll === "function") lockScroll(); } catch { }
 }
 
 function __unlockDialogScroll() {
-  try { if (typeof unlockScroll === "function") unlockScroll(); } catch (e) {}
+  try { if (typeof unlockScroll === "function") unlockScroll(); } catch { }
 }
 
 // ===============================
@@ -31,25 +31,40 @@ const BREEDS = {
 };
 
 
-// 產生「重複斜紋浮水印」畫布，供圖片與影片共用
-function __makeWatermarkCanvas(W, H, text = "台中簡媽媽狗園") {
+// 產生帶浮水印的 Blob（細字、無外框、疏一點）
+// 統一入口：圖片 / 影片皆可
+async function addWatermarkToFile(file, opts = {}) {
+  if (file && typeof file.type === "string" && file.type.startsWith("video/")) {
+    return await addWatermarkToVideo(file, opts);
+  }
+  return await addWatermarkToImage(file, opts);
+}
+
+// 共用：依寬高建立一層對角線浮水印
+function __createWatermarkLayer(width, height, text = "台中簡媽媽狗園") {
   const c = document.createElement("canvas");
-  c.width = W; c.height = H;
+  c.width = width;
+  c.height = height;
   const g = c.getContext("2d");
-  // 透明底
-  g.clearRect(0, 0, W, H);
+
+  // === 細字無外框樣式（可調參數） ===
   const ANG = -33 * Math.PI / 180;   // 斜角
-  const FS = Math.round(Math.max(W, H) * 0.03);  // 字高 ≈ 長邊 3%
+  const FS = Math.round(Math.max(width, height) * 0.03);  // 字高 ≈ 長邊 3%
   const OP = 0.25;                                  // 透明度
   const STEP_X = Math.max(Math.round(FS * 12), 360); // 同斜線間距（倍數越大越疏）
   const STEP_Y = Math.max(Math.round(FS * 8), 260);  // 斜線與斜線間距
-  const diag = Math.hypot(W, H);
+
+  const diag = Math.hypot(width, height);
+
   g.save();
-  g.translate(W / 2, H / 2);
+  g.translate(width / 2, height / 2);
   g.rotate(ANG);
   g.font = `600 ${FS}px "Noto Sans TC","Microsoft JhengHei",sans-serif`;
   g.textBaseline = "middle";
   g.fillStyle = `rgba(255,255,255,${OP})`;
+  // 想更柔和可打開下一行：
+  // g.globalCompositeOperation = "overlay"; // 或 "soft-light"
+
   for (let x = -diag; x <= diag; x += STEP_X) {
     for (let y = -diag; y <= diag; y += STEP_Y) {
       g.fillText(text, x, y);
@@ -58,8 +73,9 @@ function __makeWatermarkCanvas(W, H, text = "台中簡媽媽狗園") {
   g.restore();
   return c;
 }
-// 產生帶浮水印的 Blob（細字、無外框、疏一點）
-async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {}) {
+
+// 圖片：產生帶浮水印的 Blob（直接改寫原圖內容）
+async function addWatermarkToImage(file, { text = "台中簡媽媽狗園" } = {}) {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise((res, rej) => {
@@ -70,13 +86,105 @@ async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {})
     c.width = W; c.height = H;
     const g = c.getContext("2d");
     g.drawImage(img, 0, 0, W, H);
-    // 疊上同款式浮水印
-    const wm = __makeWatermarkCanvas(W, H, text);
-    g.drawImage(wm, 0, 0);
+
+    const wmLayer = __createWatermarkLayer(W, H, text);
+    g.drawImage(wmLayer, 0, 0, W, H);
+
     const out = await new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
     return new File([out], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
   } finally {
     URL.revokeObjectURL(url);
+  }
+}
+
+// 影片：用 <canvas> 燒入浮水印，重新編碼成 WebM
+// 注意：處理時間會接近影片實際長度，較長的影片會花比較久
+async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}) {
+  const src = URL.createObjectURL(file);
+  const video = document.createElement("video");
+  video.src = src;
+  video.muted = true;
+  video.playsInline = true;
+  video.crossOrigin = "anonymous";
+
+  try {
+    await new Promise((resolve, reject) => {
+      video.addEventListener("loadedmetadata", () => resolve(), { once: true });
+      video.addEventListener("error", () => reject(new Error("影片讀取失敗")), { once: true });
+    });
+
+    const W = video.videoWidth || 1280;
+    const H = video.videoHeight || 720;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = W;
+    canvas.height = H;
+    const g = canvas.getContext("2d");
+
+    if (!canvas.captureStream || typeof MediaRecorder === "undefined") {
+      console.warn("此瀏覽器不支援 MediaRecorder/captureStream，影片將不上浮水印原檔上傳");
+      return file;
+    }
+
+    const wmLayer = __createWatermarkLayer(W, H, text);
+
+    const canvasStream = canvas.captureStream();
+    let mime = "video/webm";
+    if (MediaRecorder.isTypeSupported("video/webm;codecs=vp9")) {
+      mime = "video/webm;codecs=vp9";
+    } else if (MediaRecorder.isTypeSupported("video/webm;codecs=vp8")) {
+      mime = "video/webm;codecs=vp8";
+    }
+
+    const recorder = new MediaRecorder(canvasStream, { mimeType: mime });
+    const chunks = [];
+
+    recorder.addEventListener("dataavailable", (e) => {
+      if (e.data && e.data.size > 0) chunks.push(e.data);
+    });
+
+    const recordDone = new Promise((resolve) => {
+      recorder.addEventListener("stop", () => resolve(), { once: true });
+    });
+
+    let playing = false;
+    let ended = false;
+
+    function drawFrame() {
+      if (!playing || ended) return;
+      try {
+        g.drawImage(video, 0, 0, W, H);
+        g.drawImage(wmLayer, 0, 0, W, H);
+      } catch (e) {
+        // 忽略單幀錯誤
+      }
+      requestAnimationFrame(drawFrame);
+    }
+
+    video.addEventListener("play", () => {
+      playing = true;
+      drawFrame();
+    });
+
+    video.addEventListener("pause", () => {
+      playing = false;
+    });
+
+    video.addEventListener("ended", () => {
+      ended = true;
+      try { recorder.stop(); } catch (_) { }
+      canvasStream.getTracks().forEach((t) => t.stop());
+    }, { once: true });
+
+    recorder.start(200);
+    await video.play();
+    await recordDone;
+
+    const blob = new Blob(chunks, { type: "video/webm" });
+    const outName = file.name.replace(/\.[^.]+$/, ".webm");
+    return new File([blob], outName, { type: "video/webm" });
+  } finally {
+    URL.revokeObjectURL(src);
   }
 }
 
@@ -119,60 +227,11 @@ function revokePreviewThumb(file) {
   __thumbPromiseCache.delete(file);
 }
 
-
 async function __decodeToBitmap(file) {
-  // If it's a video, grab the first frame as a bitmap
-  try {
-    if (file && file.type && file.type.startsWith('video/')) {
-      const url = URL.createObjectURL(file);
-      try {
-        const v = document.createElement('video');
-        v.muted = true;
-        v.playsInline = true;
-        v.src = url;
-        await new Promise((res, rej) => {
-          v.onloadeddata = () => res();
-          v.onerror = () => rej(new Error('video load error'));
-        });
-        try {
-          v.currentTime = Math.min(0.01, (v.duration || 0) * 0.01);
-          await new Promise((res) => v.onseeked = () => res());
-        } catch (e) {}
-        const W = v.videoWidth || 640;
-        const H = v.videoHeight || 360;
-        const c = document.createElement('canvas');
-        c.width = W; c.height = H;
-        const g = c.getContext('2d', { alpha: false });
-        g.drawImage(v, 0, 0, W, H);
-        URL.revokeObjectURL(url);
-        return await createImageBitmap(c);
-      } catch (e) {
-        // Try ffmpeg.wasm to decode a poster if browser can't decode (e.g., HEVC/MOV)
-        try { URL.revokeObjectURL(url); } catch (_) {}
-        if (window.FFmpeg && FFmpeg.createFFmpeg) {
-          try {
-            const { createFFmpeg, fetchFile } = FFmpeg;
-            const ffmpeg = window.__ffmpegPreview || (window.__ffmpegPreview = createFFmpeg({ log: false }));
-            if (!ffmpeg.isLoaded()) await ffmpeg.load();
-            ffmpeg.FS('writeFile', 'p_in', await fetchFile(file));
-            // decode first frame to jpeg
-            await ffmpeg.run('-i','p_in','-frames:v','1','-q:v','2','p_out.jpg');
-            const data = ffmpeg.FS('readFile', 'p_out.jpg');
-            const blob = new Blob([data.buffer], { type: 'image/jpeg' });
-            return await createImageBitmap(await (async () => {
-              const img = await createImageBitmap(blob);
-              return img;
-            })());
-          } catch (e2) {
-            // fall through to generic path
-          }
-        }
-      }
-    }
-  } catch (e) {}
   if (window.createImageBitmap) {
-    try { return await createImageBitmap(file); } catch (e) { /* fallback */ }
+    try { return await createImageBitmap(file); } catch (_) { /* fallback */ }
   }
+
   // fallback：用 <img> 解碼（比較可能卡，但至少可用）
   const raw = URL.createObjectURL(file);
   try {
@@ -192,8 +251,8 @@ async function __decodeToBitmap(file) {
     URL.revokeObjectURL(raw);
   }
 }
-async function __makePreviewThumbURL
-(file) {
+
+async function __makePreviewThumbURL(file) {
   const bmp = await __decodeToBitmap(file);
   const W = bmp.width, H = bmp.height;
   const scale = Math.min(1, PREVIEW_MAX / Math.max(W, H));
@@ -346,6 +405,40 @@ async function openDialog(id) {
     dlgThumbs.appendChild(thumb);
   });
 
+
+  // 4b. 影片顯示區
+  const dlgVideosSection = document.getElementById("dlgVideosSection");
+  const dlgVideos = document.getElementById("dlgVideos");
+
+  if (dlgVideosSection && dlgVideos) {
+    dlgVideos.innerHTML = "";
+    const videos = Array.isArray(p.videos) ? p.videos.filter(Boolean) : [];
+
+    if (videos.length === 0) {
+      dlgVideosSection.classList.add("hidden");
+    } else {
+      dlgVideosSection.classList.remove("hidden");
+
+      videos.forEach((url, idx) => {
+        const wrap = document.createElement("div");
+        wrap.className = "rounded-lg bg-gray-100 p-2";
+
+        const label = document.createElement("div");
+        label.className = "text-xs text-gray-500 mb-1";
+        label.textContent = `影片 ${idx + 1}`;
+        wrap.appendChild(label);
+
+        const videoEl = document.createElement("video");
+        videoEl.src = url;
+        videoEl.controls = true;
+        videoEl.className = "w-full rounded-md max-h-60 bg-black";
+        wrap.appendChild(videoEl);
+
+        dlgVideos.appendChild(wrap);
+      });
+    }
+  }
+
   // 5. 顯示用文字
   document.getElementById('dlgName').textContent = p.name;
   document.getElementById('dlgDesc').textContent = p.desc;
@@ -412,6 +505,14 @@ async function openDialog(id) {
   }
 
   renderEditImages(imgs);
+
+  // 重置編輯模式影片暫存
+  if (typeof pendingEditVideos !== "undefined") {
+    pendingEditVideos = [];
+  }
+  if (editVideoList) editVideoList.innerHTML = "";
+  if (editVideoCount) editVideoCount.textContent = "";
+  if (editVideoFiles) editVideoFiles.value = "";
 
   // 7. 模式 / 按鈕 / 已送養相關
   setEditMode(false);      // 一開始都是「瀏覽模式」
@@ -621,6 +722,28 @@ async function saveEdit() {
 
     newData.images = newUrls;
 
+    // 若本次有新增影片，append 到原有 videos 陣列
+    const appendVideos = [];
+    if (pendingEditVideos && pendingEditVideos.length) {
+      for (const f of pendingEditVideos) {
+        const wmBlob = await addWatermarkToFile(f);
+        const isImage = wmBlob.type && wmBlob.type.startsWith("image/");
+        const ext = isImage
+          ? (wmBlob.type === 'image/png' ? 'png' : 'jpg')
+          : (wmBlob.type.split("/")[1] || "bin");
+        const base = f.name.replace(/\.[^.]+$/, '');
+        const folder = isImage ? `pets/${currentDocId}` : `pets/${currentDocId}/videos`;
+        const path = `${folder}/${Date.now()}_${base}.${ext}`;
+        const r = sRef(storage, path);
+        await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
+        appendVideos.push(await getDownloadURL(r));
+      }
+    }
+    if (appendVideos.length) {
+      const existingVideos = Array.isArray(currentDoc?.videos) ? currentDoc.videos : [];
+      newData.videos = existingVideos.concat(appendVideos);
+    }
+
     // ③ 寫回 Firestore
     await updateDoc(doc(db, "pets", currentDocId), newData);
 
@@ -717,6 +840,42 @@ const editCount = q("#editCount");
 
 const MAX_EDIT_FILES = 5;
 
+const editVideoFiles = q("#editVideoFiles");
+const btnPickEditVideo = q("#btnPickEditVideo");
+const editVideoCount = q("#editVideoCount");
+const editVideoList = q("#editVideoList");
+const MAX_EDIT_VIDEO_FILES = 3;
+
+// 編輯模式下待新增的影片（只會 append，不處理刪除）
+let pendingEditVideos = [];
+
+btnPickEditVideo?.addEventListener("click", () => editVideoFiles?.click());
+
+editVideoFiles?.addEventListener("change", () => {
+  const incoming = Array.from(editVideoFiles.files || []);
+  const next = (pendingEditVideos || []).concat(incoming);
+  if (next.length > MAX_EDIT_VIDEO_FILES) {
+    if (typeof Swal !== "undefined" && Swal?.fire) {
+      Swal.fire({ icon: "warning", title: `最多 ${MAX_EDIT_VIDEO_FILES} 支影片` });
+    }
+  }
+  pendingEditVideos = next.slice(0, MAX_EDIT_VIDEO_FILES);
+
+  if (editVideoList) {
+    editVideoList.innerHTML = "";
+    pendingEditVideos.forEach((f, idx) => {
+      const row = document.createElement("div");
+      row.textContent = `${idx + 1}. ${f.name}`;
+      editVideoList.appendChild(row);
+    });
+  }
+  if (editVideoCount) {
+    editVideoCount.textContent = `已選 ${pendingEditVideos.length} / ${MAX_EDIT_VIDEO_FILES} 支`;
+  }
+  editVideoFiles.value = "";
+});
+
+
 // 狀態：依「目前畫面順序」維護（url=舊圖、file=新圖）
 let editImagesState = { items: [], removeUrls: [] };
 
@@ -768,7 +927,7 @@ function __makeEditTile(it) {
           const raw = URL.createObjectURL(it.file);
           img.src = raw;
           setTimeout(() => URL.revokeObjectURL(raw), 2000);
-        } catch (e) {}
+        } catch { }
       });
   }
 
@@ -791,7 +950,7 @@ function __setEditIdx(tile, idx) {
 
 // 依狀態同步 DOM（不清空重畫，避免閃爍）
 function paintEditPreview() {
-  editCount.textContent = `已選 ${editImagesState.items.length} / ${MAX_EDIT_FILES} 張/支`;
+  editCount.textContent = `已選 ${editImagesState.items.length} / ${MAX_EDIT_FILES} 張`;
 
   const keys = editImagesState.items.map(__editKey);
 
@@ -799,7 +958,7 @@ function paintEditPreview() {
     if (!keys.includes(k)) {
       // 移除 tile 時順便釋放縮圖
       if (k && typeof k === "object") {
-        try { revokePreviewThumb(k); } catch (e) {}
+        try { revokePreviewThumb(k); } catch { }
       }
       el.remove();
       __editTileMap.delete(k);
@@ -856,11 +1015,11 @@ function editBeginDrag(e, tile) {
   editDragFrom = +tile.dataset.idx;
   editDragOver = editDragFrom;
 
-  try { tile.setPointerCapture?.(e.pointerId); } catch (e) {}
+  try { tile.setPointerCapture?.(e.pointerId); } catch { }
   clearEditDragUI();
   tile.classList.add("ring-2", "ring-brand-500", "opacity-80");
   // 進入拖曳後才阻止預設（避免一開始就擋住頁面/Modal 捲動）
-  try { e.preventDefault(); } catch (e) {}
+  try { e.preventDefault(); } catch { }
 }
 
 function clearEditDragUI() {
@@ -894,7 +1053,7 @@ editPreview?.addEventListener("pointermove", (e) => {
     return;
   }
 
-  try { e.preventDefault(); } catch (e) {}
+  try { e.preventDefault(); } catch { }
   const el = document.elementFromPoint(e.clientX, e.clientY);
   const tile = el?.closest?.("[data-idx]");
   if (!tile || !editPreview.contains(tile)) return;
@@ -995,7 +1154,7 @@ function __makeAdoptedTile(file) {
         const raw = URL.createObjectURL(file);
         img.src = raw;
         setTimeout(() => URL.revokeObjectURL(raw), 2000);
-      } catch (e) {}
+      } catch { }
     });
 
   const btn = document.createElement("button");
@@ -1021,7 +1180,7 @@ function renderAdoptedPreviews() {
 
   for (const [file, el] of __adoptedTileMap) {
     if (!adoptedSelected.includes(file)) {
-      try { revokePreviewThumb(file); } catch (e) {}
+      try { revokePreviewThumb(file); } catch { }
       el.remove();
       __adoptedTileMap.delete(file);
     }
@@ -1069,10 +1228,10 @@ function adoptedBeginDrag(e, tile) {
   adoptedDragFrom = +tile.dataset.idx;
   adoptedDragOver = adoptedDragFrom;
 
-  try { tile.setPointerCapture?.(e.pointerId); } catch (e) {}
+  try { tile.setPointerCapture?.(e.pointerId); } catch { }
   clearAdoptedDragUI();
   tile.classList.add("ring-2", "ring-brand-500", "opacity-80");
-  try { e.preventDefault(); } catch (e) {}
+  try { e.preventDefault(); } catch { }
 }
 
 function clearAdoptedDragUI() {
@@ -1105,7 +1264,7 @@ adoptedPreview.addEventListener("pointermove", (e) => {
     return;
   }
 
-  try { e.preventDefault(); } catch (e) {}
+  try { e.preventDefault(); } catch { }
   const el = document.elementFromPoint(e.clientX, e.clientY);
   const tile = el?.closest?.("[data-idx]");
   if (!tile || !adoptedPreview.contains(tile)) return;
@@ -1306,7 +1465,7 @@ function swalInDialog(opts) {
         if (adoptedPreview) adoptedPreview.innerHTML = "";
         if (adoptedCount) adoptedCount.textContent = "已選 0 / 5 張";
         if (adoptedFilesInput) adoptedFilesInput.value = "";
-      } catch (e) {}
+      } catch { }
     };
   }
 
@@ -1397,65 +1556,3 @@ async function deleteAllUnder(path) {
     else clearState();
   });
 })();
-
-
-// 影片燒錄浮水印（非表層）：用 ffmpeg.wasm 把同款式水印覆蓋到每一幀
-async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}) {
-  if (!window.FFmpeg || !FFmpeg.createFFmpeg) {
-    throw new Error("ffmpeg.wasm 載入失敗，請確認 admin.html 有載入 @ffmpeg/ffmpeg。");
-  }
-  // 先探測影片尺寸（用 <video>）以產生等尺寸的 PNG 浮水印
-  const getVideoSize = async (f) => {
-    const u = URL.createObjectURL(f);
-    try {
-      const v = document.createElement('video');
-      v.muted = true; v.playsInline = true; v.src = u;
-      await new Promise((res, rej) => { v.onloadedmetadata = () => res(); v.onerror = () => rej(new Error('metadata error')); });
-      return { W: v.videoWidth || 1280, H: v.videoHeight || 720, url: u };
-    } catch (e) {
-      try { URL.revokeObjectURL(u); } catch (e) {}
-      throw e;
-    }
-  };
-  const { W, H, url } = await getVideoSize(file);
-  try {
-    const wmCanvas = __makeWatermarkCanvas(W, H, text);
-    const wmBlob = await new Promise(r => wmCanvas.toBlob(r, "image/png"));
-    const { createFFmpeg, fetchFile } = FFmpeg;
-    const ffmpeg = window.__ffmpegInstance || (window.__ffmpegInstance = createFFmpeg({ log: false }));
-    if (!ffmpeg.isLoaded()) await ffmpeg.load();
-    ffmpeg.FS('writeFile', 'in.mp4', await fetchFile(file));
-    ffmpeg.FS('writeFile', 'wm.png', new Uint8Array(await wmBlob.arrayBuffer()));
-    // overlay 全畫面燒錄；音訊直接 copy；視訊使用 x264（瀏覽器相容）
-    await ffmpeg.run(
-      '-i','in.mp4','-i','wm.png',
-      '-filter_complex','[0:v][1:v]overlay=0:0:format=auto',
-      '-c:v','libx264','-preset','veryfast','-crf','23',
-      '-c:a','aac','-b:a','128k',
-      'out.mp4'
-    );
-    const data = ffmpeg.FS('readFile', 'out.mp4');
-    const outBlob = new Blob([data.buffer], { type: 'video/mp4' });
-    // 也回傳一張首幀海報（同款式水印），供縮圖/預覽用
-    const poster = await (async () => {
-      try {
-        const v = document.createElement('video');
-        v.muted = true; v.playsInline = true; v.src = url;
-        await new Promise((res, rej) => { v.onloadeddata = () => res(); v.onerror = () => rej(new Error()); });
-        const c = document.createElement('canvas');
-        c.width = W; c.height = H;
-        const g = c.getContext('2d');
-        g.drawImage(v, 0, 0, W, H);
-        const wm = __makeWatermarkCanvas(W, H, text);
-        g.drawImage(wm, 0, 0);
-        return await new Promise(r => c.toBlob(r, 'image/jpeg', 0.85));
-      } catch { return null; }
-    })();
-    return {
-      videoFile: new File([outBlob], file.name.replace(/\.[^.]+$/, ".mp4"), { type: "video/mp4" }),
-      posterFile: poster ? new File([poster], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" }) : null
-    };
-  } finally {
-    try { URL.revokeObjectURL(url); } catch (e) {}
-  }
-}
