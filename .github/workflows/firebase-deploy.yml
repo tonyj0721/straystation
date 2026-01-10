@@ -20,7 +20,11 @@ jobs:
       - name: Install Functions deps
         run: |
           cd functions
-          npm ci
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
 
       # PR：只做 Hosting Preview（不動 Functions）
       - name: Hosting Preview (PR)
@@ -42,3 +46,4 @@ jobs:
           # 建議用服務帳戶金鑰（JSON）而不是舊的 FIREBASE_TOKEN
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
           PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+
