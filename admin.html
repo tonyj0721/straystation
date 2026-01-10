@@ -688,13 +688,19 @@ let __wmLoaded = false;
 
 async function __ensureWmLoaded() {
   if (__wmLoaded) return;
-  const baseURL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
+  const coreBaseURL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist";
+  const ffmpegBaseURL = "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm";
+
   await __wmFfmpeg.load({
-    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
-    workerURL: await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, "text/javascript"),
+    // core (ffmpeg-core.js / .wasm / .worker.js) — 用 blob URL 避免 CORS / same-origin 問題
+    coreURL: await toBlobURL(`${coreBaseURL}/ffmpeg-core.js`, "text/javascript"),
+    wasmURL: await toBlobURL(`${coreBaseURL}/ffmpeg-core.wasm`, "application/wasm"),
+    workerURL: await toBlobURL(`${coreBaseURL}/ffmpeg-core.worker.js`, "text/javascript"),
+
+    // wrapper worker（@ffmpeg/ffmpeg 的 worker.js）— 這個一定要設，不然會出現 Failed to construct 'Worker' 的 same-origin 錯誤
+    classWorkerURL: await toBlobURL(`${ffmpegBaseURL}/worker.js`, "text/javascript"),
   });
-  __wmLoaded = true;
+__wmLoaded = true;
 }
 
 async function __makeWatermarkPngBytes(width, height, text) {
