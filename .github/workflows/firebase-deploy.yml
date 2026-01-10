@@ -1,0 +1,42 @@
+name: Deploy Firebase (Hosting + Functions)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # 安裝 functions 相依
+      - name: Install Functions deps
+        run: |
+          cd functions
+          npm ci
+
+      # PR：只做 Hosting Preview（不動 Functions）
+      - name: Hosting Preview (PR)
+        if: github.event_name == 'pull_request'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          channelId: pr-${{ github.event.number }}
+          projectId: ${{ secrets.FIREBASE_PROJECT_ID }}
+
+      # main：正式部署 Hosting + Functions
+      - name: Deploy to Prod (main)
+        if: github.event_name == 'push'
+        uses: w9jds/firebase-action@v13
+        with:
+          args: deploy --only hosting,functions --project ${{ secrets.FIREBASE_PROJECT_ID }}
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
