@@ -77,6 +77,29 @@ async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {})
   }
 }
 
+
+// ===============================
+// 影片判斷 & 浮水印（燒錄進影片檔案）
+// ===============================
+function isVideoFile(file) {
+  return !!file && String(file.type || "").startsWith("video/");
+}
+
+function isVideoUrl(url) {
+  const u = String(url || "").toLowerCase();
+  return /\.(mp4|mov|m4v|webm|ogv)(\?|#|$)/.test(u);
+}
+
+// 產生「帶浮水印」的影片檔（會真的重編碼，把浮水印燒錄進去）
+async function addWatermarkToVideoFile(file, { text = "台中簡媽媽狗園" } = {}) {
+  if (typeof window.addWatermarkToVideoFile === "function") {
+    return await window.addWatermarkToVideoFile(file, { text });
+  }
+  // 後備：如果 ffmpeg 沒載到，就先原樣回傳（避免整個流程壞掉）
+  return file;
+}
+
+
 // ===============================
 // 預覽縮圖：避免大圖解碼造成卡頓（支援手機）
 // ===============================
@@ -141,7 +164,52 @@ async function __decodeToBitmap(file) {
   }
 }
 
+
+async function __makeVideoPreviewThumbURL(file) {
+  const raw = URL.createObjectURL(file);
+  try {
+    const v = document.createElement("video");
+    v.muted = true;
+    v.playsInline = true;
+    v.preload = "metadata";
+    v.src = raw;
+
+    await new Promise((res, rej) => {
+      v.addEventListener("loadeddata", () => res(), { once: true });
+      v.addEventListener("error", () => rej(new Error("video decode failed")), { once: true });
+    });
+
+    // 取前 0.1 秒附近的畫面當縮圖（有些影片 0 秒是黑畫面）
+    try {
+      const t = Math.min(0.1, (v.duration || 1) / 2);
+      v.currentTime = Number.isFinite(t) ? t : 0;
+      await new Promise((res) => v.addEventListener("seeked", () => res(), { once: true }));
+    } catch (_) { }
+
+    const W = v.videoWidth || 640;
+    const H = v.videoHeight || 360;
+    const scale = Math.min(1, PREVIEW_MAX / Math.max(W, H));
+    const w = Math.max(1, Math.round(W * scale));
+    const h = Math.max(1, Math.round(H * scale));
+
+    await new Promise((r) => requestAnimationFrame(r));
+
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    const g = c.getContext("2d", { alpha: false, desynchronized: true });
+    g.drawImage(v, 0, 0, w, h);
+
+    const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", PREVIEW_QUALITY));
+    return URL.createObjectURL(blob);
+  } finally {
+    URL.revokeObjectURL(raw);
+  }
+}
+
 async function __makePreviewThumbURL(file) {
+  if (isVideoFile(file)) {
+    return await __makeVideoPreviewThumbURL(file);
+  }
   const bmp = await __decodeToBitmap(file);
   const W = bmp.width, H = bmp.height;
   const scale = Math.min(1, PREVIEW_MAX / Math.max(W, H));
@@ -259,32 +327,74 @@ async function openDialog(id) {
   document.getElementById('dlgTagVaccinated').textContent = isVaccinated
     ? '已注射預防針' : '未注射預防針';
 
-  // 4. 圖片 + Lightbox（搭配 shared.js）
+  // 4. 圖片/影片 + Lightbox（搭配 shared.js）
   const dlgImg = document.getElementById("dlgImg");
+  const dlgVideo = document.getElementById("dlgVideo");
   const dlgBg = document.getElementById("dlgBg");
   const dlgThumbs = document.getElementById("dlgThumbs");
 
-  const imgs = Array.isArray(p.images) && p.images.length > 0
+  const media = Array.isArray(p.images) && p.images.length > 0
     ? p.images
     : (p.image ? [p.image] : []);
 
   let currentIndex = 0;
 
-  dlgImg.src = imgs[currentIndex] || "";
-  if (dlgBg) dlgBg.src = dlgImg.src;
-  dlgImg.onclick = () => openLightbox(imgs, currentIndex);
+  function renderMainMedia(url) {
+    const isVid = isVideoUrl(url);
+
+    // 影片
+    if (dlgVideo) {
+      dlgVideo.classList.toggle("hidden", !isVid);
+      if (isVid) {
+        try { dlgVideo.pause(); } catch (_) { }
+        dlgVideo.src = url || "";
+        dlgVideo.currentTime = 0;
+        dlgVideo.onclick = () => openLightbox(media, currentIndex);
+      } else {
+        try { dlgVideo.pause(); } catch (_) { }
+        dlgVideo.removeAttribute("src");
+        dlgVideo.load?.();
+      }
+    }
+
+    // 圖片
+    if (dlgImg) {
+      dlgImg.classList.toggle("hidden", isVid);
+      if (!isVid) {
+        dlgImg.src = url || "";
+        dlgImg.onclick = () => openLightbox(media, currentIndex);
+      }
+    }
+
+    // 背景模糊只用在圖片
+    if (dlgBg) {
+      dlgBg.classList.toggle("hidden", isVid);
+      if (!isVid) dlgBg.src = url || "";
+    }
+  }
+
+  renderMainMedia(media[currentIndex] || "");
 
   dlgThumbs.innerHTML = "";
-  imgs.forEach((url, i) => {
-    const thumb = document.createElement("img");
-    thumb.src = url;
+  media.forEach((url, i) => {
+    const isVid = isVideoUrl(url);
+    const thumb = document.createElement(isVid ? "video" : "img");
+
+    if (isVid) {
+      thumb.src = url;
+      thumb.muted = true;
+      thumb.playsInline = true;
+      thumb.preload = "metadata";
+      thumb.loop = true;
+    } else {
+      thumb.src = url;
+    }
+
     thumb.className = "dlg-thumb" + (i === 0 ? " active" : "");
 
     thumb.addEventListener("click", () => {
       currentIndex = i;
-
-      dlgImg.src = url;
-      if (dlgBg) dlgBg.src = url;
+      renderMainMedia(url);
 
       dlgThumbs.querySelectorAll(".dlg-thumb")
         .forEach(el => el.classList.remove("active"));
@@ -359,7 +469,7 @@ async function openDialog(id) {
     }
   }
 
-  renderEditImages(imgs);
+  renderEditImages(media);
 
   // 7. 模式 / 按鈕 / 已送養相關
   setEditMode(false);      // 一開始都是「瀏覽模式」
@@ -546,15 +656,29 @@ async function saveEdit() {
       }
 
       if (it.kind === "file") {
-        const f = it.file;
-        const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
-        const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
-        const base = f.name.replace(/\.[^.]+$/, '');
-        const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
-        const r = sRef(storage, path);
-        await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
-        newUrls.push(await getDownloadURL(r));
-      }
+  const f = it.file;
+
+  const isVideo = isVideoFile(f);
+  const wmFile = isVideo
+    ? await addWatermarkToVideoFile(f) // 影片：燒錄浮水印
+    : await addWatermarkToFile(f);     // 照片：畫到像素裡
+
+  const base = (f.name || "file").replace(/\.[^.]+$/, "");
+
+  let ext = "jpg";
+  let contentType = wmFile.type || "image/jpeg";
+  if (isVideo) {
+    ext = "mp4";
+    contentType = "video/mp4";
+  } else {
+    ext = wmFile.type === "image/png" ? "png" : "jpg";
+  }
+
+  const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
+  const r = sRef(storage, path);
+  await uploadBytes(r, wmFile, { contentType });
+  newUrls.push(await getDownloadURL(r));
+}
     }
 
     // 刪除被移除的舊圖（忽略刪失敗）
@@ -695,38 +819,65 @@ function __makeEditTile(it) {
   wrap.style.userSelect = "none";
   wrap.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  const img = document.createElement("img");
-  img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
-  img.alt = "預覽";
-  img.decoding = "async";
-  img.loading = "lazy";
-  img.draggable = false;
-  img.style.webkitUserDrag = "none";
-  img.style.webkitTouchCallout = "none";
-  img.addEventListener("contextmenu", (e) => e.preventDefault());
+  const isVid = (it.kind === "url") ? isVideoUrl(it.url) : isVideoFile(it.file);
 
-  if (it.kind === "url") {
-    img.src = it.url;
+  let mediaEl;
+
+  // url + 影片：用 <video> 直接當縮圖（避免跨網域抓 frame 造成 CORS 問題）
+  if (it.kind === "url" && isVid) {
+    const v = document.createElement("video");
+    v.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+    v.muted = true;
+    v.playsInline = true;
+    v.loop = true;
+    v.preload = "metadata";
+    v.src = it.url;
+    v.setAttribute("aria-label", "影片預覽");
+    mediaEl = v;
   } else {
-    img.src = PREVIEW_EMPTY_GIF;
-    ensurePreviewThumbURL(it.file)
-      .then((u) => { img.src = u; })
-      .catch(() => {
-        try {
-          const raw = URL.createObjectURL(it.file);
-          img.src = raw;
-          setTimeout(() => URL.revokeObjectURL(raw), 2000);
-        } catch { }
-      });
+    const img = document.createElement("img");
+    img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+    img.alt = "預覽";
+    img.decoding = "async";
+    img.loading = "lazy";
+    img.draggable = false;
+    img.style.webkitUserDrag = "none";
+    img.style.webkitTouchCallout = "none";
+    img.addEventListener("contextmenu", (e) => e.preventDefault());
+
+    if (it.kind === "url") {
+      img.src = it.url;
+    } else {
+      img.src = PREVIEW_EMPTY_GIF;
+      ensurePreviewThumbURL(it.file)
+        .then((u) => { img.src = u; })
+        .catch(() => {
+          try {
+            const raw = URL.createObjectURL(it.file);
+            img.src = raw;
+            setTimeout(() => URL.revokeObjectURL(raw), 2000);
+          } catch { }
+        });
+    }
+
+    mediaEl = img;
+  }
+
+  // 影片小徽章
+  if (isVid) {
+    const badge = document.createElement("div");
+    badge.className = "absolute inset-0 flex items-center justify-center pointer-events-none";
+    badge.innerHTML = `<span class="bg-black/50 text-white rounded-full w-10 h-10 flex items-center justify-center text-lg">▶</span>`;
+    wrap.appendChild(badge);
   }
 
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
   btn.textContent = "✕";
-  btn.setAttribute("aria-label", "刪除這張");
+  btn.setAttribute("aria-label", "刪除這個檔案");
 
-  wrap.appendChild(img);
+  wrap.appendChild(mediaEl);
   wrap.appendChild(btn);
   return wrap;
 }
@@ -739,7 +890,7 @@ function __setEditIdx(tile, idx) {
 
 // 依狀態同步 DOM（不清空重畫，避免閃爍）
 function paintEditPreview() {
-  editCount.textContent = `已選 ${editImagesState.items.length} / ${MAX_EDIT_FILES} 張`;
+  editCount.textContent = `已選 ${editImagesState.items.length} / ${MAX_EDIT_FILES} 個`;
 
   const keys = editImagesState.items.map(__editKey);
 
@@ -878,13 +1029,13 @@ function finishEditDrag() {
 editPreview?.addEventListener("pointerup", finishEditDrag);
 editPreview?.addEventListener("pointercancel", finishEditDrag);
 
-// 新增圖片（遵守上限 5）
+// 新增檔案（照片/影片；遵守上限 5）
 editFiles?.addEventListener("change", () => {
   const incoming = Array.from(editFiles.files || []);
   const room = MAX_EDIT_FILES - editImagesState.items.length;
 
   if (editImagesState.items.length + incoming.length > MAX_EDIT_FILES) {
-    swalInDialog({ icon: "warning", title: `最多 ${MAX_EDIT_FILES} 張照片` });
+    swalInDialog({ icon: "warning", title: `最多 ${MAX_EDIT_FILES} 個檔案` });
   }
 
   incoming.slice(0, Math.max(0, room)).forEach((f) => {
