@@ -87,6 +87,31 @@
       /* 避免 iOS 用 opacity 影響觀感 */
     }
   </style>
+
+  <style>
+    .wm-playback{ position:relative; }
+    .wm-playback::after{
+      content:"台中簡媽媽狗園";
+      position:absolute; right:8px; bottom:8px;
+      font-size:.75rem; opacity:.65;
+      background:rgba(0,0,0,.5); color:#fff; padding:2px 6px; border-radius:6px;
+      pointer-events:none;
+    }
+  </style>
+
+
+  <style>
+    /*wm-overlay*/
+    .wm-overlay{ position:relative; }
+    .wm-overlay::after{
+      content:"台中簡媽媽狗園";
+      position:absolute; right:8px; bottom:8px;
+      font-size:.8rem; line-height:1;
+      background:rgba(0,0,0,.55); color:#fff;
+      padding:4px 8px; border-radius:8px; pointer-events:none;
+    }
+  </style>
+
 </head>
 
 <body class="text-gray-800 bg-gradient-to-br from-brand-50 to-white">
@@ -357,11 +382,9 @@
           <div>
             <input id="imgFiles" type="file" accept="image/*,video/*" multiple class="sr-only" />
             <div class="flex items-center gap-3">
-              <button id="btnPick" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
-                新增照片
-              </button>
-              <span id="fileCount" class="text-xs text-gray-500">已選 0 / 5 項</span>
-              <span class="text-sm text-gray-400">最多 5 項</span>
+              <button id="btnPick" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增照片/影片</button>
+              <span id="fileCount" class="text-xs text-gray-500">已選 0 / 5 個</span>
+              <span class="text-sm text-gray-400">最多 5 個</span>
             </div>
             <div id="imgPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
           </div>
@@ -423,7 +446,7 @@
     <div class="bg-white">
       <!-- 新增：與下方縮圖 p-3 對齊 -->
       <div class="px-3 pt-2">
-        <p class="text-center text-xs text-gray-500 mb-1">點主圖/影片可放大</p>
+        <p class="text-center text-xs text-gray-500 mb-1">點主圖可放大</p>
         <div class="relative aspect-video bg-gray-100 overflow-hidden rounded-lg">
           <!-- 只模糊這張背景圖 -->
           <img id="dlgBg" aria-hidden="true" class="absolute inset-0 w-full h-full object-cover blur-md scale-110">
@@ -434,8 +457,7 @@
           <!-- 主圖在最上層，沒有 blur -->
           <img id="dlgImg" alt="毛孩照片"
             class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg">
-<video id="dlgVideo" playsinline controls class="relative z-10 hidden w-full h-full object-contain rounded-lg"></video>
-<div id="dlgWm" class="absolute right-2 bottom-2 z-20 pointer-events-none select-none text-white/80 text-[12px] md:text-sm hidden">台中簡媽媽狗園</div>
+          <div id="dlgVideoWrap" class="wm-overlay hidden"><video id="dlgVideo" class="block w-full h-auto" controls playsinline></video></div>
 
           <button id="dlgClose" class="absolute top-1 right-1 z-20 bg-black/60 text-white p-2 rounded-full leading-none"
             aria-label="關閉">✕</button>
@@ -571,9 +593,9 @@
             <input id="editFiles" type="file" accept="image/*,video/*" multiple class="sr-only" />
             <div class="flex items-center gap-3">
               <button id="btnPickEdit" type="button"
-                class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增媒體</button>
+                class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增照片/影片</button>
               <span id="editCount" class="text-xs text-gray-500"></span>
-              <span class="text-sm text-gray-400">最多 5 項</span>
+              <span class="text-sm text-gray-400">最多 5 個</span>
             </div>
             <!-- 和新增模式一致：三欄縮圖 + 上方間距 -->
             <div id="editPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
@@ -615,7 +637,7 @@
               選擇合照
             </button>
             <span id="adoptedCount" class="text-xs text-gray-500"></span>
-            <span class="text-sm text-gray-400">最多 5 張</span>
+            <span class="text-sm text-gray-400">最多 5 個</span>
           </div>
           <div id="adoptedPreview" class="mt-1 grid grid-cols-3 gap-2"></div>
           <button id="btnConfirmAdopted" class="mt-3 px-3 py-2 rounded-lg bg-gray-900 text-white text-sm">
@@ -634,8 +656,6 @@
   <div id="lightbox" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[9999]">
     <div id="lbWrap" class="relative inline-block">
       <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg" />
-<video id="lbVideo" playsinline controls class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg hidden"></video>
-<div id="lbWm" class="absolute right-4 bottom-3 pointer-events-none select-none text-white/80 text-sm hidden">台中簡媽媽狗園</div>
       <button id="lbClose" class="absolute top-1 right-1 z-10 bg-black/60 hover:bg-black/70 text-white rounded-full p-2
            text-2xl leading-none select-none" aria-label="關閉">✕</button>
     </div>
@@ -827,7 +847,7 @@
     syncBreedSelectors(); // 初始化一次
 
     // ===============================
-    // 新增：圖片選取/預覽（最多 5 張）- 不卡頓版（縮圖/快取/手機拖曳排序）
+    // 新增：圖片選取/預覽（最多 5 個）- 不卡頓版（縮圖/快取/手機拖曳排序）
     // ===============================
     const imgFiles = $("#imgFiles");
     const btnPick = $("#btnPick");
@@ -838,12 +858,12 @@
     const PREVIEW_MAX = 720;      // 預覽縮圖長邊上限（越小越順）
     const PREVIEW_QUALITY = 0.82; // JPEG 品質（0~1）
 
-    let selectedFiles = []; // 待上傳檔案（順序 = 上傳順序）
+    let selectedMedia = []; // 待上傳檔案（順序 = 上傳順序）
 
     // File → 縮圖 objectURL（避免每次重畫都重新解碼）
     const thumbUrlCache = new Map();
     const thumbPromiseCache = new Map();
-    // 同時跑 2 張縮圖（更快，但不會像全並發那麼容易卡）
+    // 同時跑 2 個縮圖（更快，但不會像全並發那麼容易卡）
     const THUMB_CONCURRENCY = 2;
     let thumbActive = 0;
     const thumbJobQueue = [];
@@ -946,47 +966,63 @@
     const __previewTileMap = new Map(); // File -> tile element（保留 DOM，避免重畫閃爍）
 
     function __makePreviewTile(file) {
+  const wrap = document.createElement("div");
+  wrap.className = "relative touch-none select-none";
 
-const wrap = document.createElement("div");
-wrap.className = "relative touch-none select-none";
+  // 如果是影片：顯示輕量卡片，避免手機端嘗試解碼影片
+  if (file && file.type && file.type.startsWith("video/")) {
+    const card = document.createElement("div");
+    card.className = "w-full aspect-square rounded-lg bg-gray-100 text-gray-600 flex items-center justify-center";
+    const inner = document.createElement("div");
+    inner.className = "text-center text-sm";
+    const title = document.createElement("div");
+    title.textContent = "🎬 影片";
+    const name = document.createElement("div");
+    name.className = "text-xs break-all opacity-80";
+    name.textContent = (file.name || "").slice(0, 30);
+    inner.appendChild(title);
+    inner.appendChild(name);
+    card.appendChild(inner);
+    wrap.appendChild(card);
 
-const isVideo = /^video\//.test((file && file.type) || "");
-
-// Remove button
-const btn = document.createElement("button");
-btn.type = "button";
-btn.className = "absolute top-1 right-1 z-10 rounded-full w-6 h-6 bg-black/60 text-white text-xs";
-btn.innerHTML = "×";
-btn.onclick = () => {
-  const idx = selectedFiles.indexOf(file);
-  if (idx >= 0) {
-    selectedFiles.splice(idx, 1);
-    renderPreviews();
+    const btn = document.createElement("button");
+    btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
+    btn.type = "button";
+    btn.textContent = "✕";
+    btn.setAttribute("aria-label", "刪除這個");
+    wrap.appendChild(btn);
+    return wrap;
   }
-};
 
-if (isVideo) {
-  const ph = document.createElement("div");
-  ph.className = "w-full aspect-square rounded-lg bg-gray-100 flex items-center justify-center text-3xl";
-  ph.textContent = "🎬";
-  wrap.appendChild(ph);
+  // 其餘視為圖片，生成縮圖
+  const img = document.createElement("img");
+  img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+  img.alt = "預覽";
+  img.decoding = "async";
+  img.loading = "lazy";
+  img.src = EMPTY_GIF;
+
+  // 先顯示空白，再異步塞縮圖，避免解碼瞬間卡頓
+  ensureThumbURL(file)
+    .then((url) => { img.src = url; })
+    .catch(() => {
+      // 真的不行就退回原圖（至少有預覽）
+      try {
+        const raw = URL.createObjectURL(file);
+        img.src = raw;
+        setTimeout(() => URL.revokeObjectURL(raw), 2000);
+      } catch {}
+    });
+
+  const btn = document.createElement("button");
+  btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
+  btn.type = "button";
+  btn.textContent = "✕";
+  btn.setAttribute("aria-label", "刪除這張");
+
+  wrap.appendChild(img);
   wrap.appendChild(btn);
   return wrap;
-}
-
-// Image preview
-const img = document.createElement("img");
-img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
-img.alt = "預覽";
-img.decoding = "async";
-img.loading = "lazy";
-
-ensureThumbURL(file).then((url) => { img.src = url; });
-
-wrap.appendChild(img);
-wrap.appendChild(btn);
-return wrap;
-
 }
 
     function __setPreviewIdx(tile, idx) {
@@ -995,18 +1031,62 @@ return wrap;
       if (btn) btn.dataset.idx = String(idx);
     }
 
-    function renderPreviews() {
-      fileCount.textContent = `已選 ${selectedFiles.length} / ${MAX_FILES} 項`;
+    
+function renderPreviews() {
+  const host = document.getElementById('imgPreview');
+  const fileCount = document.getElementById('fileCount');
+  if (!host) return;
+  host.innerHTML = '';
+  (selectedMedia || []).forEach((file, i) => {
+    const tile = document.createElement('div');
+    tile.className = 'relative';
+    tile.dataset.idx = String(i);
+    const wrap = document.createElement('div');
+    wrap.className = 'w-full aspect-square overflow-hidden rounded-xl bg-gray-100';
+    if (file.type && file.type.startsWith('image/')) {
+      const img = document.createElement('img');
+      img.className = 'w-full h-full object-cover';
+      img.alt = '預覽縮圖';
+      try { 
+        const raw = URL.createObjectURL(file);
+        img.src = raw;
+        setTimeout(() => URL.revokeObjectURL(raw), 2000);
+      } catch {}
+      wrap.appendChild(img);
+    } else if (file.type && file.type.startsWith('video/')) {
+      const vwrap = document.createElement('div');
+      vwrap.className = 'w-full h-full flex items-center justify-center text-gray-600';
+      vwrap.innerHTML = '<div class="text-center text-sm">🎬 影片<br><span class="text-xs break-all"></span></div>';
+      vwrap.querySelector('span').textContent = (file.name || '').slice(0,30);
+      wrap.appendChild(vwrap);
+    } else {
+      const unknown = document.createElement('div');
+      unknown.className = 'w-full h-full flex items-center justify-center text-gray-400 text-sm';
+      unknown.textContent = '不支援的檔案';
+      wrap.appendChild(unknown);
+    }
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center';
+    btn.textContent = '✕';
+    btn.setAttribute('aria-label','移除');
+    tile.appendChild(wrap);
+    tile.appendChild(btn);
+    host.appendChild(tile);
+  });
+  if (fileCount) fileCount.textContent = `已選 ${ (selectedMedia||[]).length } / 5 個（按住可拖曳換順序）`;
+}
+ / ${MAX_FILES} 個`;
 
       // 不整個清空重畫：只搬動既有 DOM，避免「換順序閃一下」
       for (const [file, el] of __previewTileMap) {
-        if (!selectedFiles.includes(file)) {
+        if (!selectedMedia.includes(file)) {
           el.remove();
           __previewTileMap.delete(file);
         }
       }
 
-      selectedFiles.forEach((file, i) => {
+      selectedMedia.forEach((file, i) => {
         let tile = __previewTileMap.get(file);
         if (!tile) {
           tile = __makePreviewTile(file);
@@ -1024,9 +1104,9 @@ return wrap;
       e.preventDefault();
       e.stopPropagation();
       const i = +btn.dataset.idx;
-      const f = selectedFiles[i];
+      const f = selectedMedia[i];
       if (f) revokeThumb(f);
-      selectedFiles.splice(i, 1);
+      selectedMedia.splice(i, 1);
       renderPreviews();
     });
 
@@ -1087,9 +1167,9 @@ return wrap;
 
       if (to == null || to === from) return;
 
-      const tmp = selectedFiles[from];
-      selectedFiles[from] = selectedFiles[to];
-      selectedFiles[to] = tmp;
+      const tmp = selectedMedia[from];
+      selectedMedia[from] = selectedMedia[to];
+      selectedMedia[to] = tmp;
 
       renderPreviews();
     }
@@ -1097,14 +1177,14 @@ return wrap;
     imgPreview.addEventListener("pointerup", finishDrag);
     imgPreview.addEventListener("pointercancel", finishDrag);
 
-    // 檔案挑選後：合併並截斷到 MAX_FILES 張
+    // 檔案挑選後：合併並截斷到 MAX_FILES 個
     imgFiles?.addEventListener("change", () => {
       const incoming = Array.from(imgFiles.files || []);
-      const next = selectedFiles.concat(incoming);
+      const next = selectedMedia.concat(incoming);
       if (next.length > MAX_FILES) {
-        Swal.fire({ icon: "warning", title: `最多 ${MAX_FILES} 項媒體` });
+        Swal.fire({ icon: "warning", title: `最多 ${MAX_FILES} 個檔案` });
       }
-      selectedFiles = next.slice(0, MAX_FILES);
+      selectedMedia = next.slice(0, MAX_FILES);
       renderPreviews();
       imgFiles.value = ""; // 清空 input，避免重複選取不到
     });
@@ -1216,37 +1296,40 @@ return wrap;
         // 1) 新增基本文件
         const docRef = await addDoc(collection(db, "pets"), payload);
 
-        // 2) 逐項上傳媒體，取得 Storage URL
-        const imageUrls = [];
-        const media = [];
-        for (const f of selectedFiles) {
-          if ((f.type || '').startsWith('image/')) {
-            const wmBlob = await addWatermarkToFile(f); // 圖片先加浮水印
-            const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
-            const base = f.name.replace(/\.[^.]+$/, '');
-            const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
-            const r = sRef(storage, path);
-            await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
-            const url = await getDownloadURL(r);
-            imageUrls.push(url);
-            media.push({ type: 'image', url });
-          } else if ((f.type || '').startsWith('video/')) {
-            const ext = (f.name.split('.').pop() || 'mp4').toLowerCase();
-            const base = f.name.replace(/\.[^.]+$/, '');
-            const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
-            const r = sRef(storage, path);
-            await uploadBytes(r, f, { contentType: f.type || 'video/mp4' });
-            const url = await getDownloadURL(r);
-            media.push({ type: 'video', url });
-          }
-        }
+        // 2) 逐張上傳圖片，取得 Storage URL
+        const urls = [];
+        
+for (const f of selectedMedia) {
+  const isImage = f.type && f.type.startsWith('image/');
+  const isVideo = f.type && f.type.startsWith('video/');
+  if (isImage) {
+    const wmBlob = await addWatermarkToFile(f);
+    const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
+    const base = (f.name || 'image').replace(/\.[^.]+$/, '');
+    const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
+    const r = sRef(storage, path);
+    await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
+    const u = await getDownloadURL(r);
+    urls.push(u);
+  } else if (isVideo) {
+    const vPath = `pets/${docRef.id}/videos/${Date.now()}_${(f.name || 'video')}`;
+    const vr = sRef(storage, vPath);
+    await uploadBytes(vr, f, { contentType: f.type || 'video/mp4' });
+    const vu = await getDownloadURL(vr);
+    (videos || (videos = [])).push(vu);
+  }
+}
+ else if (isVideo) {
+    const rawRef = sRef(storage, `raw-videos/pets/${docRef.id}/${Date.now()}_${(f.name || 'video')}`);
+    await uploadBytes(rawRef, f, {
+      contentType: f.type || "video/mp4",
+      customMetadata: { petId: docRef.id, watermarkText: "台中簡媽媽狗園" }
+    });
+    // 後端 Functions 會把浮水印轉檔結果寫回 Firestore
+  }
+}
 
-        // 3) 回寫 images / media 欄位
-        const updates = {};
-        if (imageUrls.length) updates.images = imageUrls;
-        if (media.length) updates.media = media;
-        await updateDoc(doc(db, "pets", docRef.id), updates);
-
+        // 3) 回寫 images 欄位
         if (urls.length) {
           await updateDoc(doc(db, "pets", docRef.id), { images: urls });
         }
@@ -1264,8 +1347,8 @@ return wrap;
         // 重置表單與選擇圖片（先做，避免 DOM 還在變動導致 smooth scroll 卡住）
         e.target.reset();
         imgPreview.innerHTML = "";
-        selectedFiles = [];
-        fileCount.textContent = "已選 0 / 5 張";
+        selectedMedia = [];
+        fileCount.textContent = "已選 0 / 5 個";
         syncBreedSelectors();
 
         // 先啟動重新載入列表（避免等到提示結束才開始抓資料）
