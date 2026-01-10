@@ -101,7 +101,6 @@
 
 
   <style>
-    /*wm-overlay*/
     .wm-overlay{ position:relative; }
     .wm-overlay::after{
       content:"台中簡媽媽狗園";
@@ -863,7 +862,7 @@
     // File → 縮圖 objectURL（避免每次重畫都重新解碼）
     const thumbUrlCache = new Map();
     const thumbPromiseCache = new Map();
-    // 同時跑 2 個縮圖（更快，但不會像全並發那麼容易卡）
+    // 同時跑 2 張縮圖（更快，但不會像全並發那麼容易卡）
     const THUMB_CONCURRENCY = 2;
     let thumbActive = 0;
     const thumbJobQueue = [];
@@ -1031,51 +1030,27 @@
       if (btn) btn.dataset.idx = String(idx);
     }
 
-    
-function renderPreviews() {
-  const host = document.getElementById('imgPreview');
-  const fileCount = document.getElementById('fileCount');
-  if (!host) return;
-  host.innerHTML = '';
-  (selectedMedia || []).forEach((file, i) => {
-    const tile = document.createElement('div');
-    tile.className = 'relative';
-    tile.dataset.idx = String(i);
-    const wrap = document.createElement('div');
-    wrap.className = 'w-full aspect-square overflow-hidden rounded-xl bg-gray-100';
-    if (file.type && file.type.startsWith('image/')) {
-      const img = document.createElement('img');
-      img.className = 'w-full h-full object-cover';
-      img.alt = '預覽縮圖';
-      try { 
-        const raw = URL.createObjectURL(file);
-        img.src = raw;
-        setTimeout(() => URL.revokeObjectURL(raw), 2000);
-      } catch {}
-      wrap.appendChild(img);
-    } else if (file.type && file.type.startsWith('video/')) {
-      const vwrap = document.createElement('div');
-      vwrap.className = 'w-full h-full flex items-center justify-center text-gray-600';
-      vwrap.innerHTML = '<div class="text-center text-sm">🎬 影片<br><span class="text-xs break-all"></span></div>';
-      vwrap.querySelector('span').textContent = (file.name || '').slice(0,30);
-      wrap.appendChild(vwrap);
-    } else {
-      const unknown = document.createElement('div');
-      unknown.className = 'w-full h-full flex items-center justify-center text-gray-400 text-sm';
-      unknown.textContent = '不支援的檔案';
-      wrap.appendChild(unknown);
+    function renderPreviews() {
+      fileCount.textContent = `已選 ${selectedMedia.length} / ${MAX_FILES} 個`;
+
+      // 不整個清空重畫：只搬動既有 DOM，避免「換順序閃一下」
+      for (const [file, el] of __previewTileMap) {
+        if (!selectedMedia.includes(file)) {
+          el.remove();
+          __previewTileMap.delete(file);
+        }
+      }
+
+      selectedMedia.forEach((file, i) => {
+        let tile = __previewTileMap.get(file);
+        if (!tile) {
+          tile = __makePreviewTile(file);
+          __previewTileMap.set(file, tile);
+        }
+        __setPreviewIdx(tile, i);
+        imgPreview.appendChild(tile); // appendChild 會把既有節點移動到正確位置
+      });
     }
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center';
-    btn.textContent = '✕';
-    btn.setAttribute('aria-label','移除');
-    tile.appendChild(wrap);
-    tile.appendChild(btn);
-    host.appendChild(tile);
-  });
-  if (fileCount) fileCount.textContent = `已選 ${ (selectedMedia||[]).length } / 5 個（按住可拖曳換順序）`;
-}
 
     // 刪除（事件代理）
     imgPreview.addEventListener("click", (e) => {
@@ -1157,7 +1132,7 @@ function renderPreviews() {
     imgPreview.addEventListener("pointerup", finishDrag);
     imgPreview.addEventListener("pointercancel", finishDrag);
 
-    // 檔案挑選後：合併並截斷到 MAX_FILES 個
+    // 檔案挑選後：合併並截斷到 MAX_FILES 張
     imgFiles?.addEventListener("change", () => {
       const incoming = Array.from(imgFiles.files || []);
       const next = selectedMedia.concat(incoming);
@@ -1278,28 +1253,18 @@ function renderPreviews() {
 
         // 2) 逐張上傳圖片，取得 Storage URL
         const urls = [];
-        
-for (const f of selectedMedia) {
-  const isImage = f.type && f.type.startsWith('image/');
-  const isVideo = f.type && f.type.startsWith('video/');
+        for (const f of selectedMedia) {
+  const isImage = f.type && f.type.startsWith("image/");
+  const isVideo = f.type && f.type.startsWith("video/");
   if (isImage) {
-    const wmBlob = await addWatermarkToFile(f);
+    const wmBlob = await addWatermarkToFile(f); // 圖片先加浮水印（前端 Canvas）
     const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
     const base = (f.name || 'image').replace(/\.[^.]+$/, '');
     const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
     const r = sRef(storage, path);
     await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
-    const u = await getDownloadURL(r);
-    urls.push(u);
+    urls.push(await getDownloadURL(r));
   } else if (isVideo) {
-    const vPath = `pets/${docRef.id}/videos/${Date.now()}_${(f.name || 'video')}`;
-    const vr = sRef(storage, vPath);
-    await uploadBytes(vr, f, { contentType: f.type || 'video/mp4' });
-    const vu = await getDownloadURL(vr);
-    (videos || (videos = [])).push(vu);
-  }
-}
- else if (isVideo) {
     const rawRef = sRef(storage, `raw-videos/pets/${docRef.id}/${Date.now()}_${(f.name || 'video')}`);
     await uploadBytes(rawRef, f, {
       contentType: f.type || "video/mp4",
