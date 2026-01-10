@@ -33,10 +33,19 @@ const BREEDS = {
 
 // 產生帶浮水印的 Blob（細字、無外框、疏一點）
 // 統一入口：圖片 / 影片皆可
+// 統一入口：圖片 / 影片
+// 圖片：真的燒進浮水印
+// 影片：暫時不在前端做浮水印，直接用原始檔案（避免播放異常）
+// 若未來改成後端 ffmpeg 處理，可以在這裡改成呼叫後端產生有浮水印的新影片。
 async function addWatermarkToFile(file, opts = {}) {
-  if (file && typeof file.type === "string" && file.type.startsWith("video/")) {
-    return await addWatermarkToVideo(file, opts);
+  if (!file || !file.type) return file;
+
+  // 影片：直接回傳原始檔案
+  if (file.type.startsWith("video/")) {
+    return file;
   }
+
+  // 其他一律當作圖片處理
   return await addWatermarkToImage(file, opts);
 }
 
