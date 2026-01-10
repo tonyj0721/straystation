@@ -369,11 +369,9 @@
           <div>
             <input id="imgFiles" type="file" accept="image/*,video/*" multiple class="sr-only" />
             <div class="flex items-center gap-3">
-              <button id="btnPick" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
-                新增照片
-              </button>
-              <span id="fileCount" class="text-xs text-gray-500">已選 0 / 5 張</span>
-              <span class="text-sm text-gray-400">最多 5 張</span>
+              <button id="btnPick" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增照片/影片</button>
+              <span id="fileCount" class="text-xs text-gray-500">已選 0 / 5 個</span>
+              <span class="text-sm text-gray-400">最多 5 個</span>
             </div>
             <div id="imgPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
           </div>
@@ -581,9 +579,9 @@
             <input id="editFiles" type="file" accept="image/*,video/*" multiple class="sr-only" />
             <div class="flex items-center gap-3">
               <button id="btnPickEdit" type="button"
-                class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增照片</button>
+                class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增照片/影片</button>
               <span id="editCount" class="text-xs text-gray-500"></span>
-              <span class="text-sm text-gray-400">最多 5 張</span>
+              <span class="text-sm text-gray-400">最多 5 個</span>
             </div>
             <!-- 和新增模式一致：三欄縮圖 + 上方間距 -->
             <div id="editPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
@@ -625,7 +623,7 @@
               選擇合照
             </button>
             <span id="adoptedCount" class="text-xs text-gray-500"></span>
-            <span class="text-sm text-gray-400">最多 5 張</span>
+            <span class="text-sm text-gray-400">最多 5 個</span>
           </div>
           <div id="adoptedPreview" class="mt-1 grid grid-cols-3 gap-2"></div>
           <button id="btnConfirmAdopted" class="mt-3 px-3 py-2 rounded-lg bg-gray-900 text-white text-sm">
@@ -835,7 +833,7 @@
     syncBreedSelectors(); // 初始化一次
 
     // ===============================
-    // 新增：圖片選取/預覽（最多 5 張）- 不卡頓版（縮圖/快取/手機拖曳排序）
+    // 新增：圖片選取/預覽（最多 5 個）- 不卡頓版（縮圖/快取/手機拖曳排序）
     // ===============================
     const imgFiles = $("#imgFiles");
     const btnPick = $("#btnPick");
@@ -954,38 +952,64 @@
     const __previewTileMap = new Map(); // File -> tile element（保留 DOM，避免重畫閃爍）
 
     function __makePreviewTile(file) {
-      const wrap = document.createElement("div");
-      wrap.className = "relative touch-none select-none";
+  const wrap = document.createElement("div");
+  wrap.className = "relative touch-none select-none";
 
-      const img = document.createElement("img");
-      img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
-      img.alt = "預覽";
-      img.decoding = "async";
-      img.loading = "lazy";
-      img.src = EMPTY_GIF;
+  // 如果是影片：顯示輕量卡片，避免手機端嘗試解碼影片
+  if (file && file.type && file.type.startsWith("video/")) {
+    const card = document.createElement("div");
+    card.className = "w-full aspect-square rounded-lg bg-gray-100 text-gray-600 flex items-center justify-center";
+    const inner = document.createElement("div");
+    inner.className = "text-center text-sm";
+    const title = document.createElement("div");
+    title.textContent = "🎬 影片";
+    const name = document.createElement("div");
+    name.className = "text-xs break-all opacity-80";
+    name.textContent = (file.name || "").slice(0, 30);
+    inner.appendChild(title);
+    inner.appendChild(name);
+    card.appendChild(inner);
+    wrap.appendChild(card);
 
-      // 先顯示空白，再異步塞縮圖，避免解碼瞬間卡頓
-      ensureThumbURL(file)
-        .then((url) => { img.src = url; })
-        .catch(() => {
-          // 真的不行就退回原圖（至少有預覽）
-          try {
-            const raw = URL.createObjectURL(file);
-            img.src = raw;
-            setTimeout(() => URL.revokeObjectURL(raw), 2000);
-          } catch { }
-        });
+    const btn = document.createElement("button");
+    btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
+    btn.type = "button";
+    btn.textContent = "✕";
+    btn.setAttribute("aria-label", "刪除這個");
+    wrap.appendChild(btn);
+    return wrap;
+  }
 
-      const btn = document.createElement("button");
-      btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
-      btn.type = "button";
-      btn.textContent = "✕";
-      btn.setAttribute("aria-label", "刪除這張");
+  // 其餘視為圖片，生成縮圖
+  const img = document.createElement("img");
+  img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+  img.alt = "預覽";
+  img.decoding = "async";
+  img.loading = "lazy";
+  img.src = EMPTY_GIF;
 
-      wrap.appendChild(img);
-      wrap.appendChild(btn);
-      return wrap;
-    }
+  // 先顯示空白，再異步塞縮圖，避免解碼瞬間卡頓
+  ensureThumbURL(file)
+    .then((url) => { img.src = url; })
+    .catch(() => {
+      // 真的不行就退回原圖（至少有預覽）
+      try {
+        const raw = URL.createObjectURL(file);
+        img.src = raw;
+        setTimeout(() => URL.revokeObjectURL(raw), 2000);
+      } catch {}
+    });
+
+  const btn = document.createElement("button");
+  btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
+  btn.type = "button";
+  btn.textContent = "✕";
+  btn.setAttribute("aria-label", "刪除這張");
+
+  wrap.appendChild(img);
+  wrap.appendChild(btn);
+  return wrap;
+}
 
     function __setPreviewIdx(tile, idx) {
       tile.dataset.idx = String(idx);
@@ -998,13 +1022,13 @@
 
       // 不整個清空重畫：只搬動既有 DOM，避免「換順序閃一下」
       for (const [file, el] of __previewTileMap) {
-        if (!selectedFiles.includes(file)) {
+        if (!selectedMedia.includes(file)) {
           el.remove();
           __previewTileMap.delete(file);
         }
       }
 
-      selectedFiles.forEach((file, i) => {
+      selectedMedia.forEach((file, i) => {
         let tile = __previewTileMap.get(file);
         if (!tile) {
           tile = __makePreviewTile(file);
@@ -1085,9 +1109,9 @@
 
       if (to == null || to === from) return;
 
-      const tmp = selectedFiles[from];
-      selectedFiles[from] = selectedFiles[to];
-      selectedFiles[to] = tmp;
+      const tmp = selectedMedia[from];
+      selectedMedia[from] = selectedMedia[to];
+      selectedMedia[to] = tmp;
 
       renderPreviews();
     }
@@ -1098,11 +1122,11 @@
     // 檔案挑選後：合併並截斷到 MAX_FILES 張
     imgFiles?.addEventListener("change", () => {
       const incoming = Array.from(imgFiles.files || []);
-      const next = selectedFiles.concat(incoming);
+      const next = selectedMedia.concat(incoming);
       if (next.length > MAX_FILES) {
-        Swal.fire({ icon: "warning", title: `最多 ${MAX_FILES} 張照片` });
+        Swal.fire({ icon: "warning", title: `最多 ${MAX_FILES} 個檔案` });
       }
-      selectedFiles = next.slice(0, MAX_FILES);
+      selectedMedia = next.slice(0, MAX_FILES);
       renderPreviews();
       imgFiles.value = ""; // 清空 input，避免重複選取不到
     });
@@ -1217,14 +1241,25 @@
         // 2) 逐張上傳圖片，取得 Storage URL
         const urls = [];
         for (const f of selectedMedia) {
-          const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
-          const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
-          const base = f.name.replace(/\.[^.]+$/, '');
-          const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
-          const r = sRef(storage, path);
-          await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
-          urls.push(await getDownloadURL(r));
-        }
+  const isImage = f.type && f.type.startsWith("image/");
+  const isVideo = f.type && f.type.startsWith("video/");
+  if (isImage) {
+    const wmBlob = await addWatermarkToFile(f); // 圖片先加浮水印（前端 Canvas）
+    const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
+    const base = (f.name || 'image').replace(/\.[^.]+$/, '');
+    const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
+    const r = sRef(storage, path);
+    await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
+    urls.push(await getDownloadURL(r));
+  } else if (isVideo) {
+    const rawRef = sRef(storage, `raw-videos/pets/${docRef.id}/${Date.now()}_${(f.name || 'video')}`);
+    await uploadBytes(rawRef, f, {
+      contentType: f.type || "video/mp4",
+      customMetadata: { petId: docRef.id, watermarkText: "台中簡媽媽狗園" }
+    });
+    // 後端 Functions 會把浮水印轉檔結果寫回 Firestore
+  }
+}
 
         // 3) 回寫 images 欄位
         if (urls.length) {
@@ -1245,7 +1280,7 @@
         e.target.reset();
         imgPreview.innerHTML = "";
         selectedMedia = [];
-        fileCount.textContent = "已選 0 / 5 張";
+        fileCount.textContent = "已選 0 / 5 個";
         syncBreedSelectors();
 
         // 先啟動重新載入列表（避免等到提示結束才開始抓資料）
