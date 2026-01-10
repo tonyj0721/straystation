@@ -1,11 +1,11 @@
 const q = (sel) => document.querySelector(sel);
 
 function __lockDialogScroll() {
-  try { if (typeof lockScroll === "function") lockScroll(); } catch (e) {}
+  try { if (typeof lockScroll === "function") lockScroll(); } catch { }
 }
 
 function __unlockDialogScroll() {
-  try { if (typeof unlockScroll === "function") unlockScroll(); } catch (e) {}
+  try { if (typeof unlockScroll === "function") unlockScroll(); } catch { }
 }
 
 // ===============================
@@ -30,38 +30,11 @@ const BREEDS = {
   },
 };
 
-
-// 產生「重複斜紋浮水印」畫布，供圖片與影片共用
-function __makeWatermarkCanvas(W, H, text = "台中簡媽媽狗園") {
-  const c = document.createElement("canvas");
-  c.width = W; c.height = H;
-  const g = c.getContext("2d");
-  // 透明底
-  g.clearRect(0, 0, W, H);
-  const ANG = -33 * Math.PI / 180;   // 斜角
-  const FS = Math.round(Math.max(W, H) * 0.03);  // 字高 ≈ 長邊 3%
-  const OP = 0.25;                                  // 透明度
-  const STEP_X = Math.max(Math.round(FS * 12), 360); // 同斜線間距（倍數越大越疏）
-  const STEP_Y = Math.max(Math.round(FS * 8), 260);  // 斜線與斜線間距
-  const diag = Math.hypot(W, H);
-  g.save();
-  g.translate(W / 2, H / 2);
-  g.rotate(ANG);
-  g.font = `600 ${FS}px "Noto Sans TC","Microsoft JhengHei",sans-serif`;
-  g.textBaseline = "middle";
-  g.fillStyle = `rgba(255,255,255,${OP})`;
-  for (let x = -diag; x <= diag; x += STEP_X) {
-    for (let y = -diag; y <= diag; y += STEP_Y) {
-      g.fillText(text, x, y);
-    }
-  }
-  g.restore();
-  return c;
-}
 // 產生帶浮水印的 Blob（細字、無外框、疏一點）
 async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {}) {
   const url = URL.createObjectURL(file);
   try {
+    // 讀圖 & 畫原圖
     const img = await new Promise((res, rej) => {
       const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = url;
     });
@@ -70,13 +43,236 @@ async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {})
     c.width = W; c.height = H;
     const g = c.getContext("2d");
     g.drawImage(img, 0, 0, W, H);
-    // 疊上同款式浮水印
-    const wm = __makeWatermarkCanvas(W, H, text);
-    g.drawImage(wm, 0, 0);
+
+    // === 細字無外框樣式（可調參數） ===
+    const ANG = -33 * Math.PI / 180;   // 斜角
+    const FS = Math.round(Math.max(W, H) * 0.03);  // 字高 ≈ 長邊 6%
+    const OP = 0.25;                                  // 透明度
+    const STEP_X = Math.max(Math.round(FS * 12), 360); // 同斜線間距（倍數越大越疏）
+    const STEP_Y = Math.max(Math.round(FS * 8), 260);  // 斜線與斜線間距
+
+    const diag = Math.hypot(W, H);
+
+    g.save();
+    g.translate(W / 2, H / 2);
+    g.rotate(ANG);
+    g.font = `600 ${FS}px "Noto Sans TC","Microsoft JhengHei",sans-serif`;
+    g.textBaseline = "middle";
+    g.fillStyle = `rgba(255,255,255,${OP})`;
+    // 想更柔和可打開下一行：
+    // g.globalCompositeOperation = "overlay"; // 或 "soft-light"
+
+    // 只填色，不描邊（不要 strokeText/lineWidth/strokeStyle）
+    for (let x = -diag; x <= diag; x += STEP_X) {
+      for (let y = -diag; y <= diag; y += STEP_Y) {
+        g.fillText(text, x, y);
+      }
+    }
+    g.restore();
+
     const out = await new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
     return new File([out], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
   } finally {
     URL.revokeObjectURL(url);
+  }
+}
+
+// ===============================
+// 影片浮水印：用 ffmpeg.wasm 把文字「燒」進影片（下載後仍保留）
+//  - admin.html 會先載入 @ffmpeg/ffmpeg UMD，這裡直接用 window.FFmpeg
+// ===============================
+const __WM_DEFAULT_TEXT = "台中簡媽媽狗園";
+const __FFMPEG_CORE_PATH = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js";
+
+let __ffmpeg = null;
+
+function __isVideoFile(file) {
+  return !!file && /^video\//.test(file.type || "");
+}
+
+function __guessMediaTypeFromUrl(url) {
+  const u = String(url || "");
+  return /\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i.test(u) ? "video" : "image";
+}
+
+function normalizePetMedia(p) {
+  // 優先：新版 media（可同時放照片/影片，且保留順序）
+  let arr = Array.isArray(p?.media) ? p.media : null;
+
+  // 舊版：只有 images（字串 URL）
+  if (!arr || !arr.length) {
+    arr = [];
+    const imgs = Array.isArray(p?.images) && p.images.length ? p.images : (p?.image ? [p.image] : []);
+    const vids = Array.isArray(p?.videos) && p.videos.length ? p.videos : [];
+    for (const u of imgs) arr.push({ type: "image", url: u });
+    for (const u of vids) arr.push({ type: "video", url: u });
+  }
+
+  // 正規化
+  return (arr || [])
+    .map((x) => {
+      if (!x) return null;
+      if (typeof x === "string") return { type: __guessMediaTypeFromUrl(x), url: x };
+      const url = x.url || x.src || "";
+      const type = (x.type === "video" || x.type === "image") ? x.type : __guessMediaTypeFromUrl(url);
+      return url ? { type, url } : null;
+    })
+    .filter(Boolean);
+}
+
+async function __ensureFFmpegLoaded() {
+  if (__ffmpeg) return __ffmpeg;
+
+  if (!window.FFmpeg || typeof window.FFmpeg.createFFmpeg !== "function") {
+    throw new Error("FFmpeg 尚未載入（請確認 admin.html 已引入 @ffmpeg/ffmpeg）");
+  }
+
+  const { createFFmpeg } = window.FFmpeg;
+  __ffmpeg = createFFmpeg({
+    log: false,
+    corePath: __FFMPEG_CORE_PATH,
+  });
+
+  await __ffmpeg.load();
+  return __ffmpeg;
+}
+
+async function __readVideoMeta(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const v = document.createElement("video");
+    v.preload = "metadata";
+    v.muted = true;
+    v.playsInline = true;
+    v.src = url;
+    await new Promise((res, rej) => {
+      v.onloadedmetadata = () => res();
+      v.onerror = () => rej(new Error("讀取影片資訊失敗"));
+    });
+    const w = v.videoWidth || 1280;
+    const h = v.videoHeight || 720;
+    return { width: w, height: h };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+async function __makeWatermarkPng({ width, height, text }) {
+  // 為了避免超大影片導致記憶體爆掉：浮水印圖最大長邊 1280，再由 ffmpeg scale 到主影片尺寸
+  const MAX_SIDE = 1280;
+  const scale = Math.min(1, MAX_SIDE / Math.max(width, height));
+  const w = Math.max(1, Math.round(width * scale));
+  const h = Math.max(1, Math.round(height * scale));
+
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const g = c.getContext("2d");
+
+  // 透明背景
+  g.clearRect(0, 0, w, h);
+
+  const ANG = -33 * Math.PI / 180;
+  const FS = Math.round(Math.max(w, h) * 0.03);
+  const OP = 0.25;
+  const STEP_X = Math.max(Math.round(FS * 12), 360);
+  const STEP_Y = Math.max(Math.round(FS * 8), 260);
+  const diag = Math.hypot(w, h);
+
+  g.save();
+  g.translate(w / 2, h / 2);
+  g.rotate(ANG);
+  g.font = `600 ${FS}px "Noto Sans TC","Microsoft JhengHei",sans-serif`;
+  g.textBaseline = "middle";
+  g.fillStyle = `rgba(255,255,255,${OP})`;
+
+  for (let x = -diag; x <= diag; x += STEP_X) {
+    for (let y = -diag; y <= diag; y += STEP_Y) {
+      g.fillText(text, x, y);
+    }
+  }
+  g.restore();
+
+  const blob = await new Promise((r) => c.toBlob(r, "image/png"));
+  return blob;
+}
+
+// 影片 → 新影片 File（mp4；浮水印已燒入畫面）
+async function addWatermarkToVideoFile(file, { text = __WM_DEFAULT_TEXT } = {}) {
+  if (!__isVideoFile(file)) return file;
+
+  const ffmpeg = await __ensureFFmpegLoaded();
+  const { fetchFile } = window.FFmpeg;
+
+  const { width, height } = await __readVideoMeta(file);
+  const wmPng = await __makeWatermarkPng({ width, height, text });
+
+  // 名稱統一用 mp4（方便後續播放）
+  const inName = "in" + (file.name && file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")) : ".mp4");
+  const wmName = "wm.png";
+  const outName = "out.mp4";
+
+  // 清掉可能殘留的檔案
+  for (const n of [inName, wmName, outName]) {
+    try { ffmpeg.FS("unlink", n); } catch { }
+  }
+
+  ffmpeg.FS("writeFile", inName, await fetchFile(file));
+  ffmpeg.FS("writeFile", wmName, await fetchFile(wmPng));
+
+  // 用 watermark PNG 覆蓋到整個畫面（先 scale2ref 讓浮水印圖跟主影片同尺寸）
+  const filter = "[1:v][0:v]scale2ref=w=main_w:h=main_h[wm][base];[base][wm]overlay=0:0:format=auto[v]";
+
+  // 嘗試用 H.264；如果 wasm 沒編到 x264，就 fallback 到 mpeg4
+  const run = async (codecArgs) => {
+    const args = [
+      "-i", inName,
+      "-i", wmName,
+      "-filter_complex", filter,
+      "-map", "[v]",
+      "-map", "0:a?",
+      ...codecArgs,
+      "-movflags", "+faststart",
+      outName,
+    ];
+    await ffmpeg.run(...args);
+  };
+
+  try {
+    await run(["-c:v", "libx264", "-crf", "23", "-preset", "veryfast", "-c:a", "copy"]);
+  } catch (e1) {
+    try {
+      await run(["-c:v", "mpeg4", "-q:v", "5", "-c:a", "aac", "-b:a", "128k"]);
+    } catch (e2) {
+      throw new Error("影片浮水印處理失敗（可能檔案太大或瀏覽器記憶體不足）");
+    }
+  }
+
+  const data = ffmpeg.FS("readFile", outName);
+  const outBlob = new Blob([data.buffer], { type: "video/mp4" });
+  const outFile = new File([outBlob], file.name.replace(/\.[^.]+$/, ".mp4"), { type: "video/mp4" });
+
+  // 清理
+  for (const n of [inName, wmName, outName]) {
+    try { ffmpeg.FS("unlink", n); } catch { }
+  }
+
+  return outFile;
+}
+
+// File -> video objectURL 快取（避免 tile 重建時一直 createObjectURL）
+const __videoPreviewUrlCache = new Map();
+function ensureVideoPreviewURL(file) {
+  if (__videoPreviewUrlCache.has(file)) return __videoPreviewUrlCache.get(file);
+  const u = URL.createObjectURL(file);
+  __videoPreviewUrlCache.set(file, u);
+  return u;
+}
+function revokeVideoPreviewURL(file) {
+  const u = __videoPreviewUrlCache.get(file);
+  if (u) {
+    URL.revokeObjectURL(u);
+    __videoPreviewUrlCache.delete(file);
   }
 }
 
@@ -120,61 +316,8 @@ function revokePreviewThumb(file) {
 }
 
 async function __decodeToBitmap(file) {
-  // If it's a video, grab the first frame as a bitmap
-  try {
-    if (file && file.type && file.type.startsWith('video/')) {
-      const url = URL.createObjectURL(file);
-      try {
-        const v = document.createElement('video');
-        v.muted = true;
-        v.playsInline = true;
-        v.src = url;
-        await new Promise((res, rej) => {
-          v.onloadeddata = () => res();
-          v.onerror = () => rej(new Error('video load error'));
-        });
-        // Seek a tiny bit to ensure we get a frame
-        try {
-          v.currentTime = Math.min(0.01, (v.duration || 0) * 0.01);
-          await new Promise((res) => v.onseeked = () => res());
-        } catch (e) {}
-        const W = v.videoWidth || 640;
-        const H = v.videoHeight || 360;
-        const c = document.createElement('canvas');
-        c.width = W; c.height = H;
-        const g = c.getContext('2d', { alpha: false });
-        g.drawImage(v, 0, 0, W, H);
-        URL.revokeObjectURL(url);
-        return await createImageBitmap(c);
-      } catch (e) {
-        try { URL.revokeObjectURL(url); } catch (e) {}
-      }
-    }
-  } catch (_) {}
-
   if (window.createImageBitmap) {
     try { return await createImageBitmap(file); } catch (_) { /* fallback */ }
-  }
-
-  // fallback：用 <img> 解碼（比較可能卡，但至少可用）
-  const raw = URL.createObjectURL(file);
-  try {
-    const img = await new Promise((res, rej) => {
-      const im = new Image();
-      im.onload = () => res(im);
-      im.onerror = rej;
-      im.src = raw;
-    });
-    const c = document.createElement("canvas");
-    c.width = img.naturalWidth;
-    c.height = img.naturalHeight;
-    const g = c.getContext("2d");
-    g.drawImage(img, 0, 0);
-    return await createImageBitmap(c);
-  } finally {
-    URL.revokeObjectURL(raw);
-  }
-} catch (_) { /* fallback */ }
   }
 
   // fallback：用 <img> 解碼（比較可能卡，但至少可用）
@@ -315,42 +458,97 @@ async function openDialog(id) {
   document.getElementById('dlgTagVaccinated').textContent = isVaccinated
     ? '已注射預防針' : '未注射預防針';
 
-  // 4. 圖片 + Lightbox（搭配 shared.js）
+  // 4. 照片/影片 + Lightbox（搭配 shared.js）
   const dlgImg = document.getElementById("dlgImg");
+  const dlgVideo = document.getElementById("dlgVideo");
   const dlgBg = document.getElementById("dlgBg");
   const dlgThumbs = document.getElementById("dlgThumbs");
 
-  const imgs = Array.isArray(p.images) && p.images.length > 0
-    ? p.images
-    : (p.image ? [p.image] : []);
-
+  const media = normalizePetMedia(p);
   let currentIndex = 0;
 
-  dlgImg.src = imgs[currentIndex] || "";
-  if (dlgBg) dlgBg.src = dlgImg.src;
-  dlgImg.onclick = () => openLightbox(imgs, currentIndex);
-
-  dlgThumbs.innerHTML = "";
-  imgs.forEach((url, i) => {
-    const thumb = document.createElement("img");
-    thumb.src = url;
-    thumb.className = "dlg-thumb" + (i === 0 ? " active" : "");
-
-    thumb.addEventListener("click", () => {
-      currentIndex = i;
-
-      dlgImg.src = url;
-      if (dlgBg) dlgBg.src = url;
-
-      dlgThumbs.querySelectorAll(".dlg-thumb")
-        .forEach(el => el.classList.remove("active"));
-      thumb.classList.add("active");
+  function __setThumbActive(i) {
+    dlgThumbs?.querySelectorAll?.(".dlg-thumb")?.forEach((el, idx) => {
+      el.classList.toggle("active", idx === i);
     });
+  }
 
+  function showMain(i) {
+    const it = media[i];
+    currentIndex = i;
+
+    // 停掉上一支影片
+    try { if (dlgVideo && !dlgVideo.classList.contains("hidden")) dlgVideo.pause(); } catch { }
+
+    if (!it) {
+      if (dlgImg) dlgImg.src = "";
+      if (dlgVideo) { dlgVideo.src = ""; dlgVideo.classList.add("hidden"); }
+      if (dlgBg) { dlgBg.src = ""; dlgBg.classList.remove("hidden"); }
+      return;
+    }
+
+    const isVideo = it.type === "video";
+
+    if (isVideo) {
+      // main: video
+      if (dlgImg) dlgImg.classList.add("hidden");
+      if (dlgVideo) {
+        dlgVideo.classList.remove("hidden");
+        dlgVideo.src = it.url || "";
+        dlgVideo.onclick = () => openLightbox(media, currentIndex);
+      }
+      // 背景 blur：影片不做（避免額外抽幀造成卡頓）
+      if (dlgBg) {
+        dlgBg.src = "";
+        dlgBg.classList.add("hidden");
+      }
+    } else {
+      // main: image
+      if (dlgVideo) {
+        dlgVideo.pause?.();
+        dlgVideo.classList.add("hidden");
+        dlgVideo.removeAttribute?.("src");
+        try { dlgVideo.load?.(); } catch { }
+      }
+      if (dlgImg) {
+        dlgImg.classList.remove("hidden");
+        dlgImg.src = it.url || "";
+        dlgImg.onclick = () => openLightbox(media, currentIndex);
+      }
+      if (dlgBg) {
+        dlgBg.classList.remove("hidden");
+        dlgBg.src = it.url || "";
+      }
+    }
+
+    __setThumbActive(i);
+  }
+
+  // 建立縮圖列（照片用 img；影片用 video）
+  dlgThumbs.innerHTML = "";
+  media.forEach((it, i) => {
+    let thumb;
+    if (it.type === "video") {
+      thumb = document.createElement("video");
+      thumb.src = it.url;
+      thumb.muted = true;
+      thumb.playsInline = true;
+      thumb.preload = "metadata";
+    } else {
+      thumb = document.createElement("img");
+      thumb.src = it.url;
+      thumb.alt = "縮圖";
+    }
+
+    thumb.className = "dlg-thumb" + (i === 0 ? " active" : "");
+    thumb.addEventListener("click", () => showMain(i));
     dlgThumbs.appendChild(thumb);
   });
 
-  // 5. 顯示用文字
+  // 初始顯示
+  showMain(0);
+
+// 5. 顯示用文字
   document.getElementById('dlgName').textContent = p.name;
   document.getElementById('dlgDesc').textContent = p.desc;
   document.getElementById('dlgTagBreed').textContent = p.breed;
@@ -415,7 +613,7 @@ async function openDialog(id) {
     }
   }
 
-  renderEditImages(imgs);
+  renderEditMedia(media);
 
   // 7. 模式 / 按鈕 / 已送養相關
   setEditMode(false);      // 一開始都是「瀏覽模式」
@@ -590,30 +788,50 @@ async function saveEdit() {
   const stopDots = startDots(txt, "儲存中");
 
   try {
-    // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
-    const { items, removeUrls } = editImagesState;
-    const newUrls = [];
+    // 依照「目前畫面順序」組出最終 media：url 直接保留；file 依序處理（照片加浮水印、影片燒錄浮水印）
+    const { items, removeUrls } = editMediaState;
 
-    // 依序處理（保持順序）
+    const media = [];
+    const images = [];
+    const videos = [];
+
     for (const it of items) {
       if (it.kind === "url") {
-        newUrls.push(it.url);
+        const t = (it.type === "video" || it.type === "image") ? it.type : __guessMediaTypeFromUrl(it.url);
+        media.push({ type: t, url: it.url });
+        if (t === "video") videos.push(it.url);
+        else images.push(it.url);
         continue;
       }
 
       if (it.kind === "file") {
         const f = it.file;
-        const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
-        const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
-        const base = f.name.replace(/\.[^.]+$/, '');
-        const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
-        const r = sRef(storage, path);
-        await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
-        newUrls.push(await getDownloadURL(r));
+        const t = it.type || (__isVideoFile(f) ? "video" : "image");
+        const base = (f.name || "file").replace(/\.[^.]+$/, "");
+        const ts = Date.now();
+
+        if (t === "video") {
+          const wmVideo = await addWatermarkToVideoFile(f);
+          const path = `pets/${currentDocId}/${ts}_${base}.mp4`;
+          const r = sRef(storage, path);
+          await uploadBytes(r, wmVideo, { contentType: wmVideo.type || "video/mp4" });
+          const url = await getDownloadURL(r);
+          media.push({ type: "video", url });
+          videos.push(url);
+        } else {
+          const wmImg = await addWatermarkToFile(f);
+          const ext = wmImg.type === "image/png" ? "png" : "jpg";
+          const path = `pets/${currentDocId}/${ts}_${base}.${ext}`;
+          const r = sRef(storage, path);
+          await uploadBytes(r, wmImg, { contentType: wmImg.type });
+          const url = await getDownloadURL(r);
+          media.push({ type: "image", url });
+          images.push(url);
+        }
       }
     }
 
-    // 刪除被移除的舊圖（忽略刪失敗）
+    // 刪除被移除的舊檔（忽略刪失敗）
     for (const url of (removeUrls || [])) {
       try {
         const path = url.split("/o/")[1].split("?")[0];
@@ -623,7 +841,9 @@ async function saveEdit() {
       }
     }
 
-    newData.images = newUrls;
+    newData.media = media;
+    newData.images = images;
+    newData.videos = videos;
 
     // ③ 寫回 Firestore
     await updateDoc(doc(db, "pets", currentDocId), newData);
@@ -708,7 +928,7 @@ editBreedTypeSel.addEventListener("change", () => {
 });
 
 // ===============================
-// 編輯模式：圖片管理（預覽 + 增刪）- 不卡頓版（縮圖/手機拖曳排序）
+// 編輯模式：照片/影片管理（預覽 + 增刪）- 不卡頓版（縮圖/手機拖曳排序）
 // ===============================
 const editFiles = q("#editFiles");
 const btnPickEdit = q("#btnPickEdit");
@@ -721,18 +941,38 @@ const editCount = q("#editCount");
 
 const MAX_EDIT_FILES = 5;
 
-// 狀態：依「目前畫面順序」維護（url=舊圖、file=新圖）
-let editImagesState = { items: [], removeUrls: [] };
+// 狀態：依「目前畫面順序」維護（url=舊檔、file=新檔）
+let editMediaState = { items: [], removeUrls: [] };
 
 btnPickEdit?.addEventListener("click", () => editFiles?.click());
 
-// 初始化編輯圖片列表（把舊的檔案縮圖快取清掉，避免記憶體累積）
-function renderEditImages(urls) {
-  for (const it of editImagesState.items) {
-    if (it?.kind === "file" && it.file) revokePreviewThumb(it.file);
+function __itemTypeFromFile(file) {
+  return __isVideoFile(file) ? "video" : "image";
+}
+
+function __itemTypeFromUrl(url) {
+  return __guessMediaTypeFromUrl(url);
+}
+
+// 初始化編輯媒體列表（把舊的檔案預覽快取清掉，避免記憶體累積）
+function renderEditMedia(list) {
+  for (const it of editMediaState.items) {
+    if (it?.kind === "file" && it.file) {
+      if (it.type === "video") revokeVideoPreviewURL(it.file);
+      else revokePreviewThumb(it.file);
+    }
   }
-  editImagesState.items = (urls || []).map((u) => ({ kind: "url", url: u }));
-  editImagesState.removeUrls = [];
+
+  const normalized = (list || []).map((x) => {
+    if (!x) return null;
+    if (typeof x === "string") return { kind: "url", url: x, type: __itemTypeFromUrl(x) };
+    const url = x.url || x.src || "";
+    const type = (x.type === "video" || x.type === "image") ? x.type : __itemTypeFromUrl(url);
+    return url ? { kind: "url", url, type } : null;
+  }).filter(Boolean);
+
+  editMediaState.items = normalized;
+  editMediaState.removeUrls = [];
   paintEditPreview();
 }
 
@@ -740,49 +980,75 @@ function renderEditImages(urls) {
 const __editTileMap = new Map(); // key -> tile element（保留 DOM，避免換順序閃爍）
 
 function __editKey(it) {
-  return it.kind === "url" ? `url:${it.url}` : it.file;
+  return it.kind === "url" ? `url:${it.type}:${it.url}` : it.file;
 }
 
 function __makeEditTile(it) {
   const wrap = document.createElement("div");
-  wrap.className = "relative  select-none";
+  wrap.className = "relative select-none";
   wrap.style.touchAction = "none";
   wrap.style.setProperty("-webkit-touch-callout", "none");
   wrap.style.userSelect = "none";
   wrap.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  const img = document.createElement("img");
-  img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
-  img.alt = "預覽";
-  img.decoding = "async";
-  img.loading = "lazy";
-  img.draggable = false;
-  img.style.webkitUserDrag = "none";
-  img.style.webkitTouchCallout = "none";
-  img.addEventListener("contextmenu", (e) => e.preventDefault());
+  let mediaEl;
 
-  if (it.kind === "url") {
-    img.src = it.url;
+  if (it.type === "video") {
+    const v = document.createElement("video");
+    v.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+    v.muted = true;
+    v.playsInline = true;
+    v.preload = "metadata";
+    v.draggable = false;
+    v.style.webkitUserDrag = "none";
+    v.style.webkitTouchCallout = "none";
+    v.addEventListener("contextmenu", (e) => e.preventDefault());
+
+    if (it.kind === "url") v.src = it.url;
+    else v.src = ensureVideoPreviewURL(it.file);
+
+    mediaEl = v;
+
+    const badge = document.createElement("div");
+    badge.className = "absolute inset-0 flex items-center justify-center pointer-events-none";
+    badge.innerHTML = '<span class="bg-black/50 text-white text-xs px-2 py-1 rounded-full">🎬</span>';
+    wrap.appendChild(badge);
   } else {
-    img.src = PREVIEW_EMPTY_GIF;
-    ensurePreviewThumbURL(it.file)
-      .then((u) => { img.src = u; })
-      .catch(() => {
-        try {
-          const raw = URL.createObjectURL(it.file);
-          img.src = raw;
-          setTimeout(() => URL.revokeObjectURL(raw), 2000);
-        } catch (e) {}
-      });
+    const img = document.createElement("img");
+    img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+    img.alt = "預覽";
+    img.decoding = "async";
+    img.loading = "lazy";
+    img.draggable = false;
+    img.style.webkitUserDrag = "none";
+    img.style.webkitTouchCallout = "none";
+    img.addEventListener("contextmenu", (e) => e.preventDefault());
+
+    if (it.kind === "url") {
+      img.src = it.url;
+    } else {
+      img.src = PREVIEW_EMPTY_GIF;
+      ensurePreviewThumbURL(it.file)
+        .then((u) => { img.src = u; })
+        .catch(() => {
+          try {
+            const raw = URL.createObjectURL(it.file);
+            img.src = raw;
+            setTimeout(() => URL.revokeObjectURL(raw), 2000);
+          } catch { }
+        });
+    }
+
+    mediaEl = img;
   }
 
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
   btn.textContent = "✕";
-  btn.setAttribute("aria-label", "刪除這張");
+  btn.setAttribute("aria-label", "刪除這個檔案");
 
-  wrap.appendChild(img);
+  wrap.appendChild(mediaEl);
   wrap.appendChild(btn);
   return wrap;
 }
@@ -795,22 +1061,23 @@ function __setEditIdx(tile, idx) {
 
 // 依狀態同步 DOM（不清空重畫，避免閃爍）
 function paintEditPreview() {
-  editCount.textContent = `已選 ${editImagesState.items.length} / ${MAX_EDIT_FILES} 張/支`;
+  editCount.textContent = `已選 ${editMediaState.items.length} / ${MAX_EDIT_FILES} 個`;
 
-  const keys = editImagesState.items.map(__editKey);
+  const keys = editMediaState.items.map(__editKey);
 
   for (const [k, el] of __editTileMap) {
     if (!keys.includes(k)) {
-      // 移除 tile 時順便釋放縮圖
+      // 移除 tile 時順便釋放預覽
       if (k && typeof k === "object") {
-        try { revokePreviewThumb(k); } catch (e) {}
+        try { revokePreviewThumb(k); } catch { }
+        try { revokeVideoPreviewURL(k); } catch { }
       }
       el.remove();
       __editTileMap.delete(k);
     }
   }
 
-  editImagesState.items.forEach((it, i) => {
+  editMediaState.items.forEach((it, i) => {
     const key = __editKey(it);
     let tile = __editTileMap.get(key);
     if (!tile) {
@@ -831,21 +1098,21 @@ editPreview?.addEventListener("click", (e) => {
   e.stopPropagation();
 
   const i = +btn.dataset.idx;
-  const it = editImagesState.items[i];
+  const it = editMediaState.items[i];
   if (!it) return;
 
   if (it.kind === "url") {
-    editImagesState.removeUrls.push(it.url);
+    editMediaState.removeUrls.push(it.url);
   } else if (it.kind === "file") {
-    revokePreviewThumb(it.file);
+    if (it.type === "video") revokeVideoPreviewURL(it.file);
+    else revokePreviewThumb(it.file);
   }
 
-  editImagesState.items.splice(i, 1);
+  editMediaState.items.splice(i, 1);
   paintEditPreview();
 });
 
 // 手機可用的拖曳交換（Pointer Events；「移動超過門檻」才進入拖曳；放開時與目標交換）
-// - 仍保留 swap 交換排序
 let editDragFrom = null;
 let editDragOver = null;
 let editDragEl = null;
@@ -860,11 +1127,10 @@ function editBeginDrag(e, tile) {
   editDragFrom = +tile.dataset.idx;
   editDragOver = editDragFrom;
 
-  try { tile.setPointerCapture?.(e.pointerId); } catch (e) {}
+  try { tile.setPointerCapture?.(e.pointerId); } catch { }
   clearEditDragUI();
   tile.classList.add("ring-2", "ring-brand-500", "opacity-80");
-  // 進入拖曳後才阻止預設（避免一開始就擋住頁面/Modal 捲動）
-  try { e.preventDefault(); } catch (e) {}
+  try { e.preventDefault(); } catch { }
 }
 
 function clearEditDragUI() {
@@ -874,7 +1140,6 @@ function clearEditDragUI() {
 }
 
 editPreview?.addEventListener("pointerdown", (e) => {
-  // 刪除鈕不拖
   if (e.target.closest?.("button")) return;
 
   const tile = e.target.closest?.("[data-idx]");
@@ -885,7 +1150,6 @@ editPreview?.addEventListener("pointerdown", (e) => {
 });
 
 editPreview?.addEventListener("pointermove", (e) => {
-  // 還沒進入拖曳：移動超過門檻才開始（避免點一下就鎖住捲動/點擊）
   if (editDragFrom == null) {
     if (!editPending || editPending.pointerId !== e.pointerId) return;
 
@@ -898,7 +1162,7 @@ editPreview?.addEventListener("pointermove", (e) => {
     return;
   }
 
-  try { e.preventDefault(); } catch (e) {}
+  try { e.preventDefault(); } catch { }
   const el = document.elementFromPoint(e.clientX, e.clientY);
   const tile = el?.closest?.("[data-idx]");
   if (!tile || !editPreview.contains(tile)) return;
@@ -925,26 +1189,28 @@ function finishEditDrag() {
 
   if (to == null || to === from) return;
 
-  const tmp = editImagesState.items[from];
-  editImagesState.items[from] = editImagesState.items[to];
-  editImagesState.items[to] = tmp;
+  const tmp = editMediaState.items[from];
+  editMediaState.items[from] = editMediaState.items[to];
+  editMediaState.items[to] = tmp;
   paintEditPreview();
 }
 
 editPreview?.addEventListener("pointerup", finishEditDrag);
 editPreview?.addEventListener("pointercancel", finishEditDrag);
 
-// 新增圖片（遵守上限 5）
+// 新增照片/影片（遵守上限 5）
 editFiles?.addEventListener("change", () => {
-  const incoming = Array.from(editFiles.files || []);
-  const room = MAX_EDIT_FILES - editImagesState.items.length;
+  const incomingAll = Array.from(editFiles.files || []);
+  const incoming = incomingAll.filter((f) => /^image\//.test(f.type || "") || /^video\//.test(f.type || ""));
 
-  if (editImagesState.items.length + incoming.length > MAX_EDIT_FILES) {
-    swalInDialog({ icon: "warning", title: `最多 ${MAX_EDIT_FILES} 張照片` });
+  const room = MAX_EDIT_FILES - editMediaState.items.length;
+
+  if (editMediaState.items.length + incoming.length > MAX_EDIT_FILES) {
+    swalInDialog({ icon: "warning", title: `最多 ${MAX_EDIT_FILES} 個照片/影片` });
   }
 
   incoming.slice(0, Math.max(0, room)).forEach((f) => {
-    editImagesState.items.push({ kind: "file", file: f });
+    editMediaState.items.push({ kind: "file", file: f, type: __itemTypeFromFile(f) });
   });
 
   paintEditPreview();
@@ -975,40 +1241,63 @@ const __adoptedTileMap = new Map(); // File -> tile element（保留 DOM，避�
 
 function __makeAdoptedTile(file) {
   const wrap = document.createElement("div");
-  wrap.className = "relative  select-none";
+  wrap.className = "relative select-none";
   wrap.style.touchAction = "none";
   wrap.style.setProperty("-webkit-touch-callout", "none");
   wrap.style.userSelect = "none";
   wrap.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  const img = document.createElement("img");
-  img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
-  img.alt = "預覽";
-  img.decoding = "async";
-  img.loading = "lazy";
-  img.draggable = false;
-  img.style.webkitUserDrag = "none";
-  img.style.webkitTouchCallout = "none";
-  img.addEventListener("contextmenu", (e) => e.preventDefault());
-  img.src = PREVIEW_EMPTY_GIF;
+  let mediaEl;
 
-  ensurePreviewThumbURL(file)
-    .then((u) => { img.src = u; })
-    .catch(() => {
-      try {
-        const raw = URL.createObjectURL(file);
-        img.src = raw;
-        setTimeout(() => URL.revokeObjectURL(raw), 2000);
-      } catch (e) {}
-    });
+  if (__isVideoFile(file)) {
+    const v = document.createElement("video");
+    v.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+    v.muted = true;
+    v.playsInline = true;
+    v.preload = "metadata";
+    v.src = ensureVideoPreviewURL(file);
+    v.draggable = false;
+    v.style.webkitUserDrag = "none";
+    v.style.webkitTouchCallout = "none";
+    v.addEventListener("contextmenu", (e) => e.preventDefault());
+    mediaEl = v;
+
+    const badge = document.createElement("div");
+    badge.className = "absolute inset-0 flex items-center justify-center pointer-events-none";
+    badge.innerHTML = '<span class="bg-black/50 text-white text-xs px-2 py-1 rounded-full">🎬</span>';
+    wrap.appendChild(badge);
+  } else {
+    const img = document.createElement("img");
+    img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+    img.alt = "預覽";
+    img.decoding = "async";
+    img.loading = "lazy";
+    img.draggable = false;
+    img.style.webkitUserDrag = "none";
+    img.style.webkitTouchCallout = "none";
+    img.addEventListener("contextmenu", (e) => e.preventDefault());
+    img.src = PREVIEW_EMPTY_GIF;
+
+    ensurePreviewThumbURL(file)
+      .then((u) => { img.src = u; })
+      .catch(() => {
+        try {
+          const raw = URL.createObjectURL(file);
+          img.src = raw;
+          setTimeout(() => URL.revokeObjectURL(raw), 2000);
+        } catch { }
+      });
+
+    mediaEl = img;
+  }
 
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "absolute top-1 right-1 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center";
   btn.textContent = "✕";
-  btn.setAttribute("aria-label", "刪除這張");
+  btn.setAttribute("aria-label", "刪除這個檔案");
 
-  wrap.appendChild(img);
+  wrap.appendChild(mediaEl);
   wrap.appendChild(btn);
   return wrap;
 }
@@ -1021,11 +1310,11 @@ function __setAdoptedIdx(tile, idx) {
 
 // 渲染縮圖（不清空重畫，避免閃爍）
 function renderAdoptedPreviews() {
-  adoptedCount.textContent = `已選 ${adoptedSelected.length} / 5 張`;
+  adoptedCount.textContent = `已選 ${adoptedSelected.length} / 5 個`;
 
   for (const [file, el] of __adoptedTileMap) {
     if (!adoptedSelected.includes(file)) {
-      try { revokePreviewThumb(file); } catch (e) {}
+      try { revokePreviewThumb(file); } catch { }
       el.remove();
       __adoptedTileMap.delete(file);
     }
@@ -1052,7 +1341,7 @@ adoptedPreview.addEventListener("click", (e) => {
 
   const i = +btn.dataset.idx;
   const f = adoptedSelected[i];
-  if (f) revokePreviewThumb(f);
+  if (f) { revokePreviewThumb(f); revokeVideoPreviewURL(f); }
 
   adoptedSelected.splice(i, 1);
   renderAdoptedPreviews();
@@ -1073,10 +1362,10 @@ function adoptedBeginDrag(e, tile) {
   adoptedDragFrom = +tile.dataset.idx;
   adoptedDragOver = adoptedDragFrom;
 
-  try { tile.setPointerCapture?.(e.pointerId); } catch (e) {}
+  try { tile.setPointerCapture?.(e.pointerId); } catch { }
   clearAdoptedDragUI();
   tile.classList.add("ring-2", "ring-brand-500", "opacity-80");
-  try { e.preventDefault(); } catch (e) {}
+  try { e.preventDefault(); } catch { }
 }
 
 function clearAdoptedDragUI() {
@@ -1109,7 +1398,7 @@ adoptedPreview.addEventListener("pointermove", (e) => {
     return;
   }
 
-  try { e.preventDefault(); } catch (e) {}
+  try { e.preventDefault(); } catch { }
   const el = document.elementFromPoint(e.clientX, e.clientY);
   const tile = el?.closest?.("[data-idx]");
   if (!tile || !adoptedPreview.contains(tile)) return;
@@ -1149,10 +1438,11 @@ renderAdoptedPreviews();
 
 // 檔案變更：疊加並限制最多 5 張
 adoptedFilesInput.addEventListener("change", () => {
-  const incoming = Array.from(adoptedFilesInput.files || []);
+  const incomingAll = Array.from(adoptedFilesInput.files || []);
+  const incoming = incomingAll.filter((f) => /^image\//.test(f.type || "") || /^video\//.test(f.type || ""));
   const next = adoptedSelected.concat(incoming);
   if (next.length > 5) {
-    swalInDialog({ icon: "warning", title: "最多 5 張照片" });
+    swalInDialog({ icon: "warning", title: "最多 5 個照片/影片" });
   }
   adoptedSelected = next.slice(0, 5);
   renderAdoptedPreviews();
@@ -1161,10 +1451,10 @@ adoptedFilesInput.addEventListener("change", () => {
 
 // 清空（成功/取消後呼叫）
 function resetAdoptedSelection() {
-  adoptedSelected.forEach((f) => revokePreviewThumb(f));
+  adoptedSelected.forEach((f) => { revokePreviewThumb(f); revokeVideoPreviewURL(f); });
   adoptedSelected = [];
   adoptedPreview.innerHTML = "";
-  adoptedCount.textContent = "已選 0 / 5 張";
+  adoptedCount.textContent = "已選 0 / 5 個";
   adoptedFilesInput.value = "";
 }
 
@@ -1178,22 +1468,42 @@ async function onConfirmAdopted() {
   const stopDots = startDots(btn, "儲存中");
 
   const files = adoptedSelected.slice(0, 5);
-  const urls = [];
+  const adoptedMedia = [];
+  const adoptedPhotos = [];
+  const adoptedVideos = [];
+
   try {
     for (const f of files) {
-      const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
-      const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
-      const base = f.name.replace(/\.[^.]+$/, '');
-      const path = `adopted/${currentDocId}/${Date.now()}_${base}.${ext}`;
-      const r = sRef(storage, path);
-      await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
-      urls.push(await getDownloadURL(r));
+      const base = (f.name || "file").replace(/\.[^.]+$/, "");
+      const ts = Date.now();
+
+      if (__isVideoFile(f)) {
+        const wmVideo = await addWatermarkToVideoFile(f);
+        const path = `adopted/${currentDocId}/${ts}_${base}.mp4`;
+        const r = sRef(storage, path);
+        await uploadBytes(r, wmVideo, { contentType: wmVideo.type || "video/mp4" });
+        const url = await getDownloadURL(r);
+        adoptedMedia.push({ type: "video", url });
+        adoptedVideos.push(url);
+      } else {
+        const wmImg = await addWatermarkToFile(f);
+        const ext = wmImg.type === "image/png" ? "png" : "jpg";
+        const path = `adopted/${currentDocId}/${ts}_${base}.${ext}`;
+        const r = sRef(storage, path);
+        await uploadBytes(r, wmImg, { contentType: wmImg.type });
+        const url = await getDownloadURL(r);
+        adoptedMedia.push({ type: "image", url });
+        adoptedPhotos.push(url);
+      }
     }
 
     await updateDoc(doc(db, "pets", currentDocId), {
       status: "adopted",
+
       adoptedAt: serverTimestamp(),
-      adoptedPhotos: urls,
+      adoptedMedia,
+      adoptedPhotos,
+      adoptedVideos,
       showOnHome: true,
       showOnCats: false,
       showOnDogs: false,
@@ -1308,9 +1618,9 @@ function swalInDialog(opts) {
         const adoptedCount = document.getElementById("adoptedCount");
         const adoptedFilesInput = document.getElementById("adoptedFiles");
         if (adoptedPreview) adoptedPreview.innerHTML = "";
-        if (adoptedCount) adoptedCount.textContent = "已選 0 / 5 張";
+        if (adoptedCount) adoptedCount.textContent = "已選 0 / 5 個";
         if (adoptedFilesInput) adoptedFilesInput.value = "";
-      } catch (e) {}
+      } catch { }
     };
   }
 
@@ -1401,65 +1711,3 @@ async function deleteAllUnder(path) {
     else clearState();
   });
 })();
-
-
-// 影片燒錄浮水印（非表層）：用 ffmpeg.wasm 把同款式水印覆蓋到每一幀
-async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}) {
-  if (!window.FFmpeg || !FFmpeg.createFFmpeg) {
-    throw new Error("ffmpeg.wasm 載入失敗，請確認 admin.html 有載入 @ffmpeg/ffmpeg。");
-  }
-  // 先探測影片尺寸（用 <video>）以產生等尺寸的 PNG 浮水印
-  const getVideoSize = async (f) => {
-    const u = URL.createObjectURL(f);
-    try {
-      const v = document.createElement('video');
-      v.muted = true; v.playsInline = true; v.src = u;
-      await new Promise((res, rej) => { v.onloadedmetadata = () => res(); v.onerror = () => rej(new Error('metadata error')); });
-      return { W: v.videoWidth || 1280, H: v.videoHeight || 720, url: u };
-    } catch (e) {
-      try { URL.revokeObjectURL(u); } catch (e) {}
-      throw e;
-    }
-  };
-  const { W, H, url } = await getVideoSize(file);
-  try {
-    const wmCanvas = __makeWatermarkCanvas(W, H, text);
-    const wmBlob = await new Promise(r => wmCanvas.toBlob(r, "image/png"));
-    const { createFFmpeg, fetchFile } = FFmpeg;
-    const ffmpeg = window.__ffmpegInstance || (window.__ffmpegInstance = createFFmpeg({ log: false }));
-    if (!ffmpeg.isLoaded()) await ffmpeg.load();
-    ffmpeg.FS('writeFile', 'in.mp4', await fetchFile(file));
-    ffmpeg.FS('writeFile', 'wm.png', new Uint8Array(await wmBlob.arrayBuffer()));
-    // overlay 全畫面燒錄；音訊直接 copy；視訊使用 x264（瀏覽器相容）
-    await ffmpeg.run(
-      '-i','in.mp4','-i','wm.png',
-      '-filter_complex','[0:v][1:v]overlay=0:0:format=auto',
-      '-c:v','libx264','-preset','veryfast','-crf','23',
-      '-c:a','aac','-b:a','128k',
-      'out.mp4'
-    );
-    const data = ffmpeg.FS('readFile', 'out.mp4');
-    const outBlob = new Blob([data.buffer], { type: 'video/mp4' });
-    // 也回傳一張首幀海報（同款式水印），供縮圖/預覽用
-    const poster = await (async () => {
-      try {
-        const v = document.createElement('video');
-        v.muted = true; v.playsInline = true; v.src = url;
-        await new Promise((res, rej) => { v.onloadeddata = () => res(); v.onerror = () => rej(new Error()); });
-        const c = document.createElement('canvas');
-        c.width = W; c.height = H;
-        const g = c.getContext('2d');
-        g.drawImage(v, 0, 0, W, H);
-        const wm = __makeWatermarkCanvas(W, H, text);
-        g.drawImage(wm, 0, 0);
-        return await new Promise(r => c.toBlob(r, 'image/jpeg', 0.85));
-      } catch { return null; }
-    })();
-    return {
-      videoFile: new File([outBlob], file.name.replace(/\.[^.]+$/, ".mp4"), { type: "video/mp4" }),
-      posterFile: poster ? new File([poster], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" }) : null
-    };
-  } finally {
-    try { URL.revokeObjectURL(url); } catch (e) {}
-  }
-}
