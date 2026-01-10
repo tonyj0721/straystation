@@ -99,6 +99,7 @@ async function addWatermarkToImage(file, { text = "台中簡媽媽狗園" } = {}
 
 // 影片：用 <canvas> 燒入浮水印，重新編碼成 WebM
 // 注意：處理時間會接近影片實際長度，較長的影片會花比較久
+
 async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}) {
   const src = URL.createObjectURL(file);
   const video = document.createElement("video");
@@ -149,6 +150,7 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
 
     let playing = false;
     let ended = false;
+    let recorderStarted = false;
 
     function drawFrame() {
       if (!playing || ended) return;
@@ -172,11 +174,17 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
 
     video.addEventListener("ended", () => {
       ended = true;
-      try { recorder.stop(); } catch (_) { }
+      try { recorder.stop(); } catch (_) {}
       canvasStream.getTracks().forEach((t) => t.stop());
     }, { once: true });
 
-    recorder.start(200);
+    video.addEventListener("playing", () => {
+      if (!recorderStarted) {
+        recorderStarted = true;
+        recorder.start(200);
+      }
+    }, { once: true });
+
     await video.play();
     await recordDone;
 
@@ -187,7 +195,6 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
     URL.revokeObjectURL(src);
   }
 }
-
 // ===============================
 // 預覽縮圖：避免大圖解碼造成卡頓（支援手機）
 // ===============================
