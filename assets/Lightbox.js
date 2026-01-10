@@ -7,7 +7,6 @@ window.scrollTo(0, 0);
 const dlg = document.getElementById('petDialog');
 const lb = document.getElementById("lightbox");
 const lbImg = document.getElementById("lbImg");
-const lbVideo = document.getElementById("lbVideo");
 const lbPrev = document.getElementById("lbPrev");
 const lbNext = document.getElementById("lbNext");
 const lbClose = document.getElementById("lbClose");
@@ -15,35 +14,6 @@ const lbClose = document.getElementById("lbClose");
 let lbImages = [];
 let lbIndex = 0;
 let lbReturnToDialog = false;
-
-
-// 判斷 URL 是否為影片（用副檔名/常見格式推測）
-function isVideoUrl(url) {
-  const u = String(url || "").toLowerCase();
-  return /\.(mp4|mov|m4v|webm|ogv)(\?|#|$)/.test(u);
-}
-
-function showLightboxMedia(url) {
-  const isVid = isVideoUrl(url);
-  if (lbImg) {
-    lbImg.classList.toggle("hidden", isVid);
-    if (!isVid) lbImg.src = url || "";
-  }
-  if (lbVideo) {
-    lbVideo.classList.toggle("hidden", !isVid);
-    if (isVid) {
-      try { lbVideo.pause(); } catch (_) { }
-      lbVideo.src = url || "";
-      lbVideo.currentTime = 0;
-      // 避免某些瀏覽器切換後仍在背景播放
-      lbVideo.load?.();
-    } else {
-      try { lbVideo.pause(); } catch (_) { }
-      lbVideo.removeAttribute("src");
-      lbVideo.load?.();
-    }
-  }
-}
 
 // 用來記住原本 scroll 狀態（iOS 點螢幕頂端也不會把背景捲動）
 let __lockDepth = 0;
@@ -115,38 +85,27 @@ function openLightbox(images, index = 0) {
   lbIndex = Math.max(0, Math.min(index, lbImages.length - 1));
   lbReturnToDialog = !!(dlg && dlg.open);
 
-  showLightboxMedia(lbImages[lbIndex] || "");
+  if (lbImg) lbImg.src = lbImages[lbIndex] || '';
 
   // 建立縮圖列
   const lbThumbsInner = document.getElementById("lbThumbsInner");
   if (lbThumbsInner) {
     lbThumbsInner.innerHTML = "";
     lbImages.forEach((url, i) => {
-
-const isVid = isVideoUrl(url);
-const t = document.createElement(isVid ? "video" : "img");
-if (isVid) {
-  t.src = url;
-  t.muted = true;
-  t.playsInline = true;
-  t.preload = "metadata";
-  t.loop = true;
-} else {
-  t.src = url;
-}
-t.className = i === lbIndex ? "active" : "";
-t.addEventListener("click", () => {
-  lbIndex = i;
-  showLightboxMedia(lbImages[lbIndex] || "");
-  lbThumbsInner.querySelectorAll("img,video").forEach(el => el.classList.remove("active"));
-  t.classList.add("active");
-});
-lbThumbsInner.appendChild(t);
+      const t = document.createElement("img");
+      t.src = url;
+      t.className = i === lbIndex ? "active" : "";
+      t.addEventListener("click", () => {
+        lbIndex = i;
+        if (lbImg) lbImg.src = lbImages[lbIndex] || '';
+        lbThumbsInner.querySelectorAll("img").forEach(el => el.classList.remove("active"));
+        t.classList.add("active");
+      });
+      lbThumbsInner.appendChild(t);
     });
   }
 
   // 顯示 Lightbox（先顯示，讓 dlg.close() 的 close handler 知道是要切到 Lightbox）
-  try { lbVideo?.pause?.(); } catch (_) { }
   if (lb) {
     lb.classList.remove("hidden");
     lb.classList.add("flex");
@@ -161,8 +120,6 @@ lbThumbsInner.appendChild(t);
 
 // 🔥 關閉 Lightbox：回到 dialog 或直接解鎖
 function closeLightbox() {
-  try { lbVideo?.pause?.(); } catch (_) { }
-
   if (lb) {
     lb.classList.add("hidden");
     lb.classList.remove("flex");
@@ -181,10 +138,10 @@ function closeLightbox() {
 function lbShow(delta) {
   if (!lbImages.length) return;
   lbIndex = (lbIndex + delta + lbImages.length) % lbImages.length;
-  showLightboxMedia(lbImages[lbIndex] || "");
+  if (lbImg) lbImg.src = lbImages[lbIndex] || '';
   const lbThumbsInner = document.getElementById("lbThumbsInner");
   if (lbThumbsInner) {
-    lbThumbsInner.querySelectorAll("img,video").forEach((el, i) => {
+    lbThumbsInner.querySelectorAll("img").forEach((el, i) => {
       el.classList.toggle("active", i === lbIndex);
     });
   }
