@@ -355,13 +355,13 @@
               placeholder="個性、習慣、背景故事、注意事項…"></textarea>
           </div>
           <div>
-            <input id="imgFiles" type="file" accept="image/*" multiple class="sr-only" />
+            <input id="imgFiles" type="file" accept="image/*,video/*" multiple class="sr-only" />
             <div class="flex items-center gap-3">
               <button id="btnPick" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
-                新增照片
+                新增照片/影片
               </button>
-              <span id="fileCount" class="text-xs text-gray-500">已選 0 / 5 張</span>
-              <span class="text-sm text-gray-400">最多 5 張</span>
+              <span id="fileCount" class="text-xs text-gray-500">已選 0 / 5 個</span>
+              <span class="text-sm text-gray-400">最多 5 個</span>
             </div>
             <div id="imgPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
           </div>
@@ -435,7 +435,9 @@
           <img id="dlgImg" alt="毛孩照片"
             class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg">
 
-          <button id="dlgClose" class="absolute top-1 right-1 z-20 bg-black/60 text-white p-2 rounded-full leading-none"
+          
+          <video id="dlgVideo" aria-label="毛孩影片" controls playsinline class="relative z-10 hidden w-full h-full object-contain rounded-lg"></video>
+<button id="dlgClose" class="absolute top-1 right-1 z-20 bg-black/60 text-white p-2 rounded-full leading-none"
             aria-label="關閉">✕</button>
         </div>
       </div>
@@ -566,12 +568,12 @@
           </div>
 
           <div>
-            <input id="editFiles" type="file" accept="image/*" multiple class="sr-only" />
+            <input id="editFiles" type="file" accept="image/*,video/*" multiple class="sr-only" />
             <div class="flex items-center gap-3">
               <button id="btnPickEdit" type="button"
-                class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增照片</button>
+                class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增照片/影片</button>
               <span id="editCount" class="text-xs text-gray-500"></span>
-              <span class="text-sm text-gray-400">最多 5 張</span>
+              <span class="text-sm text-gray-400">最多 5 個</span>
             </div>
             <!-- 和新增模式一致：三欄縮圖 + 上方間距 -->
             <div id="editPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
@@ -632,7 +634,8 @@
   <div id="lightbox" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[9999]">
     <div id="lbWrap" class="relative inline-block">
       <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg" />
-      <button id="lbClose" class="absolute top-1 right-1 z-10 bg-black/60 hover:bg-black/70 text-white rounded-full p-2
+            <video id="lbVideo" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg hidden" controls playsinline></video>
+<button id="lbClose" class="absolute top-1 right-1 z-10 bg-black/60 hover:bg-black/70 text-white rounded-full p-2
            text-2xl leading-none select-none" aria-label="關閉">✕</button>
     </div>
     <div id="lbThumbs" class="absolute w-full flex justify-center px-4 py-2">
@@ -673,6 +676,129 @@
       signOut,
       onAuthStateChanged,
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
+
+// ===============================
+// 影片浮水印（燒錄進影片檔案，下載後仍保留）
+// ===============================
+import { FFmpeg } from "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm/index.js";
+import { fetchFile, toBlobURL } from "https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/esm/index.js";
+
+const __wmFfmpeg = new FFmpeg();
+let __wmLoaded = false;
+
+async function __ensureWmLoaded() {
+  if (__wmLoaded) return;
+  const baseURL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
+  await __wmFfmpeg.load({
+    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
+    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+  });
+  __wmLoaded = true;
+}
+
+async function __makeWatermarkPngBytes(width, height, text) {
+  const c = document.createElement("canvas");
+  c.width = width;
+  c.height = height;
+  const g = c.getContext("2d");
+
+  // 與照片相同：細字、無外框、疏一點、斜角
+  const ANG = -33 * Math.PI / 180;
+  const FS = Math.round(Math.max(width, height) * 0.03);
+  const OP = 0.25;
+  const STEP_X = Math.max(Math.round(FS * 12), 360);
+  const STEP_Y = Math.max(Math.round(FS * 8), 260);
+  const diag = Math.hypot(width, height);
+
+  g.save();
+  g.translate(width / 2, height / 2);
+  g.rotate(ANG);
+  g.font = `600 ${FS}px "Noto Sans TC","Microsoft JhengHei",sans-serif`;
+  g.textBaseline = "middle";
+  g.fillStyle = `rgba(255,255,255,${OP})`;
+
+  for (let x = -diag; x <= diag; x += STEP_X) {
+    for (let y = -diag; y <= diag; y += STEP_Y) {
+      g.fillText(text, x, y);
+    }
+  }
+  g.restore();
+
+  const blob = await new Promise((r) => c.toBlob(r, "image/png"));
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+// 提供給 Modal.js / 這頁 module script 共用
+window.addWatermarkToVideoFile = async (file, { text = "台中簡媽媽狗園" } = {}) => {
+  await __ensureWmLoaded();
+
+  // 讀影片尺寸（只取 metadata，不整段解碼）
+  const raw = URL.createObjectURL(file);
+  let W = 1280, H = 720;
+  try {
+    const v = document.createElement("video");
+    v.preload = "metadata";
+    v.src = raw;
+    await new Promise((res, rej) => {
+      v.addEventListener("loadedmetadata", () => res(), { once: true });
+      v.addEventListener("error", () => rej(new Error("video metadata failed")), { once: true });
+    });
+    W = v.videoWidth || W;
+    H = v.videoHeight || H;
+  } finally {
+    URL.revokeObjectURL(raw);
+  }
+
+  const inName = `in_${Date.now()}.mp4`;
+  const wmName = `wm_${Date.now()}.png`;
+  const outName = `out_${Date.now()}.mp4`;
+
+  // 寫入 FS
+  await __wmFfmpeg.writeFile(inName, await fetchFile(file));
+  await __wmFfmpeg.writeFile(wmName, await __makeWatermarkPngBytes(W, H, text));
+
+  // overlay = 直接燒錄進影片畫面（不是 CSS 覆蓋）
+  const args = [
+    "-i", inName,
+    "-i", wmName,
+    "-filter_complex", "[0:v][1:v]overlay=0:0:format=auto",
+    "-c:v", "libx264",
+    "-crf", "23",
+    "-preset", "veryfast",
+    "-c:a", "aac",
+    "-b:a", "128k",
+    "-movflags", "+faststart",
+    outName,
+  ];
+
+  try {
+    await __wmFfmpeg.exec(args);
+  } catch (e) {
+    // 後備：若 libx264 不可用，改用 mpeg4
+    await __wmFfmpeg.exec([
+      "-i", inName,
+      "-i", wmName,
+      "-filter_complex", "[0:v][1:v]overlay=0:0:format=auto",
+      "-c:v", "mpeg4",
+      "-q:v", "4",
+      "-c:a", "aac",
+      "-b:a", "128k",
+      outName,
+    ]);
+  }
+
+  const data = await __wmFfmpeg.readFile(outName);
+
+  // 清理
+  try { __wmFfmpeg.deleteFile(inName); } catch (_) { }
+  try { __wmFfmpeg.deleteFile(wmName); } catch (_) { }
+  try { __wmFfmpeg.deleteFile(outName); } catch (_) { }
+
+  const base = (file.name || "video").replace(/\.[^.]+$/, "");
+  return new File([data.buffer], `${base}.mp4`, { type: "video/mp4" });
+};
+
+
 
     const app = initializeApp(window.firebaseConfig);
     const db = getFirestore(app);
@@ -897,7 +1023,52 @@
       }
     }
 
+
+async function makeVideoThumbURL(file) {
+  const raw = URL.createObjectURL(file);
+  try {
+    const v = document.createElement("video");
+    v.muted = true;
+    v.playsInline = true;
+    v.preload = "metadata";
+    v.src = raw;
+
+    await new Promise((res, rej) => {
+      v.addEventListener("loadeddata", () => res(), { once: true });
+      v.addEventListener("error", () => rej(new Error("video decode failed")), { once: true });
+    });
+
+    // 取前 0.1 秒附近的畫面當縮圖（有些影片 0 秒是黑畫面）
+    try {
+      const t = Math.min(0.1, (v.duration || 1) / 2);
+      v.currentTime = Number.isFinite(t) ? t : 0;
+      await new Promise((res) => v.addEventListener("seeked", () => res(), { once: true }));
+    } catch (_) { }
+
+    const W = v.videoWidth || 640;
+    const H = v.videoHeight || 360;
+    const scale = Math.min(1, PREVIEW_MAX / Math.max(W, H));
+    const w = Math.max(1, Math.round(W * scale));
+    const h = Math.max(1, Math.round(H * scale));
+
+    await new Promise((r) => requestAnimationFrame(r));
+
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    const g = c.getContext("2d", { alpha: false, desynchronized: true });
+    g.drawImage(v, 0, 0, w, h);
+
+    const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", PREVIEW_QUALITY));
+    return URL.createObjectURL(blob);
+  } finally {
+    URL.revokeObjectURL(raw);
+  }
+}
+
     async function makeThumbURL(file) {
+      if (file && String(file.type || "").startsWith("video/")) {
+        return await makeVideoThumbURL(file);
+      }
       const bmp = await decodeToBitmap(file);
       const W = bmp.width, H = bmp.height;
       const scale = Math.min(1, PREVIEW_MAX / Math.max(W, H));
@@ -952,6 +1123,14 @@
       img.loading = "lazy";
       img.src = EMPTY_GIF;
 
+      const isVideo = String(file?.type || "").startsWith("video/");
+      if (isVideo) {
+        const badge = document.createElement("div");
+        badge.className = "absolute inset-0 flex items-center justify-center pointer-events-none";
+        badge.innerHTML = `<span class="bg-black/50 text-white rounded-full w-10 h-10 flex items-center justify-center text-lg">▶</span>`;
+        wrap.appendChild(badge);
+      }
+
       // 先顯示空白，再異步塞縮圖，避免解碼瞬間卡頓
       ensureThumbURL(file)
         .then((url) => { img.src = url; })
@@ -982,7 +1161,7 @@
     }
 
     function renderPreviews() {
-      fileCount.textContent = `已選 ${selectedFiles.length} / ${MAX_FILES} 張`;
+      fileCount.textContent = `已選 ${selectedFiles.length} / ${MAX_FILES} 個`;
 
       // 不整個清空重畫：只搬動既有 DOM，避免「換順序閃一下」
       for (const [file, el] of __previewTileMap) {
@@ -1088,7 +1267,7 @@
       const incoming = Array.from(imgFiles.files || []);
       const next = selectedFiles.concat(incoming);
       if (next.length > MAX_FILES) {
-        Swal.fire({ icon: "warning", title: `最多 ${MAX_FILES} 張照片` });
+        Swal.fire({ icon: "warning", title: `最多 ${MAX_FILES} 個檔案` });
       }
       selectedFiles = next.slice(0, MAX_FILES);
       renderPreviews();
@@ -1205,12 +1384,25 @@
         // 2) 逐張上傳圖片，取得 Storage URL
         const urls = [];
         for (const f of selectedFiles) {
-          const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
-          const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
-          const base = f.name.replace(/\.[^.]+$/, '');
+          const isVideo = String(f?.type || "").startsWith("video/");
+          const wmFile = isVideo
+            ? await window.addWatermarkToVideoFile(f) // 影片：燒錄浮水印
+            : await addWatermarkToFile(f);            // 照片：畫到像素裡
+
+          const base = (f.name || "file").replace(/\.[^.]+$/, "");
+
+          let ext = "jpg";
+          let contentType = wmFile.type || "image/jpeg";
+          if (isVideo) {
+            ext = "mp4";
+            contentType = "video/mp4";
+          } else {
+            ext = wmFile.type === "image/png" ? "png" : "jpg";
+          }
+
           const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
           const r = sRef(storage, path);
-          await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
+          await uploadBytes(r, wmFile, { contentType });
           urls.push(await getDownloadURL(r));
         }
 
@@ -1233,7 +1425,7 @@
         e.target.reset();
         imgPreview.innerHTML = "";
         selectedFiles = [];
-        fileCount.textContent = "已選 0 / 5 張";
+        fileCount.textContent = "已選 0 / 5 個";
         syncBreedSelectors();
 
         // 先啟動重新載入列表（避免等到提示結束才開始抓資料）
