@@ -16,7 +16,7 @@ jobs:
         with:
           node-version: 20
 
-      # 安裝 functions 相依
+      # functions 相依：第一次沒有 lock 檔就用 install
       - name: Install Functions deps
         run: |
           cd functions
@@ -26,17 +26,16 @@ jobs:
             npm install
           fi
 
-      # PR：只做 Hosting Preview（不動 Functions）
+      # （可選）PR 預覽：不用 SA，也可以用 token 走 hosting channel
       - name: Hosting Preview (PR)
         if: github.event_name == 'pull_request'
-        uses: FirebaseExtended/action-hosting-deploy@v0
+        uses: w9jds/firebase-action@v15.2.1
         with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          channelId: pr-${{ github.event.number }}
-          projectId: ${{ secrets.FIREBASE_PROJECT_ID }}
+          args: hosting:channel:deploy pr-${{ github.event.number }} --project ${{ secrets.FIREBASE_PROJECT_ID }}
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
 
-      # main：正式部署 Hosting + Functions
+      # 正式部署（main）：Hosting + Functions
       - name: Deploy to Prod (main)
         if: github.event_name == 'push'
         uses: w9jds/firebase-action@v15.2.1
@@ -44,5 +43,3 @@ jobs:
           args: deploy --only hosting,functions --project ${{ secrets.FIREBASE_PROJECT_ID }}
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
-
-
