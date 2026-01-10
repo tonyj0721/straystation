@@ -895,9 +895,6 @@
 
     const EMPTY_GIF = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 
-    btnPick?.addEventListener("click", () => imgFiles.click());
-    btnPickVideo?.addEventListener("click", () => videoFiles?.click());
-
     function revokeThumb(file) {
       const u = thumbUrlCache.get(file);
       if (u) {
