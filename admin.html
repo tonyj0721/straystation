@@ -370,13 +370,14 @@
             <input id="videoFiles" type="file" accept="video/*" multiple class="sr-only" />
             <div class="flex items-center gap-3">
               <button id="btnPickVideo" type="button"
-                class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增影片</button>
-              <span id="videoFileCount" class="text-xs text-gray-500">已選 0 / 3 支</span>
-              <span class="text-sm text-gray-400">最多 3 支</span>
+                class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
+                新增影片
+              </button>
+              <span id="videoCount" class="text-xs text-gray-500">已選 0 / 3 部</span>
+              <span class="text-sm text-gray-400">最多 3 部</span>
             </div>
-            <div id="videoPreview" class="mt-2 text-xs text-gray-500 space-y-1"></div>
+            <div id="videoPreview" class="mt-3 grid grid-cols-2 gap-2"></div>
           </div>
-
 <div class="flex gap-3 pt-2">
             <button id="submitBtn" type="submit"
               class="px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-gray-800 flex items-center gap-2">
@@ -446,9 +447,6 @@
           <!-- 主圖在最上層，沒有 blur -->
           <img id="dlgImg" alt="毛孩照片"
             class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg">
-          <video id="dlgVideo"
-            class="relative z-10 hidden w-full h-full object-contain rounded-lg bg-black"
-            playsinline controls></video>
 
           <button id="dlgClose" class="absolute top-1 right-1 z-20 bg-black/60 text-white p-2 rounded-full leading-none"
             aria-label="關閉">✕</button>
@@ -456,7 +454,6 @@
       </div>
 
       <div id="dlgThumbs" class="flex gap-2 overflow-x-auto p-3"></div>
-      <!-- 影片區：有影片時才顯示 -->
       <div class="p-5 space-y-4">
         <div class="flex items-start justify-between gap-3">
           <div>
@@ -599,12 +596,10 @@
               <button id="btnPickEditVideo" type="button"
                 class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增影片</button>
               <span id="editVideoCount" class="text-xs text-gray-500"></span>
-              <span class="text-sm text-gray-400">最多 3 支</span>
+              <span class="text-sm text-gray-400">最多 3 部</span>
             </div>
-            <div id="editVideoList" class="mt-2 text-xs text-gray-500 space-y-1"></div>
+            <div id="editVideoPreview" class="mt-3 grid grid-cols-2 gap-2"></div>
           </div>
-        </div>
-
         <!-- 動作列 -->
         <div id="actionBar" class="pt-2 flex flex-col sm:flex-row gap-3 hidden">
           <button id="btnEdit" class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm">
@@ -857,18 +852,11 @@
     const fileCount = $("#fileCount");
     const imgPreview = $("#imgPreview");
 
-    const videoFiles = $("#videoFiles");
-    const btnPickVideo = $("#btnPickVideo");
-    const videoFileCount = $("#videoFileCount");
-    const videoPreview = $("#videoPreview");
-
     const MAX_FILES = 5;
-    const MAX_VIDEO_FILES = 3;
     const PREVIEW_MAX = 720;      // 預覽縮圖長邊上限（越小越順）
     const PREVIEW_QUALITY = 0.82; // JPEG 品質（0~1）
 
     let selectedFiles = []; // 待上傳檔案（順序 = 上傳順序）
-    let selectedVideoFiles = []; // 待上傳影片
 
     // File → 縮圖 objectURL（避免每次重畫都重新解碼）
     const thumbUrlCache = new Map();
@@ -895,7 +883,6 @@
     const EMPTY_GIF = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 
     btnPick?.addEventListener("click", () => imgFiles.click());
-    btnPickVideo?.addEventListener("click", () => videoFiles?.click());
 
     function revokeThumb(file) {
       const u = thumbUrlCache.get(file);
@@ -1130,30 +1117,83 @@
       imgFiles.value = ""; // 清空 input，避免重複選取不到
     });
 
-    // 影片挑選後：只做數量限制 + 檔名清單
-    videoFiles?.addEventListener("change", () => {
-      const incoming = Array.from(videoFiles.files || []);
-      const next = selectedVideoFiles.concat(incoming);
-      if (next.length > MAX_VIDEO_FILES) {
-        Swal.fire({ icon: "warning", title: `最多 ${MAX_VIDEO_FILES} 支影片` });
-      }
-      selectedVideoFiles = next.slice(0, MAX_VIDEO_FILES);
+    
+    // ===============================
+    // 新增：影片選取/預覽（最多 3 部）
+    // ===============================
+    const videoFiles = $("#videoFiles");
+    const btnPickVideo = $("#btnPickVideo");
+    const videoCount = $("#videoCount");
+    const videoPreview = $("#videoPreview");
+    const MAX_VIDEOS = 3;
+    let selectedVideos = [];
 
-      if (videoPreview) {
-        videoPreview.innerHTML = "";
-        selectedVideoFiles.forEach((f, idx) => {
-          const row = document.createElement("div");
-          row.textContent = `${idx + 1}. ${f.name}`;
-          videoPreview.appendChild(row);
-        });
+    btnPickVideo?.addEventListener("click", () => videoFiles?.click());
+
+    videoFiles?.addEventListener("change", () => {
+      if (!videoFiles.files) return;
+
+      const incoming = Array.from(videoFiles.files || []).filter(
+        (f) => f && f.type && f.type.startsWith("video/")
+      );
+      const next = selectedVideos.concat(incoming);
+      if (next.length > MAX_VIDEOS) {
+        Swal.fire({ icon: "warning", title: `最多 ${MAX_VIDEOS} 部影片` });
       }
-      if (videoFileCount) {
-        videoFileCount.textContent = `已選 ${selectedVideoFiles.length} / ${MAX_VIDEO_FILES} 支`;
-      }
-      videoFiles.value = ""; // 清空 input，避免重複選取不到
+      selectedVideos = next.slice(0, MAX_VIDEOS);
+      renderVideoPreviews();
+      videoFiles.value = "";
     });
 
-    // ===============================
+    function renderVideoPreviews() {
+      if (!videoPreview || !videoCount) return;
+
+      videoPreview.innerHTML = "";
+      videoCount.textContent = `已選 ${selectedVideos.length} / ${MAX_VIDEOS} 部`;
+
+      selectedVideos.forEach((file) => {
+        const wrap = document.createElement("div");
+        wrap.className = "relative";
+
+        const v = document.createElement("video");
+        v.className = "w-full aspect-video rounded-lg bg-black";
+        v.muted = true;
+        v.controls = true;
+        v.playsInline = true;
+
+        try {
+          const raw = URL.createObjectURL(file);
+          v.src = raw;
+          v.onloadeddata = () => {
+            try { v.currentTime = 0.1; } catch { }
+          };
+          v.dataset.objectUrl = raw;
+        } catch { }
+
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
+        btn.textContent = "✕";
+        btn.addEventListener("click", () => {
+          const i = selectedVideos.indexOf(file);
+          if (i >= 0) selectedVideos.splice(i, 1);
+          if (v.dataset.objectUrl) {
+            try { URL.revokeObjectURL(v.dataset.objectUrl); } catch { }
+          }
+          renderVideoPreviews();
+        });
+
+        wrap.appendChild(v);
+        wrap.appendChild(btn);
+        videoPreview.appendChild(wrap);
+      });
+
+      if (!selectedVideos.length) {
+        videoCount.textContent = "已選 0 / 3 部";
+      }
+    }
+
+// ===============================
     // 捲到最上方（保險版）
     // ===============================
     function forceScrollTop() {
@@ -1261,46 +1301,49 @@
         // 1) 新增基本文件
         const docRef = await addDoc(collection(db, "pets"), payload);
 
-        // 2) 上傳圖片與影片，取得 Storage URL
-        const imgUrls = [];
-        const videoUrls = [];
-
-        // 圖片：逐張加浮水印後上傳
+        // 2) 逐張上傳圖片，取得 Storage URL
+        const imageUrls = [];
         for (const f of selectedFiles) {
-          const wmBlob = await addWatermarkToFile(f);       // ← 先加浮水印
-          const isImage = wmBlob.type && wmBlob.type.startsWith("image/");
-          const ext = isImage
-            ? (wmBlob.type === 'image/png' ? 'png' : 'jpg')
-            : (wmBlob.type.split("/")[1] || "bin");
+          const wmBlob = await addWatermarkToFile(f);       // ← 先加浮水印（圖片）
+          const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
           const base = f.name.replace(/\.[^.]+$/, '');
-          const folder = isImage ? `pets/${docRef.id}` : `pets/${docRef.id}/others`;
-          const path = `${folder}/${Date.now()}_${base}.${ext}`;
+          const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
           const r = sRef(storage, path);
           await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
-          imgUrls.push(await getDownloadURL(r));
+          imageUrls.push(await getDownloadURL(r));
         }
 
-        // 影片：逐支加浮水印後上傳
-        for (const f of selectedVideoFiles) {
-          const wmBlob = await addWatermarkToFile(f);       // 影片會輸出帶浮水印的新檔
-          const ext = (wmBlob.type && wmBlob.type.split("/")[1]) || "webm";
-          const base = f.name.replace(/\.[^.]+$/, '');
-          const path = `pets/${docRef.id}/videos/${Date.now()}_${base}.${ext}`;
-          const r = sRef(storage, path);
-          await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
-          videoUrls.push(await getDownloadURL(r));
+        // 2b) 上傳影片（如有），同樣加上浮水印後再寫入 Storage
+        const videoUrls = [];
+        if (typeof selectedVideos !== "undefined" && selectedVideos.length) {
+          for (const f of selectedVideos) {
+            try {
+              const wmVideo = await addWatermarkToVideoFile(f);
+              const base = f.name.replace(/\.[^.]+$/, '');
+              const path = `pets/${docRef.id}/videos/${Date.now()}_${base}.webm`;
+              const r = sRef(storage, path);
+              await uploadBytes(r, wmVideo, { contentType: wmVideo.type || "video/webm" });
+              videoUrls.push(await getDownloadURL(r));
+            } catch (err) {
+              console.error("影片浮水印/上傳失敗：", err);
+              await Swal.fire({
+                icon: "error",
+                title: `上傳影片 ${f.name} 失敗`,
+                text: err && err.message ? err.message : String(err),
+              });
+            }
+          }
         }
 
         // 3) 回寫 images / videos 欄位
         const updatePayload = {};
-        if (imgUrls.length) updatePayload.images = imgUrls;
+        if (imageUrls.length) updatePayload.images = imageUrls;
         if (videoUrls.length) updatePayload.videos = videoUrls;
         if (Object.keys(updatePayload).length) {
           await updateDoc(doc(db, "pets", docRef.id), updatePayload);
         }
 
-
-// UI 收尾
+        // UI 收尾
         stopDots();
         submitBtn.disabled = false;
         submitText.textContent = "登錄";
@@ -1310,15 +1353,17 @@
         if (nameInput) nameInput.value = "";
         if (window.resetNameCheck) resetNameCheck();
 
-        // 重置表單與選擇圖片/影片（先做，避免 DOM 還在變動導致 smooth scroll 卡住）
+        // 重置表單與選擇圖片（先做，避免 DOM 還在變動導致 smooth scroll 卡住）
         e.target.reset();
         imgPreview.innerHTML = "";
         selectedFiles = [];
         fileCount.textContent = "已選 0 / 5 張";
 
-        if (videoPreview) videoPreview.innerHTML = "";
-        selectedVideoFiles = [];
-        if (videoFileCount) videoFileCount.textContent = "已選 0 / 3 支";
+        if (typeof selectedVideos !== "undefined") {
+          selectedVideos = [];
+          if (videoPreview) videoPreview.innerHTML = "";
+          if (videoCount) videoCount.textContent = "已選 0 / 3 部";
+        }
 
         syncBreedSelectors();
 
