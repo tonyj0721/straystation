@@ -1076,26 +1076,6 @@ function renderPreviews() {
   });
   if (fileCount) fileCount.textContent = `已選 ${ (selectedMedia||[]).length } / 5 個（按住可拖曳換順序）`;
 }
- / ${MAX_FILES} 個`;
-
-      // 不整個清空重畫：只搬動既有 DOM，避免「換順序閃一下」
-      for (const [file, el] of __previewTileMap) {
-        if (!selectedMedia.includes(file)) {
-          el.remove();
-          __previewTileMap.delete(file);
-        }
-      }
-
-      selectedMedia.forEach((file, i) => {
-        let tile = __previewTileMap.get(file);
-        if (!tile) {
-          tile = __makePreviewTile(file);
-          __previewTileMap.set(file, tile);
-        }
-        __setPreviewIdx(tile, i);
-        imgPreview.appendChild(tile); // appendChild 會把既有節點移動到正確位置
-      });
-    }
 
     // 刪除（事件代理）
     imgPreview.addEventListener("click", (e) => {
