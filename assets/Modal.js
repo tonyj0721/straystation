@@ -1521,14 +1521,26 @@ function swalInDialog(opts) {
     };
   }
 
+  function stopDialogVideos() {
+    try {
+      const videos = dlg.querySelectorAll("video");
+      videos.forEach((v) => {
+        try { v.pause(); } catch (e) {}
+        try { v.currentTime = 0; } catch (e) {}
+      });
+    } catch (e) {}
+  }
+
   // 1) 標準：dialog 關閉事件（按 X、點遮罩、呼叫 close() 都會觸發）
   dlg.addEventListener("close", () => {
     resetAdoptedSelection();
+    stopDialogVideos();
   });
 
   // 2) 取消事件（按 Esc）
   dlg.addEventListener("cancel", () => {
     resetAdoptedSelection();
+    stopDialogVideos();
     // 不阻止預設，讓它照常關閉
   });
 
@@ -1536,6 +1548,7 @@ function swalInDialog(opts) {
   const mo = new MutationObserver(() => {
     if (!dlg.open) {
       resetAdoptedSelection();
+      stopDialogVideos();
     }
   });
   mo.observe(dlg, { attributes: true, attributeFilter: ["open", "aria-hidden"] });
