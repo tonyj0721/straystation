@@ -7,13 +7,11 @@ window.scrollTo(0, 0);
 const dlg = document.getElementById('petDialog');
 const lb = document.getElementById("lightbox");
 const lbImg = document.getElementById("lbImg");
-const lbVideo = document.getElementById("lbVideo");
-const lbWm = document.getElementById("lbWm");
 const lbPrev = document.getElementById("lbPrev");
 const lbNext = document.getElementById("lbNext");
 const lbClose = document.getElementById("lbClose");
 
-let lbMedia = [];
+let lbImages = [];
 let lbIndex = 0;
 let lbReturnToDialog = false;
 
@@ -82,77 +80,47 @@ dlg?.addEventListener('close', () => {
 });
 
 // 🔥 開啟 Lightbox：關掉 dialog + 維持背景鎖定
-function openLightbox(items, index = 0) {
-// 標準化：接受 string[] 或 {type,url}[]
-lbMedia = (items || []).map(it => (typeof it === "string" ? { type: "image", url: it } : it));
-lbIndex = Math.max(0, Math.min(index, lbMedia.length - 1));
-lbReturnToDialog = !!(dlg && dlg.open);
+function openLightbox(images, index = 0) {
+  lbImages = images || [];
+  lbIndex = Math.max(0, Math.min(index, lbImages.length - 1));
+  lbReturnToDialog = !!(dlg && dlg.open);
 
-function showCurrent() {
-  const cur = lbMedia[lbIndex];
-  const isVideo = cur && cur.type === "video";
-  if (isVideo) {
-    if (lbImg) { lbImg.classList.add("hidden"); lbImg.src = ""; }
-    if (lbVideo) { lbVideo.classList.remove("hidden"); lbVideo.src = cur.url; }
-    if (lbWm) lbWm.classList.remove("hidden");
-  } else {
-    if (lbVideo) { try { lbVideo.pause(); } catch {} lbVideo.classList.add("hidden"); lbVideo.src = ""; }
-    if (lbImg) { lbImg.classList.remove("hidden"); lbImg.src = cur ? cur.url : ""; }
-    if (lbWm) lbWm.classList.add("hidden");
-  }
-}
+  if (lbImg) lbImg.src = lbImages[lbIndex] || '';
 
-// 建立縮圖列
-const lbThumbsInner = document.getElementById("lbThumbsInner");
-if (lbThumbsInner) {
-  lbThumbsInner.innerHTML = "";
-  lbMedia.forEach((m, i) => {
-    let t;
-    if (m.type === "video") {
-      t = document.createElement("div");
-      t.textContent = "🎬";
+  // 建立縮圖列
+  const lbThumbsInner = document.getElementById("lbThumbsInner");
+  if (lbThumbsInner) {
+    lbThumbsInner.innerHTML = "";
+    lbImages.forEach((url, i) => {
+      const t = document.createElement("img");
+      t.src = url;
       t.className = i === lbIndex ? "active" : "";
-      t.style.width = "48px";
-      t.style.height = "48px";
-      t.style.display = "flex";
-      t.style.alignItems = "center";
-      t.style.justifyContent = "center";
-      t.style.background = "rgba(255,255,255,0.08)";
-      t.style.borderRadius = "8px";
-      t.style.color = "#fff";
-      t.style.fontSize = "20px";
-    } else {
-      t = document.createElement("img");
-      t.src = m.url;
-      t.className = i === lbIndex ? "active" : "";
-    }
-    t.addEventListener("click", () => {
-      lbIndex = i;
-      showCurrent();
-      if (lbThumbsInner) {
-        Array.from(lbThumbsInner.children).forEach((el, idx) => el.classList.toggle("active", idx === lbIndex));
-      }
+      t.addEventListener("click", () => {
+        lbIndex = i;
+        if (lbImg) lbImg.src = lbImages[lbIndex] || '';
+        lbThumbsInner.querySelectorAll("img").forEach(el => el.classList.remove("active"));
+        t.classList.add("active");
+      });
+      lbThumbsInner.appendChild(t);
     });
-    lbThumbsInner.appendChild(t);
-  });
+  }
+
+  // 顯示 Lightbox（先顯示，讓 dlg.close() 的 close handler 知道是要切到 Lightbox）
+  if (lb) {
+    lb.classList.remove("hidden");
+    lb.classList.add("flex");
+  }
+
+  // 關掉 Modal（移除 backdrop）
+  if (dlg?.open) dlg.close();
+
+  // 確保背景鎖住（不要 unlock，避免 iOS 點頂端時背景被捲）
+  if (__lockDepth === 0) lockScroll();
 }
-
-// 顯示 Lightbox（先顯示，讓 dlg.close() 的 close handler 知道是要切到 Lightbox）
-if (lb) { try { lbVideo?.pause?.(); } catch {} if (lbVideo) lbVideo.src = "";
-  lb.classList.remove("hidden");
-  lb.classList.add("flex");
-}
-
-// 關掉 Modal（移除 backdrop）
-if (dlg?.open) dlg.close();
-
-// 初次顯示當前
-showCurrent();
-
 
 // 🔥 關閉 Lightbox：回到 dialog 或直接解鎖
 function closeLightbox() {
-  if (lb) { try { lbVideo?.pause?.(); } catch {} if (lbVideo) lbVideo.src = "";
+  if (lb) {
     lb.classList.add("hidden");
     lb.classList.remove("flex");
   }
@@ -168,19 +136,9 @@ function closeLightbox() {
 
 // 🔥 左右切換
 function lbShow(delta) {
-  if (!lbMedia.length) return;
-  lbIndex = (lbIndex + delta + lbMedia.length) % lbMedia.length;
-  try { lbVideo?.pause?.(); } catch {}
-  const cur = lbMedia[lbIndex];
-  if (cur?.type === "video") {
-    if (lbImg) { lbImg.classList.add("hidden"); lbImg.src = ""; }
-    if (lbVideo) { lbVideo.classList.remove("hidden"); lbVideo.src = cur.url; }
-    if (lbWm) lbWm.classList.remove("hidden");
-  } else {
-    if (lbVideo) { lbVideo.classList.add("hidden"); lbVideo.src = ""; }
-    if (lbImg) { lbImg.classList.remove("hidden"); lbImg.src = cur ? cur.url : ""; }
-    if (lbWm) lbWm.classList.add("hidden");
-  }
+  if (!lbImages.length) return;
+  lbIndex = (lbIndex + delta + lbImages.length) % lbImages.length;
+  if (lbImg) lbImg.src = lbImages[lbIndex] || '';
   const lbThumbsInner = document.getElementById("lbThumbsInner");
   if (lbThumbsInner) {
     lbThumbsInner.querySelectorAll("img").forEach((el, i) => {
