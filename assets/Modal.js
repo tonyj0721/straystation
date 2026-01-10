@@ -294,33 +294,6 @@ async function openDialog(id) {
     dlgThumbs.appendChild(thumb);
   });
 
-  // === 新增：影片清單（可播放；前端覆蓋浮水印，行動裝置也可用）
-  try {
-    let dlgVideos = document.getElementById("dlgVideos");
-    const thumbsHost = document.getElementById("dlgThumbs");
-    if (!dlgVideos) {
-      dlgVideos = document.createElement("div");
-      dlgVideos.id = "dlgVideos";
-      dlgVideos.className = "px-3 pb-3 grid grid-cols-1 gap-3";
-      if (thumbsHost && thumbsHost.parentElement) {
-        thumbsHost.parentElement.insertAdjacentElement("afterend", dlgVideos);
-      } else {
-        document.getElementById("petDialog")?.appendChild(dlgVideos);
-      }
-    }
-    dlgVideos.innerHTML = "";
-    (Array.isArray(p.videos) ? p.videos : []).forEach((url) => {
-      const wrap = document.createElement("div");
-      wrap.className = "relative rounded-lg overflow-hidden";
-      const v = document.createElement("video");
-      v.src = url; v.controls = true; v.playsInline = true; v.muted = true;
-      v.className = "block w-full h-auto wm-playback";
-      wrap.appendChild(v);
-      dlgVideos.appendChild(wrap);
-    });
-  } catch (e) { console.warn("render videos failed", e); }
-
-
   // 5. 顯示用文字
   document.getElementById('dlgName').textContent = p.name;
   document.getElementById('dlgDesc').textContent = p.desc;
@@ -564,7 +537,6 @@ async function saveEdit() {
     // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
     const { items, removeUrls } = editImagesState;
     const newUrls = [];
-      let uploadedVideos = false;
 
     // 依序處理（保持順序）
     for (const it of items) {
@@ -717,33 +689,35 @@ function __editKey(it) {
 
 function __makeEditTile(it) {
   const wrap = document.createElement("div");
-  wrap.className = "relative w-full aspect-square overflow-hidden rounded-xl bg-gray-100";
+  wrap.className = "relative  select-none";
+  wrap.style.touchAction = "none";
+  wrap.style.setProperty("-webkit-touch-callout", "none");
+  wrap.style.userSelect = "none";
+  wrap.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  if (it.kind === "file" && it.file && it.file.type && it.file.type.startsWith("video/")) {
-    const vwrap = document.createElement("div");
-    vwrap.className = "w-full h-full flex items-center justify-center text-gray-600";
-    vwrap.innerHTML = '<div class="text-center text-sm">🎬 影片<br><span class="text-xs break-all"></span></div>';
-    vwrap.querySelector("span").textContent = (it.file.name || "").slice(0, 30);
-    wrap.appendChild(vwrap);
+  const img = document.createElement("img");
+  img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+  img.alt = "預覽";
+  img.decoding = "async";
+  img.loading = "lazy";
+  img.draggable = false;
+  img.style.webkitUserDrag = "none";
+  img.style.webkitTouchCallout = "none";
+  img.addEventListener("contextmenu", (e) => e.preventDefault());
+
+  if (it.kind === "url") {
+    img.src = it.url;
   } else {
-    const img = document.createElement("img");
-    img.alt = "預覽縮圖";
-    img.className = "w-full h-full object-cover";
-    if (it.kind === "url") {
-      img.src = it.url;
-    } else {
-      img.src = PREVIEW_EMPTY_GIF;
-      ensurePreviewThumbURL(it.file)
-        .then((u) => { img.src = u; })
-        .catch(() => {
-          try {
-            const raw = URL.createObjectURL(it.file);
-            img.src = raw;
-            setTimeout(() => URL.revokeObjectURL(raw), 2000);
-          } catch { }
-        });
-    }
-    wrap.appendChild(img);
+    img.src = PREVIEW_EMPTY_GIF;
+    ensurePreviewThumbURL(it.file)
+      .then((u) => { img.src = u; })
+      .catch(() => {
+        try {
+          const raw = URL.createObjectURL(it.file);
+          img.src = raw;
+          setTimeout(() => URL.revokeObjectURL(raw), 2000);
+        } catch { }
+      });
   }
 
   const btn = document.createElement("button");
@@ -752,11 +726,9 @@ function __makeEditTile(it) {
   btn.textContent = "✕";
   btn.setAttribute("aria-label", "刪除這張");
 
-  const outer = document.createElement("div");
-  outer.className = "relative";
-  outer.appendChild(wrap);
-  outer.appendChild(btn);
-  return outer;
+  wrap.appendChild(img);
+  wrap.appendChild(btn);
+  return wrap;
 }
 
 function __setEditIdx(tile, idx) {
@@ -767,7 +739,7 @@ function __setEditIdx(tile, idx) {
 
 // 依狀態同步 DOM（不清空重畫，避免閃爍）
 function paintEditPreview() {
-  editCount.textContent = `已選 ${editImagesState.items.length} / ${MAX_EDIT_FILES} 個`;
+  editCount.textContent = `已選 ${editImagesState.items.length} / ${MAX_EDIT_FILES} 張`;
 
   const keys = editImagesState.items.map(__editKey);
 
