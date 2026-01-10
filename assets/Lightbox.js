@@ -7,65 +7,13 @@ window.scrollTo(0, 0);
 const dlg = document.getElementById('petDialog');
 const lb = document.getElementById("lightbox");
 const lbImg = document.getElementById("lbImg");
-const lbVideo = document.getElementById("lbVideo");
 const lbPrev = document.getElementById("lbPrev");
 const lbNext = document.getElementById("lbNext");
 const lbClose = document.getElementById("lbClose");
 
-let lbMedia = [];
+let lbImages = [];
 let lbIndex = 0;
 let lbReturnToDialog = false;
-function __guessType(url) {
-  const u = String(url || "");
-  return /\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i.test(u) ? "video" : "image";
-}
-
-function __normalizeMedia(items) {
-  return (items || [])
-    .map((x) => {
-      if (!x) return null;
-      if (typeof x === "string") return { type: __guessType(x), url: x };
-      const url = x.url || x.src || "";
-      const type = (x.type === "video" || x.type === "image") ? x.type : __guessType(url);
-      return url ? { type, url } : null;
-    })
-    .filter(Boolean);
-}
-
-function __showLightboxMedia(i) {
-  const it = lbMedia[i];
-  if (!it) return;
-
-  try { lbVideo?.pause?.(); } catch { }
-
-  if (it.type === "video") {
-    if (lbImg) lbImg.classList.add("hidden");
-    if (lbVideo) {
-      lbVideo.classList.remove("hidden");
-      lbVideo.src = it.url || "";
-      lbVideo.currentTime = 0;
-      try { lbVideo.load?.(); } catch { }
-    }
-  } else {
-    if (lbVideo) {
-      lbVideo.pause?.();
-      lbVideo.classList.add("hidden");
-      lbVideo.removeAttribute?.("src");
-      try { lbVideo.load?.(); } catch { }
-    }
-    if (lbImg) {
-      lbImg.classList.remove("hidden");
-      lbImg.src = it.url || "";
-    }
-  }
-
-  const lbThumbsInner = document.getElementById("lbThumbsInner");
-  if (lbThumbsInner) {
-    Array.from(lbThumbsInner.children).forEach((el, idx) => {
-      el.classList.toggle("active", idx === i);
-    });
-  }
-}
 
 // 用來記住原本 scroll 狀態（iOS 點螢幕頂端也不會把背景捲動）
 let __lockDepth = 0;
@@ -132,58 +80,46 @@ dlg?.addEventListener('close', () => {
 });
 
 // 🔥 開啟 Lightbox：關掉 dialog + 維持背景鎖定
-function openLightbox(items, index = 0) {
-  lbMedia = __normalizeMedia(items);
-  lbIndex = Math.max(0, Math.min(index, lbMedia.length - 1));
+function openLightbox(images, index = 0) {
+  lbImages = images || [];
+  lbIndex = Math.max(0, Math.min(index, lbImages.length - 1));
   lbReturnToDialog = !!(dlg && dlg.open);
 
-  __showLightboxMedia(lbIndex);
+  if (lbImg) lbImg.src = lbImages[lbIndex] || '';
 
+  // 建立縮圖列
   const lbThumbsInner = document.getElementById("lbThumbsInner");
   if (lbThumbsInner) {
     lbThumbsInner.innerHTML = "";
-    lbMedia.forEach((it, i) => {
-      let t;
-      if (it.type === "video") {
-        t = document.createElement("video");
-        t.src = it.url;
-        t.muted = true;
-        t.playsInline = true;
-        t.preload = "metadata";
-      } else {
-        t = document.createElement("img");
-        t.src = it.url;
-      }
+    lbImages.forEach((url, i) => {
+      const t = document.createElement("img");
+      t.src = url;
       t.className = i === lbIndex ? "active" : "";
       t.addEventListener("click", () => {
         lbIndex = i;
-        __showLightboxMedia(lbIndex);
+        if (lbImg) lbImg.src = lbImages[lbIndex] || '';
+        lbThumbsInner.querySelectorAll("img").forEach(el => el.classList.remove("active"));
+        t.classList.add("active");
       });
       lbThumbsInner.appendChild(t);
     });
   }
 
+  // 顯示 Lightbox（先顯示，讓 dlg.close() 的 close handler 知道是要切到 Lightbox）
   if (lb) {
     lb.classList.remove("hidden");
     lb.classList.add("flex");
   }
 
+  // 關掉 Modal（移除 backdrop）
   if (dlg?.open) dlg.close();
 
+  // 確保背景鎖住（不要 unlock，避免 iOS 點頂端時背景被捲）
   if (__lockDepth === 0) lockScroll();
 }
 
 // 🔥 關閉 Lightbox：回到 dialog 或直接解鎖
 function closeLightbox() {
-  // 停掉影片，避免關閉後還在播放
-  try { lbVideo?.pause?.(); } catch { }
-  if (lbVideo) {
-    lbVideo.classList.add("hidden");
-    lbVideo.removeAttribute?.("src");
-    try { lbVideo.load?.(); } catch { }
-  }
-  if (lbImg) lbImg.classList.remove("hidden");
-
   if (lb) {
     lb.classList.add("hidden");
     lb.classList.remove("flex");
@@ -200,9 +136,15 @@ function closeLightbox() {
 
 // 🔥 左右切換
 function lbShow(delta) {
-  if (!lbMedia.length) return;
-  lbIndex = (lbIndex + delta + lbMedia.length) % lbMedia.length;
-  __showLightboxMedia(lbIndex);
+  if (!lbImages.length) return;
+  lbIndex = (lbIndex + delta + lbImages.length) % lbImages.length;
+  if (lbImg) lbImg.src = lbImages[lbIndex] || '';
+  const lbThumbsInner = document.getElementById("lbThumbsInner");
+  if (lbThumbsInner) {
+    lbThumbsInner.querySelectorAll("img").forEach((el, i) => {
+      el.classList.toggle("active", i === lbIndex);
+    });
+  }
 }
 
 lbPrev?.addEventListener('click', (e) => {
