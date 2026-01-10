@@ -688,14 +688,13 @@ let __wmLoaded = false;
 
 async function __ensureWmLoaded() {
   if (__wmLoaded) return;
-  const coreBaseURL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist";
+  const coreBaseURL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
   const ffmpegBaseURL = "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm";
 
   await __wmFfmpeg.load({
-    // core (ffmpeg-core.js / .wasm / .worker.js) — 用 blob URL 避免 CORS / same-origin 問題
+    // core (ffmpeg-core.js / .wasm) — 用 blob URL 避免 CORS / same-origin 問題（單執行緒版不需要 ffmpeg-core.worker.js）
     coreURL: await toBlobURL(`${coreBaseURL}/ffmpeg-core.js`, "text/javascript"),
     wasmURL: await toBlobURL(`${coreBaseURL}/ffmpeg-core.wasm`, "application/wasm"),
-    workerURL: await toBlobURL(`${coreBaseURL}/ffmpeg-core.worker.js`, "text/javascript"),
 
     // wrapper worker（@ffmpeg/ffmpeg 的 worker.js）— 這個一定要設，不然會出現 Failed to construct 'Worker' 的 same-origin 錯誤
     classWorkerURL: await toBlobURL(`${ffmpegBaseURL}/worker.js`, "text/javascript"),
