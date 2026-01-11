@@ -971,14 +971,27 @@ function __makePreviewTile(file) {
           });
 
         wrap.appendChild(img);
+      } else if (file && file.type && file.type.startsWith("video/")) {
+        // 影片：直接用 <video> 當預覽，可以點播放
+        const v = document.createElement("video");
+        v.className = "w-full aspect-square object-cover rounded-lg bg-black";
+        v.controls = true;
+        v.muted = true;
+        v.playsInline = true;
+        try {
+          const raw = URL.createObjectURL(file);
+          v.src = raw;
+          // 載入後就把 objectURL 釋放掉，避免累積太多
+          v.addEventListener("loadeddata", () => {
+            try { URL.revokeObjectURL(raw); } catch { }
+          }, { once: true });
+        } catch { }
+        wrap.appendChild(v);
       } else {
+        // 其他檔案型態：顯示簡單方塊
         const box = document.createElement("div");
         box.className = "w-full aspect-square rounded-lg bg-gray-900 text-white/90 flex items-center justify-center text-xs";
-        if (file && file.type && file.type.startsWith("video/")) {
-          box.textContent = "影片";
-        } else {
-          box.textContent = "檔案";
-        }
+        box.textContent = "檔案";
         wrap.appendChild(box);
       }
 
