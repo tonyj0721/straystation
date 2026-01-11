@@ -356,56 +356,55 @@
           </div>
           <div>
             <input id="imgFiles" type="file" accept="image/*,video/*" multiple class="sr-only" />
-            <div class="flex items-center gap-3">
-              <button id="btnPick" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
-                新增照片
-              </button>
-              <span id="fileCount" class="text-xs text-gray-500">已選 0 / 5 張</span>
-              <span class="text-sm text-gray-400">最多 5 張</span>
-            </div>
-            <div id="imgPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
-          </div>
-          <div class="flex gap-3 pt-2">
-            <button id="submitBtn" type="submit"
-              class="px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-gray-800 flex items-center gap-2">
-              <span id="submitText">登錄</span>
+            <button id="btnPick" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
+              新增照片/影片
             </button>
+            <span id="fileCount" class="text-xs text-gray-500">已選 0 / 5 個</span>
+            <span class="text-sm text-gray-400">最多 5 張</span>
           </div>
-        </form>
-      </section>
+          <div id="imgPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
+    </div>
+    <div class="flex gap-3 pt-2">
+      <button id="submitBtn" type="submit"
+        class="px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-gray-800 flex items-center gap-2">
+        <span id="submitText">登錄</span>
+      </button>
+    </div>
+    </form>
+    </section>
 
-      <!-- 右：資料表 -->
-      <section id="listSection" class="lg:col-span-2 space-y-6">
-        <div class="bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
-          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <h2 class="text-lg font-semibold">資料表</h2>
-            <div class="relative w-full sm:w-72">
-              <input id="searchName" class="w-full rounded-xl border border-gray-300 p-2 pl-9 text-base"
-                placeholder="搜尋名字…" />
-              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔎</span>
-            </div>
+    <!-- 右：資料表 -->
+    <section id="listSection" class="lg:col-span-2 space-y-6">
+      <div class="bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <h2 class="text-lg font-semibold">資料表</h2>
+          <div class="relative w-full sm:w-72">
+            <input id="searchName" class="w-full rounded-xl border border-gray-300 p-2 pl-9 text-base"
+              placeholder="搜尋名字…" />
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔎</span>
           </div>
-          <div class="hidden md:block overflow-x-auto mt-4">
-            <table class="min-w-[640px] w-full text-sm">
-              <thead>
-                <tr class="text-left text-gray-500">
-                  <th class="py-2">名字</th>
-                  <th class="py-2">類別</th>
-                  <th class="py-2">品種</th>
-                  <th class="py-2">性別</th>
-                </tr>
-              </thead>
-              <tbody id="rows"></tbody>
-            </table>
-          </div>
-          <div class="md:hidden mt-4 grid gap-3" id="rowsMobile"></div>
-          <div id="pagerWrap" class="mt-6 flex flex-col items-center gap-2">
-            <div id="pageInfo" class="text-xs text-gray-500"></div>
-            <div id="pager" class="pager"></div>
-          </div>
-
         </div>
-      </section>
+        <div class="hidden md:block overflow-x-auto mt-4">
+          <table class="min-w-[640px] w-full text-sm">
+            <thead>
+              <tr class="text-left text-gray-500">
+                <th class="py-2">名字</th>
+                <th class="py-2">類別</th>
+                <th class="py-2">品種</th>
+                <th class="py-2">性別</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <div class="md:hidden mt-4 grid gap-3" id="rowsMobile"></div>
+        <div id="pagerWrap" class="mt-6 flex flex-col items-center gap-2">
+          <div id="pageInfo" class="text-xs text-gray-500"></div>
+          <div id="pager" class="pager"></div>
+        </div>
+
+      </div>
+    </section>
     </div>
   </main>
 
@@ -566,65 +565,64 @@
           </div>
 
           <div>
-            <input id="editFiles" type="file" accept="image/*" multiple class="sr-only" />
-            <div class="flex items-center gap-3">
-              <button id="btnPickEdit" type="button"
-                class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增照片</button>
-              <span id="editCount" class="text-xs text-gray-500"></span>
-              <span class="text-sm text-gray-400">最多 5 張</span>
-            </div>
-            <!-- 和新增模式一致：三欄縮圖 + 上方間距 -->
-            <div id="editPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
+            <input id="editFiles" type="file" accept="image/*,video/*" multiple class="sr-only" />
+            <button id="btnPickEdit" type="button"
+              class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增照片/影片</button>
+            <span id="editCount" class="text-xs text-gray-500"></span>
+            <span class="text-sm text-gray-400">最多 5 個</span>
           </div>
-        </div>
-
-        <!-- 動作列 -->
-        <div id="actionBar" class="pt-2 flex flex-col sm:flex-row gap-3 hidden">
-          <button id="btnEdit" class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm">
-            編輯
-          </button>
-          <button id="btnAdopted" class="w-full px-4 py-3 rounded-xl bg-emerald-600 text-white text-sm">
-            已送養
-          </button>
-          <button id="btnUnadopt"
-            class="w-full px-4 py-3 rounded-xl border border-amber-300 text-amber-700 text-sm hidden">
-            退養
-          </button>
-          <button id="btnDelete" class="w-full px-4 py-3 rounded-xl border border-red-300 text-red-600 text-sm">
-            刪除
-          </button>
-        </div>
-        <div id="editActionBar" class="hidden pt-2 grid grid-cols-2 gap-3">
-          <button id="btnSave"
-            class="w-full px-4 py-3 rounded-xl bg-gray-900 text-white text-sm flex items-center justify-center gap-2">
-            <span id="saveText">儲存</span>
-          </button>
-          <button id="btnCancel" type="button" class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm">
-            取消
-          </button>
-        </div>
-
-        <!-- 已領養合照上傳 -->
-        <div id="adoptedUpload" class="hidden">
-          <input id="adoptedFiles" type="file" accept="image/*" multiple class="sr-only" />
-          <div class="flex items-center gap-3 mb-2">
-            <button id="btnPickAdopted" type="button"
-              class="px-3 py-2 rounded-lg border border-gray-300 bg-brand-600 text-white text-sm">
-              選擇合照
-            </button>
-            <span id="adoptedCount" class="text-xs text-gray-500"></span>
-            <span class="text-sm text-gray-400">最多 5 張</span>
-          </div>
-          <div id="adoptedPreview" class="mt-1 grid grid-cols-3 gap-2"></div>
-          <button id="btnConfirmAdopted" class="mt-3 px-3 py-2 rounded-lg bg-gray-900 text-white text-sm">
-            儲存領養資訊
-          </button>
-          <button id="btnCancelAdopted" type="button"
-            class="px-3 py-2 rounded-lg bg-gray-200 text-gray-900 hover:bg-gray-300 text-sm">
-            取消
-          </button>
+          <!-- 和新增模式一致：三欄縮圖 + 上方間距 -->
+          <div id="editPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
         </div>
       </div>
+
+      <!-- 動作列 -->
+      <div id="actionBar" class="pt-2 flex flex-col sm:flex-row gap-3 hidden">
+        <button id="btnEdit" class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm">
+          編輯
+        </button>
+        <button id="btnAdopted" class="w-full px-4 py-3 rounded-xl bg-emerald-600 text-white text-sm">
+          已送養
+        </button>
+        <button id="btnUnadopt"
+          class="w-full px-4 py-3 rounded-xl border border-amber-300 text-amber-700 text-sm hidden">
+          退養
+        </button>
+        <button id="btnDelete" class="w-full px-4 py-3 rounded-xl border border-red-300 text-red-600 text-sm">
+          刪除
+        </button>
+      </div>
+      <div id="editActionBar" class="hidden pt-2 grid grid-cols-2 gap-3">
+        <button id="btnSave"
+          class="w-full px-4 py-3 rounded-xl bg-gray-900 text-white text-sm flex items-center justify-center gap-2">
+          <span id="saveText">儲存</span>
+        </button>
+        <button id="btnCancel" type="button" class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm">
+          取消
+        </button>
+      </div>
+
+      <!-- 已領養合照上傳 -->
+      <div id="adoptedUpload" class="hidden">
+        <input id="adoptedFiles" type="file" accept="image/*" multiple class="sr-only" />
+        <div class="flex items-center gap-3 mb-2">
+          <button id="btnPickAdopted" type="button"
+            class="px-3 py-2 rounded-lg border border-gray-300 bg-brand-600 text-white text-sm">
+            選擇合照
+          </button>
+          <span id="adoptedCount" class="text-xs text-gray-500"></span>
+          <span class="text-sm text-gray-400">最多 5 張</span>
+        </div>
+        <div id="adoptedPreview" class="mt-1 grid grid-cols-3 gap-2"></div>
+        <button id="btnConfirmAdopted" class="mt-3 px-3 py-2 rounded-lg bg-gray-900 text-white text-sm">
+          儲存領養資訊
+        </button>
+        <button id="btnCancelAdopted" type="button"
+          class="px-3 py-2 rounded-lg bg-gray-200 text-gray-900 hover:bg-gray-300 text-sm">
+          取消
+        </button>
+      </div>
+    </div>
     </div>
   </dialog>
 
@@ -945,45 +943,33 @@
       const wrap = document.createElement("div");
       wrap.className = "relative touch-none select-none";
 
-      let media;
+      const img = document.createElement("img");
+      img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+      img.alt = "預覽";
+      img.decoding = "async";
+      img.loading = "lazy";
+      img.src = EMPTY_GIF;
 
-      if (file.type.startsWith("video/")) {
-        media = document.createElement("video");
-        media.src = URL.createObjectURL(file);
-        media.controls = true;
-        media.muted = true;
-        media.playsInline = true;
-        media.preload = "metadata";
-        media.className =
-          "w-full aspect-square object-cover rounded-lg bg-black";
-      } else {
-        media = document.createElement("img");
-        media.alt = "預覽";
-        media.decoding = "async";
-        media.loading = "lazy";
-        media.className =
-          "w-full aspect-square object-cover rounded-lg bg-gray-100";
-        media.src = EMPTY_GIF;
-
-        ensureThumbURL(file)
-          .then((url) => (media.src = url))
-          .catch(() => {
+      // 先顯示空白，再異步塞縮圖，避免解碼瞬間卡頓
+      ensureThumbURL(file)
+        .then((url) => { img.src = url; })
+        .catch(() => {
+          // 真的不行就退回原圖（至少有預覽）
+          try {
             const raw = URL.createObjectURL(file);
-            media.src = raw;
+            img.src = raw;
             setTimeout(() => URL.revokeObjectURL(raw), 2000);
-          });
-      }
+          } catch { }
+        });
 
       const btn = document.createElement("button");
-      btn.className =
-        "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
+      btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
       btn.type = "button";
       btn.textContent = "✕";
-      btn.setAttribute("aria-label", "刪除");
+      btn.setAttribute("aria-label", "刪除這張");
 
-      wrap.appendChild(media);
+      wrap.appendChild(img);
       wrap.appendChild(btn);
-
       return wrap;
     }
 
@@ -1214,17 +1200,23 @@
         // 1) 新增基本文件
         const docRef = await addDoc(collection(db, "pets"), payload);
 
-        // 2) 逐張上傳圖片，取得 Storage URL
+        // 2) 逐個上傳媒體（圖片或影片），都先加浮水印
         const urls = [];
         for (const f of selectedFiles) {
-          const wmBlob = f.type.startsWith("image/")
-            ? await addWatermarkToFile(f)
-            : f;
-          const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
-          const base = f.name.replace(/\.[^.]+$/, '');
+          let outFile;
+          if (f.type.startsWith("image/")) {
+            outFile = await addWatermarkToFile(f);         // 產生 jpg
+          } else if (f.type.startsWith("video/")) {
+            outFile = await addWatermarkToVideo(f);        // 產生 webm
+          } else {
+            continue; // 非圖非影略過
+          }
+
+          const ext = outFile.name.split(".").pop() || "bin";
+          const base = f.name.replace(/\.[^.]+$/, "");
           const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
           const r = sRef(storage, path);
-          await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
+          await uploadBytes(r, outFile, { contentType: outFile.type });
           urls.push(await getDownloadURL(r));
         }
 
