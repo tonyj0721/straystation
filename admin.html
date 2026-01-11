@@ -945,8 +945,8 @@
 
     const __previewTileMap = new Map(); // File -> tile element（保留 DOM，避免重畫閃爍）
 
-    
-function __makePreviewTile(file) {
+
+    function __makePreviewTile(file) {
       const wrap = document.createElement("div");
       wrap.className = "relative touch-none select-none";
 
@@ -993,7 +993,6 @@ function __makePreviewTile(file) {
     }
 
     function __setPreviewIdx(tile, idx) {
-function __setPreviewIdx(tile, idx) {
       tile.dataset.idx = String(idx);
       const btn = tile.querySelector("button");
       if (btn) btn.dataset.idx = String(idx);
@@ -1248,7 +1247,7 @@ function __setPreviewIdx(tile, idx) {
           await updateDoc(doc(db, "pets", docRef.id), { imgs: imgUrls, images: imgUrls });
         }
 
-// 3) 回寫 images 欄位
+        // 3) 回寫 images 欄位
         if (urls.length) {
           await updateDoc(doc(db, "pets", docRef.id), { images: urls });
         }
