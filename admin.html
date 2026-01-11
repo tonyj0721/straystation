@@ -1217,6 +1217,7 @@ function __setPreviewIdx(tile, idx) {
       const stopDots = startDots(submitText, "登錄中");
 
       try {
+        // 1
         // 1) 新增基本文件
         const docRef = await addDoc(collection(db, "pets"), payload);
 
