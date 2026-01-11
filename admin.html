@@ -943,33 +943,49 @@
       const wrap = document.createElement("div");
       wrap.className = "relative touch-none select-none";
 
-      const img = document.createElement("img");
-      img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
-      img.alt = "預覽";
-      img.decoding = "async";
-      img.loading = "lazy";
-      img.src = EMPTY_GIF;
+      const isVideo = /^video\//.test(file.type);
 
-      // 先顯示空白，再異步塞縮圖，避免解碼瞬間卡頓
-      ensureThumbURL(file)
-        .then((url) => { img.src = url; })
-        .catch(() => {
-          // 真的不行就退回原圖（至少有預覽）
-          try {
-            const raw = URL.createObjectURL(file);
-            img.src = raw;
-            setTimeout(() => URL.revokeObjectURL(raw), 2000);
-          } catch { }
-        });
+      if (isVideo) {
+        // 影片：直接用 <video>，可播放
+        const vurl = URL.createObjectURL(file);
+        wrap.dataset.vidurl = vurl;          // 之後刪除時好 revoke
+        const vid = document.createElement("video");
+        vid.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+        vid.src = vurl;
+        vid.controls = true;
+        vid.muted = true;                    // 手機自動播放需要 muted
+        vid.playsInline = true;
+        vid.preload = "metadata";
+        wrap.appendChild(vid);
+      } else {
+        // 圖片：先放空白，再異步塞縮圖（你原本就有）
+        const img = document.createElement("img");
+        img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+        img.alt = "預覽";
+        img.decoding = "async";
+        img.loading = "lazy";
+        img.src = EMPTY_GIF;
+
+        ensureThumbURL(file)                 // 這段是你現有的縮圖快取流程
+          .then((url) => { img.src = url; })
+          .catch(() => {
+            try {
+              const raw = URL.createObjectURL(file);
+              img.src = raw;
+              setTimeout(() => URL.revokeObjectURL(raw), 2000);
+            } catch { }
+          });
+
+        wrap.appendChild(img);
+      }
 
       const btn = document.createElement("button");
       btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
       btn.type = "button";
       btn.textContent = "✕";
       btn.setAttribute("aria-label", "刪除這張");
-
-      wrap.appendChild(img);
       wrap.appendChild(btn);
+
       return wrap;
     }
 
@@ -1007,9 +1023,21 @@
       if (!btn) return;
       e.preventDefault();
       e.stopPropagation();
+
       const i = +btn.dataset.idx;
+
+      // 1) 如果這格是影片：把建立時存的 vurl 釋放掉
+      const tile = imgPreview.querySelector(`[data-idx="${i}"]`);
+      const vurl = tile?.dataset?.vidurl;
+      if (vurl) {
+        try { URL.revokeObjectURL(vurl); } catch { }
+      }
+
+      // 2) 如果這格是圖片：沿用原本的縮圖 revoke
       const f = selectedFiles[i];
-      if (f) revokeThumb(f);
+      if (f && !vurl) revokeThumb(f);
+
+      // 3) 移除資料 & 重畫
       selectedFiles.splice(i, 1);
       renderPreviews();
     });
