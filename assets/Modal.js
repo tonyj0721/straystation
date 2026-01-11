@@ -446,7 +446,7 @@ async function openDialog(id) {
     }
   }
 
-  renderEditImages(imgs);
+  renderEditImages(imgList);
 
   // 7. 模式 / 按鈕 / 已送養相關
   setEditMode(false);      // 一開始都是「瀏覽模式」
