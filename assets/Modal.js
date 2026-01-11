@@ -30,63 +30,11 @@ const BREEDS = {
   },
 };
 
-
 // 產生帶浮水印的 Blob（細字、無外框、疏一點）
-// 統一入口：圖片 / 影片皆可
-// 統一入口：圖片 / 影片
-// 圖片：真的燒進浮水印
-// 影片：暫時不在前端做浮水印，直接用原始檔案（避免播放異常）
-// 若未來改成後端 ffmpeg 處理，可以在這裡改成呼叫後端產生有浮水印的新影片。
-async function addWatermarkToFile(file, opts = {}) {
-  if (!file || !file.type) return file;
-
-  // 影片：直接回傳原始檔案
-  if (file.type.startsWith("video/")) {
-    return file;
-  }
-
-  // 其他一律當作圖片處理
-  return await addWatermarkToImage(file, opts);
-}
-
-// 共用：依寬高建立一層對角線浮水印
-function __createWatermarkLayer(width, height, text = "台中簡媽媽狗園") {
-  const c = document.createElement("canvas");
-  c.width = width;
-  c.height = height;
-  const g = c.getContext("2d");
-
-  // === 細字無外框樣式（可調參數） ===
-  const ANG = -33 * Math.PI / 180;   // 斜角
-  const FS = Math.round(Math.max(width, height) * 0.03);  // 字高 ≈ 長邊 3%
-  const OP = 0.25;                                  // 透明度
-  const STEP_X = Math.max(Math.round(FS * 12), 360); // 同斜線間距（倍數越大越疏）
-  const STEP_Y = Math.max(Math.round(FS * 8), 260);  // 斜線與斜線間距
-
-  const diag = Math.hypot(width, height);
-
-  g.save();
-  g.translate(width / 2, height / 2);
-  g.rotate(ANG);
-  g.font = `600 ${FS}px "Noto Sans TC","Microsoft JhengHei",sans-serif`;
-  g.textBaseline = "middle";
-  g.fillStyle = `rgba(255,255,255,${OP})`;
-  // 想更柔和可打開下一行：
-  // g.globalCompositeOperation = "overlay"; // 或 "soft-light"
-
-  for (let x = -diag; x <= diag; x += STEP_X) {
-    for (let y = -diag; y <= diag; y += STEP_Y) {
-      g.fillText(text, x, y);
-    }
-  }
-  g.restore();
-  return c;
-}
-
-// 圖片：產生帶浮水印的 Blob（直接改寫原圖內容）
-async function addWatermarkToImage(file, { text = "台中簡媽媽狗園" } = {}) {
+async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {}) {
   const url = URL.createObjectURL(file);
   try {
+    // 讀圖 & 畫原圖
     const img = await new Promise((res, rej) => {
       const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = url;
     });
@@ -96,8 +44,31 @@ async function addWatermarkToImage(file, { text = "台中簡媽媽狗園" } = {}
     const g = c.getContext("2d");
     g.drawImage(img, 0, 0, W, H);
 
-    const wmLayer = __createWatermarkLayer(W, H, text);
-    g.drawImage(wmLayer, 0, 0, W, H);
+    // === 細字無外框樣式（可調參數） ===
+    const ANG = -33 * Math.PI / 180;   // 斜角
+    const FS = Math.round(Math.max(W, H) * 0.03);  // 字高 ≈ 長邊 6%
+    const OP = 0.25;                                  // 透明度
+    const STEP_X = Math.max(Math.round(FS * 12), 360); // 同斜線間距（倍數越大越疏）
+    const STEP_Y = Math.max(Math.round(FS * 8), 260);  // 斜線與斜線間距
+
+    const diag = Math.hypot(W, H);
+
+    g.save();
+    g.translate(W / 2, H / 2);
+    g.rotate(ANG);
+    g.font = `600 ${FS}px "Noto Sans TC","Microsoft JhengHei",sans-serif`;
+    g.textBaseline = "middle";
+    g.fillStyle = `rgba(255,255,255,${OP})`;
+    // 想更柔和可打開下一行：
+    // g.globalCompositeOperation = "overlay"; // 或 "soft-light"
+
+    // 只填色，不描邊（不要 strokeText/lineWidth/strokeStyle）
+    for (let x = -diag; x <= diag; x += STEP_X) {
+      for (let y = -diag; y <= diag; y += STEP_Y) {
+        g.fillText(text, x, y);
+      }
+    }
+    g.restore();
 
     const out = await new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
     return new File([out], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
@@ -106,104 +77,6 @@ async function addWatermarkToImage(file, { text = "台中簡媽媽狗園" } = {}
   }
 }
 
-// 影片：用 <canvas> 燒入浮水印，重新編碼成 WebM
-// 注意：處理時間會接近影片實際長度，較長的影片會花比較久
-
-async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}) {
-  const src = URL.createObjectURL(file);
-  const video = document.createElement("video");
-  video.src = src;
-  video.muted = true;
-  video.playsInline = true;
-  video.crossOrigin = "anonymous";
-
-  try {
-    await new Promise((resolve, reject) => {
-      video.addEventListener("loadedmetadata", () => resolve(), { once: true });
-      video.addEventListener("error", () => reject(new Error("影片讀取失敗")), { once: true });
-    });
-
-    const W = video.videoWidth || 1280;
-    const H = video.videoHeight || 720;
-
-    const canvas = document.createElement("canvas");
-    canvas.width = W;
-    canvas.height = H;
-    const g = canvas.getContext("2d");
-
-    if (!canvas.captureStream || typeof MediaRecorder === "undefined") {
-      console.warn("此瀏覽器不支援 MediaRecorder/captureStream，影片將不上浮水印原檔上傳");
-      return file;
-    }
-
-    const wmLayer = __createWatermarkLayer(W, H, text);
-
-    const canvasStream = canvas.captureStream();
-    let mime = "video/webm";
-    if (MediaRecorder.isTypeSupported("video/webm;codecs=vp9")) {
-      mime = "video/webm;codecs=vp9";
-    } else if (MediaRecorder.isTypeSupported("video/webm;codecs=vp8")) {
-      mime = "video/webm;codecs=vp8";
-    }
-
-    const recorder = new MediaRecorder(canvasStream, { mimeType: mime });
-    const chunks = [];
-
-    recorder.addEventListener("dataavailable", (e) => {
-      if (e.data && e.data.size > 0) chunks.push(e.data);
-    });
-
-    const recordDone = new Promise((resolve) => {
-      recorder.addEventListener("stop", () => resolve(), { once: true });
-    });
-
-    let playing = false;
-    let ended = false;
-    let recorderStarted = false;
-
-    function drawFrame() {
-      if (!playing || ended) return;
-      try {
-        g.drawImage(video, 0, 0, W, H);
-        g.drawImage(wmLayer, 0, 0, W, H);
-      } catch (e) {
-        // 忽略單幀錯誤
-      }
-      requestAnimationFrame(drawFrame);
-    }
-
-    video.addEventListener("play", () => {
-      playing = true;
-      drawFrame();
-    });
-
-    video.addEventListener("pause", () => {
-      playing = false;
-    });
-
-    video.addEventListener("ended", () => {
-      ended = true;
-      try { recorder.stop(); } catch (_) {}
-      canvasStream.getTracks().forEach((t) => t.stop());
-    }, { once: true });
-
-    video.addEventListener("playing", () => {
-      if (!recorderStarted) {
-        recorderStarted = true;
-        recorder.start(200);
-      }
-    }, { once: true });
-
-    await video.play();
-    await recordDone;
-
-    const blob = new Blob(chunks, { type: "video/webm" });
-    const outName = file.name.replace(/\.[^.]+$/, ".webm");
-    return new File([blob], outName, { type: "video/webm" });
-  } finally {
-    URL.revokeObjectURL(src);
-  }
-}
 // ===============================
 // 預覽縮圖：避免大圖解碼造成卡頓（支援手機）
 // ===============================
@@ -386,104 +259,126 @@ async function openDialog(id) {
   document.getElementById('dlgTagVaccinated').textContent = isVaccinated
     ? '已注射預防針' : '未注射預防針';
 
-  // 4. 圖片 + Lightbox（搭配 shared.js）
-
+  // 4. 圖片 / 影片 + Lightbox（搭配 shared.js）
   const dlgImg = document.getElementById("dlgImg");
-  const dlgVideo = document.getElementById("dlgVideo");
   const dlgBg = document.getElementById("dlgBg");
   const dlgThumbs = document.getElementById("dlgThumbs");
 
-  const imgUrls = Array.isArray(p.images) && p.images.length > 0
+  // 找出圖片與影片清單
+  const imgList = Array.isArray(p.images) && p.images.length > 0
     ? p.images
     : (p.image ? [p.image] : []);
 
-  const videoUrls = Array.isArray(p.videos) ? p.videos.filter(Boolean) : [];
+  const videoList = Array.isArray(p.videos) ? p.videos : [];
 
-  const media = [];
-  imgUrls.forEach((url, idx) => media.push({ type: "image", url, imgIndex: idx }));
-  videoUrls.forEach((url) => media.push({ type: "video", url, imgIndex: null }));
+  // 統一做成 media 陣列：[{ kind: "image" | "video", url }]
+  const mediaItems = [
+    ...imgList.map((u) => ({ kind: "image", url: u })),
+    ...videoList.map((u) => ({ kind: "video", url: u })),
+  ];
 
-  let currentIndex = 0;
+  let currentIndex = 0;          // 在 mediaItems 裡的 index
+  let currentImageIndex = 0;     // 在 imgList 裡的 index（給 Lightbox 用）
 
-  function showMedia(index) {
-    if (!media.length) return;
-    if (index < 0 || index >= media.length) index = 0;
-    currentIndex = index;
-    const item = media[index];
-
-    if (item.type === "image") {
-      if (dlgImg) {
-        dlgImg.classList.remove("hidden");
-        dlgImg.src = item.url;
-      }
-      if (dlgVideo) {
-        try { dlgVideo.pause(); } catch (e) {}
-        dlgVideo.classList.add("hidden");
-      }
-      if (dlgBg) dlgBg.src = item.url;
-    } else {
-      if (dlgVideo) {
-        dlgVideo.classList.remove("hidden");
-        if (dlgVideo.src !== item.url) {
-          dlgVideo.src = item.url;
-        }
-      }
-      if (dlgImg) {
-        dlgImg.classList.add("hidden");
-      }
-      if (dlgBg && imgUrls.length > 0) {
-        dlgBg.src = imgUrls[0];
-      }
-    }
-
-    if (dlgThumbs) {
-      dlgThumbs.querySelectorAll(".dlg-thumb")
-        .forEach((el, i) => {
-          el.classList.toggle("active", i === index);
-        });
+  // 準備一個 <video>，跟原本的 <img> 擺在同一個容器裡，輪流顯示
+  let dlgVideo = null;
+  if (dlgImg && dlgImg.parentElement) {
+    const box = dlgImg.parentElement;
+    dlgVideo = box.querySelector("#dlgVideo");
+    if (!dlgVideo) {
+      dlgVideo = document.createElement("video");
+      dlgVideo.id = "dlgVideo";
+      dlgVideo.className = "relative z-10 block w-full h-full object-contain rounded-lg";
+      dlgVideo.controls = true;
+      dlgVideo.playsInline = true;
+      dlgVideo.style.display = "none";
+      box.appendChild(dlgVideo);
     }
   }
 
+  function showMedia(idx) {
+    if (!mediaItems.length || !dlgImg) return;
+    if (idx < 0 || idx >= mediaItems.length) idx = 0;
+    currentIndex = idx;
+
+    const item = mediaItems[idx];
+
+    if (item.kind === "image") {
+      // 切回顯示圖片
+      if (dlgVideo) {
+        dlgVideo.pause();
+        dlgVideo.removeAttribute("src");
+        dlgVideo.load();
+        dlgVideo.style.display = "none";
+      }
+      dlgImg.style.display = "";
+      dlgImg.src = item.url;
+      if (dlgBg) dlgBg.src = item.url;
+
+      const imgIdx = imgList.indexOf(item.url);
+      currentImageIndex = imgIdx >= 0 ? imgIdx : 0;
+    } else {
+      // 顯示影片
+      dlgImg.style.display = "none";
+      if (dlgVideo) {
+        dlgVideo.style.display = "";
+        dlgVideo.src = item.url;
+        dlgVideo.load();
+      }
+      // 背景圖維持上一張圖片即可，若沒有圖片就清掉
+      if (dlgBg && imgList.length === 0) dlgBg.removeAttribute("src");
+    }
+
+    // 更新縮圖的 active 樣式
+    if (dlgThumbs) {
+      const thumbs = dlgThumbs.querySelectorAll(".dlg-thumb");
+      thumbs.forEach((el, i) => {
+        el.classList.toggle("active", i === idx);
+      });
+    }
+  }
+
+  // 點主圖：只有圖片才打開 Lightbox
   if (dlgImg) {
     dlgImg.onclick = () => {
-      const cur = media[currentIndex];
-      if (!cur || cur.type !== "image") return;
-      const idx = cur.imgIndex ?? 0;
-      openLightbox(imgUrls, idx);
+      if (!imgList.length) return;
+      openLightbox(imgList, currentImageIndex);
     };
   }
 
+  // 建立縮圖
   if (dlgThumbs) {
     dlgThumbs.innerHTML = "";
-    media.forEach((item, i) => {
-      let thumb;
-      if (item.type === "image") {
-        thumb = document.createElement("img");
-        thumb.src = item.url;
+    mediaItems.forEach((item, i) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "dlg-thumb" + (i === 0 ? " active" : "");
+
+      if (item.kind === "image") {
+        const img = document.createElement("img");
+        img.src = item.url;
+        img.alt = "縮圖";
+        img.className = "w-full h-full object-cover rounded-lg";
+        btn.appendChild(img);
       } else {
-        thumb = document.createElement("video");
-        thumb.src = item.url;
-        thumb.muted = true;
-        thumb.playsInline = true;
+        // 影片的縮圖就簡單做一個帶「影片」文字的灰底方塊
+        const box = document.createElement("div");
+        box.className = "w-full h-full flex items-center justify-center rounded-lg bg-black/60 text-white text-xs";
+        box.textContent = "影片";
+        btn.appendChild(box);
       }
-      thumb.className = "dlg-thumb" + (i === 0 ? " active" : "");
-      thumb.addEventListener("click", () => showMedia(i));
-      dlgThumbs.appendChild(thumb);
+
+      btn.addEventListener("click", () => showMedia(i));
+      dlgThumbs.appendChild(btn);
     });
   }
 
-  if (media.length > 0) {
+  // 一開始顯示第一個媒體（如果有）
+  if (mediaItems.length) {
     showMedia(0);
-  } else {
-    if (dlgImg) {
-      dlgImg.classList.remove("hidden");
-      dlgImg.src = "";
-    }
-    if (dlgVideo) {
-      dlgVideo.classList.add("hidden");
-      dlgVideo.src = "";
-    }
-    if (dlgBg) dlgBg.src = "";
+  } else if (dlgImg) {
+    dlgImg.removeAttribute("src");
+    if (dlgBg) dlgBg.removeAttribute("src");
   }
 
   // 5. 顯示用文字
@@ -551,20 +446,7 @@ async function openDialog(id) {
     }
   }
 
-  // 編集模式圖片預設：只有 images（不含 videos）
-  const imgs = Array.isArray(p.images) && p.images.length > 0
-    ? p.images
-    : (p.image ? [p.image] : []);
-
   renderEditImages(imgs);
-
-  // 重置編輯模式影片暫存
-  if (typeof pendingEditVideos !== "undefined") {
-    pendingEditVideos = [];
-  }
-  if (editVideoList) editVideoList.innerHTML = "";
-  if (editVideoCount) editVideoCount.textContent = "";
-  if (editVideoFiles) editVideoFiles.value = "";
 
   // 7. 模式 / 按鈕 / 已送養相關
   setEditMode(false);      // 一開始都是「瀏覽模式」
@@ -774,28 +656,6 @@ async function saveEdit() {
 
     newData.images = newUrls;
 
-    // 若本次有新增影片，append 到原有 videos 陣列
-    const appendVideos = [];
-    if (pendingEditVideos && pendingEditVideos.length) {
-      for (const f of pendingEditVideos) {
-        const wmBlob = await addWatermarkToFile(f);
-        const isImage = wmBlob.type && wmBlob.type.startsWith("image/");
-        const ext = isImage
-          ? (wmBlob.type === 'image/png' ? 'png' : 'jpg')
-          : (wmBlob.type.split("/")[1] || "bin");
-        const base = f.name.replace(/\.[^.]+$/, '');
-        const folder = isImage ? `pets/${currentDocId}` : `pets/${currentDocId}/videos`;
-        const path = `${folder}/${Date.now()}_${base}.${ext}`;
-        const r = sRef(storage, path);
-        await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
-        appendVideos.push(await getDownloadURL(r));
-      }
-    }
-    if (appendVideos.length) {
-      const existingVideos = Array.isArray(currentDoc?.videos) ? currentDoc.videos : [];
-      newData.videos = existingVideos.concat(appendVideos);
-    }
-
     // ③ 寫回 Firestore
     await updateDoc(doc(db, "pets", currentDocId), newData);
 
@@ -891,42 +751,6 @@ if (editPreview) {
 const editCount = q("#editCount");
 
 const MAX_EDIT_FILES = 5;
-
-const editVideoFiles = q("#editVideoFiles");
-const btnPickEditVideo = q("#btnPickEditVideo");
-const editVideoCount = q("#editVideoCount");
-const editVideoList = q("#editVideoList");
-const MAX_EDIT_VIDEO_FILES = 3;
-
-// 編輯模式下待新增的影片（只會 append，不處理刪除）
-let pendingEditVideos = [];
-
-btnPickEditVideo?.addEventListener("click", () => editVideoFiles?.click());
-
-editVideoFiles?.addEventListener("change", () => {
-  const incoming = Array.from(editVideoFiles.files || []);
-  const next = (pendingEditVideos || []).concat(incoming);
-  if (next.length > MAX_EDIT_VIDEO_FILES) {
-    if (typeof Swal !== "undefined" && Swal?.fire) {
-      Swal.fire({ icon: "warning", title: `最多 ${MAX_EDIT_VIDEO_FILES} 支影片` });
-    }
-  }
-  pendingEditVideos = next.slice(0, MAX_EDIT_VIDEO_FILES);
-
-  if (editVideoList) {
-    editVideoList.innerHTML = "";
-    pendingEditVideos.forEach((f, idx) => {
-      const row = document.createElement("div");
-      row.textContent = `${idx + 1}. ${f.name}`;
-      editVideoList.appendChild(row);
-    });
-  }
-  if (editVideoCount) {
-    editVideoCount.textContent = `已選 ${pendingEditVideos.length} / ${MAX_EDIT_VIDEO_FILES} 支`;
-  }
-  editVideoFiles.value = "";
-});
-
 
 // 狀態：依「目前畫面順序」維護（url=舊圖、file=新圖）
 let editImagesState = { items: [], removeUrls: [] };
@@ -1521,26 +1345,14 @@ function swalInDialog(opts) {
     };
   }
 
-  function stopDialogVideos() {
-    try {
-      const videos = dlg.querySelectorAll("video");
-      videos.forEach((v) => {
-        try { v.pause(); } catch (e) {}
-        try { v.currentTime = 0; } catch (e) {}
-      });
-    } catch (e) {}
-  }
-
   // 1) 標準：dialog 關閉事件（按 X、點遮罩、呼叫 close() 都會觸發）
   dlg.addEventListener("close", () => {
     resetAdoptedSelection();
-    stopDialogVideos();
   });
 
   // 2) 取消事件（按 Esc）
   dlg.addEventListener("cancel", () => {
     resetAdoptedSelection();
-    stopDialogVideos();
     // 不阻止預設，讓它照常關閉
   });
 
@@ -1548,7 +1360,6 @@ function swalInDialog(opts) {
   const mo = new MutationObserver(() => {
     if (!dlg.open) {
       resetAdoptedSelection();
-      stopDialogVideos();
     }
   });
   mo.observe(dlg, { attributes: true, attributeFilter: ["open", "aria-hidden"] });
