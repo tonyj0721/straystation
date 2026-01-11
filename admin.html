@@ -945,8 +945,8 @@
 
     const __previewTileMap = new Map(); // File -> tile element（保留 DOM，避免重畫閃爍）
 
-
-    function __makePreviewTile(file) {
+    
+function __makePreviewTile(file) {
       const wrap = document.createElement("div");
       wrap.className = "relative touch-none select-none";
 
@@ -1245,11 +1245,6 @@
         // 3) 回寫 images/imgs 欄位（沿用舊欄位名稱讓 Modal 看得到）
         if (imgUrls.length) {
           await updateDoc(doc(db, "pets", docRef.id), { imgs: imgUrls, images: imgUrls });
-        }
-
-        // 3) 回寫 images 欄位
-        if (urls.length) {
-          await updateDoc(doc(db, "pets", docRef.id), { images: urls });
         }
 
         // UI 收尾
