@@ -972,47 +972,21 @@ function __makePreviewTile(file) {
 
         wrap.appendChild(img);
       } else if (file && file.type && file.type.startsWith("video/")) {
-        // 影片：用自訂的縮圖播放器（整個方塊可點擊播放 / 暫停）
-        wrap.classList.add("relative", "overflow-hidden");
-
+        // 影片：直接用 <video> 當預覽，可以點播放
         const v = document.createElement("video");
         v.className = "w-full aspect-square object-cover rounded-lg bg-black";
-        v.controls = false;        // 不用內建控制列，避免太小又被裁掉
+        v.controls = true;
         v.muted = true;
         v.playsInline = true;
-
-        let objectUrl = "";
         try {
-          objectUrl = URL.createObjectURL(file);
-          v.src = objectUrl;
+          const raw = URL.createObjectURL(file);
+          v.src = raw;
+          // 載入後就把 objectURL 釋放掉，避免累積太多
           v.addEventListener("loadeddata", () => {
-            try { URL.revokeObjectURL(objectUrl); } catch {}
+            try { URL.revokeObjectURL(raw); } catch { }
           }, { once: true });
-        } catch {}
-
-        // 右下角的小播放 / 暫停圖示（比較低調）
-        const overlay = document.createElement("div");
-        overlay.className = "pointer-events-none absolute inset-0";
-
-        const icon = document.createElement("div");
-        icon.className = "absolute left-1.5 bottom-1.5 w-6 h-6 rounded-full bg-black/70 flex items-center justify-center text-[11px] text-white shadow-sm";
-        icon.innerHTML = "&#9658;"; // ▶
-
-        overlay.appendChild(icon);
-
+        } catch { }
         wrap.appendChild(v);
-        wrap.appendChild(overlay);
-
-        // 點擊整個方塊：切換播放 / 暫停
-        wrap.addEventListener("click", () => {
-          if (v.paused) {
-            v.play().catch(() => {});
-            icon.innerHTML = "&#10074;&#10074;"; // ❚❚
-          } else {
-            v.pause();
-            icon.innerHTML = "&#9658;"; // ▶
-          }
-        });
       } else {
         // 其他檔案型態：顯示簡單方塊
         const box = document.createElement("div");
