@@ -990,12 +990,14 @@ function __makePreviewTile(file) {
           }, { once: true });
         } catch {}
 
-        // 中間的大播放 / 暫停圖示
+        // 右下角的小播放 / 暫停圖示（比較低調）
         const overlay = document.createElement("div");
-        overlay.className = "pointer-events-none absolute inset-0 flex items-center justify-center";
+        overlay.className = "pointer-events-none absolute inset-0";
+
         const icon = document.createElement("div");
-        icon.className = "w-10 h-10 rounded-full bg-black/60 flex items-center justify-center text-white";
+        icon.className = "absolute left-1.5 bottom-1.5 w-6 h-6 rounded-full bg-black/70 flex items-center justify-center text-[11px] text-white shadow-sm";
         icon.innerHTML = "&#9658;"; // ▶
+
         overlay.appendChild(icon);
 
         wrap.appendChild(v);
