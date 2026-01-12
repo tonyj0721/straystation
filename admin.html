@@ -972,21 +972,37 @@ function __makePreviewTile(file) {
 
         wrap.appendChild(img);
       } else if (file && file.type && file.type.startsWith("video/")) {
-        // 影片：直接用 <video> 當預覽，可以點播放
+        // 影片：使用原生 controls，外加一個中央播放提示 icon（不影響操作）
+        wrap.classList.add("relative", "overflow-hidden");
+
         const v = document.createElement("video");
         v.className = "w-full aspect-square object-cover rounded-lg bg-black";
         v.controls = true;
         v.muted = true;
         v.playsInline = true;
+        v.preload = "metadata";
+
+        let objectUrl = "";
         try {
-          const raw = URL.createObjectURL(file);
-          v.src = raw;
-          // 載入後就把 objectURL 釋放掉，避免累積太多
+          objectUrl = URL.createObjectURL(file);
+          v.src = objectUrl;
           v.addEventListener("loadeddata", () => {
-            try { URL.revokeObjectURL(raw); } catch { }
+            try { URL.revokeObjectURL(objectUrl); } catch {}
           }, { once: true });
-        } catch { }
+        } catch {}
+
+        // 中央的小播放圖示（只作為提示，不接收事件）
+        const overlay = document.createElement("div");
+        overlay.className = "pointer-events-none absolute inset-0 flex items-center justify-center";
+
+        const icon = document.createElement("div");
+        icon.className = "w-8 h-8 rounded-full bg-black/45 flex items-center justify-center text-xs text-white";
+        icon.innerHTML = "&#9658;"; // ▶
+
+        overlay.appendChild(icon);
+
         wrap.appendChild(v);
+        wrap.appendChild(overlay);
       } else {
         // 其他檔案型態：顯示簡單方塊
         const box = document.createElement("div");
