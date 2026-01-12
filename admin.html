@@ -972,21 +972,70 @@ function __makePreviewTile(file) {
 
         wrap.appendChild(img);
       } else if (file && file.type && file.type.startsWith("video/")) {
-        // 影片：直接用 <video> 當預覽，可以點播放
+        // 影片：預覽可播放（自訂 UI，避免不同裝置的原生 controls 長相不一致）
         const v = document.createElement("video");
         v.className = "w-full aspect-square object-cover rounded-lg bg-black";
-        v.controls = true;
+        v.controls = false;
         v.muted = true;
         v.playsInline = true;
+        v.preload = "metadata";
         try {
           const raw = URL.createObjectURL(file);
           v.src = raw;
-          // 載入後就把 objectURL 釋放掉，避免累積太多
-          v.addEventListener("loadeddata", () => {
-            try { URL.revokeObjectURL(raw); } catch { }
-          }, { once: true });
+          // ⚠️ 不要在 loadeddata 立刻 revoke（Safari 有機率後續播放失效）
+          // 改成：記在 tile 上，刪除/移除時再 revoke
+          wrap.dataset.blobUrl = raw;
         } catch { }
         wrap.appendChild(v);
+
+        // 中央播放鍵（只佔中間，不擋拖曳）
+        const overlay = document.createElement("div");
+        overlay.className = "absolute inset-0 flex items-center justify-center pointer-events-none";
+        const playBtn = document.createElement("button");
+        playBtn.type = "button";
+        playBtn.className = "pointer-events-auto rounded-full bg-black/50 text-white w-12 h-12 flex items-center justify-center";
+        playBtn.setAttribute("aria-label", "播放/暫停");
+        playBtn.textContent = "▶";
+        overlay.appendChild(playBtn);
+        wrap.appendChild(overlay);
+
+        // 底部進度條
+        const bar = document.createElement("div");
+        bar.className = "absolute left-2 right-2 bottom-2 h-1 bg-white/30 rounded pointer-events-none";
+        const fill = document.createElement("div");
+        fill.className = "h-1 bg-white rounded w-0";
+        bar.appendChild(fill);
+        wrap.appendChild(bar);
+
+        const syncPlayIcon = () => {
+          playBtn.textContent = (!v.paused && !v.ended) ? "❚❚" : "▶";
+        };
+
+        playBtn.addEventListener("click", async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          try {
+            if (v.paused || v.ended) await v.play();
+            else v.pause();
+          } catch (err) {
+            console.warn("play blocked:", err);
+          }
+          syncPlayIcon();
+        });
+
+        v.addEventListener("play", syncPlayIcon);
+        v.addEventListener("pause", syncPlayIcon);
+        v.addEventListener("ended", () => {
+          syncPlayIcon();
+          fill.style.width = "0%";
+        });
+
+        v.addEventListener("timeupdate", () => {
+          if (!v.duration) return;
+          fill.style.width = `${(v.currentTime / v.duration) * 100}%`;
+        });
+
+        syncPlayIcon();
       } else {
         // 其他檔案型態：顯示簡單方塊
         const box = document.createElement("div");
@@ -1000,6 +1049,7 @@ function __makePreviewTile(file) {
       btn.type = "button";
       btn.textContent = "✕";
       btn.setAttribute("aria-label", "刪除這個檔案");
+      btn.dataset.role = "remove";
 
       wrap.appendChild(btn);
       return wrap;
@@ -1007,7 +1057,7 @@ function __makePreviewTile(file) {
 
     function __setPreviewIdx(tile, idx) {
       tile.dataset.idx = String(idx);
-      const btn = tile.querySelector("button");
+      const btn = tile.querySelector('button[data-role="remove"]');
       if (btn) btn.dataset.idx = String(idx);
     }
 
@@ -1017,6 +1067,11 @@ function __makePreviewTile(file) {
       // 不整個清空重畫：只搬動既有 DOM，避免「換順序閃一下」
       for (const [file, el] of __previewTileMap) {
         if (!selectedFiles.includes(file)) {
+          // 若是影片預覽，有 blob URL 的話一起釋放
+          const blobUrl = el?.dataset?.blobUrl;
+          if (blobUrl && blobUrl.startsWith("blob:")) {
+            try { URL.revokeObjectURL(blobUrl); } catch { }
+          }
           el.remove();
           __previewTileMap.delete(file);
         }
@@ -1035,13 +1090,19 @@ function __makePreviewTile(file) {
 
     // 刪除（事件代理）
     imgPreview.addEventListener("click", (e) => {
-      const btn = e.target.closest?.("button[data-idx]");
+      const btn = e.target.closest?.('button[data-role="remove"][data-idx]');
       if (!btn) return;
       e.preventDefault();
       e.stopPropagation();
       const i = +btn.dataset.idx;
       const f = selectedFiles[i];
       if (f) revokeThumb(f);
+      // 影片預覽用到的 blob URL（若有）也一併釋放
+      const tile = f ? __previewTileMap.get(f) : null;
+      const blobUrl = tile?.dataset?.blobUrl;
+      if (blobUrl && blobUrl.startsWith("blob:")) {
+        try { URL.revokeObjectURL(blobUrl); } catch { }
+      }
       selectedFiles.splice(i, 1);
       renderPreviews();
     });
