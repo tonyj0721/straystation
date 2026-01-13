@@ -1021,27 +1021,26 @@ function __makePreviewTile(file) {
         wrap.appendChild(playBtn);
 
         // 底部進度條
-        const bar = document.createElement("div");
-        bar.style.position = "absolute";
-        bar.style.left = "8px";
-        bar.style.right = "8px";
-        bar.style.bottom = "8px";
-        bar.style.height = "4px";
-        bar.style.borderRadius = "9999px";
-        bar.style.background = "rgba(255,255,255,0.25)";
-        bar.style.overflow = "hidden";
-        bar.style.zIndex = "4";
-
-        const fill = document.createElement("div");
-        fill.style.height = "100%";
-        fill.style.width = "0%";
-        fill.style.borderRadius = "9999px";
-        fill.style.background = "rgba(255,255,255,0.9)";
-        bar.appendChild(fill);
-        wrap.appendChild(bar);
+        
+        const PLAY_ICON = `
+          <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 5v14l11-7z" fill="white"></path>
+          </svg>`;
+        const PAUSE_ICON = `
+          <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 5h4v14H6zM14 5h4v14h-4z" fill="white"></path>
+          </svg>`;
 
         const syncPlay = () => {
-          playBtn.style.display = (v.paused || v.ended) ? "flex" : "none";
+          if (v.paused || v.ended) {
+            bubble.innerHTML = PLAY_ICON;
+            bubble.style.background = "rgba(0,0,0,0.45)";
+            bubble.style.opacity = "1";
+          } else {
+            bubble.innerHTML = PAUSE_ICON;
+            bubble.style.background = "rgba(0,0,0,0.35)";
+            bubble.style.opacity = "0.9";
+          }
         };
 
         playBtn.addEventListener("click", async (e) => {
@@ -1060,12 +1059,6 @@ function __makePreviewTile(file) {
         v.addEventListener("pause", syncPlay);
         v.addEventListener("ended", () => {
           syncPlay();
-          fill.style.width = "0%";
-        });
-
-        v.addEventListener("timeupdate", () => {
-          if (!v.duration) return;
-          fill.style.width = `${(v.currentTime / v.duration) * 100}%`;
         });
 
         // iPhone：剛選完檔案時常常不會自動畫出第一幀 → 生成 poster，確保一定看得到畫面
