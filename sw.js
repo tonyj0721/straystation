@@ -1,4 +1,5 @@
-const CACHE = "jm-pwa-2026-01-13";
+// sw.js
+const CACHE = "jm-pwa-runtime-v2"; // ← 改成 v2 先把舊快取整批換掉（這次建議一定要做）
 
 const PRECACHE = [
   "./",
@@ -8,21 +9,42 @@ const PRECACHE = [
   "./about.html",
   "./home.html",
   "./adopt.html",
+  "./manifest.webmanifest",
   "./assets/tailwind.css",
   "./assets/shared.css",
+  "./assets/Modal.js",
+  "./assets/Lightbox.js",
+  "./assets/firebase-config.js",
   "./images/dogpaw-32.png",
   "./images/dogpaw-180.png",
   "./images/dogpaw-192.png",
-  "./images/dogpaw-512.png"
+  "./images/dogpaw-512.png",
+  "./images/dogpaw-512-maskable.png",
+  "./images/dogpaw.png",
+  "./images/hero-bg.jpg",
 ];
 
-// 安裝：預先快取（離線可開）
+// 讓 fetch 盡量拿到「最新」的 helper
+function withReloadCache(req) {
+  // 對同源 GET 可用 cache: "reload" 逼瀏覽器重新跟伺服器確認
+  return new Request(req, { cache: "reload" });
+}
+
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(PRECACHE)));
+  event.waitUntil(
+    caches.open(CACHE).then((c) =>
+      c.addAll(PRECACHE.map((u) => new Request(u, { cache: "reload" })))
+    )
+  );
   self.skipWaiting();
 });
 
-// 啟用：清舊快取
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
@@ -32,56 +54,57 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// 接收指令：立刻啟用新版（跳過 waiting）
-self.addEventListener("message", (event) => {
-  if (event.data && event.data.type === "SKIP_WAITING") {
-    self.skipWaiting();
+async function networkFirst(req) {
+  const cache = await caches.open(CACHE);
+  try {
+    const res = await fetch(withReloadCache(req));
+    cache.put(req, res.clone());
+    return res;
+  } catch (_) {
+    const cached = await cache.match(req);
+    return cached || caches.match("./index.html");
   }
-});
+}
 
-// 取用：頁面 Network-first；靜態檔 stale-while-revalidate
+async function cacheFirst(req) {
+  const cache = await caches.open(CACHE);
+  const cached = await cache.match(req);
+  if (cached) return cached;
+
+  const res = await fetch(req);
+  cache.put(req, res.clone());
+  return res;
+}
+
 self.addEventListener("fetch", (event) => {
   const req = event.request;
-  const url = new URL(req.url);
-
-  // 只管同源
-  if (url.origin !== location.origin) return;
-
-  // 非 GET 不碰（避免表單/登入等出問題）
   if (req.method !== "GET") return;
 
-  // 導航（多頁站最重要）：Network-first
-  if (req.mode === "navigate") {
-    event.respondWith(
-      fetch(req)
-        .then((res) => {
-          // 更新快取
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(req, copy));
-          return res;
-        })
-        .catch(() =>
-          caches.match(req).then((r) => r || caches.match("./index.html") || caches.match("/index.html"))
-        )
-    );
+  const url = new URL(req.url);
+
+  // 只處理同源
+  if (url.origin !== self.location.origin) return;
+
+  const dest = req.destination; // document/script/style/image/font/manifest...
+
+  // 1) 所有「頁面」：network-first（確保一載入就最新）
+  if (req.mode === "navigate" || dest === "document" || url.pathname.endsWith(".html")) {
+    event.respondWith(networkFirst(req));
     return;
   }
 
-  // 其他資源：stale-while-revalidate
-  event.respondWith(
-    caches.match(req).then((cached) => {
-      const fetchAndUpdate = fetch(req)
-        .then((res) => {
-          // 只快取成功回應
-          if (res && res.ok) {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(req, copy));
-          }
-          return res;
-        })
-        .catch(() => cached);
+  // 2) JS/CSS：network-first（你卡住的主因就在這）
+  if (dest === "script" || dest === "style" || url.pathname.endsWith(".js") || url.pathname.endsWith(".css")) {
+    event.respondWith(networkFirst(req));
+    return;
+  }
 
-      return cached || fetchAndUpdate;
-    })
-  );
+  // 3) 圖片/字型：cache-first（省流量，沒那麼需要秒更新）
+  if (dest === "image" || dest === "font") {
+    event.respondWith(cacheFirst(req));
+    return;
+  }
+
+  // 4) 其他：保守用 network-first
+  event.respondWith(networkFirst(req));
 });
