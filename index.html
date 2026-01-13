@@ -238,10 +238,6 @@
         <p class="mt-4 text-lg text-gray-600 dark:text-gray-300">在浪浪轉運站，我們與民間中途與收容所合作，為每一隻貓狗找到安全、穩定、充滿愛的家。</p>
         <dl class="mt-8 grid grid-cols-3 gap-4 text-center">
           <div class="p-4 rounded-xl bg-white/70 border border-gray-200">
-            <dt class="text-sm text-gray-500">已成功送養</dt>
-            <dd class="text-xl font-semibold" id="statAdopted">0</dd>
-          </div>
-          <div class="p-4 rounded-xl bg-white/70 border border-gray-200">
             <dt class="text-sm text-gray-500">待領養貓咪</dt>
             <dd class="text-xl font-semibold" id="statCats">0</dd>
           </div>
@@ -249,7 +245,17 @@
             <dt class="text-sm text-gray-500">待領養狗狗</dt>
             <dd class="text-xl font-semibold" id="statDogs">0</dd>
           </div>
+          <div class="p-4 rounded-xl bg-white/70 border border-gray-200">
+            <dt class="text-sm text-gray-500">已成功送養</dt>
+            <dd class="text-xl font-semibold" id="statAdopted">0</dd>
+          </div>
         </dl>
+        <p class="mt-3 mx-auto max-w-3xl px-4 text-xs leading-relaxed text-gray-500 text-left">
+          註：檔案陸續建置中<br>
+          以上數字為「已建檔的送養資料」統計，<br>
+          部分毛孩因年齡、疾病或安置評估暫不送養，<br>
+          因此會低於園區實際照護總數。
+        </p>
       </div>
       <div class="relative">
         <div class="aspect-[4/3] rounded-3xl overflow-hidden shadow-soft ring-1 ring-gray-200">
@@ -807,7 +813,7 @@
     });
 
     // 統計起始基數（已成功送養、待領養貓咪、待領養狗狗）
-    const STATS_BASE = { adopted: 1021, cats: 89, dogs: 743 };
+    const STATS_BASE = { adopted: 0, cats: 0, dogs: 0 };
     const pets = (window.pets ||= []);
     let currentPetId = null;
 
@@ -1085,8 +1091,27 @@
   <script src="assets/Lightbox.js"></script>
   <script>
     if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./sw.js");
+      window.addEventListener("load", async () => {
+        const reg = await navigator.serviceWorker.register("./sw.js");
+
+        // 每次載入都主動檢查 sw.js 是否有更新
+        reg.update();
+
+        // 新版 SW 接手後，自動重整一次，讓使用者立刻進到最新內容
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          window.location.reload();
+        });
+
+        // 若發現有新版在安裝，叫它直接跳過 waiting
+        reg.addEventListener("updatefound", () => {
+          const nw = reg.installing;
+          if (!nw) return;
+          nw.addEventListener("statechange", () => {
+            if (nw.state === "installed" && navigator.serviceWorker.controller) {
+              nw.postMessage({ type: "SKIP_WAITING" });
+            }
+          });
+        });
       });
     }
   </script>
