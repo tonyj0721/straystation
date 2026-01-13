@@ -19,7 +19,7 @@
   <link rel="icon" href="images/dogpaw-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="images/dogpaw-180.png">
   <title>已領養牆｜台中簡媽媽狗園</title>
-  <meta  name="description" content="台中簡媽媽狗園領養合照牆，記錄毛孩找到新家的幸福時刻，感謝每一位認養人的愛心與支持。" />
+  <meta name="description" content="台中簡媽媽狗園領養合照牆，記錄毛孩找到新家的幸福時刻，感謝每一位認養人的愛心與支持。" />
   <meta name="theme-color" content="#fcd34d">
   <link rel="manifest" href="./manifest.webmanifest">
   <meta name="mobile-web-app-capable" content="yes">
@@ -624,8 +624,36 @@
   </script>
   <script>
     if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./sw.js");
+      window.addEventListener("load", async () => {
+        const reg = await navigator.serviceWorker.register("./sw.js");
+
+        // 每次載入都主動檢查 sw.js 是否有更新
+        reg.update();
+
+        // 如果已經有 waiting 的新版，直接叫它上線（更穩）
+        if (reg.waiting) {
+          reg.waiting.postMessage({ type: "SKIP_WAITING" });
+        }
+
+        // 新版 SW 接手後，自動重整一次（加 guard，避免連續重整）
+        let reloaded = false;
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          if (reloaded) return;
+          reloaded = true;
+          window.location.reload();
+        });
+
+        // 若發現新版 SW：叫它直接跳過 waiting
+        reg.addEventListener("updatefound", () => {
+          const nw = reg.installing;
+          if (!nw) return;
+
+          nw.addEventListener("statechange", () => {
+            if (nw.state === "installed" && navigator.serviceWorker.controller) {
+              (reg.waiting || nw).postMessage({ type: "SKIP_WAITING" });
+            }
+          });
+        });
       });
     }
   </script>

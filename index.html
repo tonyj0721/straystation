@@ -251,7 +251,7 @@
           </div>
         </dl>
         <p class="mt-3 mx-auto max-w-3xl px-4 text-xs leading-relaxed text-gray-500 text-left">
-          註：
+          註：<br>
           檔案陸續建置中<br>
           以上數字為「已建檔的送養資料」統計，<br>
           部分毛孩因年齡、疾病或安置評估暫不送養，<br>
@@ -1098,6 +1098,11 @@
         // 每次載入都主動檢查 sw.js 是否有更新
         reg.update();
 
+        // 如果已經有 waiting 的新版，直接叫它上線（更穩）
+        if (reg.waiting) {
+          reg.waiting.postMessage({ type: "SKIP_WAITING" });
+        }
+
         // 新版 SW 接手後，自動重整一次（加 guard，避免連續重整）
         let reloaded = false;
         navigator.serviceWorker.addEventListener("controllerchange", () => {
@@ -1113,7 +1118,6 @@
 
           nw.addEventListener("statechange", () => {
             if (nw.state === "installed" && navigator.serviceWorker.controller) {
-              // 用 waiting 優先，其次才用 nw
               (reg.waiting || nw).postMessage({ type: "SKIP_WAITING" });
             }
           });

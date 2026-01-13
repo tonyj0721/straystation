@@ -355,13 +355,13 @@
               placeholder="個性、習慣、背景故事、注意事項…"></textarea>
           </div>
           <div>
-            <input id="imgFiles" type="file" accept="image/*" multiple class="sr-only" />
+            <input id="imgFiles" type="file" accept="image/*,video/*" multiple class="sr-only" />
             <div class="flex items-center gap-3">
               <button id="btnPick" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
-                新增照片
+                新增照片/影片
               </button>
-              <span id="fileCount" class="text-xs text-gray-500">已選 0 / 5 張</span>
-              <span class="text-sm text-gray-400">最多 5 張</span>
+              <span id="fileCount" class="text-xs text-gray-500">已選 0 / 5 個檔案</span>
+              <span class="text-sm text-gray-400">最多 5 個檔案</span>
             </div>
             <div id="imgPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
           </div>
@@ -571,7 +571,7 @@
               <button id="btnPickEdit" type="button"
                 class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增照片</button>
               <span id="editCount" class="text-xs text-gray-500"></span>
-              <span class="text-sm text-gray-400">最多 5 張</span>
+              <span class="text-sm text-gray-400">最多 5 個檔案</span>
             </div>
             <!-- 和新增模式一致：三欄縮圖 + 上方間距 -->
             <div id="editPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
@@ -613,7 +613,7 @@
               選擇合照
             </button>
             <span id="adoptedCount" class="text-xs text-gray-500"></span>
-            <span class="text-sm text-gray-400">最多 5 張</span>
+            <span class="text-sm text-gray-400">最多 5 個檔案</span>
           </div>
           <div id="adoptedPreview" class="mt-1 grid grid-cols-3 gap-2"></div>
           <button id="btnConfirmAdopted" class="mt-3 px-3 py-2 rounded-lg bg-gray-900 text-white text-sm">
@@ -823,7 +823,7 @@
     syncBreedSelectors(); // 初始化一次
 
     // ===============================
-    // 新增：圖片選取/預覽（最多 5 張）- 不卡頓版（縮圖/快取/手機拖曳排序）
+    // 新增：圖片選取/預覽（最多 5 個檔案）- 不卡頓版（縮圖/快取/手機拖曳排序）
     // ===============================
     const imgFiles = $("#imgFiles");
     const btnPick = $("#btnPick");
@@ -918,6 +918,10 @@
     }
 
     function ensureThumbURL(file) {
+      // 只對圖片產生縮圖，影片等其他類型不需要解碼
+      if (!(file && file.type && file.type.startsWith("image/"))) {
+        return Promise.resolve(EMPTY_GIF);
+      }
       if (thumbUrlCache.has(file)) return Promise.resolve(thumbUrlCache.get(file));
       if (thumbPromiseCache.has(file)) return thumbPromiseCache.get(file);
 
@@ -941,52 +945,209 @@
 
     const __previewTileMap = new Map(); // File -> tile element（保留 DOM，避免重畫閃爍）
 
+
     function __makePreviewTile(file) {
       const wrap = document.createElement("div");
       wrap.className = "relative touch-none select-none";
 
-      const img = document.createElement("img");
-      img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
-      img.alt = "預覽";
-      img.decoding = "async";
-      img.loading = "lazy";
-      img.src = EMPTY_GIF;
+      if (file && file.type && file.type.startsWith("image/")) {
+        const img = document.createElement("img");
+        img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+        img.alt = "預覽";
+        img.decoding = "async";
+        img.loading = "lazy";
+        img.src = EMPTY_GIF;
 
-      // 先顯示空白，再異步塞縮圖，避免解碼瞬間卡頓
-      ensureThumbURL(file)
-        .then((url) => { img.src = url; })
-        .catch(() => {
-          // 真的不行就退回原圖（至少有預覽）
+        // 先顯示空白，再異步塞縮圖，避免解碼瞬間卡頓
+        ensureThumbURL(file)
+          .then((url) => { img.src = url; })
+          .catch(() => {
+            // 真的不行就退回原圖（至少有預覽）
+            try {
+              const raw = URL.createObjectURL(file);
+              img.src = raw;
+              setTimeout(() => URL.revokeObjectURL(raw), 2000);
+            } catch { }
+          });
+
+        wrap.appendChild(img);
+      } else if (file && file.type && file.type.startsWith("video/")) {
+        const v = document.createElement("video");
+        v.className = "w-full aspect-square object-cover rounded-lg bg-black";
+        v.controls = false;
+        v.muted = true;
+        v.playsInline = true;
+        v.preload = "metadata";
+        v.setAttribute("playsinline", "");
+        v.setAttribute("webkit-playsinline", "");
+        v.style.pointerEvents = "none"; // 只讓我們自己的播放按鈕接手點擊
+
+        let blobUrl = "";
+        try {
+          blobUrl = URL.createObjectURL(file);
+          v.src = blobUrl;
+          wrap.dataset.blobUrl = blobUrl;
+        } catch { }
+
+        wrap.appendChild(v);
+
+        // ---- 自訂播放/暫停鍵（固定樣式，跨平台一致；長得像你截圖那種左下角膠囊）----
+        const playBtn = document.createElement("button");
+        playBtn.type = "button";
+        playBtn.setAttribute("aria-label", "播放/暫停");
+
+        // 位置與外觀：左下角半透明圓角矩形
+        playBtn.style.position = "absolute";
+        playBtn.style.left = "10px";
+        playBtn.style.bottom = "10px";
+        playBtn.style.width = "78px";
+        playBtn.style.height = "56px";
+        playBtn.style.borderRadius = "14px";
+        playBtn.style.display = "flex";
+        playBtn.style.alignItems = "center";
+        playBtn.style.justifyContent = "center";
+        playBtn.style.background = "rgba(0,0,0,0.45)";
+        playBtn.style.border = "none";
+        playBtn.style.padding = "0";
+        playBtn.style.zIndex = "5";
+        playBtn.style.backdropFilter = "blur(2px)";
+        playBtn.style.webkitBackdropFilter = "blur(2px)";
+
+        const PLAY_ICON = `
+          <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8.6 5.6v12.8c0 .8.9 1.3 1.6.9l10.6-6.4c.7-.4.7-1.4 0-1.8L10.2 4.7c-.7-.4-1.6.1-1.6.9z" fill="white"></path>
+          </svg>`;
+        const PAUSE_ICON = `
+          <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6.8 5.5h3.8c.4 0 .7.3.7.7v11.6c0 .4-.3.7-.7.7H6.8c-.4 0-.7-.3-.7-.7V6.2c0-.4.3-.7.7-.7z" fill="white"></path>
+            <path d="M13.7 5.5h3.8c.4 0 .7.3.7.7v11.6c0 .4-.3.7-.7.7h-3.8c-.4 0-.7-.3-.7-.7V6.2c0-.4.3-.7.7-.7z" fill="white"></path>
+          </svg>`;
+
+        playBtn.innerHTML = PLAY_ICON;
+        wrap.appendChild(playBtn);
+
+        const syncPlay = () => {
+          playBtn.innerHTML = (v.paused || v.ended) ? PLAY_ICON : PAUSE_ICON;
+        };
+
+
+        playBtn.addEventListener("click", async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
           try {
-            const raw = URL.createObjectURL(file);
-            img.src = raw;
-            setTimeout(() => URL.revokeObjectURL(raw), 2000);
-          } catch { }
+            if (v.paused || v.ended) await v.play();
+            else v.pause();
+          } catch (err) {
+            console.warn("play blocked:", err);
+          }
+          syncPlay();
         });
+
+        v.addEventListener("play", syncPlay);
+        v.addEventListener("pause", syncPlay);
+        v.addEventListener("ended", () => {
+          syncPlay();
+        });
+
+        // iPhone：剛選完檔案時常常不會自動畫出第一幀 → 生成 poster，確保一定看得到畫面
+        (async () => {
+          if (!blobUrl) return;
+          const posterUrl = await (async function makePoster(u) {
+            return await new Promise((resolve) => {
+              const tv = document.createElement("video");
+              tv.muted = true;
+              tv.playsInline = true;
+              tv.preload = "metadata";
+              tv.setAttribute("playsinline", "");
+              tv.setAttribute("webkit-playsinline", "");
+              tv.src = u;
+
+              let done = false;
+              const finish = (val) => {
+                if (done) return;
+                done = true;
+                try { tv.src = ""; } catch { }
+                resolve(val || null);
+              };
+
+              const capture = () => {
+                const W = tv.videoWidth || 0;
+                const H = tv.videoHeight || 0;
+                if (!W || !H) return finish(null);
+
+                const s = Math.min(W, H);
+                const sx = Math.floor((W - s) / 2);
+                const sy = Math.floor((H - s) / 2);
+
+                const c = document.createElement("canvas");
+                c.width = 256; c.height = 256;
+                const g = c.getContext("2d", { alpha: false });
+                try { g.drawImage(tv, sx, sy, s, s, 0, 0, 256, 256); } catch { return finish(null); }
+
+                c.toBlob((blob) => {
+                  if (!blob) return finish(null);
+                  const pu = URL.createObjectURL(blob);
+                  finish(pu);
+                }, "image/jpeg", 0.82);
+              };
+
+              const trySeek = () => {
+                try { tv.currentTime = Math.min(0.05, (tv.duration || 1) * 0.1); } catch { /* 等 loadeddata */ }
+              };
+
+              tv.addEventListener("loadedmetadata", trySeek, { once: true });
+              tv.addEventListener("loadeddata", trySeek, { once: true });
+              tv.addEventListener("seeked", capture, { once: true });
+              tv.addEventListener("error", () => finish(null), { once: true });
+
+              // 保險：1.5 秒還沒成功就放棄
+              setTimeout(() => finish(null), 1500);
+            });
+          })(blobUrl);
+
+          if (posterUrl) {
+            v.poster = posterUrl;
+            wrap.dataset.posterUrl = posterUrl;
+          }
+        })();
+
+        syncPlay();
+      } else {
+        // 其他檔案型態：顯示簡單方塊
+        const box = document.createElement("div");
+        box.className = "w-full aspect-square rounded-lg bg-gray-900 text-white/90 flex items-center justify-center text-xs";
+        box.textContent = "檔案";
+        wrap.appendChild(box);
+      }
 
       const btn = document.createElement("button");
       btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
       btn.type = "button";
       btn.textContent = "✕";
-      btn.setAttribute("aria-label", "刪除這張");
+      btn.setAttribute("aria-label", "刪除這個檔案");
+      btn.dataset.role = "remove";
 
-      wrap.appendChild(img);
       wrap.appendChild(btn);
       return wrap;
     }
 
     function __setPreviewIdx(tile, idx) {
       tile.dataset.idx = String(idx);
-      const btn = tile.querySelector("button");
+      const btn = tile.querySelector('button[data-role="remove"]');
       if (btn) btn.dataset.idx = String(idx);
     }
 
     function renderPreviews() {
-      fileCount.textContent = `已選 ${selectedFiles.length} / ${MAX_FILES} 張`;
+      fileCount.textContent = `已選 ${selectedFiles.length} / ${MAX_FILES} 個檔案`;
 
       // 不整個清空重畫：只搬動既有 DOM，避免「換順序閃一下」
       for (const [file, el] of __previewTileMap) {
         if (!selectedFiles.includes(file)) {
+          // 若是影片預覽，有 blob URL 的話一起釋放
+          const blobUrl = el?.dataset?.blobUrl;
+          if (blobUrl && blobUrl.startsWith("blob:")) {
+            try { URL.revokeObjectURL(blobUrl); } catch { }
+          }
           el.remove();
           __previewTileMap.delete(file);
         }
@@ -1005,13 +1166,23 @@
 
     // 刪除（事件代理）
     imgPreview.addEventListener("click", (e) => {
-      const btn = e.target.closest?.("button[data-idx]");
+      const btn = e.target.closest?.('button[data-role="remove"][data-idx]');
       if (!btn) return;
       e.preventDefault();
       e.stopPropagation();
       const i = +btn.dataset.idx;
       const f = selectedFiles[i];
       if (f) revokeThumb(f);
+      // 影片預覽用到的 blob URL（若有）也一併釋放
+      const tile = f ? __previewTileMap.get(f) : null;
+      const blobUrl = tile?.dataset?.blobUrl;
+      if (blobUrl && blobUrl.startsWith("blob:")) {
+        try { URL.revokeObjectURL(blobUrl); } catch { }
+      }
+      const posterUrl = tile?.dataset?.posterUrl;
+      if (posterUrl && posterUrl.startsWith("blob:")) {
+        try { URL.revokeObjectURL(posterUrl); } catch { }
+      }
       selectedFiles.splice(i, 1);
       renderPreviews();
     });
@@ -1088,7 +1259,7 @@
       const incoming = Array.from(imgFiles.files || []);
       const next = selectedFiles.concat(incoming);
       if (next.length > MAX_FILES) {
-        Swal.fire({ icon: "warning", title: `最多 ${MAX_FILES} 張照片` });
+        Swal.fire({ icon: "warning", title: `最多 ${MAX_FILES} 個檔案` });
       }
       selectedFiles = next.slice(0, MAX_FILES);
       renderPreviews();
@@ -1199,24 +1370,35 @@
       const stopDots = startDots(submitText, "登錄中");
 
       try {
+        // 1
         // 1) 新增基本文件
         const docRef = await addDoc(collection(db, "pets"), payload);
 
         // 2) 逐張上傳圖片，取得 Storage URL
-        const urls = [];
+        const imgUrls = [];
         for (const f of selectedFiles) {
-          const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
-          const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
-          const base = f.name.replace(/\.[^.]+$/, '');
-          const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
-          const r = sRef(storage, path);
-          await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
-          urls.push(await getDownloadURL(r));
+          if (f.type && f.type.startsWith("image/")) {
+            const wmBlob = await addWatermarkToFile(f);       // 圖片先加浮水印再上傳
+            const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
+            const base = f.name.replace(/\.[^.]+$/, '');
+            const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
+            const r = sRef(storage, path);
+            await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
+            imgUrls.push(await getDownloadURL(r));
+          } else if (f.type && f.type.startsWith("video/")) {
+            // 影片：直接上傳原檔到 pets/{docId}/videos/，交給 Cloud Functions 加浮水印
+            const base = f.name.replace(/\.[^.]+$/, '');
+            const extMatch = f.name.match(/\.([^.]+)$/);
+            const ext = extMatch ? extMatch[1] : (f.type.split("/")[1] || "mp4");
+            const path = `pets/${docRef.id}/videos/${Date.now()}_${base}.${ext}`;
+            const r = sRef(storage, path);
+            await uploadBytes(r, f, { contentType: f.type || "video/mp4" });
+          }
         }
 
-        // 3) 回寫 images 欄位
-        if (urls.length) {
-          await updateDoc(doc(db, "pets", docRef.id), { images: urls });
+        // 3) 回寫 images/imgs 欄位（沿用舊欄位名稱讓 Modal 看得到）
+        if (imgUrls.length) {
+          await updateDoc(doc(db, "pets", docRef.id), { imgs: imgUrls, images: imgUrls });
         }
 
         // UI 收尾
@@ -1229,11 +1411,20 @@
         if (nameInput) nameInput.value = "";
         if (window.resetNameCheck) resetNameCheck();
 
+        // 釋放預覽用到的 objectURL（圖片縮圖 / 影片 blob / 影片 poster）
+        for (const f of selectedFiles) {
+          if (f) revokeThumb(f);
+          const tile = f ? __previewTileMap.get(f) : null;
+          const bu = tile?.dataset?.blobUrl;
+          const pu = tile?.dataset?.posterUrl;
+          if (bu && bu.startsWith("blob:")) { try { URL.revokeObjectURL(bu); } catch { } }
+          if (pu && pu.startsWith("blob:")) { try { URL.revokeObjectURL(pu); } catch { } }
+        }
         // 重置表單與選擇圖片（先做，避免 DOM 還在變動導致 smooth scroll 卡住）
         e.target.reset();
         imgPreview.innerHTML = "";
         selectedFiles = [];
-        fileCount.textContent = "已選 0 / 5 張";
+        fileCount.textContent = "已選 0 / 5 個檔案";
         syncBreedSelectors();
 
         // 先啟動重新載入列表（避免等到提示結束才開始抓資料）
@@ -1606,8 +1797,36 @@
   <script src="assets/Lightbox.js"></script>
   <script>
     if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./sw.js");
+      window.addEventListener("load", async () => {
+        const reg = await navigator.serviceWorker.register("./sw.js");
+
+        // 每次載入都主動檢查 sw.js 是否有更新
+        reg.update();
+
+        // 如果已經有 waiting 的新版，直接叫它上線（更穩）
+        if (reg.waiting) {
+          reg.waiting.postMessage({ type: "SKIP_WAITING" });
+        }
+
+        // 新版 SW 接手後，自動重整一次（加 guard，避免連續重整）
+        let reloaded = false;
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          if (reloaded) return;
+          reloaded = true;
+          window.location.reload();
+        });
+
+        // 若發現新版 SW：叫它直接跳過 waiting
+        reg.addEventListener("updatefound", () => {
+          const nw = reg.installing;
+          if (!nw) return;
+
+          nw.addEventListener("statechange", () => {
+            if (nw.state === "installed" && navigator.serviceWorker.controller) {
+              (reg.waiting || nw).postMessage({ type: "SKIP_WAITING" });
+            }
+          });
+        });
       });
     }
   </script>

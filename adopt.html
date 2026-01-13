@@ -326,8 +326,36 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script>
     if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./sw.js");
+      window.addEventListener("load", async () => {
+        const reg = await navigator.serviceWorker.register("./sw.js");
+
+        // 每次載入都主動檢查 sw.js 是否有更新
+        reg.update();
+
+        // 如果已經有 waiting 的新版，直接叫它上線（更穩）
+        if (reg.waiting) {
+          reg.waiting.postMessage({ type: "SKIP_WAITING" });
+        }
+
+        // 新版 SW 接手後，自動重整一次（加 guard，避免連續重整）
+        let reloaded = false;
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          if (reloaded) return;
+          reloaded = true;
+          window.location.reload();
+        });
+
+        // 若發現新版 SW：叫它直接跳過 waiting
+        reg.addEventListener("updatefound", () => {
+          const nw = reg.installing;
+          if (!nw) return;
+
+          nw.addEventListener("statechange", () => {
+            if (nw.state === "installed" && navigator.serviceWorker.controller) {
+              (reg.waiting || nw).postMessage({ type: "SKIP_WAITING" });
+            }
+          });
+        });
       });
     }
   </script>
