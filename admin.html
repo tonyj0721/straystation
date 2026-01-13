@@ -972,158 +972,21 @@ function __makePreviewTile(file) {
 
         wrap.appendChild(img);
       } else if (file && file.type && file.type.startsWith("video/")) {
+        // 影片：直接用 <video> 當預覽，可以點播放
         const v = document.createElement("video");
         v.className = "w-full aspect-square object-cover rounded-lg bg-black";
-        v.controls = false;
+        v.controls = true;
         v.muted = true;
         v.playsInline = true;
-        v.preload = "metadata";
-        v.setAttribute("playsinline", "");
-        v.setAttribute("webkit-playsinline", "");
-        v.style.pointerEvents = "none"; // 只讓我們自己的播放按鈕接手點擊
-
-        let blobUrl = "";
         try {
-          blobUrl = URL.createObjectURL(file);
-          v.src = blobUrl;
-          wrap.dataset.blobUrl = blobUrl;
+          const raw = URL.createObjectURL(file);
+          v.src = raw;
+          // 載入後就把 objectURL 釋放掉，避免累積太多
+          v.addEventListener("loadeddata", () => {
+            try { URL.revokeObjectURL(raw); } catch { }
+          }, { once: true });
         } catch { }
-
         wrap.appendChild(v);
-
-        // ---- 自訂播放鍵（不要用原生 controls，避免桌機/iOS 長相不一樣）----
-        const playBtn = document.createElement("button");
-        playBtn.type = "button";
-        playBtn.setAttribute("aria-label", "播放/暫停");
-        playBtn.style.position = "absolute";
-        playBtn.style.inset = "0";
-        playBtn.style.display = "flex";
-        playBtn.style.alignItems = "center";
-        playBtn.style.justifyContent = "center";
-        playBtn.style.background = "transparent";
-        playBtn.style.border = "none";
-        playBtn.style.padding = "0";
-        playBtn.style.zIndex = "5";
-
-        const bubble = document.createElement("span");
-        bubble.style.width = "56px";
-        bubble.style.height = "56px";
-        bubble.style.borderRadius = "9999px";
-        bubble.style.display = "flex";
-        bubble.style.alignItems = "center";
-        bubble.style.justifyContent = "center";
-        bubble.style.background = "rgba(0,0,0,0.45)";
-        bubble.innerHTML = `
-          <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M8 5v14l11-7z" fill="white"></path>
-          </svg>`;
-        playBtn.appendChild(bubble);
-        wrap.appendChild(playBtn);
-
-        // 底部進度條
-        
-        const PLAY_ICON = `
-          <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M8 5v14l11-7z" fill="white"></path>
-          </svg>`;
-        const PAUSE_ICON = `
-          <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M6 5h4v14H6zM14 5h4v14h-4z" fill="white"></path>
-          </svg>`;
-
-        const syncPlay = () => {
-          if (v.paused || v.ended) {
-            bubble.innerHTML = PLAY_ICON;
-            bubble.style.background = "rgba(0,0,0,0.45)";
-            bubble.style.opacity = "1";
-          } else {
-            bubble.innerHTML = PAUSE_ICON;
-            bubble.style.background = "rgba(0,0,0,0.35)";
-            bubble.style.opacity = "0.9";
-          }
-        };
-
-        playBtn.addEventListener("click", async (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          try {
-            if (v.paused || v.ended) await v.play();
-            else v.pause();
-          } catch (err) {
-            console.warn("play blocked:", err);
-          }
-          syncPlay();
-        });
-
-        v.addEventListener("play", syncPlay);
-        v.addEventListener("pause", syncPlay);
-        v.addEventListener("ended", () => {
-          syncPlay();
-        });
-
-        // iPhone：剛選完檔案時常常不會自動畫出第一幀 → 生成 poster，確保一定看得到畫面
-        (async () => {
-          if (!blobUrl) return;
-          const posterUrl = await (async function makePoster(u) {
-            return await new Promise((resolve) => {
-              const tv = document.createElement("video");
-              tv.muted = true;
-              tv.playsInline = true;
-              tv.preload = "metadata";
-              tv.setAttribute("playsinline", "");
-              tv.setAttribute("webkit-playsinline", "");
-              tv.src = u;
-
-              let done = false;
-              const finish = (val) => {
-                if (done) return;
-                done = true;
-                try { tv.src = ""; } catch { }
-                resolve(val || null);
-              };
-
-              const capture = () => {
-                const W = tv.videoWidth || 0;
-                const H = tv.videoHeight || 0;
-                if (!W || !H) return finish(null);
-
-                const s = Math.min(W, H);
-                const sx = Math.floor((W - s) / 2);
-                const sy = Math.floor((H - s) / 2);
-
-                const c = document.createElement("canvas");
-                c.width = 256; c.height = 256;
-                const g = c.getContext("2d", { alpha: false });
-                try { g.drawImage(tv, sx, sy, s, s, 0, 0, 256, 256); } catch { return finish(null); }
-
-                c.toBlob((blob) => {
-                  if (!blob) return finish(null);
-                  const pu = URL.createObjectURL(blob);
-                  finish(pu);
-                }, "image/jpeg", 0.82);
-              };
-
-              const trySeek = () => {
-                try { tv.currentTime = Math.min(0.05, (tv.duration || 1) * 0.1); } catch { /* 等 loadeddata */ }
-              };
-
-              tv.addEventListener("loadedmetadata", trySeek, { once: true });
-              tv.addEventListener("loadeddata", trySeek, { once: true });
-              tv.addEventListener("seeked", capture, { once: true });
-              tv.addEventListener("error", () => finish(null), { once: true });
-
-              // 保險：1.5 秒還沒成功就放棄
-              setTimeout(() => finish(null), 1500);
-            });
-          })(blobUrl);
-
-          if (posterUrl) {
-            v.poster = posterUrl;
-            wrap.dataset.posterUrl = posterUrl;
-          }
-        })();
-
-        syncPlay();
       } else {
         // 其他檔案型態：顯示簡單方塊
         const box = document.createElement("div");
@@ -1137,7 +1000,6 @@ function __makePreviewTile(file) {
       btn.type = "button";
       btn.textContent = "✕";
       btn.setAttribute("aria-label", "刪除這個檔案");
-      btn.dataset.role = "remove";
 
       wrap.appendChild(btn);
       return wrap;
@@ -1145,7 +1007,7 @@ function __makePreviewTile(file) {
 
     function __setPreviewIdx(tile, idx) {
       tile.dataset.idx = String(idx);
-      const btn = tile.querySelector('button[data-role="remove"]');
+      const btn = tile.querySelector("button");
       if (btn) btn.dataset.idx = String(idx);
     }
 
@@ -1155,11 +1017,6 @@ function __makePreviewTile(file) {
       // 不整個清空重畫：只搬動既有 DOM，避免「換順序閃一下」
       for (const [file, el] of __previewTileMap) {
         if (!selectedFiles.includes(file)) {
-          // 若是影片預覽，有 blob URL 的話一起釋放
-          const blobUrl = el?.dataset?.blobUrl;
-          if (blobUrl && blobUrl.startsWith("blob:")) {
-            try { URL.revokeObjectURL(blobUrl); } catch { }
-          }
           el.remove();
           __previewTileMap.delete(file);
         }
@@ -1178,23 +1035,13 @@ function __makePreviewTile(file) {
 
     // 刪除（事件代理）
     imgPreview.addEventListener("click", (e) => {
-      const btn = e.target.closest?.('button[data-role="remove"][data-idx]');
+      const btn = e.target.closest?.("button[data-idx]");
       if (!btn) return;
       e.preventDefault();
       e.stopPropagation();
       const i = +btn.dataset.idx;
       const f = selectedFiles[i];
       if (f) revokeThumb(f);
-      // 影片預覽用到的 blob URL（若有）也一併釋放
-      const tile = f ? __previewTileMap.get(f) : null;
-      const blobUrl = tile?.dataset?.blobUrl;
-      if (blobUrl && blobUrl.startsWith("blob:")) {
-        try { URL.revokeObjectURL(blobUrl); } catch { }
-      }
-      const posterUrl = tile?.dataset?.posterUrl;
-      if (posterUrl && posterUrl.startsWith("blob:")) {
-        try { URL.revokeObjectURL(posterUrl); } catch { }
-      }
       selectedFiles.splice(i, 1);
       renderPreviews();
     });
@@ -1423,15 +1270,6 @@ function __makePreviewTile(file) {
         if (nameInput) nameInput.value = "";
         if (window.resetNameCheck) resetNameCheck();
 
-        // 釋放預覽用到的 objectURL（圖片縮圖 / 影片 blob / 影片 poster）
-        for (const f of selectedFiles) {
-          if (f) revokeThumb(f);
-          const tile = f ? __previewTileMap.get(f) : null;
-          const bu = tile?.dataset?.blobUrl;
-          const pu = tile?.dataset?.posterUrl;
-          if (bu && bu.startsWith("blob:")) { try { URL.revokeObjectURL(bu); } catch { } }
-          if (pu && pu.startsWith("blob:")) { try { URL.revokeObjectURL(pu); } catch { } }
-        }
         // 重置表單與選擇圖片（先做，避免 DOM 還在變動導致 smooth scroll 卡住）
         e.target.reset();
         imgPreview.innerHTML = "";
