@@ -945,8 +945,8 @@
 
     const __previewTileMap = new Map(); // File -> tile element（保留 DOM，避免重畫閃爍）
 
-    
-function __makePreviewTile(file) {
+
+    function __makePreviewTile(file) {
       const wrap = document.createElement("div");
       wrap.className = "relative touch-none select-none";
 
@@ -1104,16 +1104,39 @@ function __makePreviewTile(file) {
       }
 
       const btn = document.createElement("button");
-      btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
       btn.type = "button";
-      btn.textContent = "✕";
+      btn.dataset.role = "remove";
       btn.setAttribute("aria-label", "刪除這個檔案");
 
-      
-      btn.dataset.role = "remove";
+      // 不依賴 Tailwind，避免不同環境 class 沒吃到 + iOS button 預設樣式干擾
+      btn.style.position = "absolute";
+      btn.style.top = "4px";
+      btn.style.right = "4px";
+      btn.style.width = "28px";
+      btn.style.height = "28px";
+      btn.style.borderRadius = "9999px";
+      btn.style.display = "flex";
+      btn.style.alignItems = "center";
+      btn.style.justifyContent = "center";
+      btn.style.background = "rgba(0,0,0,0.7)";
+      btn.style.border = "none";
+      btn.style.padding = "0";
+      btn.style.margin = "0";
+      btn.style.color = "#fff";
+      btn.style.lineHeight = "1";
+      btn.style.zIndex = "30";
+      btn.style.appearance = "none";
+      btn.style.webkitAppearance = "none";
+
+      // 用 SVG 畫 X（不同平台就會完全一致）
+      btn.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M6 6L18 18M18 6L6 18"
+            stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>
+      `;
 
       wrap.appendChild(btn);
-      return wrap;
     }
 
     function __setPreviewIdx(tile, idx) {
