@@ -1060,6 +1060,9 @@
         playBtn.style.background = "rgba(0,0,0,0.45)";
         playBtn.style.backdropFilter = "blur(8px)";
         playBtn.style.webkitBackdropFilter = "blur(8px)";
+        playBtn.style.transform = "translate3d(0,0,0)";
+        playBtn.style.willChange = "transform";
+
         playBtn.style.border = "none";
         playBtn.style.padding = "0";
         playBtn.style.color = "#fff";
@@ -1127,6 +1130,10 @@
       btn.style.zIndex = "30";
       btn.style.appearance = "none";
       btn.style.webkitAppearance = "none";
+      btn.style.webkitTransform = "translate3d(0,0,0)";
+      btn.style.transform = "translate3d(0,0,0)";
+      btn.style.willChange = "transform";
+
 
       // 用 SVG 畫 X（不同平台就會完全一致）
       btn.innerHTML = `
@@ -1177,6 +1184,14 @@
       const i = +btn.dataset.idx;
       const f = selectedFiles[i];
       if (f) revokeThumb(f);
+      // 釋放影片/海報 blob URL（避免 iOS/桌機記憶體累積）
+      const tile = f ? __previewTileMap.get(f) : null;
+      if (tile) {
+        const bu = tile.dataset?.blobUrl;
+        const pu = tile.dataset?.posterUrl;
+        if (bu && bu.startsWith("blob:")) { try { URL.revokeObjectURL(bu); } catch {} }
+        if (pu && pu.startsWith("blob:")) { try { URL.revokeObjectURL(pu); } catch {} }
+      }
       selectedFiles.splice(i, 1);
       renderPreviews();
     });
@@ -1185,6 +1200,30 @@
     let dragFrom = null;
     let dragOver = null;
     let dragEl = null;
+
+
+    // iOS Safari：拖曳排序時，overlay（刪除鈕/播放鈕）可能因合成層抖動而看似「跑位」
+    // 做法：拖曳時關掉 blur（backdrop-filter），並把 overlay 提升為獨立合成層
+    function __setDraggingUI(tile, dragging) {
+      if (!tile) return;
+
+      const play = tile.querySelector('button[aria-label="播放/暫停"]');
+      if (play) {
+        play.style.backdropFilter = dragging ? "none" : "blur(8px)";
+        play.style.webkitBackdropFilter = dragging ? "none" : "blur(8px)";
+        play.style.transform = "translate3d(0,0,0)";
+        play.style.webkitTransform = "translate3d(0,0,0)";
+        play.style.willChange = "transform";
+      }
+
+      const del = tile.querySelector('button[data-role="remove"]');
+      if (del) {
+        del.style.transform = "translate3d(0,0,0)";
+        del.style.webkitTransform = "translate3d(0,0,0)";
+        del.style.willChange = "transform";
+      }
+    }
+
 
     function clearDragUI() {
       imgPreview.querySelectorAll("[data-idx]").forEach((el) => {
@@ -1206,6 +1245,8 @@
       tile.setPointerCapture?.(e.pointerId);
       clearDragUI();
       tile.classList.add("ring-2", "ring-brand-500", "opacity-80");
+
+      __setDraggingUI(tile, true);
 
       // 避免觸控滾動搶走手勢
       e.preventDefault();
@@ -1233,6 +1274,8 @@
       const to = dragOver;
 
       clearDragUI();
+
+      __setDraggingUI(dragEl, false);
       dragFrom = dragOver = null;
       dragEl = null;
 
@@ -1782,8 +1825,36 @@
   <script src="assets/Lightbox.js"></script>
   <script>
     if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./sw.js");
+      window.addEventListener("load", async () => {
+        const reg = await navigator.serviceWorker.register("./sw.js");
+
+        // 每次載入都主動檢查 sw.js 是否有更新
+        reg.update();
+
+        // 如果已經有 waiting 的新版，直接叫它上線（更穩）
+        if (reg.waiting) {
+          reg.waiting.postMessage({ type: "SKIP_WAITING" });
+        }
+
+        // 新版 SW 接手後，自動重整一次（加 guard，避免連續重整）
+        let reloaded = false;
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          if (reloaded) return;
+          reloaded = true;
+          window.location.reload();
+        });
+
+        // 若發現新版 SW：叫它直接跳過 waiting
+        reg.addEventListener("updatefound", () => {
+          const nw = reg.installing;
+          if (!nw) return;
+
+          nw.addEventListener("statechange", () => {
+            if (nw.state === "installed" && navigator.serviceWorker.controller) {
+              (reg.waiting || nw).postMessage({ type: "SKIP_WAITING" });
+            }
+          });
+        });
       });
     }
   </script>
