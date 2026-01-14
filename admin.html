@@ -1044,7 +1044,11 @@ function __makePreviewTile(file) {
         const playBtn = document.createElement("button");
         playBtn.type = "button";
         playBtn.setAttribute("aria-label", "播放/暫停");
-        playBtn.className = "absolute left-2 bottom-2 z-10";
+        playBtn.className = "";
+        playBtn.style.position = "absolute";
+        playBtn.style.left = "8px";
+        playBtn.style.bottom = "8px";
+        playBtn.style.zIndex = "10";
 
         // 外觀（不依賴 Tailwind，避免不同環境 class 沒吃到）
         playBtn.style.width = "78px";
