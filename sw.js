@@ -1,5 +1,4 @@
-// sw.js
-const CACHE = "jm-pwa-runtime-v2"; // ← 改成 v2 先把舊快取整批換掉（這次建議一定要做）
+const CACHE = "jm-pwa-2026-01-15"; // ← 改成 v2 先把舊快取整批換掉（這次建議一定要做）
 
 const PRECACHE = [
   "./",

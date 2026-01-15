@@ -259,127 +259,40 @@ async function openDialog(id) {
   document.getElementById('dlgTagVaccinated').textContent = isVaccinated
     ? '已注射預防針' : '未注射預防針';
 
-  // 4. 圖片 / 影片 + Lightbox（搭配 shared.js）
+  // 4. 圖片 + Lightbox（搭配 shared.js）
   const dlgImg = document.getElementById("dlgImg");
   const dlgBg = document.getElementById("dlgBg");
   const dlgThumbs = document.getElementById("dlgThumbs");
 
-  // 找出圖片與影片清單
-  const imgList = Array.isArray(p.images) && p.images.length > 0
+  const imgs = Array.isArray(p.images) && p.images.length > 0
     ? p.images
     : (p.image ? [p.image] : []);
 
-  const videoList = Array.isArray(p.videos) ? p.videos : [];
+  let currentIndex = 0;
 
-  // 統一做成 media 陣列：[{ kind: "image" | "video", url }]
-  const mediaItems = [
-    ...imgList.map((u) => ({ kind: "image", url: u })),
-    ...videoList.map((u) => ({ kind: "video", url: u })),
-  ];
+  dlgImg.src = imgs[currentIndex] || "";
+  if (dlgBg) dlgBg.src = dlgImg.src;
+  dlgImg.onclick = () => openLightbox(imgs, currentIndex);
 
-  let currentIndex = 0;          // 在 mediaItems 裡的 index
-  let currentImageIndex = 0;     // 在 imgList 裡的 index（給 Lightbox 用）
+  dlgThumbs.innerHTML = "";
+  imgs.forEach((url, i) => {
+    const thumb = document.createElement("img");
+    thumb.src = url;
+    thumb.className = "dlg-thumb" + (i === 0 ? " active" : "");
 
-  // 準備一個 <video>，跟原本的 <img> 擺在同一個容器裡，輪流顯示
-  let dlgVideo = null;
-  if (dlgImg && dlgImg.parentElement) {
-    const box = dlgImg.parentElement;
-    dlgVideo = box.querySelector("#dlgVideo");
-    if (!dlgVideo) {
-      dlgVideo = document.createElement("video");
-      dlgVideo.id = "dlgVideo";
-      dlgVideo.className = "relative z-10 block w-full h-full object-contain rounded-lg";
-      dlgVideo.controls = true;
-      dlgVideo.playsInline = true;
-      dlgVideo.style.display = "none";
-      box.appendChild(dlgVideo);
-    }
-  }
+    thumb.addEventListener("click", () => {
+      currentIndex = i;
 
-  function showMedia(idx) {
-    if (!mediaItems.length || !dlgImg) return;
-    if (idx < 0 || idx >= mediaItems.length) idx = 0;
-    currentIndex = idx;
+      dlgImg.src = url;
+      if (dlgBg) dlgBg.src = url;
 
-    const item = mediaItems[idx];
-
-    if (item.kind === "image") {
-      // 切回顯示圖片
-      if (dlgVideo) {
-        dlgVideo.pause();
-        dlgVideo.removeAttribute("src");
-        dlgVideo.load();
-        dlgVideo.style.display = "none";
-      }
-      dlgImg.style.display = "";
-      dlgImg.src = item.url;
-      if (dlgBg) dlgBg.src = item.url;
-
-      const imgIdx = imgList.indexOf(item.url);
-      currentImageIndex = imgIdx >= 0 ? imgIdx : 0;
-    } else {
-      // 顯示影片
-      dlgImg.style.display = "none";
-      if (dlgVideo) {
-        dlgVideo.style.display = "";
-        dlgVideo.src = item.url;
-        dlgVideo.load();
-      }
-      // 背景圖維持上一張圖片即可，若沒有圖片就清掉
-      if (dlgBg && imgList.length === 0) dlgBg.removeAttribute("src");
-    }
-
-    // 更新縮圖的 active 樣式
-    if (dlgThumbs) {
-      const thumbs = dlgThumbs.querySelectorAll(".dlg-thumb");
-      thumbs.forEach((el, i) => {
-        el.classList.toggle("active", i === idx);
-      });
-    }
-  }
-
-  // 點主圖：只有圖片才打開 Lightbox
-  if (dlgImg) {
-    dlgImg.onclick = () => {
-      if (!imgList.length) return;
-      openLightbox(imgList, currentImageIndex);
-    };
-  }
-
-  // 建立縮圖
-  if (dlgThumbs) {
-    dlgThumbs.innerHTML = "";
-    mediaItems.forEach((item, i) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "dlg-thumb" + (i === 0 ? " active" : "");
-
-      if (item.kind === "image") {
-        const img = document.createElement("img");
-        img.src = item.url;
-        img.alt = "縮圖";
-        img.className = "w-full h-full object-cover rounded-lg";
-        btn.appendChild(img);
-      } else {
-        // 影片的縮圖就簡單做一個帶「影片」文字的灰底方塊
-        const box = document.createElement("div");
-        box.className = "w-full h-full flex items-center justify-center rounded-lg bg-black/60 text-white text-xs";
-        box.textContent = "影片";
-        btn.appendChild(box);
-      }
-
-      btn.addEventListener("click", () => showMedia(i));
-      dlgThumbs.appendChild(btn);
+      dlgThumbs.querySelectorAll(".dlg-thumb")
+        .forEach(el => el.classList.remove("active"));
+      thumb.classList.add("active");
     });
-  }
 
-  // 一開始顯示第一個媒體（如果有）
-  if (mediaItems.length) {
-    showMedia(0);
-  } else if (dlgImg) {
-    dlgImg.removeAttribute("src");
-    if (dlgBg) dlgBg.removeAttribute("src");
-  }
+    dlgThumbs.appendChild(thumb);
+  });
 
   // 5. 顯示用文字
   document.getElementById('dlgName').textContent = p.name;
@@ -446,7 +359,7 @@ async function openDialog(id) {
     }
   }
 
-  renderEditImages(imgList);
+  renderEditImages(imgs);
 
   // 7. 模式 / 按鈕 / 已送養相關
   setEditMode(false);      // 一開始都是「瀏覽模式」
