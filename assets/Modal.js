@@ -185,7 +185,6 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
     URL.revokeObjectURL(src);
   }
 }
-}
 
 // ===============================
 // 預覽縮圖：避免大圖解碼造成卡頓（支援手機）
