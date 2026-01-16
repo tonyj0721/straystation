@@ -498,11 +498,19 @@ async function openDialog(id) {
       const icon = document.createElement("div");
       icon.className = "pointer-events-none absolute inset-0 flex items-center justify-center";
       icon.innerHTML = `
-        <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-black/75">
-          <svg viewBox="0 0 24 24" class="w-4 h-4">
-            <polygon points="9,7 9,17 17,12" fill="white" />
+        <div style="
+          width: 28px;
+          height: 28px;
+          border-radius: 9999px;
+          background: rgba(156, 163, 175, 0.95); /* 灰色圓 */
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        ">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+            <path d="M9 7v10l8-5z" fill="#ffffff" />
           </svg>
-        </span>
+        </div>
       `;
       wrapper.appendChild(icon);
     } else {
