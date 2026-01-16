@@ -507,7 +507,7 @@ async function openDialog(id) {
           align-items: center;
           justify-content: center;
         ">
-          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
             <path d="M9 7v10l8-5z" fill="#ffffff" />
           </svg>
         </div>
