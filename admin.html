@@ -875,26 +875,62 @@
       thumbPromiseCache.delete(file);
     }
 
-    const VIDEO_EXT_RE = /\.(mp4|mov|m4v|webm|ogg)$/i;
-
-    function isVideoFile(file) {
-      if (!file) return false;
-      if ((file.type || "").startsWith("video/")) return true;
-      const name = file.name || "";
-      return VIDEO_EXT_RE.test(name.toLowerCase());
-    }
-
     async function decodeToBitmap(file) {
-      // 只對圖片做縮圖，影片我們會用 <video> 直接播
-      if (isVideoFile(file)) {
-        throw new Error("video file: skip thumbnail decode");
+      const type = (file && file.type) || "";
+      const name = (file && file.name || "").toLowerCase();
+
+      const isVideo =
+        type.startsWith("video/") ||
+        /\.(mp4|mov|m4v|webm|3gp|3gpp|3g2|avi)$/i.test(name);
+
+      const isImage =
+        type.startsWith("image/") ||
+        /\.(jpe?g|png|gif|webp|bmp|heic|heif)$/i.test(name);
+
+      // 影片：抓一張影格當縮圖
+      if (isVideo) {
+        const vUrl = URL.createObjectURL(file);
+        try {
+          const v = document.createElement("video");
+          v.src = vUrl;
+          v.muted = true;
+          v.playsInline = true;
+
+          await new Promise((res, rej) => {
+            v.onloadeddata = () => res();
+            v.onerror = (e) => rej(e || new Error("載入影片失敗"));
+          });
+
+          try {
+            if (!Number.isNaN(v.duration) && v.duration > 0.2) {
+              v.currentTime = Math.min(0.2, v.duration / 2);
+              await new Promise((res) => {
+                const h = () => { v.removeEventListener("seeked", h); res(); };
+                v.addEventListener("seeked", h);
+              });
+            }
+          } catch (_) {
+            // 忽略定位錯誤，直接用第一幀
+          }
+
+          const c = document.createElement("canvas");
+          c.width = v.videoWidth || 640;
+          c.height = v.videoHeight || 360;
+          const g = c.getContext("2d");
+          g.drawImage(v, 0, 0, c.width, c.height);
+          return c;
+        } finally {
+          URL.revokeObjectURL(vUrl);
+        }
       }
 
-      // createImageBitmap 在大多數現代瀏覽器/手機上是非阻塞解碼
-      if (window.createImageBitmap) {
-        try {
-          return await createImageBitmap(file);
-        } catch (_) { /* fallback */ }
+      // 圖片：優先用 createImageBitmap（非阻塞解碼）
+      if (window.createImageBitmap && isImage) {
+        try { return await createImageBitmap(file); } catch (_) { /* fallback */ }
+      }
+
+      if (!isImage) {
+        throw new Error("不支援的檔案類型");
       }
 
       // fallback：用 <img> 解碼（比較可能卡，但至少可用）
