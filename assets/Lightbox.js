@@ -6,8 +6,7 @@ window.scrollTo(0, 0);
 // ---- Modal + Lightbox 共用狀態 ----
 const dlg = document.getElementById('petDialog');
 const lb = document.getElementById("lightbox");
-const lbImg = document.getElementById('lbImg');
-const lbVideo = document.getElementById('lbVideo');
+const lbImg = document.getElementById("lbImg");
 const lbPrev = document.getElementById("lbPrev");
 const lbNext = document.getElementById("lbNext");
 const lbClose = document.getElementById("lbClose");
@@ -15,49 +14,6 @@ const lbClose = document.getElementById("lbClose");
 let lbImages = [];
 let lbIndex = 0;
 let lbReturnToDialog = false;
-
-function __isVideoUrl(url) {
-  try {
-    if (!url) return false;
-    const path = url.includes('/o/')
-      ? decodeURIComponent(url.split('/o/')[1].split('?')[0])
-      : url;
-    return /\.(mp4|mov|m4v|webm)$/i.test(path);
-  } catch {
-    return false;
-  }
-}
-
-const __VIDEO_THUMB = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(
-  `<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'>
-    <rect width='160' height='160' rx='18' ry='18' fill='#111827'/>
-    <polygon points='64,52 64,108 112,80' fill='#ffffff'/>
-    <text x='80' y='142' text-anchor='middle' font-size='16' fill='#e5e7eb' font-family='sans-serif'>VIDEO</text>
-  </svg>`
-);
-
-function __renderLightboxMedia() {
-  const url = lbImages[lbIndex] || '';
-  const isV = __isVideoUrl(url);
-
-  if (lbImg) lbImg.classList.toggle('hidden', isV);
-  if (lbVideo) lbVideo.classList.toggle('hidden', !isV);
-
-  if (isV) {
-    if (lbVideo) {
-      lbVideo.src = url;
-      try { lbVideo.load(); } catch { }
-    }
-    if (lbImg) lbImg.src = '';
-  } else {
-    if (lbImg) lbImg.src = url;
-    if (lbVideo) {
-      lbVideo.pause?.();
-      lbVideo.removeAttribute('src');
-      try { lbVideo.load(); } catch { }
-    }
-  }
-}
 
 // 用來記住原本 scroll 狀態（iOS 點螢幕頂端也不會把背景捲動）
 let __lockDepth = 0;
@@ -129,7 +85,7 @@ function openLightbox(images, index = 0) {
   lbIndex = Math.max(0, Math.min(index, lbImages.length - 1));
   lbReturnToDialog = !!(dlg && dlg.open);
 
-  __renderLightboxMedia();
+  if (lbImg) lbImg.src = lbImages[lbIndex] || '';
 
   // 建立縮圖列
   const lbThumbsInner = document.getElementById("lbThumbsInner");
@@ -137,12 +93,11 @@ function openLightbox(images, index = 0) {
     lbThumbsInner.innerHTML = "";
     lbImages.forEach((url, i) => {
       const t = document.createElement("img");
-      t.src = __isVideoUrl(url) ? __VIDEO_THUMB : url;
-      t.dataset.idx = String(i);
+      t.src = url;
       t.className = i === lbIndex ? "active" : "";
       t.addEventListener("click", () => {
         lbIndex = i;
-        __renderLightboxMedia();
+        if (lbImg) lbImg.src = lbImages[lbIndex] || '';
         lbThumbsInner.querySelectorAll("img").forEach(el => el.classList.remove("active"));
         t.classList.add("active");
       });
@@ -170,13 +125,6 @@ function closeLightbox() {
     lb.classList.remove("flex");
   }
 
-  // 收尾：避免背景播放
-  if (lbVideo) {
-    lbVideo.pause?.();
-    lbVideo.removeAttribute('src');
-    try { lbVideo.load(); } catch { }
-  }
-
   if (lbReturnToDialog && dlg) {
     dlg.showModal();
     // dialog 也需要鎖背景（但避免重複 lock）
@@ -190,7 +138,7 @@ function closeLightbox() {
 function lbShow(delta) {
   if (!lbImages.length) return;
   lbIndex = (lbIndex + delta + lbImages.length) % lbImages.length;
-  __renderLightboxMedia();
+  if (lbImg) lbImg.src = lbImages[lbIndex] || '';
   const lbThumbsInner = document.getElementById("lbThumbsInner");
   if (lbThumbsInner) {
     lbThumbsInner.querySelectorAll("img").forEach((el, i) => {
