@@ -634,8 +634,7 @@
   <div id="lightbox" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[9999]">
     <div id="lbWrap" class="relative inline-block">
       <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg" />
-      <video id="lbVideo" playsinline controls
-        class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg hidden"></video>
+      <video id="lbVideo" playsinline controls class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg hidden"></video>
       <button id="lbClose" class="absolute top-1 right-1 z-10 bg-black/60 hover:bg-black/70 text-white rounded-full p-2
            text-2xl leading-none select-none" aria-label="關閉">✕</button>
     </div>
@@ -877,15 +876,8 @@
 
     async function decodeToBitmap(file) {
       const type = (file && file.type) || "";
-      const name = (file && file.name || "").toLowerCase();
-
-      const isVideo =
-        type.startsWith("video/") ||
-        /\.(mp4|mov|m4v|webm|3gp|3gpp|3g2|avi)$/i.test(name);
-
-      const isImage =
-        type.startsWith("image/") ||
-        /\.(jpe?g|png|gif|webp|bmp|heic|heif)$/i.test(name);
+      const isVideo = type.startsWith("video/");
+      const isImage = type.startsWith("image/");
 
       // 影片：抓一張影格當縮圖
       if (isVideo) {
@@ -909,9 +901,7 @@
                 v.addEventListener("seeked", h);
               });
             }
-          } catch (_) {
-            // 忽略定位錯誤，直接用第一幀
-          }
+          } catch (_) { /* 忽略定位錯誤，直接用第一張影格 */ }
 
           const c = document.createElement("canvas");
           c.width = v.videoWidth || 640;
@@ -952,8 +942,7 @@
         URL.revokeObjectURL(raw);
       }
     }
-
-    async function makeThumbURL(file) {
+async function makeThumbURL(file) {
       const bmp = await decodeToBitmap(file);
       const W = bmp.width, H = bmp.height;
       const scale = Math.min(1, PREVIEW_MAX / Math.max(W, H));
@@ -1001,86 +990,24 @@
       const wrap = document.createElement("div");
       wrap.className = "relative touch-none select-none";
 
-      const name = (file && file.name || "").toLowerCase();
-      const isVideo =
-        (file.type && file.type.startsWith("video/")) ||
-        /\.(mp4|mov|m4v|webm|3gp|3gpp|3g2|avi)$/i.test(name);
+      const img = document.createElement("img");
+      img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+      img.alt = "預覽";
+      img.decoding = "async";
+      img.loading = "lazy";
+      img.src = EMPTY_GIF;
 
-      let mediaEl;
-
-      if (isVideo) {
-        // 影片預覽：可以播放
-        const video = document.createElement("video");
-        video.className = "w-full aspect-square object-cover rounded-lg bg-black/80";
-        video.playsInline = true;
-        video.controls = true;   // ✅ 可以直接播放確認檔案
-        video.muted = true;
-        video.preload = "metadata";
-
-        // 先直接給 src，讓 iOS 至少有畫面（就算等等縮圖失敗也不會整片透明）
-        try {
-          const raw = URL.createObjectURL(file);
-          video.src = raw;
-          // 不急著 revoke，讓使用者可以重播；之後整個頁面關掉時瀏覽器會回收
-        } catch { }
-
-        // 再試著用縮圖塞到 poster（成功就變成「第一幀」）
-        ensureThumbURL(file)
-          .then((url) => {
-            // 只有真的有縮圖時才設 poster
-            video.poster = url;
-          })
-          .catch(() => {
-            // 縮圖失敗就維持原本影片行為，不另外處理
-          });
-
-        mediaEl = video;
-
-        // 疊一個播放 icon（不擋操作）
-        const icon = document.createElement("div");
-        icon.className = "pointer-events-none absolute inset-0 flex items-center justify-center";
-        icon.innerHTML = `
-      <div style="
-        width: 40px;
-        height: 40px;
-        border-radius: 9999px;
-        background: rgba(156, 163, 175, 0.95);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      ">
-        <svg viewBox="0 0 24 24" width="40" height="40" aria-hidden="true">
-          <path d="M9 7v10l8-5z" fill="#ffffff" />
-        </svg>
-      </div>
-    `;
-
-        wrap.appendChild(mediaEl);
-        wrap.appendChild(icon);
-      } else {
-        // 圖片預覽：維持原本邏輯
-        const img = document.createElement("img");
-        img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
-        img.alt = "預覽";
-        img.decoding = "async";
-        img.loading = "lazy";
-        img.src = EMPTY_GIF;
-
-        // 先顯示空白，再異步塞縮圖，避免解碼瞬間卡頓
-        ensureThumbURL(file)
-          .then((url) => { img.src = url; })
-          .catch(() => {
-            // 真的不行就退回原圖（至少有預覽）
-            try {
-              const raw = URL.createObjectURL(file);
-              img.src = raw;
-              setTimeout(() => URL.revokeObjectURL(raw), 2000);
-            } catch { }
-          });
-
-        mediaEl = img;
-        wrap.appendChild(mediaEl);
-      }
+      // 先顯示空白，再異步塞縮圖，避免解碼瞬間卡頓
+      ensureThumbURL(file)
+        .then((url) => { img.src = url; })
+        .catch(() => {
+          // 真的不行就退回原圖（至少有預覽）
+          try {
+            const raw = URL.createObjectURL(file);
+            img.src = raw;
+            setTimeout(() => URL.revokeObjectURL(raw), 2000);
+          } catch { }
+        });
 
       const btn = document.createElement("button");
       btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
@@ -1088,6 +1015,7 @@
       btn.textContent = "✕";
       btn.setAttribute("aria-label", "刪除這張");
 
+      wrap.appendChild(img);
       wrap.appendChild(btn);
       return wrap;
     }

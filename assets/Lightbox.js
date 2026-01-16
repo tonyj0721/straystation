@@ -27,7 +27,7 @@ function renderLightboxMedia() {
   if (!lbImages.length) {
     if (lbImg) lbImg.src = "";
     if (lbVideo) {
-      try { lbVideo.pause(); } catch (_) { }
+      try { lbVideo.pause(); } catch (_) {}
       lbVideo.src = "";
       lbVideo.classList.add("hidden");
     }
@@ -44,9 +44,9 @@ function renderLightboxMedia() {
       lbVideo.src = url;
       lbVideo.playsInline = true;
       lbVideo.controls = true;
-      try { lbVideo.play().catch(() => { }); } catch (_) { }
+      try { lbVideo.play().catch(() => {}); } catch (_) {}
     } else {
-      try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
+      try { lbVideo.pause && lbVideo.pause(); } catch (_) {}
       lbVideo.classList.add("hidden");
       lbImg.classList.remove("hidden");
       lbImg.src = url;
@@ -123,9 +123,9 @@ dlg?.addEventListener('close', () => {
   // 關掉 dialog 一律先把影片停掉
   const v = document.getElementById("dlgVideo");
   if (v) {
-    try { v.pause(); } catch (_) { }
+    try { v.pause(); } catch (_) {}
     v.removeAttribute("src");
-    try { v.load && v.load(); } catch (_) { }
+    try { v.load && v.load(); } catch (_) {}
   }
 
   // 如果是切到 Lightbox 才關掉 dialog：不要清 currentPetId、不要解鎖
@@ -150,42 +150,17 @@ function openLightbox(images, index = 0) {
     lbImages.forEach((url, i) => {
       const isVid = isVideoUrl(url);
       const wrapper = document.createElement("div");
-      wrapper.className = "lb-thumb relative" + (i === lbIndex ? " active" : "");
+      wrapper.className = "lb-thumb" + (i === lbIndex ? " active" : "");
 
       if (isVid) {
-        const v = document.createElement("video");
-        v.src = url;
-        v.muted = true;
-        v.playsInline = true;
-        v.preload = "metadata";
-        // 🔥 填滿整個縮圖格
-        v.className = "w-full h-full object-cover rounded-md bg-black/80";
-        v.controls = false;
-        wrapper.appendChild(v);
-
-        const icon = document.createElement("div");
-        icon.className = "pointer-events-none absolute inset-0 flex items-center justify-center";
-        icon.innerHTML = `
-          <div style="
-            width: 40px;
-            height: 40px;
-            border-radius: 9999px;
-            background: rgba(156, 163, 175, 0.95); /* 灰色圓 */
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          ">
-            <svg viewBox="0 0 24 24" width="40" height="40" aria-hidden="true">
-              <path d="M9 7v10l8-5z" fill="#ffffff" />
-            </svg>
-          </div>
-        `;
-        wrapper.appendChild(icon);
+        const box = document.createElement("div");
+        box.className = "w-14 h-14 md:w-16 md:h-16 rounded-md bg-black/60 text-white flex items-center justify-center text-xs";
+        box.textContent = "🎬 影片";
+        wrapper.appendChild(box);
       } else {
         const img = document.createElement("img");
         img.src = url;
-        // 🔥 一樣填滿
-        img.className = "w-full h-full object-cover rounded-md";
+        img.className = "w-14 h-14 md:w-16 md:h-16 object-cover rounded-md";
         wrapper.appendChild(img);
       }
 
@@ -217,9 +192,9 @@ function openLightbox(images, index = 0) {
 function closeLightbox() {
   // 關閉前一定要把影片停掉
   if (lbVideo) {
-    try { lbVideo.pause(); } catch (_) { }
+    try { lbVideo.pause(); } catch (_) {}
     lbVideo.removeAttribute("src");
-    try { lbVideo.load && lbVideo.load(); } catch (_) { }
+    try { lbVideo.load && lbVideo.load(); } catch (_) {}
   }
 
   if (lb) {

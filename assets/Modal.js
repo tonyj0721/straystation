@@ -293,7 +293,6 @@ async function __decodeToBitmap(file) {
     URL.revokeObjectURL(raw);
   }
 }
-
 async function __makePreviewThumbURL(file) {
   const bmp = await __decodeToBitmap(file);
   const W = bmp.width, H = bmp.height;
@@ -413,8 +412,8 @@ async function openDialog(id) {
     ? '已注射預防針' : '未注射預防針';
 
   // 4. 圖片 + Lightbox（搭配 shared.js）
-
-  const dlgImg = document.getElementById("dlgImg");
+  
+const dlgImg = document.getElementById("dlgImg");
   const dlgVideo = document.getElementById("dlgVideo");
   const dlgBg = document.getElementById("dlgBg");
   const dlgThumbs = document.getElementById("dlgThumbs");
@@ -429,7 +428,7 @@ async function openDialog(id) {
     if (!media.length) {
       if (dlgImg) dlgImg.src = "";
       if (dlgVideo) {
-        try { dlgVideo.pause(); } catch (_) { }
+        try { dlgVideo.pause(); } catch (_) {}
         dlgVideo.src = "";
         dlgVideo.classList.add("hidden");
       }
@@ -447,11 +446,11 @@ async function openDialog(id) {
         dlgVideo.src = url;
         dlgVideo.playsInline = true;
         dlgVideo.controls = true;
-        try { dlgVideo.play().catch(() => { }); } catch (_) { }
+        try { dlgVideo.play().catch(() => {}); } catch (_) {}
       } else {
         try {
           dlgVideo.pause && dlgVideo.pause();
-        } catch (_) { }
+        } catch (_) {}
         dlgVideo.classList.add("hidden");
         dlgImg.classList.remove("hidden");
         dlgImg.src = url;
@@ -486,39 +485,14 @@ async function openDialog(id) {
     wrapper.className = "dlg-thumb relative" + (i === 0 ? " active" : "");
 
     if (isVid) {
-      const v = document.createElement("video");
-      v.src = url;
-      v.muted = true;
-      v.playsInline = true;
-      v.preload = "metadata";
-      // 🔥 填滿整個縮圖格子，大小統一
-      v.className = "w-full h-full object-cover rounded-md bg-black/80";
-      v.controls = false;
-      wrapper.appendChild(v);
-
-      const icon = document.createElement("div");
-      icon.className = "pointer-events-none absolute inset-0 flex items-center justify-center";
-      icon.innerHTML = `
-        <div style="
-          width: 40px;
-          height: 40px;
-          border-radius: 9999px;
-          background: rgba(156, 163, 175, 0.95); /* 灰色圓 */
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        ">
-          <svg viewBox="0 0 24 24" width="40" height="40" aria-hidden="true">
-            <path d="M9 7v10l8-5z" fill="#ffffff" />
-          </svg>
-        </div>
-      `;
-      wrapper.appendChild(icon);
+      const box = document.createElement("div");
+      box.className = "w-16 h-16 md:w-20 md:h-20 rounded-md bg-black/60 text-white flex items-center justify-center text-xs";
+      box.textContent = "🎬 影片";
+      wrapper.appendChild(box);
     } else {
       const img = document.createElement("img");
       img.src = url;
-      // 🔥 一樣填滿縮圖格子
-      img.className = "w-full h-full object-cover rounded-md";
+      img.className = "w-16 h-16 md:w-20 md:h-20 object-cover rounded-md";
       wrapper.appendChild(img);
     }
 
@@ -531,7 +505,7 @@ async function openDialog(id) {
 
   showDialogMedia(currentIndex);
 
-  // 5. 顯示用文字
+// 5. 顯示用文字
   document.getElementById('dlgName').textContent = p.name;
   document.getElementById('dlgDesc').textContent = p.desc;
   document.getElementById('dlgTagBreed').textContent = p.breed;
@@ -941,86 +915,29 @@ function __makeEditTile(it) {
   wrap.style.userSelect = "none";
   wrap.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  const isUrl = it.kind === "url";
-  const isFile = it.kind === "file" && it.file;
-  const isVideo = isUrl
-    ? isVideoUrl(it.url || "")
-    : (isFile && it.file.type && it.file.type.startsWith("video/"));
+  const img = document.createElement("img");
+  img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+  img.alt = "預覽";
+  img.decoding = "async";
+  img.loading = "lazy";
+  img.draggable = false;
+  img.style.webkitUserDrag = "none";
+  img.style.webkitTouchCallout = "none";
+  img.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  let mediaEl;
-
-  if (isVideo) {
-    const v = document.createElement("video");
-    v.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
-    v.playsInline = true;
-    v.controls = true;
-    v.muted = true;
-    v.preload = "metadata";
-
-    // 先用透明圖當 poster
-    v.poster = PREVIEW_EMPTY_GIF;
-
-    if (isUrl) {
-      // 已上傳在雲端的影片：直接用 URL 播放
-      v.src = it.url;
-    } else if (isFile) {
-      // 編輯時新選的影片：poster 用縮圖（第一幀）
-      ensurePreviewThumbURL(it.file)
-        .then((thumb) => {
-          v.poster = thumb;
-        })
-        .catch(() => { });
-
-      try {
-        const raw = URL.createObjectURL(it.file);
-        v.src = raw;
-        v.addEventListener("loadeddata", () => {
-          // 看你要不要額外釋放 raw
-          // setTimeout(() => URL.revokeObjectURL(raw), 5000);
-        });
-      } catch { }
-    }
-
-    mediaEl = v;
-
-    // 播放 icon（不擋操作）
-    const icon = document.createElement("div");
-    icon.className = "pointer-events-none absolute inset-0 flex items-center justify-center";
-    icon.innerHTML = `
-      <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-black/70 text-white text-sm">
-        ▶
-      </span>
-    `;
-    wrap.appendChild(mediaEl);
-    wrap.appendChild(icon);
+  if (it.kind === "url") {
+    img.src = it.url;
   } else {
-    const img = document.createElement("img");
-    img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
-    img.alt = "預覽";
-    img.decoding = "async";
-    img.loading = "lazy";
-    img.draggable = false;
-    img.style.webkitUserDrag = "none";
-    img.style.webkitTouchCallout = "none";
-    img.addEventListener("contextmenu", (e) => e.preventDefault());
-
-    if (isUrl) {
-      img.src = it.url;
-    } else if (isFile) {
-      img.src = PREVIEW_EMPTY_GIF;
-      ensurePreviewThumbURL(it.file)
-        .then((u) => { img.src = u; })
-        .catch(() => {
-          try {
-            const raw = URL.createObjectURL(it.file);
-            img.src = raw;
-            setTimeout(() => URL.revokeObjectURL(raw), 2000);
-          } catch { }
-        });
-    }
-
-    mediaEl = img;
-    wrap.appendChild(mediaEl);
+    img.src = PREVIEW_EMPTY_GIF;
+    ensurePreviewThumbURL(it.file)
+      .then((u) => { img.src = u; })
+      .catch(() => {
+        try {
+          const raw = URL.createObjectURL(it.file);
+          img.src = raw;
+          setTimeout(() => URL.revokeObjectURL(raw), 2000);
+        } catch { }
+      });
   }
 
   const btn = document.createElement("button");
@@ -1029,6 +946,7 @@ function __makeEditTile(it) {
   btn.textContent = "✕";
   btn.setAttribute("aria-label", "刪除這張");
 
+  wrap.appendChild(img);
   wrap.appendChild(btn);
   return wrap;
 }
@@ -1428,7 +1346,7 @@ async function onConfirmAdopted() {
   try {
     for (const f of files) {
       const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
-      const type = wmBlob.type || '';
+            const type = wmBlob.type || '';
       let ext = 'bin';
       if (type.startsWith('image/')) {
         ext = type === 'image/png' ? 'png' : 'jpg';
