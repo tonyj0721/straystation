@@ -558,14 +558,6 @@
       }).join('');
     }
 
-    // 取得「今年第幾週」當作亂數種子
-    function getWeeklySeed() {
-      const now = new Date();
-      const oneJan = new Date(now.getFullYear(), 0, 1);
-      const dayOfYear = Math.floor((now - oneJan) / 86400000) + 1;
-      const week = Math.floor((dayOfYear + oneJan.getDay()) / 7);
-      return now.getFullYear() * 100 + week; // e.g. 202552
-    }
 
     // 簡單的可重現 PRNG
     function mulberry32(a) {
@@ -576,16 +568,6 @@
         return ((t ^ t >>> 14) >>> 0) / 4294967296;
       };
     }
-
-    // 用指定種子洗牌
-    function shuffleWithSeed(arr, seed) {
-      const rng = mulberry32(seed);
-      for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(rng() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]];
-      }
-    }
-
 
     async function loadPets() {
       const qRef = query(collection(db, 'pets'), where('status', '==', 'adopted'), orderBy('createdAt', 'desc'));
@@ -609,12 +591,7 @@
       // 去重複（可有可無，看你需不需要）
       allPhotos = Array.from(new Set(allPhotos));
 
-      // 依「每週」固定種子隨機排序
-      const seed = getWeeklySeed();
-      shuffleWithSeed(allPhotos, seed);
-
-      // 建立右側相片拼貼（每週一組隨機 10 張）
-      buildMosaic(allPhotos.slice(0, 10));
+      buildMosaic(allPhotos);
     }
 
     loadPets();
