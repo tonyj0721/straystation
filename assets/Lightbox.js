@@ -167,15 +167,15 @@ function openLightbox(images, index = 0) {
         icon.className = "pointer-events-none absolute inset-0 flex items-center justify-center";
         icon.innerHTML = `
           <div style="
-            width: 28px;
-            height: 28px;
+            width: 40px;
+            height: 40px;
             border-radius: 9999px;
             background: rgba(156, 163, 175, 0.95); /* 灰色圓 */
             display: flex;
             align-items: center;
             justify-content: center;
           ">
-            <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="40" height="40" aria-hidden="true">
               <path d="M9 7v10l8-5z" fill="#ffffff" />
             </svg>
           </div>
