@@ -358,9 +358,9 @@
             <input id="imgFiles" type="file" accept="image/*,video/*" multiple class="sr-only" />
             <div class="flex items-center gap-3">
               <button id="btnPick" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
-                新增照片／影片
+                新增照片/影片
               </button>
-              <span id="fileCount" class="text-xs text-gray-500">已選 0 / 5 張</span>
+              <span id="fileCount" class="text-xs text-gray-500">已選 0 / 5 筆</span>
               <span class="text-sm text-gray-400">最多 5 張</span>
             </div>
             <div id="imgPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
@@ -434,8 +434,6 @@
           <!-- 主圖在最上層，沒有 blur -->
           <img id="dlgImg" alt="毛孩照片"
             class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg">
-          <video id="dlgVideo" playsinline controls
-            class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg hidden"></video>
 
           <button id="dlgClose" class="absolute top-1 right-1 z-20 bg-black/60 text-white p-2 rounded-full leading-none"
             aria-label="關閉">✕</button>
@@ -571,7 +569,7 @@
             <input id="editFiles" type="file" accept="image/*,video/*" multiple class="sr-only" />
             <div class="flex items-center gap-3">
               <button id="btnPickEdit" type="button"
-                class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增照片／影片</button>
+                class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增照片/影片</button>
               <span id="editCount" class="text-xs text-gray-500"></span>
               <span class="text-sm text-gray-400">最多 5 張</span>
             </div>
@@ -634,7 +632,6 @@
   <div id="lightbox" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[9999]">
     <div id="lbWrap" class="relative inline-block">
       <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg" />
-      <video id="lbVideo" playsinline controls class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg hidden"></video>
       <button id="lbClose" class="absolute top-1 right-1 z-10 bg-black/60 hover:bg-black/70 text-white rounded-full p-2
            text-2xl leading-none select-none" aria-label="關閉">✕</button>
     </div>
@@ -874,53 +871,59 @@
       thumbPromiseCache.delete(file);
     }
 
-    async function decodeToBitmap(file) {
-      const type = (file && file.type) || "";
-      const isVideo = type.startsWith("video/");
-      const isImage = type.startsWith("image/");
+    
 
-      // 影片：抓一張影格當縮圖
-      if (isVideo) {
-        const vUrl = URL.createObjectURL(file);
-        try {
-          const v = document.createElement("video");
-          v.src = vUrl;
-          v.muted = true;
-          v.playsInline = true;
+    function __isVideoFile(file) {
+      return !!(file && typeof file.type === "string" && file.type.startsWith("video/"));
+    }
 
-          await new Promise((res, rej) => {
-            v.onloadeddata = () => res();
-            v.onerror = (e) => rej(e || new Error("載入影片失敗"));
-          });
+    // 影片縮圖：抓 0.1s 的畫面畫到 canvas（再交給 createImageBitmap）
+    async function decodeVideoToBitmap(file) {
+      const raw = URL.createObjectURL(file);
+      try {
+        const v = document.createElement("video");
+        v.preload = "metadata";
+        v.muted = true;
+        v.playsInline = true;
+        v.src = raw;
 
-          try {
-            if (!Number.isNaN(v.duration) && v.duration > 0.2) {
-              v.currentTime = Math.min(0.2, v.duration / 2);
-              await new Promise((res) => {
-                const h = () => { v.removeEventListener("seeked", h); res(); };
-                v.addEventListener("seeked", h);
-              });
-            }
-          } catch (_) { /* 忽略定位錯誤，直接用第一張影格 */ }
+        await new Promise((res, rej) => {
+          v.onloadedmetadata = () => res();
+          v.onerror = () => rej(new Error("video decode error"));
+        });
 
-          const c = document.createElement("canvas");
-          c.width = v.videoWidth || 640;
-          c.height = v.videoHeight || 360;
-          const g = c.getContext("2d");
-          g.drawImage(v, 0, 0, c.width, c.height);
-          return c;
-        } finally {
-          URL.revokeObjectURL(vUrl);
-        }
+        const target = Math.min(0.1, Math.max(0, (v.duration || 0) - 0.01));
+        try { v.currentTime = target; } catch { }
+
+        await new Promise((res) => {
+          let done = false;
+          const finish = () => { if (done) return; done = true; res(); };
+          v.onseeked = finish;
+          setTimeout(finish, 350);
+        });
+
+        const W = v.videoWidth || 1;
+        const H = v.videoHeight || 1;
+        const c = document.createElement("canvas");
+        c.width = W;
+        c.height = H;
+        const g = c.getContext("2d", { alpha: false, desynchronized: true });
+        g.drawImage(v, 0, 0, W, H);
+        if (window.createImageBitmap) return await createImageBitmap(c);
+
+        // very old fallback
+        return c;
+      } finally {
+        URL.revokeObjectURL(raw);
       }
-
-      // 圖片：優先用 createImageBitmap（非阻塞解碼）
-      if (window.createImageBitmap && isImage) {
+    }
+async function decodeToBitmap(file) {
+      if (__isVideoFile(file)) {
+        return await decodeVideoToBitmap(file);
+      }
+      // createImageBitmap 在大多數現代瀏覽器/手機上是非阻塞解碼
+      if (window.createImageBitmap) {
         try { return await createImageBitmap(file); } catch (_) { /* fallback */ }
-      }
-
-      if (!isImage) {
-        throw new Error("不支援的檔案類型");
       }
 
       // fallback：用 <img> 解碼（比較可能卡，但至少可用）
@@ -942,7 +945,8 @@
         URL.revokeObjectURL(raw);
       }
     }
-async function makeThumbURL(file) {
+
+    async function makeThumbURL(file) {
       const bmp = await decodeToBitmap(file);
       const W = bmp.width, H = bmp.height;
       const scale = Math.min(1, PREVIEW_MAX / Math.max(W, H));
@@ -1016,6 +1020,15 @@ async function makeThumbURL(file) {
       btn.setAttribute("aria-label", "刪除這張");
 
       wrap.appendChild(img);
+
+      // 如果是影片：加一個播放角標
+      if (__isVideoFile(file)) {
+        const tag = document.createElement("div");
+        tag.textContent = "▶";
+        tag.className = "absolute bottom-1 left-1 bg-black/60 text-white text-xs px-2 py-1 rounded";
+        wrap.appendChild(tag);
+      }
+
       wrap.appendChild(btn);
       return wrap;
     }
@@ -1027,7 +1040,7 @@ async function makeThumbURL(file) {
     }
 
     function renderPreviews() {
-      fileCount.textContent = `已選 ${selectedFiles.length} / ${MAX_FILES} 張`;
+      fileCount.textContent = `已選 ${selectedFiles.length} / ${MAX_FILES} 筆`;
 
       // 不整個清空重畫：只搬動既有 DOM，避免「換順序閃一下」
       for (const [file, el] of __previewTileMap) {
@@ -1130,10 +1143,14 @@ async function makeThumbURL(file) {
 
     // 檔案挑選後：合併並截斷到 MAX_FILES 張
     imgFiles?.addEventListener("change", () => {
-      const incoming = Array.from(imgFiles.files || []);
+      const incomingAll = Array.from(imgFiles.files || []);
+      const incoming = incomingAll.filter(f => (f && typeof f.type === "string" && (f.type.startsWith("image/") || f.type.startsWith("video/"))));
+      if (incoming.length !== incomingAll.length) {
+        Swal.fire({ icon: "warning", title: "只支援照片或影片檔" });
+      }
       const next = selectedFiles.concat(incoming);
       if (next.length > MAX_FILES) {
-        Swal.fire({ icon: "warning", title: `最多 ${MAX_FILES} 張照片` });
+        Swal.fire({ icon: "warning", title: `最多 ${MAX_FILES} 筆` });
       }
       selectedFiles = next.slice(0, MAX_FILES);
       renderPreviews();
@@ -1250,17 +1267,8 @@ async function makeThumbURL(file) {
         // 2) 逐張上傳圖片，取得 Storage URL
         const urls = [];
         for (const f of selectedFiles) {
-          const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
-          const type = wmBlob.type || '';
-          let ext = 'bin';
-          if (type.startsWith('image/')) {
-            ext = type === 'image/png' ? 'png' : 'jpg';
-          } else if (type.startsWith('video/')) {
-            if (type.includes('webm')) ext = 'webm';
-            else if (type.includes('ogg')) ext = 'ogg';
-            else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
-            else ext = 'mp4';
-          }
+          const wmBlob = await addWatermarkToMediaFile(f);       // ← 先加浮水印（照片/影片）
+          const ext = wmBlob.type.startsWith('video/') ? 'mp4' : (wmBlob.type === 'image/png' ? 'png' : 'jpg');
           const base = f.name.replace(/\.[^.]+$/, '');
           const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
           const r = sRef(storage, path);
@@ -1287,7 +1295,7 @@ async function makeThumbURL(file) {
         e.target.reset();
         imgPreview.innerHTML = "";
         selectedFiles = [];
-        fileCount.textContent = "已選 0 / 5 張";
+        fileCount.textContent = "已選 0 / 5 筆";
         syncBreedSelectors();
 
         // 先啟動重新載入列表（避免等到提示結束才開始抓資料）
@@ -1319,7 +1327,9 @@ async function makeThumbURL(file) {
         stopDots();
         submitBtn.disabled = false;
         submitText.textContent = "登錄";
-        Swal.fire({ icon: "error", title: "登錄失敗", text: err.message });
+        console.error("登錄失敗：", err);
+        const msg = (err && (err.message || err.code || String(err))) || "未知錯誤";
+        Swal.fire({ icon: "error", title: "登錄失敗", text: msg });
       }
     });
 

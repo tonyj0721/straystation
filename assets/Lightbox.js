@@ -1,12 +1,5 @@
 const $ = (sel) => document.querySelector(sel);
 
-function isVideoUrl(url) {
-  if (!url) return false;
-  const u = String(url).split("?", 1)[0];
-  return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
-}
-
-
 history.scrollRestoration = "manual";
 window.scrollTo(0, 0);
 
@@ -14,7 +7,6 @@ window.scrollTo(0, 0);
 const dlg = document.getElementById('petDialog');
 const lb = document.getElementById("lightbox");
 const lbImg = document.getElementById("lbImg");
-const lbVideo = document.getElementById("lbVideo");
 const lbPrev = document.getElementById("lbPrev");
 const lbNext = document.getElementById("lbNext");
 const lbClose = document.getElementById("lbClose");
@@ -23,46 +15,52 @@ let lbImages = [];
 let lbIndex = 0;
 let lbReturnToDialog = false;
 
-function renderLightboxMedia() {
-  if (!lbImages.length) {
-    if (lbImg) lbImg.src = "";
-    if (lbVideo) {
-      try { lbVideo.pause(); } catch (_) {}
-      lbVideo.src = "";
-      lbVideo.classList.add("hidden");
-    }
-    return;
-  }
 
-  const url = lbImages[lbIndex] || "";
-  const isVid = isVideoUrl(url);
-
-  if (lbImg && lbVideo) {
-    if (isVid) {
-      lbImg.classList.add("hidden");
-      lbVideo.classList.remove("hidden");
-      lbVideo.src = url;
-      lbVideo.playsInline = true;
-      lbVideo.controls = true;
-      try { lbVideo.play().catch(() => {}); } catch (_) {}
-    } else {
-      try { lbVideo.pause && lbVideo.pause(); } catch (_) {}
-      lbVideo.classList.add("hidden");
-      lbImg.classList.remove("hidden");
-      lbImg.src = url;
-    }
-  } else if (lbImg) {
-    lbImg.src = url;
-  }
-
-  const lbThumbsInner = document.getElementById("lbThumbsInner");
-  if (lbThumbsInner) {
-    Array.prototype.forEach.call(lbThumbsInner.children, (el, i) => {
-      el.classList.toggle("active", i === lbIndex);
-    });
+function __isVideoUrl(url) {
+  try {
+    if (!url) return false;
+    const path = url.includes("/o/")
+      ? decodeURIComponent(url.split("/o/")[1].split("?")[0])
+      : url;
+    return /\.(mp4|mov|m4v|webm)$/i.test(path);
+  } catch {
+    return false;
   }
 }
 
+let lbVideo = document.getElementById("lbVideo");
+if (!lbVideo && lbImg && lbImg.parentElement) {
+  lbVideo = document.createElement("video");
+  lbVideo.id = "lbVideo";
+  lbVideo.className = lbImg.className;
+  lbVideo.setAttribute("controls", "");
+  lbVideo.playsInline = true;
+  lbVideo.style.display = "none";
+  lbImg.parentElement.insertBefore(lbVideo, lbImg.nextSibling);
+}
+
+function __renderLightboxMedia(url) {
+  const isV = __isVideoUrl(url);
+  if (lbVideo) {
+    if (isV) {
+      if (lbImg) lbImg.style.display = "none";
+      lbVideo.style.display = "block";
+      if (lbVideo.src !== url) lbVideo.src = url || "";
+    } else {
+      lbVideo.pause?.();
+      lbVideo.removeAttribute("src");
+      lbVideo.load?.();
+      lbVideo.style.display = "none";
+      if (lbImg) {
+        lbImg.style.display = "block";
+        lbImg.src = url || "";
+      }
+    }
+    return;
+  }
+  // fallback: only img
+  if (lbImg) lbImg.src = url || "";
+}
 
 // 用來記住原本 scroll 狀態（iOS 點螢幕頂端也不會把背景捲動）
 let __lockDepth = 0;
@@ -129,44 +127,30 @@ dlg?.addEventListener('close', () => {
 });
 
 // 🔥 開啟 Lightbox：關掉 dialog + 維持背景鎖定
-
 function openLightbox(images, index = 0) {
   lbImages = images || [];
   lbIndex = Math.max(0, Math.min(index, lbImages.length - 1));
   lbReturnToDialog = !!(dlg && dlg.open);
+
+  __renderLightboxMedia(lbImages[lbIndex] || '');
 
   // 建立縮圖列
   const lbThumbsInner = document.getElementById("lbThumbsInner");
   if (lbThumbsInner) {
     lbThumbsInner.innerHTML = "";
     lbImages.forEach((url, i) => {
-      const isVid = isVideoUrl(url);
-      const wrapper = document.createElement("div");
-      wrapper.className = "lb-thumb" + (i === lbIndex ? " active" : "");
-
-      if (isVid) {
-        const box = document.createElement("div");
-        box.className = "w-14 h-14 md:w-16 md:h-16 rounded-md bg-black/60 text-white flex items-center justify-center text-xs";
-        box.textContent = "🎬 影片";
-        wrapper.appendChild(box);
-      } else {
-        const img = document.createElement("img");
-        img.src = url;
-        img.className = "w-14 h-14 md:w-16 md:h-16 object-cover rounded-md";
-        wrapper.appendChild(img);
-      }
-
-      wrapper.addEventListener("click", () => {
+      const t = document.createElement("img");
+      t.src = url;
+      t.className = i === lbIndex ? "active" : "";
+      t.addEventListener("click", () => {
         lbIndex = i;
-        renderLightboxMedia();
+        __renderLightboxMedia(lbImages[lbIndex] || '');
+        lbThumbsInner.querySelectorAll("img").forEach(el => el.classList.remove("active"));
+        t.classList.add("active");
       });
-
-      lbThumbsInner.appendChild(wrapper);
+      lbThumbsInner.appendChild(t);
     });
   }
-
-  // 一開始顯示當前項目
-  renderLightboxMedia();
 
   // 顯示 Lightbox（先顯示，讓 dlg.close() 的 close handler 知道是要切到 Lightbox）
   if (lb) {
@@ -177,10 +161,10 @@ function openLightbox(images, index = 0) {
   // 關掉 Modal（移除 backdrop）
   if (dlg?.open) dlg.close();
 
-  // 鎖背景（避免底層頁面被捲動）
+  // 確保背景鎖住（不要 unlock，避免 iOS 點頂端時背景被捲）
   if (__lockDepth === 0) lockScroll();
-  __lockDepth++;
 }
+
 // 🔥 關閉 Lightbox：回到 dialog 或直接解鎖
 function closeLightbox() {
   if (lb) {
@@ -201,9 +185,14 @@ function closeLightbox() {
 function lbShow(delta) {
   if (!lbImages.length) return;
   lbIndex = (lbIndex + delta + lbImages.length) % lbImages.length;
-  renderLightboxMedia();
+  __renderLightboxMedia(lbImages[lbIndex] || '');
+  const lbThumbsInner = document.getElementById("lbThumbsInner");
+  if (lbThumbsInner) {
+    lbThumbsInner.querySelectorAll("img").forEach((el, i) => {
+      el.classList.toggle("active", i === lbIndex);
+    });
+  }
 }
-
 
 lbPrev?.addEventListener('click', (e) => {
   e.stopPropagation();
