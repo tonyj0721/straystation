@@ -7,13 +7,63 @@ window.scrollTo(0, 0);
 const dlg = document.getElementById('petDialog');
 const lb = document.getElementById("lightbox");
 const lbImg = document.getElementById("lbImg");
+const lbVideo = document.getElementById("lbVideo");
 const lbPrev = document.getElementById("lbPrev");
 const lbNext = document.getElementById("lbNext");
 const lbClose = document.getElementById("lbClose");
 
-let lbImages = [];
+let lbItems = [];
 let lbIndex = 0;
 let lbReturnToDialog = false;
+
+function __normalizeLbItems(items) {
+  if (!Array.isArray(items)) return [];
+  if (items.length && typeof items[0] === 'string') {
+    return items.map((u) => ({ type: 'image', url: u }));
+  }
+  return items
+    .map((it) => {
+      if (!it) return null;
+      if (typeof it === 'string') return { type: 'image', url: it };
+      const t = (it.type === 'video') ? 'video' : 'image';
+      return { type: t, url: it.url, poster: it.poster };
+    })
+    .filter((it) => !!it && !!it.url);
+}
+
+function __lbShowAt(idx) {
+  if (!lbItems.length) return;
+  lbIndex = Math.max(0, Math.min(idx, lbItems.length - 1));
+  const it = lbItems[lbIndex];
+
+  if (it.type === 'video') {
+    if (lbImg) lbImg.classList.add('hidden');
+    if (lbVideo) {
+      lbVideo.classList.remove('hidden');
+      if (lbVideo.src !== it.url) lbVideo.src = it.url;
+      if (it.poster) lbVideo.poster = it.poster;
+    }
+  } else {
+    if (lbVideo) {
+      lbVideo.classList.add('hidden');
+      try { lbVideo.pause(); } catch { }
+      lbVideo.removeAttribute('src');
+      try { lbVideo.load(); } catch { }
+    }
+    if (lbImg) {
+      lbImg.classList.remove('hidden');
+      lbImg.src = it.url || '';
+    }
+  }
+
+  const lbThumbsInner = document.getElementById('lbThumbsInner');
+  if (lbThumbsInner) {
+    lbThumbsInner.querySelectorAll('.lb-thumb').forEach((el, i) => {
+      el.classList.toggle('active', i === lbIndex);
+    });
+  }
+}
+
 
 // 用來記住原本 scroll 狀態（iOS 點螢幕頂端也不會把背景捲動）
 let __lockDepth = 0;
@@ -80,30 +130,35 @@ dlg?.addEventListener('close', () => {
 });
 
 // 🔥 開啟 Lightbox：關掉 dialog + 維持背景鎖定
-function openLightbox(images, index = 0) {
-  lbImages = images || [];
-  lbIndex = Math.max(0, Math.min(index, lbImages.length - 1));
+function openLightbox(items, index = 0) {
+  lbItems = __normalizeLbItems(items);
+  lbIndex = Math.max(0, Math.min(index, lbItems.length - 1));
   lbReturnToDialog = !!(dlg && dlg.open);
-
-  if (lbImg) lbImg.src = lbImages[lbIndex] || '';
 
   // 建立縮圖列
   const lbThumbsInner = document.getElementById("lbThumbsInner");
   if (lbThumbsInner) {
     lbThumbsInner.innerHTML = "";
-    lbImages.forEach((url, i) => {
-      const t = document.createElement("img");
-      t.src = url;
-      t.className = i === lbIndex ? "active" : "";
-      t.addEventListener("click", () => {
-        lbIndex = i;
-        if (lbImg) lbImg.src = lbImages[lbIndex] || '';
-        lbThumbsInner.querySelectorAll("img").forEach(el => el.classList.remove("active"));
-        t.classList.add("active");
-      });
+    lbItems.forEach((it, i) => {
+      let t;
+      if (it.type === 'video') {
+        t = document.createElement('video');
+        t.src = it.url;
+        t.muted = true;
+        t.playsInline = true;
+        t.preload = 'metadata';
+        if (it.poster) t.poster = it.poster;
+      } else {
+        t = document.createElement('img');
+        t.src = it.url;
+      }
+      t.className = "lb-thumb" + (i === lbIndex ? " active" : "");
+      t.addEventListener("click", () => __lbShowAt(i));
       lbThumbsInner.appendChild(t);
     });
   }
+
+  __lbShowAt(lbIndex);
 
   // 顯示 Lightbox（先顯示，讓 dlg.close() 的 close handler 知道是要切到 Lightbox）
   if (lb) {
@@ -136,15 +191,10 @@ function closeLightbox() {
 
 // 🔥 左右切換
 function lbShow(delta) {
-  if (!lbImages.length) return;
-  lbIndex = (lbIndex + delta + lbImages.length) % lbImages.length;
-  if (lbImg) lbImg.src = lbImages[lbIndex] || '';
-  const lbThumbsInner = document.getElementById("lbThumbsInner");
-  if (lbThumbsInner) {
-    lbThumbsInner.querySelectorAll("img").forEach((el, i) => {
-      el.classList.toggle("active", i === lbIndex);
-    });
-  }
+  if (!lbItems.length) return;
+  const n = lbItems.length;
+  lbIndex = (lbIndex + delta + n) % n;
+  __lbShowAt(lbIndex);
 }
 
 lbPrev?.addEventListener('click', (e) => {
