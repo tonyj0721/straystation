@@ -225,24 +225,12 @@ function revokePreviewThumb(file) {
   __thumbPromiseCache.delete(file);
 }
 
-function __guessFileKind(file) {
-  const type = (file && file.type) || "";
-  if (type.startsWith("image/")) return "image";
-  if (type.startsWith("video/")) return "video";
-
-  const name = (file && file.name || "").toLowerCase();
-  if (/\.(mp4|mov|m4v|webm|3gp|3gpp|3g2|avi)$/i.test(name)) return "video";
-  if (/\.(jpe?g|png|gif|webp|bmp|heic|heif)$/i.test(name)) return "image";
-
-  return "unknown";
-}
-
 async function __decodeToBitmap(file) {
-  const kind = __guessFileKind(file);
-  const isVideo = kind === "video";
-  const isImage = kind === "image";
+  const type = (file && file.type) || "";
+  const isVideo = type.startsWith("video/");
+  const isImage = type.startsWith("image/");
 
-  // 影片：抓一幀當縮圖
+  // 影片：抓一張影格當縮圖
   if (isVideo) {
     const vUrl = URL.createObjectURL(file);
     try {
@@ -253,7 +241,7 @@ async function __decodeToBitmap(file) {
 
       await new Promise((res, rej) => {
         v.onloadeddata = () => res();
-        v.onerror = (e) => rej(e || new Error("影片預覽載入失敗"));
+        v.onerror = (e) => rej(e || new Error("載入影片失敗"));
       });
 
       try {
@@ -264,25 +252,20 @@ async function __decodeToBitmap(file) {
             v.addEventListener("seeked", h);
           });
         }
-      } catch { }
+      } catch (_) { /* 忽略定位錯誤，直接用第一張影格 */ }
 
       const c = document.createElement("canvas");
       c.width = v.videoWidth || 640;
       c.height = v.videoHeight || 360;
       const g = c.getContext("2d");
       g.drawImage(v, 0, 0, c.width, c.height);
-
-      // 統一回傳 ImageBitmap，比後面流程好處理
-      if (window.createImageBitmap) {
-        return await createImageBitmap(c);
-      }
       return c;
     } finally {
       URL.revokeObjectURL(vUrl);
     }
   }
 
-  // 圖片：先用 createImageBitmap
+  // 圖片：優先用 createImageBitmap（非阻塞解碼）
   if (window.createImageBitmap && isImage) {
     try { return await createImageBitmap(file); } catch (_) { /* fallback */ }
   }
@@ -291,7 +274,7 @@ async function __decodeToBitmap(file) {
     throw new Error("不支援的檔案類型");
   }
 
-  // fallback：用 <img> 解碼
+  // fallback：用 <img> 解碼（比較可能卡，但至少可用）
   const raw = URL.createObjectURL(file);
   try {
     const img = await new Promise((res, rej) => {
@@ -305,10 +288,7 @@ async function __decodeToBitmap(file) {
     c.height = img.naturalHeight;
     const g = c.getContext("2d");
     g.drawImage(img, 0, 0);
-    if (window.createImageBitmap) {
-      return await createImageBitmap(c);
-    }
-    return c;
+    return await createImageBitmap(c);
   } finally {
     URL.revokeObjectURL(raw);
   }

@@ -875,64 +875,26 @@
       thumbPromiseCache.delete(file);
     }
 
-    function guessFileKind(file) {
-      const type = (file && file.type) || "";
-      if (type.startsWith("image/")) return "image";
-      if (type.startsWith("video/")) return "video";
+    const VIDEO_EXT_RE = /\.(mp4|mov|m4v|webm|ogg)$/i;
 
-      const name = (file && file.name || "").toLowerCase();
-      if (/\.(mp4|mov|m4v|webm|3gp|3gpp|3g2|avi)$/i.test(name)) return "video";
-      if (/\.(jpe?g|png|gif|webp|bmp|heic|heif)$/i.test(name)) return "image";
-
-      return "unknown";
+    function isVideoFile(file) {
+      if (!file) return false;
+      if ((file.type || "").startsWith("video/")) return true;
+      const name = file.name || "";
+      return VIDEO_EXT_RE.test(name.toLowerCase());
     }
 
     async function decodeToBitmap(file) {
-      const kind = guessFileKind(file);
-      const isVideo = kind === "video";
-      const isImage = kind === "image";
+      // 只對圖片做縮圖，影片我們會用 <video> 直接播
+      if (isVideoFile(file)) {
+        throw new Error("video file: skip thumbnail decode");
+      }
 
-      if (isVideo) {
-        const vUrl = URL.createObjectURL(file);
+      // createImageBitmap 在大多數現代瀏覽器/手機上是非阻塞解碼
+      if (window.createImageBitmap) {
         try {
-          const v = document.createElement("video");
-          v.src = vUrl;
-          v.muted = true;
-          v.playsInline = true;
-
-          await new Promise((res, rej) => {
-            v.onloadeddata = () => res();
-            v.onerror = (e) => rej(e || new Error("影片預覽載入失敗"));
-          });
-
-          // 抓前 0.2 秒左右當縮圖
-          try {
-            if (!Number.isNaN(v.duration) && v.duration > 0.2) {
-              v.currentTime = Math.min(0.2, v.duration / 2);
-              await new Promise((res) => {
-                const h = () => { v.removeEventListener("seeked", h); res(); };
-                v.addEventListener("seeked", h);
-              });
-            }
-          } catch { }
-
-          const c = document.createElement("canvas");
-          c.width = v.videoWidth || 640;
-          c.height = v.videoHeight || 360;
-          const g = c.getContext("2d");
-          g.drawImage(v, 0, 0, c.width, c.height);
-          return c;
-        } finally {
-          URL.revokeObjectURL(vUrl);
-        }
-      }
-
-      if (window.createImageBitmap && isImage) {
-        try { return await createImageBitmap(file); } catch (_) { /* fallback */ }
-      }
-
-      if (!isImage) {
-        throw new Error("不支援的檔案類型");
+          return await createImageBitmap(file);
+        } catch (_) { /* fallback */ }
       }
 
       // fallback：用 <img> 解碼（比較可能卡，但至少可用）
@@ -949,10 +911,7 @@
         c.height = img.naturalHeight;
         const g = c.getContext("2d");
         g.drawImage(img, 0, 0);
-        if (window.createImageBitmap) {
-          return await createImageBitmap(c);
-        }
-        return c;
+        return await createImageBitmap(c);
       } finally {
         URL.revokeObjectURL(raw);
       }
