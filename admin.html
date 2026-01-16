@@ -355,10 +355,10 @@
               placeholder="個性、習慣、背景故事、注意事項…"></textarea>
           </div>
           <div>
-            <input id="imgFiles" type="file" accept="image/*,video/*" multiple class="sr-only" />
+            <input id="imgFiles" type="file" accept="image/*" multiple class="sr-only" />
             <div class="flex items-center gap-3">
               <button id="btnPick" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
-                新增照片／影片
+                新增照片
               </button>
               <span id="fileCount" class="text-xs text-gray-500">已選 0 / 5 張</span>
               <span class="text-sm text-gray-400">最多 5 張</span>
@@ -566,7 +566,7 @@
           </div>
 
           <div>
-            <input id="editFiles" type="file" accept="image/*,video/*" multiple class="sr-only" />
+            <input id="editFiles" type="file" accept="image/*" multiple class="sr-only" />
             <div class="flex items-center gap-3">
               <button id="btnPickEdit" type="button"
                 class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增照片</button>
@@ -872,50 +872,9 @@
     }
 
     async function decodeToBitmap(file) {
-      const type = (file && file.type) || "";
-      const isVideo = type.startsWith("video/");
-      const isImage = type.startsWith("image/");
-
-      if (isVideo) {
-        const vUrl = URL.createObjectURL(file);
-        try {
-          const v = document.createElement("video");
-          v.src = vUrl;
-          v.muted = true;
-          v.playsInline = true;
-
-          await new Promise((res, rej) => {
-            v.onloadeddata = () => res();
-            v.onerror = (e) => rej(e || new Error("影片預覽載入失敗"));
-          });
-
-          try {
-            if (!Number.isNaN(v.duration) && v.duration > 0.2) {
-              v.currentTime = Math.min(0.2, v.duration / 2);
-              await new Promise((res) => {
-                const h = () => { v.removeEventListener("seeked", h); res(); };
-                v.addEventListener("seeked", h);
-              });
-            }
-          } catch { }
-
-          const c = document.createElement("canvas");
-          c.width = v.videoWidth || 640;
-          c.height = v.videoHeight || 360;
-          const g = c.getContext("2d");
-          g.drawImage(v, 0, 0, c.width, c.height);
-          return c;
-        } finally {
-          URL.revokeObjectURL(vUrl);
-        }
-      }
-
-      if (window.createImageBitmap && isImage) {
+      // createImageBitmap 在大多數現代瀏覽器/手機上是非阻塞解碼
+      if (window.createImageBitmap) {
         try { return await createImageBitmap(file); } catch (_) { /* fallback */ }
-      }
-
-      if (!isImage) {
-        throw new Error("不支援的檔案類型");
       }
 
       // fallback：用 <img> 解碼（比較可能卡，但至少可用）
@@ -932,10 +891,7 @@
         c.height = img.naturalHeight;
         const g = c.getContext("2d");
         g.drawImage(img, 0, 0);
-        if (window.createImageBitmap) {
-          return await createImageBitmap(c);
-        }
-        return c;
+        return await createImageBitmap(c);
       } finally {
         URL.revokeObjectURL(raw);
       }
