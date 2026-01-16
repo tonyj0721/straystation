@@ -175,7 +175,7 @@ function openLightbox(images, index = 0) {
             align-items: center;
             justify-content: center;
           ">
-            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
               <path d="M9 7v10l8-5z" fill="#ffffff" />
             </svg>
           </div>
