@@ -412,8 +412,8 @@ async function openDialog(id) {
     ? '已注射預防針' : '未注射預防針';
 
   // 4. 圖片 + Lightbox（搭配 shared.js）
-  
-const dlgImg = document.getElementById("dlgImg");
+
+  const dlgImg = document.getElementById("dlgImg");
   const dlgVideo = document.getElementById("dlgVideo");
   const dlgBg = document.getElementById("dlgBg");
   const dlgThumbs = document.getElementById("dlgThumbs");
@@ -428,7 +428,7 @@ const dlgImg = document.getElementById("dlgImg");
     if (!media.length) {
       if (dlgImg) dlgImg.src = "";
       if (dlgVideo) {
-        try { dlgVideo.pause(); } catch (_) {}
+        try { dlgVideo.pause(); } catch (_) { }
         dlgVideo.src = "";
         dlgVideo.classList.add("hidden");
       }
@@ -446,11 +446,11 @@ const dlgImg = document.getElementById("dlgImg");
         dlgVideo.src = url;
         dlgVideo.playsInline = true;
         dlgVideo.controls = true;
-        try { dlgVideo.play().catch(() => {}); } catch (_) {}
+        try { dlgVideo.play().catch(() => { }); } catch (_) { }
       } else {
         try {
           dlgVideo.pause && dlgVideo.pause();
-        } catch (_) {}
+        } catch (_) { }
         dlgVideo.classList.add("hidden");
         dlgImg.classList.remove("hidden");
         dlgImg.src = url;
@@ -505,7 +505,7 @@ const dlgImg = document.getElementById("dlgImg");
 
   showDialogMedia(currentIndex);
 
-// 5. 顯示用文字
+  // 5. 顯示用文字
   document.getElementById('dlgName').textContent = p.name;
   document.getElementById('dlgDesc').textContent = p.desc;
   document.getElementById('dlgTagBreed').textContent = p.breed;
@@ -915,39 +915,90 @@ function __makeEditTile(it) {
   wrap.style.userSelect = "none";
   wrap.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  const img = document.createElement("img");
-  img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
-  img.alt = "預覽";
-  img.decoding = "async";
-  img.loading = "lazy";
-  img.draggable = false;
-  img.style.webkitUserDrag = "none";
-  img.style.webkitTouchCallout = "none";
-  img.addEventListener("contextmenu", (e) => e.preventDefault());
+  const isUrl = it.kind === "url";
+  const isFile = it.kind === "file";
+  const isVideo =
+    isUrl ? !!(typeof isVideoUrl === "function" && isVideoUrl(it.url))
+      : !!(isFile && it.file && it.file.type && it.file.type.startsWith("video/"));
 
-  if (it.kind === "url") {
-    img.src = it.url;
+  let mediaEl;
+  let playBtn = null;
+
+  if (isVideo) {
+    // 影片預覽
+    const video = document.createElement("video");
+    video.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+    video.playsInline = true;
+    video.muted = true;
+    video.preload = "metadata";
+    video.draggable = false;
+    video.style.webkitUserDrag = "none";
+    video.style.webkitTouchCallout = "none";
+    video.addEventListener("contextmenu", (e) => e.preventDefault());
+
+    if (isUrl) {
+      video.src = it.url;
+    } else if (isFile && it.file) {
+      try {
+        video.src = URL.createObjectURL(it.file);
+      } catch { }
+    }
+
+    mediaEl = video;
+
+    playBtn = document.createElement("button");
+    playBtn.type = "button";
+    playBtn.className =
+      "absolute left-1 bottom-1 bg-black/70 text-white rounded-full w-8 h-8 flex items-center justify-center text-xs";
+    playBtn.textContent = "▶︎/⏸";
+    playBtn.setAttribute("aria-label", "播放或暫停影片");
+    playBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (video.paused) video.play();
+      else video.pause();
+    });
   } else {
-    img.src = PREVIEW_EMPTY_GIF;
-    ensurePreviewThumbURL(it.file)
-      .then((u) => { img.src = u; })
-      .catch(() => {
-        try {
-          const raw = URL.createObjectURL(it.file);
-          img.src = raw;
-          setTimeout(() => URL.revokeObjectURL(raw), 2000);
-        } catch { }
-      });
+    // 圖片預覽：沿用原本縮圖邏輯
+    const img = document.createElement("img");
+    img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+    img.alt = "預覽";
+    img.decoding = "async";
+    img.loading = "lazy";
+    img.draggable = false;
+    img.style.webkitUserDrag = "none";
+    img.style.webkitTouchCallout = "none";
+    img.addEventListener("contextmenu", (e) => e.preventDefault());
+
+    if (isUrl) {
+      img.src = it.url;
+    } else {
+      img.src = PREVIEW_EMPTY_GIF;
+      ensurePreviewThumbURL(it.file)
+        .then((u) => { img.src = u; })
+        .catch(() => {
+          try {
+            const raw = URL.createObjectURL(it.file);
+            img.src = raw;
+            setTimeout(() => URL.revokeObjectURL(raw), 2000);
+          } catch { }
+        });
+    }
+
+    mediaEl = img;
   }
 
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
+  btn.className =
+    "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
   btn.textContent = "✕";
   btn.setAttribute("aria-label", "刪除這張");
 
-  wrap.appendChild(img);
+  wrap.appendChild(mediaEl);
   wrap.appendChild(btn);
+  if (playBtn) wrap.appendChild(playBtn);
+
   return wrap;
 }
 
@@ -1346,7 +1397,7 @@ async function onConfirmAdopted() {
   try {
     for (const f of files) {
       const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
-            const type = wmBlob.type || '';
+      const type = wmBlob.type || '';
       let ext = 'bin';
       if (type.startsWith('image/')) {
         ext = type === 'image/png' ? 'png' : 'jpg';

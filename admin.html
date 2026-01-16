@@ -634,7 +634,8 @@
   <div id="lightbox" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[9999]">
     <div id="lbWrap" class="relative inline-block">
       <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg" />
-      <video id="lbVideo" playsinline controls class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg hidden"></video>
+      <video id="lbVideo" playsinline controls
+        class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg hidden"></video>
       <button id="lbClose" class="absolute top-1 right-1 z-10 bg-black/60 hover:bg-black/70 text-white rounded-full p-2
            text-2xl leading-none select-none" aria-label="關閉">✕</button>
     </div>
@@ -942,7 +943,7 @@
         URL.revokeObjectURL(raw);
       }
     }
-async function makeThumbURL(file) {
+    async function makeThumbURL(file) {
       const bmp = await decodeToBitmap(file);
       const W = bmp.width, H = bmp.height;
       const scale = Math.min(1, PREVIEW_MAX / Math.max(W, H));
@@ -990,33 +991,71 @@ async function makeThumbURL(file) {
       const wrap = document.createElement("div");
       wrap.className = "relative touch-none select-none";
 
-      const img = document.createElement("img");
-      img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
-      img.alt = "預覽";
-      img.decoding = "async";
-      img.loading = "lazy";
-      img.src = EMPTY_GIF;
+      const type = (file && file.type) || "";
+      const isVideo = type.startsWith("video/");
 
-      // 先顯示空白，再異步塞縮圖，避免解碼瞬間卡頓
-      ensureThumbURL(file)
-        .then((url) => { img.src = url; })
-        .catch(() => {
-          // 真的不行就退回原圖（至少有預覽）
-          try {
-            const raw = URL.createObjectURL(file);
-            img.src = raw;
-            setTimeout(() => URL.revokeObjectURL(raw), 2000);
-          } catch { }
+      let mediaEl;
+      let playBtn = null;
+
+      if (isVideo) {
+        // 影片預覽：用 <video>，另外給一顆播放/暫停按鈕
+        const video = document.createElement("video");
+        video.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+        video.playsInline = true;
+        video.muted = true;
+        video.preload = "metadata";
+        video.src = URL.createObjectURL(file);
+        video.addEventListener("contextmenu", (e) => e.preventDefault());
+        mediaEl = video;
+
+        playBtn = document.createElement("button");
+        playBtn.type = "button";
+        playBtn.className =
+          "absolute left-1 bottom-1 bg-black/70 text-white rounded-full w-8 h-8 flex items-center justify-center text-xs";
+        playBtn.textContent = "▶︎/⏸";
+        playBtn.setAttribute("aria-label", "播放或暫停影片");
+        playBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (video.paused) video.play();
+          else video.pause();
         });
+      } else {
+        // 圖片維持原本的縮圖流程
+        const img = document.createElement("img");
+        img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+        img.alt = "預覽";
+        img.decoding = "async";
+        img.loading = "lazy";
+        img.src = EMPTY_GIF;
+
+        // 先顯示空白，再異步塞縮圖，避免解碼瞬間卡頓
+        ensureThumbURL(file)
+          .then((url) => { img.src = url; })
+          .catch(() => {
+            // 真的不行就退回原圖（至少有預覽）
+            try {
+              const raw = URL.createObjectURL(file);
+              img.src = raw;
+              setTimeout(() => URL.revokeObjectURL(raw), 2000);
+            } catch { }
+          });
+
+        mediaEl = img;
+      }
 
       const btn = document.createElement("button");
-      btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
+      btn.className =
+        "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
       btn.type = "button";
       btn.textContent = "✕";
       btn.setAttribute("aria-label", "刪除這張");
 
-      wrap.appendChild(img);
+      // 要讓 __setPreviewIdx 找到的是刪除鍵，所以先 append 刪除鍵，再 append 播放鍵
+      wrap.appendChild(mediaEl);
       wrap.appendChild(btn);
+      if (playBtn) wrap.appendChild(playBtn);
+
       return wrap;
     }
 
