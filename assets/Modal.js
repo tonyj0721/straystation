@@ -499,15 +499,15 @@ async function openDialog(id) {
       icon.className = "pointer-events-none absolute inset-0 flex items-center justify-center";
       icon.innerHTML = `
         <div style="
-          width: 40px;
-          height: 40px;
+          width: 56px;
+          height: 56px;
           border-radius: 9999px;
           background: rgba(156, 163, 175, 0.95); /* 灰色圓 */
           display: flex;
           align-items: center;
           justify-content: center;
         ">
-          <svg viewBox="0 0 24 24" width="40" height="40" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="56" height="56" aria-hidden="true">
             <path d="M9 7v10l8-5z" fill="#ffffff" />
           </svg>
         </div>
