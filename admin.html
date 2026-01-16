@@ -355,10 +355,10 @@
               placeholder="個性、習慣、背景故事、注意事項…"></textarea>
           </div>
           <div>
-            <input id="imgFiles" type="file" accept="image/*" multiple class="sr-only" />
+            <input id="imgFiles" type="file" accept="image/*,video/*" multiple class="sr-only" />
             <div class="flex items-center gap-3">
               <button id="btnPick" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
-                新增照片
+                新增照片/影片
               </button>
               <span id="fileCount" class="text-xs text-gray-500">已選 0 / 5 張</span>
               <span class="text-sm text-gray-400">最多 5 張</span>
@@ -434,6 +434,9 @@
           <!-- 主圖在最上層，沒有 blur -->
           <img id="dlgImg" alt="毛孩照片"
             class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg">
+
+          <!-- 影片：需要把浮水印燒進影片本體，所以這裡只負責播放（浮水印會在檔案內） -->
+          <video id="dlgVideo" class="relative z-10 hidden w-full h-full object-contain rounded-lg" controls playsinline></video>
 
           <button id="dlgClose" class="absolute top-1 right-1 z-20 bg-black/60 text-white p-2 rounded-full leading-none"
             aria-label="關閉">✕</button>
@@ -566,10 +569,10 @@
           </div>
 
           <div>
-            <input id="editFiles" type="file" accept="image/*" multiple class="sr-only" />
+            <input id="editFiles" type="file" accept="image/*,video/*" multiple class="sr-only" />
             <div class="flex items-center gap-3">
               <button id="btnPickEdit" type="button"
-                class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增照片</button>
+                class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增照片/影片</button>
               <span id="editCount" class="text-xs text-gray-500"></span>
               <span class="text-sm text-gray-400">最多 5 張</span>
             </div>
@@ -632,6 +635,7 @@
   <div id="lightbox" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[9999]">
     <div id="lbWrap" class="relative inline-block">
       <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg" />
+      <video id="lbVideo" class="hidden max-h-[90vh] max-w-[90vw] object-contain rounded-lg" controls playsinline></video>
       <button id="lbClose" class="absolute top-1 right-1 z-10 bg-black/60 hover:bg-black/70 text-white rounded-full p-2
            text-2xl leading-none select-none" aria-label="關閉">✕</button>
     </div>
@@ -871,7 +875,58 @@
       thumbPromiseCache.delete(file);
     }
 
+    function isVideoFile(file) {
+      return !!(file && typeof file.type === "string" && file.type.startsWith("video/"));
+    }
+
+    // 影片縮圖：抓 0.1s 的畫面畫到 canvas（再交給 createImageBitmap）
+    async function decodeVideoToBitmap(file) {
+      const raw = URL.createObjectURL(file);
+      try {
+        const v = document.createElement("video");
+        v.preload = "metadata";
+        v.muted = true;
+        v.playsInline = true;
+        v.src = raw;
+
+        await new Promise((res, rej) => {
+          v.onloadedmetadata = () => res();
+          v.onerror = () => rej(new Error("video decode error"));
+        });
+
+        const target = Math.min(0.1, Math.max(0, (v.duration || 0) - 0.01));
+        try { v.currentTime = target; } catch { /* ignore */ }
+        await new Promise((res) => {
+          let done = false;
+          const finish = () => { if (done) return; done = true; res(); };
+          v.onseeked = finish;
+          // iOS 偶發不觸發 seeked：給它一個保險
+          setTimeout(finish, 350);
+        });
+
+        const W = v.videoWidth || 1;
+        const H = v.videoHeight || 1;
+        const c = document.createElement("canvas");
+        c.width = W;
+        c.height = H;
+        const g = c.getContext("2d");
+        g.drawImage(v, 0, 0, W, H);
+
+        // 若瀏覽器不支援 createImageBitmap，就直接回傳 canvas 也能被 drawImage
+        if (window.createImageBitmap) {
+          try { return await createImageBitmap(c); } catch { /* fallback */ }
+        }
+        return c;
+      } finally {
+        URL.revokeObjectURL(raw);
+      }
+    }
+
     async function decodeToBitmap(file) {
+      if (isVideoFile(file)) {
+        return await decodeVideoToBitmap(file);
+      }
+
       // createImageBitmap 在大多數現代瀏覽器/手機上是非阻塞解碼
       if (window.createImageBitmap) {
         try { return await createImageBitmap(file); } catch (_) { /* fallback */ }
@@ -891,7 +946,8 @@
         c.height = img.naturalHeight;
         const g = c.getContext("2d");
         g.drawImage(img, 0, 0);
-        return await createImageBitmap(c);
+        if (window.createImageBitmap) return await createImageBitmap(c);
+        return c;
       } finally {
         URL.revokeObjectURL(raw);
       }
@@ -1202,11 +1258,13 @@
         // 1) 新增基本文件
         const docRef = await addDoc(collection(db, "pets"), payload);
 
-        // 2) 逐張上傳圖片，取得 Storage URL
+        // 2) 逐筆上傳照片/影片，取得 Storage URL
         const urls = [];
         for (const f of selectedFiles) {
-          const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
-          const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
+          // 影片需要「把浮水印燒進檔案內」，所以要走 ffmpeg.wasm
+          const wmBlob = await addWatermarkToMediaFile(f);       // ← 先加浮水印（照片/影片）
+          const ext = wmBlob.type.startsWith('video/') ? 'mp4'
+            : (wmBlob.type === 'image/png' ? 'png' : 'jpg');
           const base = f.name.replace(/\.[^.]+$/, '');
           const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
           const r = sRef(storage, path);
