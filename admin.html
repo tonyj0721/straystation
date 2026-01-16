@@ -634,7 +634,8 @@
   <div id="lightbox" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[9999]">
     <div id="lbWrap" class="relative inline-block">
       <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg" />
-      <video id="lbVideo" playsinline controls class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg hidden"></video>
+      <video id="lbVideo" playsinline controls
+        class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg hidden"></video>
       <button id="lbClose" class="absolute top-1 right-1 z-10 bg-black/60 hover:bg-black/70 text-white rounded-full p-2
            text-2xl leading-none select-none" aria-label="關閉">✕</button>
     </div>
@@ -942,7 +943,7 @@
         URL.revokeObjectURL(raw);
       }
     }
-async function makeThumbURL(file) {
+    async function makeThumbURL(file) {
       const bmp = await decodeToBitmap(file);
       const W = bmp.width, H = bmp.height;
       const scale = Math.min(1, PREVIEW_MAX / Math.max(W, H));
@@ -990,24 +991,78 @@ async function makeThumbURL(file) {
       const wrap = document.createElement("div");
       wrap.className = "relative touch-none select-none";
 
-      const img = document.createElement("img");
-      img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
-      img.alt = "預覽";
-      img.decoding = "async";
-      img.loading = "lazy";
-      img.src = EMPTY_GIF;
+      const isVideo = file.type && file.type.startsWith("video/");
 
-      // 先顯示空白，再異步塞縮圖，避免解碼瞬間卡頓
-      ensureThumbURL(file)
-        .then((url) => { img.src = url; })
-        .catch(() => {
-          // 真的不行就退回原圖（至少有預覽）
-          try {
-            const raw = URL.createObjectURL(file);
-            img.src = raw;
-            setTimeout(() => URL.revokeObjectURL(raw), 2000);
-          } catch { }
-        });
+      let mediaEl;
+
+      if (isVideo) {
+        // 影片預覽：可以播放，縮圖用第一幀
+        const video = document.createElement("video");
+        video.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+        video.playsInline = true;
+        video.controls = true;   // ✅ 可以直接播放確認檔案
+        video.muted = true;
+        video.preload = "metadata";
+
+        // 先給一個透明圖，等縮圖（第一幀）出來再塞到 poster
+        video.poster = EMPTY_GIF;
+
+        // 用 ensureThumbURL 取第一幀縮圖，放到 poster
+        ensureThumbURL(file)
+          .then((url) => { video.poster = url; })
+          .catch(() => {
+            // 縮圖失敗就退回原影片畫面
+            try {
+              const raw = URL.createObjectURL(file);
+              video.src = raw;
+              setTimeout(() => URL.revokeObjectURL(raw), 5000);
+            } catch { }
+          });
+
+        // 真正播放用的 src
+        try {
+          const raw = URL.createObjectURL(file);
+          video.src = raw;
+          // 這裡不急著 revoke，等頁面關閉或重整自然會被清掉
+        } catch { }
+
+        mediaEl = video;
+
+        // 疊一個播放 icon（不擋操作）
+        const icon = document.createElement("div");
+        icon.className = "pointer-events-none absolute inset-0 flex items-center justify-center";
+        icon.innerHTML = `
+      <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-black/70 text-white text-sm">
+        ▶
+      </span>
+    `;
+
+        wrap.appendChild(mediaEl);
+        wrap.appendChild(icon);
+      } else {
+        // 圖片預覽：維持原本邏輯
+        const img = document.createElement("img");
+        img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+        img.alt = "預覽";
+        img.decoding = "async";
+        img.loading = "lazy";
+        img.src = EMPTY_GIF;
+
+        // 先顯示空白，再異步塞縮圖，避免解碼瞬間卡頓
+        ensureThumbURL(file)
+          .then((url) => { img.src = url; })
+          .catch(() => {
+            // 真的不行就退回原圖（至少有預覽）
+            try {
+              const raw = URL.createObjectURL(file);
+              img.src = raw;
+              setTimeout(() => URL.revokeObjectURL(raw), 2000);
+            } catch { }
+          });
+
+        mediaEl = img;
+        wrap.appendChild(mediaEl);
+      }
 
       const btn = document.createElement("button");
       btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
@@ -1015,7 +1070,6 @@ async function makeThumbURL(file) {
       btn.textContent = "✕";
       btn.setAttribute("aria-label", "刪除這張");
 
-      wrap.appendChild(img);
       wrap.appendChild(btn);
       return wrap;
     }

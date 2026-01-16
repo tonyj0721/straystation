@@ -929,29 +929,86 @@ function __makeEditTile(it) {
   wrap.style.userSelect = "none";
   wrap.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  const img = document.createElement("img");
-  img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
-  img.alt = "預覽";
-  img.decoding = "async";
-  img.loading = "lazy";
-  img.draggable = false;
-  img.style.webkitUserDrag = "none";
-  img.style.webkitTouchCallout = "none";
-  img.addEventListener("contextmenu", (e) => e.preventDefault());
+  const isUrl = it.kind === "url";
+  const isFile = it.kind === "file" && it.file;
+  const isVideo = isUrl
+    ? isVideoUrl(it.url || "")
+    : (isFile && it.file.type && it.file.type.startsWith("video/"));
 
-  if (it.kind === "url") {
-    img.src = it.url;
+  let mediaEl;
+
+  if (isVideo) {
+    const v = document.createElement("video");
+    v.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+    v.playsInline = true;
+    v.controls = true;
+    v.muted = true;
+    v.preload = "metadata";
+
+    // 先用透明圖當 poster
+    v.poster = PREVIEW_EMPTY_GIF;
+
+    if (isUrl) {
+      // 已上傳在雲端的影片：直接用 URL 播放
+      v.src = it.url;
+    } else if (isFile) {
+      // 編輯時新選的影片：poster 用縮圖（第一幀）
+      ensurePreviewThumbURL(it.file)
+        .then((thumb) => {
+          v.poster = thumb;
+        })
+        .catch(() => { });
+
+      try {
+        const raw = URL.createObjectURL(it.file);
+        v.src = raw;
+        v.addEventListener("loadeddata", () => {
+          // 看你要不要額外釋放 raw
+          // setTimeout(() => URL.revokeObjectURL(raw), 5000);
+        });
+      } catch { }
+    }
+
+    mediaEl = v;
+
+    // 播放 icon（不擋操作）
+    const icon = document.createElement("div");
+    icon.className = "pointer-events-none absolute inset-0 flex items-center justify-center";
+    icon.innerHTML = `
+      <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-black/70 text-white text-sm">
+        ▶
+      </span>
+    `;
+    wrap.appendChild(mediaEl);
+    wrap.appendChild(icon);
   } else {
-    img.src = PREVIEW_EMPTY_GIF;
-    ensurePreviewThumbURL(it.file)
-      .then((u) => { img.src = u; })
-      .catch(() => {
-        try {
-          const raw = URL.createObjectURL(it.file);
-          img.src = raw;
-          setTimeout(() => URL.revokeObjectURL(raw), 2000);
-        } catch { }
-      });
+    const img = document.createElement("img");
+    img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+    img.alt = "預覽";
+    img.decoding = "async";
+    img.loading = "lazy";
+    img.draggable = false;
+    img.style.webkitUserDrag = "none";
+    img.style.webkitTouchCallout = "none";
+    img.addEventListener("contextmenu", (e) => e.preventDefault());
+
+    if (isUrl) {
+      img.src = it.url;
+    } else if (isFile) {
+      img.src = PREVIEW_EMPTY_GIF;
+      ensurePreviewThumbURL(it.file)
+        .then((u) => { img.src = u; })
+        .catch(() => {
+          try {
+            const raw = URL.createObjectURL(it.file);
+            img.src = raw;
+            setTimeout(() => URL.revokeObjectURL(raw), 2000);
+          } catch { }
+        });
+    }
+
+    mediaEl = img;
+    wrap.appendChild(mediaEl);
   }
 
   const btn = document.createElement("button");
@@ -960,7 +1017,6 @@ function __makeEditTile(it) {
   btn.textContent = "✕";
   btn.setAttribute("aria-label", "刪除這張");
 
-  wrap.appendChild(img);
   wrap.appendChild(btn);
   return wrap;
 }
