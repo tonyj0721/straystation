@@ -915,51 +915,33 @@ function __makeEditTile(it) {
   wrap.style.userSelect = "none";
   wrap.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  const isUrl = it.kind === "url";
-  const isFile = it.kind === "file";
-  const isVideo =
-    isUrl ? !!(typeof isVideoUrl === "function" && isVideoUrl(it.url))
-      : !!(isFile && it.file && it.file.type && it.file.type.startsWith("video/"));
-
   let mediaEl;
-  let playBtn = null;
+  const fromUrl = it.kind === "url";
+  const fromFile = it.kind === "file";
+
+  // 判斷是不是影片
+  const isVideo =
+    fromUrl ? isVideoUrl(it.url) :
+      fromFile ? (((it.file && it.file.type) || "").startsWith("video/")) :
+        false;
 
   if (isVideo) {
-    // 影片預覽
+    // ✅ 影片：用瀏覽器內建的播放列
     const video = document.createElement("video");
-    video.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
-    video.playsInline = true;
+    video.className = "w-full aspect-square object-cover rounded-lg bg-black";
     video.muted = true;
-    video.preload = "metadata";
-    video.draggable = false;
-    video.style.webkitUserDrag = "none";
-    video.style.webkitTouchCallout = "none";
-    video.addEventListener("contextmenu", (e) => e.preventDefault());
+    video.playsInline = true;
+    video.controls = true;
 
-    if (isUrl) {
+    if (fromUrl) {
       video.src = it.url;
-    } else if (isFile && it.file) {
-      try {
-        video.src = URL.createObjectURL(it.file);
-      } catch { }
+    } else if (fromFile) {
+      video.src = URL.createObjectURL(it.file);
     }
 
     mediaEl = video;
-
-    playBtn = document.createElement("button");
-    playBtn.type = "button";
-    playBtn.className =
-      "absolute left-1 bottom-1 bg-black/70 text-white rounded-full w-8 h-8 flex items-center justify-center text-xs";
-    playBtn.textContent = "▶︎/⏸";
-    playBtn.setAttribute("aria-label", "播放或暫停影片");
-    playBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (video.paused) video.play();
-      else video.pause();
-    });
   } else {
-    // 圖片預覽：沿用原本縮圖邏輯
+    // ✅ 圖片：維持原本縮圖邏輯
     const img = document.createElement("img");
     img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
     img.alt = "預覽";
@@ -970,7 +952,7 @@ function __makeEditTile(it) {
     img.style.webkitTouchCallout = "none";
     img.addEventListener("contextmenu", (e) => e.preventDefault());
 
-    if (isUrl) {
+    if (fromUrl) {
       img.src = it.url;
     } else {
       img.src = PREVIEW_EMPTY_GIF;
@@ -997,8 +979,6 @@ function __makeEditTile(it) {
 
   wrap.appendChild(mediaEl);
   wrap.appendChild(btn);
-  if (playBtn) wrap.appendChild(playBtn);
-
   return wrap;
 }
 

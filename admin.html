@@ -993,35 +993,19 @@
 
       const type = (file && file.type) || "";
       const isVideo = type.startsWith("video/");
-
       let mediaEl;
-      let playBtn = null;
 
       if (isVideo) {
-        // 影片預覽：用 <video>，另外給一顆播放/暫停按鈕
+        // ✅ 影片：直接用瀏覽器內建的播放列，沒有那顆藍色按鈕
         const video = document.createElement("video");
-        video.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
-        video.playsInline = true;
+        video.className = "w-full aspect-square object-cover rounded-lg bg-black";
         video.muted = true;
-        video.preload = "metadata";
+        video.playsInline = true;
+        video.controls = true; // 這行就是顯示播放/暫停按鈕
         video.src = URL.createObjectURL(file);
-        video.addEventListener("contextmenu", (e) => e.preventDefault());
         mediaEl = video;
-
-        playBtn = document.createElement("button");
-        playBtn.type = "button";
-        playBtn.className =
-          "absolute left-1 bottom-1 bg-black/70 text-white rounded-full w-8 h-8 flex items-center justify-center text-xs";
-        playBtn.textContent = "▶︎/⏸";
-        playBtn.setAttribute("aria-label", "播放或暫停影片");
-        playBtn.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (video.paused) video.play();
-          else video.pause();
-        });
       } else {
-        // 圖片維持原本的縮圖流程
+        // ✅ 圖片：維持原本縮圖邏輯
         const img = document.createElement("img");
         img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
         img.alt = "預覽";
@@ -1051,10 +1035,8 @@
       btn.textContent = "✕";
       btn.setAttribute("aria-label", "刪除這張");
 
-      // 要讓 __setPreviewIdx 找到的是刪除鍵，所以先 append 刪除鍵，再 append 播放鍵
       wrap.appendChild(mediaEl);
       wrap.appendChild(btn);
-      if (playBtn) wrap.appendChild(playBtn);
 
       return wrap;
     }
