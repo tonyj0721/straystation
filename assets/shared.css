@@ -33,19 +33,27 @@ dialog::backdrop {
 .dlg-thumb {
   width: 70px;
   height: 70px;
-  object-fit: cover;
-  /* 🔥 填滿區域，被裁切也沒關係 */
   background-color: #f3f4f6;
   border-radius: 6px;
-  /* 你想多圓都可調整 */
   cursor: pointer;
   opacity: 0.8;
   transition: 0.2s;
+  overflow: hidden;
+  position: relative;
+}
+
+/* 縮圖裡的 img / video 一律填滿格子 */
+.dlg-thumb>img,
+.dlg-thumb>video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 6px;
 }
 
 .dlg-thumb.active {
   outline: 3px solid #ff6900;
-  /* 或你的品牌色都可以 */
   opacity: 1;
 }
 
@@ -62,17 +70,31 @@ dialog::backdrop {
   bottom: env(safe-area-inset-bottom);
 }
 
-#lbThumbs img {
+/* 🔥 Lightbox 縮圖：統一用 lb-thumb 包起來 */
+.lb-thumb {
   width: 60px;
   height: 60px;
-  object-fit: contain;
   border-radius: 6px;
-  opacity: 0.5;
-  cursor: pointer;
   background: #444;
+  cursor: pointer;
+  opacity: 0.5;
+  flex-shrink: 0;
+  overflow: hidden;
+  position: relative;
 }
 
-#lbThumbs img.active {
+/* 縮圖裡的 img / video 一律同尺寸 */
+.lb-thumb>img,
+.lb-thumb>video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 6px;
+}
+
+/* 被選中的縮圖 */
+.lb-thumb.active {
   opacity: 1;
   border: 2px solid white;
 }

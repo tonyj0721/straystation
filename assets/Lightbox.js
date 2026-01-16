@@ -158,22 +158,24 @@ function openLightbox(images, index = 0) {
         v.muted = true;
         v.playsInline = true;
         v.preload = "metadata";
-        v.className = "w-14 h-14 md:w-16 md:h-16 object-cover rounded-md bg-black/80";
-        v.controls = false; // 縮圖不要控制列
+        // 🔥 填滿整個縮圖格
+        v.className = "w-full h-full object-cover rounded-md bg-black/80";
+        v.controls = false;
         wrapper.appendChild(v);
 
         const icon = document.createElement("div");
         icon.className = "pointer-events-none absolute inset-0 flex items-center justify-center";
         icon.innerHTML = `
-        <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-black/70 text-white text-[10px]">
-          ▶
-        </span>
-      `;
+          <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-black/70 text-white text-[10px]">
+            ▶
+          </span>
+        `;
         wrapper.appendChild(icon);
       } else {
         const img = document.createElement("img");
         img.src = url;
-        img.className = "w-14 h-14 md:w-16 md:h-16 object-cover rounded-md";
+        // 🔥 一樣填滿
+        img.className = "w-full h-full object-cover rounded-md";
         wrapper.appendChild(img);
       }
 

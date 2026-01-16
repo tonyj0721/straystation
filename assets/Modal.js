@@ -490,11 +490,11 @@ async function openDialog(id) {
       v.muted = true;
       v.playsInline = true;
       v.preload = "metadata";
-      v.className = "w-16 h-16 md:w-20 md:h-20 object-cover rounded-md bg-black/80";
-      v.controls = false; // 縮圖不需要控制列
+      // 🔥 填滿整個縮圖格子，大小統一
+      v.className = "w-full h-full object-cover rounded-md bg-black/80";
+      v.controls = false;
       wrapper.appendChild(v);
 
-      // 播放 icon（只顯示，不擋點擊）
       const icon = document.createElement("div");
       icon.className = "pointer-events-none absolute inset-0 flex items-center justify-center";
       icon.innerHTML = `
@@ -506,7 +506,8 @@ async function openDialog(id) {
     } else {
       const img = document.createElement("img");
       img.src = url;
-      img.className = "w-16 h-16 md:w-20 md:h-20 object-cover rounded-md";
+      // 🔥 一樣填滿縮圖格子
+      img.className = "w-full h-full object-cover rounded-md";
       wrapper.appendChild(img);
     }
 
