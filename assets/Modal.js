@@ -498,8 +498,10 @@ async function openDialog(id) {
       const icon = document.createElement("div");
       icon.className = "pointer-events-none absolute inset-0 flex items-center justify-center";
       icon.innerHTML = `
-        <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-black/70 text-white text-xs">
-          ▶
+        <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-black/75">
+          <svg viewBox="0 0 24 24" class="w-4 h-4">
+            <polygon points="9,7 9,17 17,12" fill="white" />
+          </svg>
         </span>
       `;
       wrapper.appendChild(icon);

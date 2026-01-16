@@ -166,8 +166,10 @@ function openLightbox(images, index = 0) {
         const icon = document.createElement("div");
         icon.className = "pointer-events-none absolute inset-0 flex items-center justify-center";
         icon.innerHTML = `
-          <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-black/70 text-white text-[10px]">
-            ▶
+          <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-black/75">
+            <svg viewBox="0 0 24 24" class="w-3.5 h-3.5">
+              <polygon points="9,7 9,17 17,12" fill="white" />
+            </svg>
           </span>
         `;
         wrapper.appendChild(icon);
