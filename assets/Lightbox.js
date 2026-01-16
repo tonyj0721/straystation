@@ -1,5 +1,12 @@
 const $ = (sel) => document.querySelector(sel);
 
+function isVideoUrl(url) {
+  if (!url) return false;
+  const u = String(url).split("?", 1)[0];
+  return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
+}
+
+
 history.scrollRestoration = "manual";
 window.scrollTo(0, 0);
 
@@ -7,20 +14,7 @@ window.scrollTo(0, 0);
 const dlg = document.getElementById('petDialog');
 const lb = document.getElementById("lightbox");
 const lbImg = document.getElementById("lbImg");
-
-// 讓 Lightbox 支援影片：如果 HTML 沒有 lbVideo，就動態補上（避免你一定要改 HTML）
-let lbVideo = document.getElementById("lbVideo");
-if (!lbVideo && lbImg && lbImg.parentElement) {
-  lbVideo = document.createElement("video");
-  lbVideo.id = "lbVideo";
-  lbVideo.className = lbImg.className;
-  lbVideo.controls = true;
-  lbVideo.playsInline = true;
-  lbVideo.preload = "metadata";
-  lbVideo.style.display = "none";
-  lbImg.insertAdjacentElement("afterend", lbVideo);
-}
-
+const lbVideo = document.getElementById("lbVideo");
 const lbPrev = document.getElementById("lbPrev");
 const lbNext = document.getElementById("lbNext");
 const lbClose = document.getElementById("lbClose");
@@ -28,6 +22,47 @@ const lbClose = document.getElementById("lbClose");
 let lbImages = [];
 let lbIndex = 0;
 let lbReturnToDialog = false;
+
+function renderLightboxMedia() {
+  if (!lbImages.length) {
+    if (lbImg) lbImg.src = "";
+    if (lbVideo) {
+      try { lbVideo.pause(); } catch (_) {}
+      lbVideo.src = "";
+      lbVideo.classList.add("hidden");
+    }
+    return;
+  }
+
+  const url = lbImages[lbIndex] || "";
+  const isVid = isVideoUrl(url);
+
+  if (lbImg && lbVideo) {
+    if (isVid) {
+      lbImg.classList.add("hidden");
+      lbVideo.classList.remove("hidden");
+      lbVideo.src = url;
+      lbVideo.playsInline = true;
+      lbVideo.controls = true;
+      try { lbVideo.play().catch(() => {}); } catch (_) {}
+    } else {
+      try { lbVideo.pause && lbVideo.pause(); } catch (_) {}
+      lbVideo.classList.add("hidden");
+      lbImg.classList.remove("hidden");
+      lbImg.src = url;
+    }
+  } else if (lbImg) {
+    lbImg.src = url;
+  }
+
+  const lbThumbsInner = document.getElementById("lbThumbsInner");
+  if (lbThumbsInner) {
+    Array.prototype.forEach.call(lbThumbsInner.children, (el, i) => {
+      el.classList.toggle("active", i === lbIndex);
+    });
+  }
+}
+
 
 // 用來記住原本 scroll 狀態（iOS 點螢幕頂端也不會把背景捲動）
 let __lockDepth = 0;
@@ -93,88 +128,45 @@ dlg?.addEventListener('close', () => {
   unlockScroll();
 });
 
-function __isVideoUrl(url) {
-  try {
-    const s = String(url || "");
-    // Firebase Storage 下載連結會把路徑放在 /o/<encodedPath>?...
-    const path = s.includes("/o/")
-      ? decodeURIComponent(s.split("/o/")[1].split("?")[0])
-      : s;
-    return /\.(mp4|mov|m4v|webm)$/i.test(path);
-  } catch {
-    return /\.(mp4|mov|m4v|webm)$/i.test(String(url || ""));
-  }
-}
-
-function __videoThumbDataUrl() {
-  // 簡單 SVG 縮圖（避免影片 URL 放進 <img> 直接壞圖）
-  const svg = `
-  <svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240">
-    <defs>
-      <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stop-color="#111827"/>
-        <stop offset="1" stop-color="#374151"/>
-      </linearGradient>
-    </defs>
-    <rect width="240" height="240" rx="24" fill="url(#g)"/>
-    <circle cx="120" cy="120" r="46" fill="rgba(255,255,255,0.12)"/>
-    <path d="M110 96 L110 144 L148 120 Z" fill="rgba(255,255,255,0.9)"/>
-    <text x="120" y="200" text-anchor="middle" font-size="18" fill="rgba(255,255,255,0.75)" font-family="system-ui, -apple-system, Segoe UI, Roboto">影片</text>
-  </svg>`;
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-}
-
-function __showMedia(url) {
-  const isV = __isVideoUrl(url);
-
-  if (lbImg) {
-    lbImg.style.display = isV ? "none" : "";
-    if (!isV) lbImg.src = url || '';
-  }
-
-  if (lbVideo) {
-    if (isV) {
-      lbVideo.style.display = "";
-      if (lbVideo.src !== url) {
-        try { lbVideo.pause(); } catch { }
-        lbVideo.src = url || '';
-        try { lbVideo.load(); } catch { }
-      }
-    } else {
-      try { lbVideo.pause(); } catch { }
-      lbVideo.removeAttribute("src");
-      try { lbVideo.load(); } catch { }
-      lbVideo.style.display = "none";
-    }
-  }
-}
-
 // 🔥 開啟 Lightbox：關掉 dialog + 維持背景鎖定
+
 function openLightbox(images, index = 0) {
   lbImages = images || [];
   lbIndex = Math.max(0, Math.min(index, lbImages.length - 1));
   lbReturnToDialog = !!(dlg && dlg.open);
-
-  __showMedia(lbImages[lbIndex] || '');
 
   // 建立縮圖列
   const lbThumbsInner = document.getElementById("lbThumbsInner");
   if (lbThumbsInner) {
     lbThumbsInner.innerHTML = "";
     lbImages.forEach((url, i) => {
-      const t = document.createElement("img");
-      t.src = __isVideoUrl(url) ? __videoThumbDataUrl() : url;
-      t.className = i === lbIndex ? "active" : "";
-      t.alt = __isVideoUrl(url) ? "video" : "image";
-      t.addEventListener("click", () => {
+      const isVid = isVideoUrl(url);
+      const wrapper = document.createElement("div");
+      wrapper.className = "lb-thumb" + (i === lbIndex ? " active" : "");
+
+      if (isVid) {
+        const box = document.createElement("div");
+        box.className = "w-14 h-14 md:w-16 md:h-16 rounded-md bg-black/60 text-white flex items-center justify-center text-xs";
+        box.textContent = "🎬 影片";
+        wrapper.appendChild(box);
+      } else {
+        const img = document.createElement("img");
+        img.src = url;
+        img.className = "w-14 h-14 md:w-16 md:h-16 object-cover rounded-md";
+        wrapper.appendChild(img);
+      }
+
+      wrapper.addEventListener("click", () => {
         lbIndex = i;
-        __showMedia(lbImages[lbIndex] || '');
-        lbThumbsInner.querySelectorAll("img").forEach(el => el.classList.remove("active"));
-        t.classList.add("active");
+        renderLightboxMedia();
       });
-      lbThumbsInner.appendChild(t);
+
+      lbThumbsInner.appendChild(wrapper);
     });
   }
+
+  // 一開始顯示當前項目
+  renderLightboxMedia();
 
   // 顯示 Lightbox（先顯示，讓 dlg.close() 的 close handler 知道是要切到 Lightbox）
   if (lb) {
@@ -185,22 +177,15 @@ function openLightbox(images, index = 0) {
   // 關掉 Modal（移除 backdrop）
   if (dlg?.open) dlg.close();
 
-  // 確保背景鎖住（不要 unlock，避免 iOS 點頂端時背景被捲）
+  // 鎖背景（避免底層頁面被捲動）
   if (__lockDepth === 0) lockScroll();
+  __lockDepth++;
 }
-
 // 🔥 關閉 Lightbox：回到 dialog 或直接解鎖
 function closeLightbox() {
   if (lb) {
     lb.classList.add("hidden");
     lb.classList.remove("flex");
-  }
-
-  // 關掉影片播放與釋放 src（避免背景偷播/吃流量）
-  if (lbVideo) {
-    try { lbVideo.pause(); } catch { }
-    lbVideo.removeAttribute("src");
-    try { lbVideo.load(); } catch { }
   }
 
   if (lbReturnToDialog && dlg) {
@@ -216,14 +201,9 @@ function closeLightbox() {
 function lbShow(delta) {
   if (!lbImages.length) return;
   lbIndex = (lbIndex + delta + lbImages.length) % lbImages.length;
-  __showMedia(lbImages[lbIndex] || '');
-  const lbThumbsInner = document.getElementById("lbThumbsInner");
-  if (lbThumbsInner) {
-    lbThumbsInner.querySelectorAll("img").forEach((el, i) => {
-      el.classList.toggle("active", i === lbIndex);
-    });
-  }
+  renderLightboxMedia();
 }
+
 
 lbPrev?.addEventListener('click', (e) => {
   e.stopPropagation();
