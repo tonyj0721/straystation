@@ -27,7 +27,7 @@ function renderLightboxMedia() {
   if (!lbImages.length) {
     if (lbImg) lbImg.src = "";
     if (lbVideo) {
-      try { lbVideo.pause(); } catch (_) {}
+      try { lbVideo.pause(); } catch (_) { }
       lbVideo.src = "";
       lbVideo.classList.add("hidden");
     }
@@ -44,9 +44,9 @@ function renderLightboxMedia() {
       lbVideo.src = url;
       lbVideo.playsInline = true;
       lbVideo.controls = true;
-      try { lbVideo.play().catch(() => {}); } catch (_) {}
+      try { lbVideo.play().catch(() => { }); } catch (_) { }
     } else {
-      try { lbVideo.pause && lbVideo.pause(); } catch (_) {}
+      try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
       lbVideo.classList.add("hidden");
       lbImg.classList.remove("hidden");
       lbImg.src = url;
@@ -123,9 +123,9 @@ dlg?.addEventListener('close', () => {
   // 關掉 dialog 一律先把影片停掉
   const v = document.getElementById("dlgVideo");
   if (v) {
-    try { v.pause(); } catch (_) {}
+    try { v.pause(); } catch (_) { }
     v.removeAttribute("src");
-    try { v.load && v.load(); } catch (_) {}
+    try { v.load && v.load(); } catch (_) { }
   }
 
   // 如果是切到 Lightbox 才關掉 dialog：不要清 currentPetId、不要解鎖
@@ -150,13 +150,26 @@ function openLightbox(images, index = 0) {
     lbImages.forEach((url, i) => {
       const isVid = isVideoUrl(url);
       const wrapper = document.createElement("div");
-      wrapper.className = "lb-thumb" + (i === lbIndex ? " active" : "");
+      wrapper.className = "lb-thumb relative" + (i === lbIndex ? " active" : "");
 
       if (isVid) {
-        const box = document.createElement("div");
-        box.className = "w-14 h-14 md:w-16 md:h-16 rounded-md bg-black/60 text-white flex items-center justify-center text-xs";
-        box.textContent = "🎬 影片";
-        wrapper.appendChild(box);
+        const v = document.createElement("video");
+        v.src = url;
+        v.muted = true;
+        v.playsInline = true;
+        v.preload = "metadata";
+        v.className = "w-14 h-14 md:w-16 md:h-16 object-cover rounded-md bg-black/80";
+        v.controls = false; // 縮圖不要控制列
+        wrapper.appendChild(v);
+
+        const icon = document.createElement("div");
+        icon.className = "pointer-events-none absolute inset-0 flex items-center justify-center";
+        icon.innerHTML = `
+        <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-black/70 text-white text-[10px]">
+          ▶
+        </span>
+      `;
+        wrapper.appendChild(icon);
       } else {
         const img = document.createElement("img");
         img.src = url;
@@ -192,9 +205,9 @@ function openLightbox(images, index = 0) {
 function closeLightbox() {
   // 關閉前一定要把影片停掉
   if (lbVideo) {
-    try { lbVideo.pause(); } catch (_) {}
+    try { lbVideo.pause(); } catch (_) { }
     lbVideo.removeAttribute("src");
-    try { lbVideo.load && lbVideo.load(); } catch (_) {}
+    try { lbVideo.load && lbVideo.load(); } catch (_) { }
   }
 
   if (lb) {

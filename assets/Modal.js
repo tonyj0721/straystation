@@ -412,8 +412,8 @@ async function openDialog(id) {
     ? '已注射預防針' : '未注射預防針';
 
   // 4. 圖片 + Lightbox（搭配 shared.js）
-  
-const dlgImg = document.getElementById("dlgImg");
+
+  const dlgImg = document.getElementById("dlgImg");
   const dlgVideo = document.getElementById("dlgVideo");
   const dlgBg = document.getElementById("dlgBg");
   const dlgThumbs = document.getElementById("dlgThumbs");
@@ -428,7 +428,7 @@ const dlgImg = document.getElementById("dlgImg");
     if (!media.length) {
       if (dlgImg) dlgImg.src = "";
       if (dlgVideo) {
-        try { dlgVideo.pause(); } catch (_) {}
+        try { dlgVideo.pause(); } catch (_) { }
         dlgVideo.src = "";
         dlgVideo.classList.add("hidden");
       }
@@ -446,11 +446,11 @@ const dlgImg = document.getElementById("dlgImg");
         dlgVideo.src = url;
         dlgVideo.playsInline = true;
         dlgVideo.controls = true;
-        try { dlgVideo.play().catch(() => {}); } catch (_) {}
+        try { dlgVideo.play().catch(() => { }); } catch (_) { }
       } else {
         try {
           dlgVideo.pause && dlgVideo.pause();
-        } catch (_) {}
+        } catch (_) { }
         dlgVideo.classList.add("hidden");
         dlgImg.classList.remove("hidden");
         dlgImg.src = url;
@@ -485,10 +485,24 @@ const dlgImg = document.getElementById("dlgImg");
     wrapper.className = "dlg-thumb relative" + (i === 0 ? " active" : "");
 
     if (isVid) {
-      const box = document.createElement("div");
-      box.className = "w-16 h-16 md:w-20 md:h-20 rounded-md bg-black/60 text-white flex items-center justify-center text-xs";
-      box.textContent = "🎬 影片";
-      wrapper.appendChild(box);
+      const v = document.createElement("video");
+      v.src = url;
+      v.muted = true;
+      v.playsInline = true;
+      v.preload = "metadata";
+      v.className = "w-16 h-16 md:w-20 md:h-20 object-cover rounded-md bg-black/80";
+      v.controls = false; // 縮圖不需要控制列
+      wrapper.appendChild(v);
+
+      // 播放 icon（只顯示，不擋點擊）
+      const icon = document.createElement("div");
+      icon.className = "pointer-events-none absolute inset-0 flex items-center justify-center";
+      icon.innerHTML = `
+        <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-black/70 text-white text-xs">
+          ▶
+        </span>
+      `;
+      wrapper.appendChild(icon);
     } else {
       const img = document.createElement("img");
       img.src = url;
@@ -505,7 +519,7 @@ const dlgImg = document.getElementById("dlgImg");
 
   showDialogMedia(currentIndex);
 
-// 5. 顯示用文字
+  // 5. 顯示用文字
   document.getElementById('dlgName').textContent = p.name;
   document.getElementById('dlgDesc').textContent = p.desc;
   document.getElementById('dlgTagBreed').textContent = p.breed;
@@ -1346,7 +1360,7 @@ async function onConfirmAdopted() {
   try {
     for (const f of files) {
       const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
-            const type = wmBlob.type || '';
+      const type = wmBlob.type || '';
       let ext = 'bin';
       if (type.startsWith('image/')) {
         ext = type === 'image/png' ? 'png' : 'jpg';
