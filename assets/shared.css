@@ -72,8 +72,8 @@ dialog::backdrop {
 
 /* 🔥 Lightbox 縮圖：統一用 lb-thumb 包起來 */
 .lb-thumb {
-  width: 60px;
-  height: 60px;
+  width: 70px;
+  height: 70px;
   border-radius: 6px;
   background: #444;
   cursor: pointer;
