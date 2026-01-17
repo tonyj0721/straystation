@@ -676,7 +676,7 @@
       }
       wrap.classList.remove("hidden");
 
-      info.textContent = `第 ${currentPage}/${totalPages} 頁（共 ${totalItems} 張照片）`;
+      info.textContent = `第 ${currentPage}/${totalPages} 頁`;
 
       pager.innerHTML = "";
       const makeBtn = (label, targetPage, disabled = false, active = false) => {
