@@ -985,12 +985,16 @@
       return p;
     }
 
-    const __previewTileMap = new Map(); // File -> tile element
+    const __previewTileMap = new Map(); // File -> tile element（保留 DOM，避免重畫閃爍）
 
     function __makePreviewTile(file) {
       const wrap = document.createElement("div");
       wrap.className = "relative touch-none select-none";
 
+      const type = (file && file.type) || "";
+      const isVideo = type.startsWith("video/");
+
+      // 縮圖 img（圖片 / 影片都先顯示縮圖）
       const img = document.createElement("img");
       img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
       img.alt = "預覽";
@@ -998,7 +1002,6 @@
       img.loading = "lazy";
       img.src = EMPTY_GIF;
 
-      // 先顯示空白，再異步塞縮圖
       ensureThumbURL(file)
         .then((url) => { img.src = url; })
         .catch(() => {
@@ -1009,111 +1012,103 @@
           } catch { }
         });
 
-      // 刪除鈕
-      const removeBtn = document.createElement("button");
-      removeBtn.type = "button";
-      removeBtn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
-      removeBtn.textContent = "✕";
-      removeBtn.setAttribute("aria-label", "刪除這張");
-      removeBtn.dataset.role = "remove";
-
       wrap.appendChild(img);
-      wrap.appendChild(removeBtn);
 
-      // 影片才加播放鍵
-      const type = (file && file.type) || "";
-      const isVideo = type.startsWith("video/");
+      let video = null;
+      let playing = false;
 
       if (isVideo) {
-        let videoEl = null;
-        let playing = false;
+        // 影片本體，先藏起來
+        video = document.createElement("video");
+        video.playsInline = true;
+        video.muted = true;
+        video.loop = true;
+        video.controls = false;
+        video.style.position = "absolute";
+        video.style.inset = "0";
+        video.style.width = "100%";
+        video.style.height = "100%";
+        video.style.objectFit = "cover";
+        video.style.borderRadius = "12px"; // 對應 rounded-lg
+        video.style.display = "none";
 
-        // 整個 overlay，負責置中
+        try {
+          const vUrl = URL.createObjectURL(file);
+          video.src = vUrl;
+        } catch { }
+
+        wrap.appendChild(video);
+
+        // ✅ 播放 / 暫停鍵：跟你綠色圈起來一樣，疊在縮圖裡面偏下
         const playBtn = document.createElement("button");
         playBtn.type = "button";
-        playBtn.dataset.role = "play";
-        playBtn.className = "absolute inset-0 flex items-center justify-center";
-        // 把預設 button 樣式全部清掉
-        playBtn.style.background = "transparent";
+        playBtn.textContent = "▶";
+
+        playBtn.style.position = "absolute";
+        playBtn.style.left = "50%";
+        playBtn.style.bottom = "8px";
+        playBtn.style.transform = "translateX(-50%)";
+        playBtn.style.padding = "6px 14px";
+        playBtn.style.backgroundColor = "rgba(72, 53, 40, 0.92)"; // 咖啡色
+        playBtn.style.color = "#fff";
         playBtn.style.border = "none";
-        playBtn.style.padding = "0";
-        playBtn.style.margin = "0";
-        playBtn.style.outline = "none";
-        playBtn.setAttribute("aria-label", "播放 / 暫停預覽影片");
+        playBtn.style.borderRadius = "9999px";
+        playBtn.style.fontSize = "14px";
+        playBtn.style.display = "flex";
+        playBtn.style.alignItems = "center";
+        playBtn.style.justifyContent = "center";
+        playBtn.style.cursor = "pointer";
 
-        // 中間那顆咖啡色長條
-        const pill = document.createElement("div");
-        pill.style.background = "rgba(62, 44, 36, 0.92)";  // 咖啡色
-        pill.style.color = "#fff";
-        pill.style.borderRadius = "20px";
-        pill.style.padding = "8px 16px";
-        pill.style.minWidth = "44px";
-        pill.style.display = "flex";
-        pill.style.alignItems = "center";
-        pill.style.justifyContent = "center";
-        pill.style.boxShadow = "0 6px 16px rgba(0,0,0,0.35)";
+        const syncIcon = () => {
+          playBtn.textContent = playing ? "❚❚" : "▶";
+        };
 
-        const icon = document.createElement("span");
-        icon.textContent = "▶";
-        icon.style.display = "inline-block";
-        icon.style.transform = "translateX(1px)"; // 視覺置中
-        pill.appendChild(icon);
-
-        playBtn.appendChild(pill);
-
-        function updateIcon() {
-          icon.textContent = playing ? "⏸" : "▶";
-        }
-
-        playBtn.addEventListener("click", async (e) => {
+        playBtn.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
-
-          // 第一次點：建立 video
-          if (!videoEl) {
-            videoEl = document.createElement("video");
-            videoEl.muted = true;
-            videoEl.playsInline = true;
-            videoEl.loop = true;
-            videoEl.controls = false;
-            videoEl.className = "w-full aspect-square object-cover rounded-lg bg-black hidden";
-
-            try {
-              videoEl.src = URL.createObjectURL(file);
-            } catch { }
-
-            wrap.insertBefore(videoEl, img);
-          }
+          if (!video) return;
 
           if (!playing) {
-            // 播放：顯示 video、隱藏縮圖
-            img.classList.add("hidden");
-            videoEl.classList.remove("hidden");
-            try {
-              videoEl.currentTime = 0;
-              await videoEl.play();
-            } catch { }
+            video.style.display = "block";
+            img.style.visibility = "hidden";
+            video.play().catch(() => { });
             playing = true;
           } else {
-            // 暫停：隱藏 video、顯示縮圖（不讓原生大藍鈕出現）
-            try { videoEl.pause(); } catch { }
-            videoEl.classList.add("hidden");
-            img.classList.remove("hidden");
+            video.pause();
             playing = false;
           }
-          updateIcon();
+          syncIcon();
+        });
+
+        video.addEventListener("pause", () => {
+          playing = false;
+          syncIcon();
+        });
+        video.addEventListener("ended", () => {
+          playing = false;
+          syncIcon();
         });
 
         wrap.appendChild(playBtn);
       }
 
+      // 刪除鈕（照舊）
+      const delBtn = document.createElement("button");
+      delBtn.className =
+        "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
+      delBtn.type = "button";
+      delBtn.textContent = "✕";
+      delBtn.dataset.role = "delete";
+      delBtn.setAttribute("aria-label", "刪除這張");
+
+      wrap.appendChild(delBtn);
       return wrap;
     }
 
     function __setPreviewIdx(tile, idx) {
       tile.dataset.idx = String(idx);
-      const btn = tile.querySelector('button[data-role="remove"]');
-      if (btn) btn.dataset.idx = String(idx);
+      const delBtn = tile.querySelector('button[data-role="delete"]');
+      if (delBtn) delBtn.dataset.idx = String(idx);
     }
 
     function renderPreviews() {
