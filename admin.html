@@ -995,69 +995,72 @@
       const isVideo = type.startsWith("video/");
 
       let mediaEl;
-      let playBtn = null;
+      let playOverlay = null;
 
       if (isVideo) {
-        // 🔸 影片預覽：用 <video> + 中間一顆大播放鈕，沒有原生控制列
+        // 🔸 影片：用 <video> + 自己畫的播放鈕（沒有原生控制列）
         const video = document.createElement("video");
         video.className = "w-full aspect-square object-cover rounded-lg bg-black";
         video.playsInline = true;
-        video.muted = false;          // 需要點一下才會播，有使用者手勢就可以出聲
+        video.muted = false;
         video.preload = "metadata";
         video.src = URL.createObjectURL(file);
+        video.controls = false;
         video.addEventListener("contextmenu", (e) => e.preventDefault());
         mediaEl = video;
 
-        // 中間那顆大大的 ▶ 播放鈕（覆蓋整個磚塊）
-        playBtn = document.createElement("button");
-        playBtn.type = "button";
-        playBtn.className = "absolute inset-0 flex items-center justify-center";
-        playBtn.style.border = "none";
-        playBtn.style.padding = "0";
-        playBtn.style.background = "transparent";
-        playBtn.style.cursor = "pointer";
+        // 覆蓋整塊的透明按鈕，中間放一顆膠囊狀的播放圖示
+        playOverlay = document.createElement("button");
+        playOverlay.type = "button";
+        playOverlay.className = "absolute inset-0 flex items-center justify-center";
+        playOverlay.style.border = "none";
+        playOverlay.style.padding = "0";
+        playOverlay.style.background = "transparent";
+        playOverlay.style.cursor = "pointer";
 
-        const icon = document.createElement("span");
-        icon.className =
-          "inline-flex items-center justify-center w-12 h-12 rounded-full bg-black/70 text-white text-2xl leading-none";
-        icon.textContent = "▶";
-        playBtn.appendChild(icon);
+        const chip = document.createElement("div");
+        chip.className =
+          "flex items-center justify-center px-4 py-2 rounded-full bg-black/70";
+        chip.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg"
+           viewBox="0 0 24 24"
+           class="w-5 h-5"
+           fill="white">
+        <path d="M8 5v14l11-7z" />
+      </svg>
+    `;
+        playOverlay.appendChild(chip);
 
         const toggle = () => {
           try {
-            if (video.paused) {
-              video.play();
-            } else {
-              video.pause();
-            }
+            if (video.paused) video.play();
+            else video.pause();
           } catch (_) { }
         };
 
-        // 點播放鈕：播放 / 暫停
-        playBtn.addEventListener("click", (e) => {
+        // 點播放鈕或影片本身都可以 播放/暫停
+        playOverlay.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
           toggle();
         });
-
-        // 點影片畫面本身也可以播放 / 暫停
         video.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
           toggle();
         });
 
-        // 播放時把大按鈕藏起來；暫停時再顯示
+        // 播放時把膠囊藏起來，暫停時再顯示
         video.addEventListener("play", () => {
-          playBtn.style.opacity = "0";
-          playBtn.style.pointerEvents = "none";
+          playOverlay.style.opacity = "0";
+          playOverlay.style.pointerEvents = "none";
         });
         video.addEventListener("pause", () => {
-          playBtn.style.opacity = "1";
-          playBtn.style.pointerEvents = "auto";
+          playOverlay.style.opacity = "1";
+          playOverlay.style.pointerEvents = "auto";
         });
       } else {
-        // 🔸 圖片：維持原本縮圖邏輯
+        // 🔸 圖片：沿用原本縮圖邏輯
         const img = document.createElement("img");
         img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
         img.alt = "預覽";
@@ -1087,11 +1090,10 @@
       btn.textContent = "✕";
       btn.setAttribute("aria-label", "刪除這張");
 
-      // ⚠️ 一定要先 append 刪除鈕，再 append 播放鈕
-      // 這樣 __setPreviewIdx 裡 querySelector("button") 才會抓到的是刪除鈕
+      // 先放刪除鈕，再放播放 overlay，這樣原本 __setPreviewIdx 還是會抓到刪除鈕
       wrap.appendChild(mediaEl);
       wrap.appendChild(btn);
-      if (playBtn) wrap.appendChild(playBtn);
+      if (playOverlay) wrap.appendChild(playOverlay);
 
       return wrap;
     }
