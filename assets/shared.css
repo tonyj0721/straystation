@@ -128,3 +128,35 @@ dialog::backdrop {
   font-weight: 600;
   border: none;
 }
+
+/* 列表縮圖上的自訂影片播放鍵（新增 / 編輯模式共用） */
+.preview-video-btn {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  /* 大小跟你原本設計差不多 */
+  width: 44px;
+  height: 32px;
+  border-radius: 10px;
+  background: rgba(64, 40, 33, 0.92);
+  /* 接近你 UI 的咖啡色塊 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 18px;
+  pointer-events: auto;
+}
+
+.preview-video-btn-icon {
+  display: block;
+  transform: translateX(1px);
+  /* 讓 ▶ 視覺上更置中 */
+}
+
+/* 預覽用 <video> 不要出現瀏覽器自己的播放按鈕 */
+.preview-video-el::-webkit-media-controls-enclosure,
+.preview-video-el::-webkit-media-controls-overlay-play-button,
+.preview-video-el::-webkit-media-controls-start-playback-button {
+  display: none !important;
+}
