@@ -985,7 +985,7 @@
       return p;
     }
 
-    const __previewTileMap = new Map(); // File -> tile element（保留 DOM，避免重畫閃爍）
+    const __previewTileMap = new Map(); // File -> tile element
 
     function __makePreviewTile(file) {
       const wrap = document.createElement("div");
@@ -998,11 +998,10 @@
       img.loading = "lazy";
       img.src = EMPTY_GIF;
 
-      // 先顯示空白，再異步塞縮圖，避免解碼瞬間卡頓
+      // 先顯示空白，再異步塞縮圖
       ensureThumbURL(file)
         .then((url) => { img.src = url; })
         .catch(() => {
-          // 真的不行就退回原圖（至少有預覽）
           try {
             const raw = URL.createObjectURL(file);
             img.src = raw;
@@ -1012,8 +1011,8 @@
 
       // 刪除鈕
       const removeBtn = document.createElement("button");
-      removeBtn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
       removeBtn.type = "button";
+      removeBtn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
       removeBtn.textContent = "✕";
       removeBtn.setAttribute("aria-label", "刪除這張");
       removeBtn.dataset.role = "remove";
@@ -1021,7 +1020,7 @@
       wrap.appendChild(img);
       wrap.appendChild(removeBtn);
 
-      // 影片：加左下角咖啡色長條播放/暫停鍵
+      // 影片才加播放鍵
       const type = (file && file.type) || "";
       const isVideo = type.startsWith("video/");
 
@@ -1029,52 +1028,78 @@
         let videoEl = null;
         let playing = false;
 
+        // 整個 overlay，負責置中
         const playBtn = document.createElement("button");
         playBtn.type = "button";
         playBtn.dataset.role = "play";
-        playBtn.className = "absolute left-2 bottom-2";
+        playBtn.className = "absolute inset-0 flex items-center justify-center";
+        // 把預設 button 樣式全部清掉
+        playBtn.style.background = "transparent";
+        playBtn.style.border = "none";
+        playBtn.style.padding = "0";
+        playBtn.style.margin = "0";
+        playBtn.style.outline = "none";
         playBtn.setAttribute("aria-label", "播放 / 暫停預覽影片");
 
-        const iconBox = document.createElement("div");
-        // 外觀：像你截圖那顆咖啡色長條
-        iconBox.className = "px-4 py-2 rounded-2xl text-white text-sm flex items-center justify-center shadow-md";
-        iconBox.textContent = "▶";
-        // 顏色直接寫 style，比較好調
-        iconBox.style.background = "rgba(70, 44, 33, 0.95)";
+        // 中間那顆咖啡色長條
+        const pill = document.createElement("div");
+        pill.style.background = "rgba(62, 44, 36, 0.92)";  // 咖啡色
+        pill.style.color = "#fff";
+        pill.style.borderRadius = "20px";
+        pill.style.padding = "8px 16px";
+        pill.style.minWidth = "44px";
+        pill.style.display = "flex";
+        pill.style.alignItems = "center";
+        pill.style.justifyContent = "center";
+        pill.style.boxShadow = "0 6px 16px rgba(0,0,0,0.35)";
 
-        playBtn.appendChild(iconBox);
+        const icon = document.createElement("span");
+        icon.textContent = "▶";
+        icon.style.display = "inline-block";
+        icon.style.transform = "translateX(1px)"; // 視覺置中
+        pill.appendChild(icon);
+
+        playBtn.appendChild(pill);
 
         function updateIcon() {
-          iconBox.textContent = playing ? "⏸" : "▶";
+          icon.textContent = playing ? "⏸" : "▶";
         }
 
         playBtn.addEventListener("click", async (e) => {
           e.preventDefault();
           e.stopPropagation();
 
+          // 第一次點：建立 video
           if (!videoEl) {
             videoEl = document.createElement("video");
             videoEl.muted = true;
             videoEl.playsInline = true;
             videoEl.loop = true;
             videoEl.controls = false;
-            videoEl.className = "w-full aspect-square object-cover rounded-lg bg-black";
+            videoEl.className = "w-full aspect-square object-cover rounded-lg bg-black hidden";
 
             try {
               videoEl.src = URL.createObjectURL(file);
             } catch { }
 
-            // 把 video 放在最底層，並把縮圖藏起來
             wrap.insertBefore(videoEl, img);
-            img.classList.add("hidden");
           }
 
-          if (playing) {
-            try { videoEl.pause(); } catch { }
-            playing = false;
-          } else {
-            try { await videoEl.play(); } catch { }
+          if (!playing) {
+            // 播放：顯示 video、隱藏縮圖
+            img.classList.add("hidden");
+            videoEl.classList.remove("hidden");
+            try {
+              videoEl.currentTime = 0;
+              await videoEl.play();
+            } catch { }
             playing = true;
+          } else {
+            // 暫停：隱藏 video、顯示縮圖（不讓原生大藍鈕出現）
+            try { videoEl.pause(); } catch { }
+            videoEl.classList.add("hidden");
+            img.classList.remove("hidden");
+            playing = false;
           }
           updateIcon();
         });
