@@ -994,117 +994,97 @@
       const type = (file && file.type) || "";
       const isVideo = type.startsWith("video/");
 
-      let mediaEl;
+      // 共同：先用 img 當縮圖
+      const img = document.createElement("img");
+      img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+      img.alt = "預覽";
+      img.decoding = "async";
+      img.loading = "lazy";
+      img.src = EMPTY_GIF;
+
+      ensureThumbURL(file)
+        .then((url) => { img.src = url; })
+        .catch(() => {
+          try {
+            const raw = URL.createObjectURL(file);
+            img.src = raw;
+            setTimeout(() => URL.revokeObjectURL(raw), 2000);
+          } catch { }
+        });
+
+      wrap.appendChild(img);
+
+      let video = null;
+      let playing = false;
 
       if (isVideo) {
-        // 🔥 影片預覽：用 <video> + 自訂播放鍵
-        const video = document.createElement("video");
-        video.className = "w-full aspect-square object-cover rounded-lg bg-black/80";
-        video.muted = true;
+        // 預覽用 <video>，一開始先藏起來，按播放才顯示
+        video = document.createElement("video");
+        video.className = "w-full aspect-square object-cover rounded-lg bg-gray-100 hidden";
         video.playsInline = true;
-        video.preload = "metadata";
-        video.setAttribute("playsinline", "");
+        video.muted = true;
+        video.loop = true;
+        video.controls = false;
 
-        // 先用縮圖當 poster，避免一開始就解碼影片
-        ensureThumbURL(file)
-          .then((url) => { video.poster = url; })
-          .catch(() => {
-            try {
-              const raw = URL.createObjectURL(file);
-              video.poster = raw;
-              setTimeout(() => URL.revokeObjectURL(raw), 2000);
-            } catch { }
-          });
+        try {
+          const vUrl = URL.createObjectURL(file);
+          video.src = vUrl;
+        } catch { }
 
-        const ctrl = document.createElement("button");
-        ctrl.type = "button";
-        ctrl.className = "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/70 text-white flex items-center justify-center text-lg";
-        ctrl.setAttribute("aria-label", "播放 / 暫停影片");
-        ctrl.dataset.role = "play-toggle";
+        wrap.appendChild(video);
 
-        const icon = document.createElement("span");
-        icon.className = "leading-none";
-        icon.textContent = "▶";
-        ctrl.appendChild(icon);
+        // ✅ 自訂播放 / 暫停鍵（仿你截圖：底部中間一塊長條）
+        const playBtn = document.createElement("button");
+        playBtn.type = "button";
+        playBtn.className =
+          "absolute bottom-2 left-1/2 -translate-x-1/2 " +
+          "px-4 py-1 rounded-full bg-black/70 text-white text-xs " +
+          "flex items-center justify-center z-10";
+        playBtn.textContent = "▶";
 
-        let playing = false;
         const syncIcon = () => {
-          icon.textContent = playing ? "⏸" : "▶";
+          playBtn.textContent = playing ? "❚❚" : "▶";
         };
 
-        async function playVideo() {
-          try {
-            // 第一次播放時才建立 objectURL
-            if (!video.dataset.objectUrl) {
-              const raw = URL.createObjectURL(file);
-              video.dataset.objectUrl = raw;
-              video.src = raw;
-            }
-            await video.play();
-            playing = true;
-            syncIcon();
-          } catch (_) { }
-        }
-
-        function pauseVideo() {
-          try { video.pause(); } catch (_) { }
-          playing = false;
-          syncIcon();
-        }
-
-        ctrl.addEventListener("click", (e) => {
+        playBtn.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
-          if (video.paused || video.ended) {
-            playVideo();
-          } else {
-            pauseVideo();
-          }
-        });
+          if (!video) return;
 
-        video.addEventListener("ended", () => {
-          playing = false;
+          if (!playing) {
+            if (video.classList.contains("hidden")) {
+              video.classList.remove("hidden");
+              img.classList.add("hidden");
+            }
+            video.play().catch(() => { });
+            playing = true;
+          } else {
+            video.pause();
+            playing = false;
+          }
           syncIcon();
         });
+
         video.addEventListener("pause", () => {
           playing = false;
           syncIcon();
         });
+        video.addEventListener("ended", () => {
+          playing = false;
+          syncIcon();
+        });
 
-        wrap.appendChild(video);
-        wrap.appendChild(ctrl);
-        mediaEl = video;
-      } else {
-        // 圖片預覽
-        const img = document.createElement("img");
-        img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
-        img.alt = "預覽";
-        img.decoding = "async";
-        img.loading = "lazy";
-        img.src = EMPTY_GIF;
-
-        // 先顯示空白，再異步塞縮圖，避免解碼瞬間卡頓
-        ensureThumbURL(file)
-          .then((url) => { img.src = url; })
-          .catch(() => {
-            // 真的不行就退回原圖（至少有預覽）
-            try {
-              const raw = URL.createObjectURL(file);
-              img.src = raw;
-              setTimeout(() => URL.revokeObjectURL(raw), 2000);
-            } catch { }
-          });
-
-        wrap.appendChild(img);
-        mediaEl = img;
+        wrap.appendChild(playBtn);
       }
 
-      // 刪除按鈕（只給刪除鍵 data-idx）
+      // 刪除鈕
       const btn = document.createElement("button");
-      btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
+      btn.className =
+        "absolute top-1 right-1 bg-black/70 text-white rounded-full " +
+        "w-7 h-7 flex items-center justify-center";
       btn.type = "button";
       btn.textContent = "✕";
-      btn.dataset.role = "remove";
+      btn.dataset.role = "delete";           // 👈 只給刪除鈕這個標記
       btn.setAttribute("aria-label", "刪除這張");
 
       wrap.appendChild(btn);
@@ -1113,7 +1093,7 @@
 
     function __setPreviewIdx(tile, idx) {
       tile.dataset.idx = String(idx);
-      const btn = tile.querySelector('button[data-role="remove"]');
+      const btn = tile.querySelector('button[data-role="delete"]'); // 👈 不會影響播放鍵
       if (btn) btn.dataset.idx = String(idx);
     }
 
