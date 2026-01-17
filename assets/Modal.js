@@ -915,33 +915,81 @@ function __makeEditTile(it) {
   wrap.style.userSelect = "none";
   wrap.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  let mediaEl;
   const fromUrl = it.kind === "url";
   const fromFile = it.kind === "file";
 
-  // 判斷是不是影片
-  const isVideo =
-    fromUrl ? isVideoUrl(it.url) :
-      fromFile ? (((it.file && it.file.type) || "").startsWith("video/")) :
-        false;
+  const type = fromFile && it.file ? (it.file.type || "") : "";
+  const isVideo = fromUrl ? isVideoUrl(it.url) : type.startsWith("video/");
+
+  let mediaEl;
+  let playBtn = null;
 
   if (isVideo) {
-    // ✅ 影片：用瀏覽器內建的播放列
+    // 🔸 影片：跟新增模式一樣，用 <video> + 中央大播放鈕
     const video = document.createElement("video");
     video.className = "w-full aspect-square object-cover rounded-lg bg-black";
-    video.muted = true;
     video.playsInline = true;
-    video.controls = true;
+    video.muted = false;
+    video.preload = "metadata";
+    video.draggable = false;
+    video.style.webkitUserDrag = "none";
+    video.style.webkitTouchCallout = "none";
+    video.addEventListener("contextmenu", (e) => e.preventDefault());
 
     if (fromUrl) {
       video.src = it.url;
-    } else if (fromFile) {
+    } else if (fromFile && it.file) {
       video.src = URL.createObjectURL(it.file);
     }
 
     mediaEl = video;
+
+    playBtn = document.createElement("button");
+    playBtn.type = "button";
+    playBtn.className = "absolute inset-0 flex items-center justify-center";
+    playBtn.style.border = "none";
+    playBtn.style.padding = "0";
+    playBtn.style.background = "transparent";
+    playBtn.style.cursor = "pointer";
+
+    const icon = document.createElement("span");
+    icon.className =
+      "inline-flex items-center justify-center w-12 h-12 rounded-full bg-black/70 text-white text-2xl leading-none";
+    icon.textContent = "▶";
+    playBtn.appendChild(icon);
+
+    const toggle = () => {
+      try {
+        if (video.paused) {
+          video.play();
+        } else {
+          video.pause();
+        }
+      } catch (_) { }
+    };
+
+    playBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggle();
+    });
+
+    video.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggle();
+    });
+
+    video.addEventListener("play", () => {
+      playBtn.style.opacity = "0";
+      playBtn.style.pointerEvents = "none";
+    });
+    video.addEventListener("pause", () => {
+      playBtn.style.opacity = "1";
+      playBtn.style.pointerEvents = "auto";
+    });
   } else {
-    // ✅ 圖片：維持原本縮圖邏輯
+    // 🔸 圖片：維持原本縮圖邏輯
     const img = document.createElement("img");
     img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
     img.alt = "預覽";
@@ -977,8 +1025,11 @@ function __makeEditTile(it) {
   btn.textContent = "✕";
   btn.setAttribute("aria-label", "刪除這張");
 
+  // 一樣：先放刪除鈕，再放播放鈕，讓 __setEditIdx 抓到的是刪除鈕
   wrap.appendChild(mediaEl);
   wrap.appendChild(btn);
+  if (playBtn) wrap.appendChild(playBtn);
+
   return wrap;
 }
 

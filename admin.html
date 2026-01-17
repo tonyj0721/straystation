@@ -993,19 +993,71 @@
 
       const type = (file && file.type) || "";
       const isVideo = type.startsWith("video/");
+
       let mediaEl;
+      let playBtn = null;
 
       if (isVideo) {
-        // ✅ 影片：直接用瀏覽器內建的播放列，沒有那顆藍色按鈕
+        // 🔸 影片預覽：用 <video> + 中間一顆大播放鈕，沒有原生控制列
         const video = document.createElement("video");
         video.className = "w-full aspect-square object-cover rounded-lg bg-black";
-        video.muted = true;
         video.playsInline = true;
-        video.controls = true; // 這行就是顯示播放/暫停按鈕
+        video.muted = false;          // 需要點一下才會播，有使用者手勢就可以出聲
+        video.preload = "metadata";
         video.src = URL.createObjectURL(file);
+        video.addEventListener("contextmenu", (e) => e.preventDefault());
         mediaEl = video;
+
+        // 中間那顆大大的 ▶ 播放鈕（覆蓋整個磚塊）
+        playBtn = document.createElement("button");
+        playBtn.type = "button";
+        playBtn.className = "absolute inset-0 flex items-center justify-center";
+        playBtn.style.border = "none";
+        playBtn.style.padding = "0";
+        playBtn.style.background = "transparent";
+        playBtn.style.cursor = "pointer";
+
+        const icon = document.createElement("span");
+        icon.className =
+          "inline-flex items-center justify-center w-12 h-12 rounded-full bg-black/70 text-white text-2xl leading-none";
+        icon.textContent = "▶";
+        playBtn.appendChild(icon);
+
+        const toggle = () => {
+          try {
+            if (video.paused) {
+              video.play();
+            } else {
+              video.pause();
+            }
+          } catch (_) { }
+        };
+
+        // 點播放鈕：播放 / 暫停
+        playBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          toggle();
+        });
+
+        // 點影片畫面本身也可以播放 / 暫停
+        video.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          toggle();
+        });
+
+        // 播放時把大按鈕藏起來；暫停時再顯示
+        video.addEventListener("play", () => {
+          playBtn.style.opacity = "0";
+          playBtn.style.pointerEvents = "none";
+        });
+        video.addEventListener("pause", () => {
+          playBtn.style.opacity = "1";
+          playBtn.style.pointerEvents = "auto";
+        });
       } else {
-        // ✅ 圖片：維持原本縮圖邏輯
+        // 🔸 圖片：維持原本縮圖邏輯
         const img = document.createElement("img");
         img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
         img.alt = "預覽";
@@ -1035,8 +1087,11 @@
       btn.textContent = "✕";
       btn.setAttribute("aria-label", "刪除這張");
 
+      // ⚠️ 一定要先 append 刪除鈕，再 append 播放鈕
+      // 這樣 __setPreviewIdx 裡 querySelector("button") 才會抓到的是刪除鈕
       wrap.appendChild(mediaEl);
       wrap.appendChild(btn);
+      if (playBtn) wrap.appendChild(playBtn);
 
       return wrap;
     }
