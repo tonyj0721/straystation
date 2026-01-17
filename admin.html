@@ -992,13 +992,13 @@
       wrap.className = "relative touch-none select-none";
 
       const type = (file && file.type) || "";
-      const isVideo = type.startsWith("video/");
+      const isVideo = !!type && type.startsWith("video/");
 
       let mediaEl;
       let playOverlay = null;
 
       if (isVideo) {
-        // 🔸 影片：用 <video> + 自己畫的播放鈕（沒有原生控制列）
+        // 🔸 影片預覽：用 <video> + 自己的播放按鈕
         const video = document.createElement("video");
         video.className = "w-full aspect-square object-cover rounded-lg bg-black";
         video.playsInline = true;
@@ -1009,10 +1009,11 @@
         video.addEventListener("contextmenu", (e) => e.preventDefault());
         mediaEl = video;
 
-        // 覆蓋整塊的透明按鈕，中間放一顆膠囊狀的播放圖示
+        // 底部中間的膠囊播放鈕（像你截圖綠框那種感覺）
         playOverlay = document.createElement("button");
         playOverlay.type = "button";
-        playOverlay.className = "absolute left-1/2 bottom-2 -translate-x-1/2 flex items-center justify-center";
+        playOverlay.className =
+          "absolute left-1/2 bottom-2 -translate-x-1/2 flex items-center justify-center";
         playOverlay.style.border = "none";
         playOverlay.style.padding = "0";
         playOverlay.style.background = "transparent";
@@ -1033,12 +1034,15 @@
 
         const toggle = () => {
           try {
-            if (video.paused) video.play();
-            else video.pause();
+            if (video.paused) {
+              video.play();
+            } else {
+              video.pause();
+            }
           } catch (_) { }
         };
 
-        // 點播放鈕或影片本身都可以 播放/暫停
+        // 點播放鈕 或 點影片本身，都可以播放/暫停
         playOverlay.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -1050,7 +1054,7 @@
           toggle();
         });
 
-        // 播放時把膠囊藏起來，暫停時再顯示
+        // 播放時隱藏播放鈕；暫停時再顯示
         video.addEventListener("play", () => {
           playOverlay.style.opacity = "0";
           playOverlay.style.pointerEvents = "none";
@@ -1068,11 +1072,11 @@
         img.loading = "lazy";
         img.src = EMPTY_GIF;
 
-        // 先顯示空白，再異步塞縮圖，避免解碼瞬間卡頓
         ensureThumbURL(file)
-          .then((url) => { img.src = url; })
+          .then((url) => {
+            img.src = url;
+          })
           .catch(() => {
-            // 真的不行就退回原圖（至少有預覽）
             try {
               const raw = URL.createObjectURL(file);
               img.src = raw;
@@ -1090,7 +1094,7 @@
       btn.textContent = "✕";
       btn.setAttribute("aria-label", "刪除這張");
 
-      // 先放刪除鈕，再放播放 overlay，這樣原本 __setPreviewIdx 還是會抓到刪除鈕
+      // ⚠️ 先放刪除鈕，再放播放鈕，這樣原本 __setPreviewIdx 的邏輯不用改
       wrap.appendChild(mediaEl);
       wrap.appendChild(btn);
       if (playOverlay) wrap.appendChild(playOverlay);
