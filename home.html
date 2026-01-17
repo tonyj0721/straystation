@@ -122,6 +122,47 @@
     #GoogleLogin img {
       pointer-events: none;
     }
+
+    .pager {
+      display: inline-flex;
+      align-items: center;
+      overflow: hidden;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, .05)
+    }
+
+    .pager-btn {
+      min-width: 38px;
+      height: 38px;
+      padding: 0 12px;
+      border: 0;
+      background: transparent;
+      color: #6b7280;
+      font-size: 14px;
+      cursor: pointer
+    }
+
+    .pager-btn+.pager-btn {
+      border-left: 1px solid #e5e7eb
+    }
+
+    .pager-btn:hover {
+      background: #f9fafb
+    }
+
+    .pager-btn.active {
+      color: #ef4444;
+      font-weight: 700;
+      background: #fff5f5
+    }
+
+    .pager-btn:disabled {
+      color: #d1d5db;
+      cursor: not-allowed;
+      background: transparent
+    }
   </style>
 </head>
 
@@ -339,6 +380,12 @@
     </header>
     <section class="mb-10">
       <div class="mosaic-grid" id="heroMosaic"></div>
+
+      <!-- 分頁區 -->
+      <div id="pagerWrap" class="mt-8 flex flex-col items-center gap-2 hidden">
+        <div id="pageInfo" class="text-xs text-gray-500"></div>
+        <div id="pager" class="pager"></div>
+      </div>
     </section>
   </main>
 
@@ -541,10 +588,10 @@
       const box = document.getElementById('heroMosaic');
       if (!box) return;
 
-      // 不再限制張數，只是把空值過濾掉
+      // 不在這裡限制張數，讓外面分頁控制
       imgs = (imgs || []).filter(Boolean);
 
-      // 若沒有圖片，放幾張漸層占位（這邊要幾張都可以，你現在是 10）
+      // 若沒有圖片，放幾張漸層占位
       if (imgs.length === 0) {
         box.innerHTML = Array.from({ length: 10 }).map(() => (
           `<div class="itm" style="background:linear-gradient(135deg,#fde68a,#fecaca);"></div>`
@@ -552,6 +599,7 @@
         return;
       }
 
+      // 產生拼貼 HTML（第 1、5 格加高）
       box.innerHTML = imgs.map((src, i) => {
         const tall = (i === 0 || i === 4) ? ' style="grid-row: span 2 / span 2;"' : '';
         return `<div class="itm"${tall}><img src="${src}" alt="adopted photo" loading="lazy"></div>`;
@@ -587,10 +635,80 @@
           allPhotos.push(...p.adoptedPhotos);
         }
       }
-      // 去重複（可有可無，看你需不需要）
-      allPhotos = Array.from(new Set(allPhotos));
+      // 去重複
+      photoList = Array.from(new Set(allPhotos));
 
-      buildMosaic(allPhotos);
+      // 一律從第 1 頁開始
+      currentPage = 1;
+      renderCurrentPage();
+    }
+
+    // ===== Pagination (1頁10筆) =====
+    const PAGE_SIZE = 10;
+    let currentPage = 1;
+    let photoList = [];        // 全部照片的 URL
+
+    function renderCurrentPage() {
+      const totalItems = photoList.length;
+      const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+
+      if (currentPage > totalPages) currentPage = totalPages;
+      if (currentPage < 1) currentPage = 1;
+
+      const start = (currentPage - 1) * PAGE_SIZE;
+      const pageItems = photoList.slice(start, start + PAGE_SIZE);
+
+      // ✅ 用原本的拼貼函式來畫畫面，排版風格完全保留
+      buildMosaic(pageItems);
+
+      updatePager(totalItems, totalPages);
+    }
+
+    function updatePager(totalItems, totalPages) {
+      const wrap = document.getElementById("pagerWrap");
+      const info = document.getElementById("pageInfo");
+      const pager = document.getElementById("pager");
+      if (!wrap || !info || !pager) return;
+
+      if (totalItems === 0) {
+        wrap.classList.add("hidden");
+        return;
+      }
+      wrap.classList.remove("hidden");
+
+      info.textContent = `第 ${currentPage}/${totalPages} 頁（共 ${totalItems} 張照片）`;
+
+      pager.innerHTML = "";
+      const makeBtn = (label, targetPage, disabled = false, active = false) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "pager-btn" + (active ? " active" : "");
+        b.textContent = label;
+        b.disabled = disabled;
+        if (!disabled) {
+          b.addEventListener("click", () => {
+            currentPage = targetPage;
+            renderCurrentPage();
+            document.getElementById("heroMosaic")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+        }
+        return b;
+      };
+
+      pager.appendChild(makeBtn("«", 1, currentPage === 1));
+      pager.appendChild(makeBtn("‹", Math.max(1, currentPage - 1), currentPage === 1));
+
+      const maxNums = 5;
+      let start = Math.max(1, currentPage - Math.floor(maxNums / 2));
+      let end = Math.min(totalPages, start + maxNums - 1);
+      start = Math.max(1, end - maxNums + 1);
+
+      for (let p = start; p <= end; p++) {
+        pager.appendChild(makeBtn(String(p), p, false, p === currentPage));
+      }
+
+      pager.appendChild(makeBtn("›", Math.min(totalPages, currentPage + 1), currentPage === totalPages));
+      pager.appendChild(makeBtn("»", totalPages, currentPage === totalPages));
     }
 
     loadPets();
