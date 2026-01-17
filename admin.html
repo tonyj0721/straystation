@@ -991,132 +991,107 @@
       const wrap = document.createElement("div");
       wrap.className = "relative touch-none select-none";
 
-      const type = (file && file.type) || "";
-      const isVideo = type.startsWith("video/");
-
-      // --- 縮圖：沿用你原本的邏輯（支援 image / video） ---
-      const thumb = document.createElement("img");
-      thumb.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
-      thumb.alt = "預覽";
-      thumb.decoding = "async";
-      thumb.loading = "lazy";
-      thumb.src = EMPTY_GIF;
+      const img = document.createElement("img");
+      img.src = EMPTY_GIF;
+      img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
 
       ensureThumbURL(file)
-        .then((url) => { thumb.src = url; })
-        .catch(() => {
-          try {
-            const raw = URL.createObjectURL(file);
-            thumb.src = raw;
-            setTimeout(() => URL.revokeObjectURL(raw), 2000);
-          } catch { }
+        .then((url) => {
+          img.src = url;
+        })
+        .catch((err) => {
+          console.error("預覽縮圖失敗:", err);
+          // 失敗時 fallback：直接用原圖 URL（可能較卡，但至少可用）
+          const raw = URL.createObjectURL(file);
+          img.src = raw;
+          img.onload = img.onerror = () => URL.revokeObjectURL(raw);
         });
 
-      // --- 刪除按鈕：維持原本 ---
-      const closeBtn = document.createElement("button");
-      closeBtn.className =
+      // 刪除按鈕（右上角）
+      const delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className =
         "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
-      closeBtn.type = "button";
-      closeBtn.textContent = "✕";
-      closeBtn.setAttribute("aria-label", "刪除這張");
+      delBtn.textContent = "✕";
+      delBtn.setAttribute("aria-label", "刪除這張");
+      // 給一個 role 方便之後只對刪除鈕掛 data-idx
+      delBtn.dataset.role = "delete";
 
-      wrap.appendChild(thumb);
-      wrap.appendChild(closeBtn);
+      wrap.appendChild(img);
 
-      // --- 如果是影片，額外加「播放 / 暫停」 ---
+      // 如果是影片，加上自訂播放/暫停按鈕 + <video> 預覽（不使用原生控制列）
+      const isVideo = (file && file.type || "").startsWith("video/");
       if (isVideo) {
-        let video = null;
-        let videoUrl = null;
+        const video = document.createElement("video");
+        video.className =
+          "absolute inset-0 w-full h-full rounded-lg object-cover bg-black/90 hidden";
+        video.muted = true;
+        video.playsInline = true;
+        video.loop = true;
+        try {
+          const vUrl = URL.createObjectURL(file);
+          video.src = vUrl;
+          // 不特別 revoke，最多 5 個 preview，影響很小
+        } catch (_) { }
 
-        // 建立隱藏的 <video>，放在縮圖前面
-        function ensureVideo() {
-          if (video) return video;
-          video = document.createElement("video");
-          video.className = "w-full aspect-square object-cover rounded-lg bg-black";
-          video.playsInline = true;
-          video.muted = false;
-          video.controls = false;
-          video.addEventListener("contextmenu", (e) => e.preventDefault());
+        // 中間那顆圓形播放/暫停鍵（不蓋滿整塊，邊緣仍可拖曳排序）
+        const overlay = document.createElement("div");
+        overlay.className =
+          "absolute inset-0 flex items-center justify-center pointer-events-none";
 
-          videoUrl = URL.createObjectURL(file);
-          video.src = videoUrl;
+        const toggleBtn = document.createElement("button");
+        toggleBtn.type = "button";
+        toggleBtn.className =
+          "pointer-events-auto w-10 h-10 rounded-full bg-black/60 text-white flex items-center justify-center text-sm";
+        toggleBtn.setAttribute("aria-label", "播放／暫停影片預覽");
 
-          // 一開始先藏起來（只顯示縮圖）
-          video.style.display = "none";
-          wrap.insertBefore(video, thumb);
-          return video;
-        }
+        const icon = document.createElement("span");
+        icon.textContent = "▶";
+        toggleBtn.appendChild(icon);
+        overlay.appendChild(toggleBtn);
 
-        // 底部中間的「▶ 播放 / ⏸ 暫停」膠囊按鈕
-        const playBtn = document.createElement("button");
-        playBtn.type = "button";
-        playBtn.className =
-          "absolute left-1/2 bottom-2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/70 text-white text-xs";
-        playBtn.style.border = "none";
-        playBtn.style.cursor = "pointer";
-        playBtn.textContent = "▶ 播放";
-
-        wrap.appendChild(playBtn);
-
-        function syncUi(v) {
-          if (!v || v.paused || v.ended) {
-            playBtn.textContent = "▶ 播放";
-            thumb.style.display = "";
-            if (v) v.style.display = "none";
+        let playing = false;
+        function syncState() {
+          if (playing) {
+            img.classList.add("opacity-0");
+            video.classList.remove("hidden");
+            icon.textContent = "⏸";
           } else {
-            playBtn.textContent = "⏸ 暫停";
-            thumb.style.display = "none";
-            v.style.display = "";
+            img.classList.remove("opacity-0");
+            video.classList.add("hidden");
+            icon.textContent = "▶";
+            try { video.pause(); } catch (_) { }
           }
         }
 
-        function toggle() {
-          const v = ensureVideo();
-          if (v.paused || v.ended) {
-            v.play().then(() => syncUi(v)).catch(() => { });
-          } else {
-            v.pause();
-            syncUi(v);
-          }
-        }
-
-        // 點膠囊按鈕
-        playBtn.addEventListener("click", (e) => {
+        toggleBtn.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
-          toggle();
-        });
-
-        // 點影片本身也可以暫停 / 播放
-        wrap.addEventListener("click", (e) => {
-          // 避免按到刪除鍵也被當成 toggle
-          if (e.target === closeBtn || e.target === playBtn) return;
-          if (e.target.tagName === "VIDEO" || e.target.closest("video")) {
-            e.preventDefault();
-            e.stopPropagation();
-            toggle();
+          playing = !playing;
+          syncState();
+          if (playing) {
+            video.play().catch(() => {
+              playing = false;
+              syncState();
+            });
           }
         });
 
-        const v = ensureVideo();
-        v.addEventListener("play", () => syncUi(v));
-        v.addEventListener("pause", () => syncUi(v));
-        v.addEventListener("ended", () => {
-          v.pause();
-          syncUi(v);
-        });
-
-        // 初始化 UI 狀態
-        syncUi(v);
+        wrap.appendChild(video);
+        wrap.appendChild(overlay);
       }
 
+      // 最後再掛上刪除鈕（維持在右上角）
+      wrap.appendChild(delBtn);
       return wrap;
     }
 
     function __setPreviewIdx(tile, idx) {
       tile.dataset.idx = String(idx);
-      const btn = tile.querySelector("button");
-      if (btn) btn.dataset.idx = String(idx);
+      // 只對 data-role="delete" 的按鈕掛 index，避免中間的播放鍵被當成刪除鈕
+      tile.querySelectorAll('button[data-role="delete"]').forEach((btn) => {
+        btn.dataset.idx = String(idx);
+      });
     }
 
     function renderPreviews() {
