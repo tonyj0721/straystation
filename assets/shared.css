@@ -136,11 +136,10 @@ dialog::backdrop {
 /* 中央播放/暫停按鈕（樣式/位置跟截圖一致：圓角矩形 + 半透明底） */
 .media-play-overlay {
   position: absolute;
-  left: 4px;
-  bottom: 4px;
+  left: 8px;
+  bottom: 8px;
   z-index: 10;
   pointer-events: none;
-  line-height:0;
 }
 
 .media-play-btn {
@@ -161,10 +160,9 @@ dialog::backdrop {
 }
 
 .media-play-btn svg {
-  width: 21px;
-  height: 21px;
+  width: 14px;
+  height: 14px;
   fill: #fff;
-  display:block;
 }
 
 /* 影片縮圖本體：不顯示原生控制列 */
@@ -179,4 +177,23 @@ video.video-preview::-webkit-media-controls-start-playback-button,
 video.video-preview::-webkit-media-controls-enclosure {
   display: none !important;
   -webkit-appearance: none;
+}
+/* ===============================
+   iOS/桌機一致：縮圖刪除按鈕（避免 iOS text-size-adjust 影響 rem 尺寸）
+   =============================== */
+
+.preview-remove-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  line-height: 0; /* 不走 baseline */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+.preview-remove-btn svg {
+  width: 14px;
+  height: 14px;
+  display: block;
 }

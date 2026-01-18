@@ -1103,8 +1103,14 @@ function __makeEditTile(it) {
 
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = "absolute top-1 right-1 z-20 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
-  btn.textContent = "✕";
+  // iOS Safari 可能因「文字大小 / text-size-adjust」放大 rem，導致 Tailwind w-7/h-7 變大。
+  // 這裡改用固定 px 尺寸 + SVG，確保手機/桌機一致。
+  btn.className = "preview-remove-btn absolute top-1 right-1 z-20 bg-black/70 text-white rounded-full flex items-center justify-center";
+  btn.innerHTML = `
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M18.3 5.7a1 1 0 0 0-1.4 0L12 10.6 7.1 5.7a1 1 0 1 0-1.4 1.4L10.6 12l-4.9 4.9a1 1 0 1 0 1.4 1.4L12 13.4l4.9 4.9a1 1 0 0 0 1.4-1.4L13.4 12l4.9-4.9a1 1 0 0 0 0-1.4z" fill="currentColor"/>
+    </svg>
+  `;
   btn.setAttribute("aria-label", "刪除這張");
   btn.dataset.remove = "1";
 
@@ -1331,8 +1337,14 @@ function __makeAdoptedTile(file) {
 
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = "absolute top-1 right-1 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center";
-  btn.textContent = "✕";
+  // iOS Safari 可能因「文字大小 / text-size-adjust」放大 rem，導致 Tailwind w-7/h-7 變大。
+  // 這裡改用固定 px 尺寸 + SVG，確保手機/桌機一致。
+  btn.className = "preview-remove-btn absolute top-1 right-1 z-20 bg-black/60 text-white rounded-full flex items-center justify-center";
+  btn.innerHTML = `
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M18.3 5.7a1 1 0 0 0-1.4 0L12 10.6 7.1 5.7a1 1 0 1 0-1.4 1.4L10.6 12l-4.9 4.9a1 1 0 1 0 1.4 1.4L12 13.4l4.9 4.9a1 1 0 0 0 1.4-1.4L13.4 12l4.9-4.9a1 1 0 0 0 0-1.4z" fill="currentColor"/>
+    </svg>
+  `;
   btn.setAttribute("aria-label", "刪除這張");
 
   wrap.appendChild(img);
