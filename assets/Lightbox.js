@@ -153,28 +153,31 @@ function openLightbox(images, index = 0) {
       wrapper.className = "lb-thumb" + (i === lbIndex ? " active" : "");
 
       if (isVid) {
-        const thumb = document.createElement("div");
-        thumb.className = "relative w-14 h-14 md:w-16 md:h-16 rounded-md overflow-hidden bg-black/70 flex-shrink-0";
+        const box = document.createElement("div");
+        box.className = "relative w-14 h-14 md:w-16 md:h-16 rounded-md overflow-hidden bg-black/60 lb-thumb-video";
+        box.dataset.videoUrl = url;
 
-        const v = document.createElement("video");
-        v.src = url;
-        v.muted = true;
-        v.playsInline = true;
-        v.preload = "metadata";
-        v.className = "w-full h-full object-cover pointer-events-none";
-        thumb.appendChild(v);
+        const placeholder = document.createElement("div");
+        placeholder.className = "video-thumb-placeholder";
+        box.appendChild(placeholder);
 
-        const overlay = document.createElement("div");
-        overlay.className = "absolute inset-0 flex items-center justify-center pointer-events-none";
-        overlay.innerHTML = `
-          <div class="w-9 h-9 rounded-full bg-black/70 flex items-center justify-center">
-            <svg viewBox="0 0 24 24" aria-hidden="true" class="w-5 h-5 text-white">
-              <path d="M9 7v10l8-5z" fill="currentColor"></path>
-            </svg>
-          </div>`;
-        thumb.appendChild(overlay);
+        const icon = document.createElement("div");
+        icon.className = "video-play-icon";
+        box.appendChild(icon);
 
-        wrapper.appendChild(thumb);
+        if (typeof window !== "undefined" && typeof window.ensureVideoThumbFromUrl === "function") {
+          try {
+            window.ensureVideoThumbFromUrl(url, 320).then((thumb) => {
+              if (!thumb || !box.isConnected) return;
+              const img = document.createElement("img");
+              img.src = thumb;
+              img.className = "w-full h-full object-cover";
+              box.insertBefore(img, box.firstChild);
+            }).catch(() => {});
+          } catch (_) {}
+        }
+
+        wrapper.appendChild(box);
       } else {
         const img = document.createElement("img");
         img.src = url;
