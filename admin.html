@@ -915,36 +915,79 @@
       const type = (file && file.type) || "";
       const isVideo = type.startsWith("video/");
       const isImage = type.startsWith("image/");
-
-      // 影片：抓一張影格當縮圖
+      // 影片：抓一張影格當縮圖（iOS 需要用 loadedmetadata \+ seek / RVFC 才容易出現畫面）
       if (isVideo) {
         const vUrl = URL.createObjectURL(file);
         try {
           const v = document.createElement("video");
+          v.preload = "metadata";
           v.src = vUrl;
           v.muted = true;
           v.playsInline = true;
+          v.setAttribute("playsinline", "");
+          v.setAttribute("webkit-playsinline", "");
+          v.disablePictureInPicture = true;
 
+          // iOS Safari 有時不會觸發 loadeddata（不播放就不解碼畫面），所以用 loadedmetadata + seek 逼出第一張影格
           await new Promise((res, rej) => {
-            v.onloadeddata = () => res();
+            v.onloadedmetadata = () => res();
             v.onerror = (e) => rej(e || new Error("載入影片失敗"));
           });
 
+          // 目標抓取時間：盡量靠前，但不要是 0（iOS 有時 seek 到 0 會拿不到 frame）
+          let t = 0.05;
           try {
-            if (!Number.isNaN(v.duration) && v.duration > 0.2) {
-              v.currentTime = Math.min(0.2, v.duration / 2);
-              await new Promise((res) => {
-                const h = () => { v.removeEventListener("seeked", h); res(); };
-                v.addEventListener("seeked", h);
-              });
+            if (Number.isFinite(v.duration) && v.duration > 0.2) {
+              t = Math.min(0.2, v.duration / 2);
+              t = Math.max(0.05, Math.min(t, v.duration - 0.05));
             }
-          } catch (_) { /* 忽略定位錯誤，直接用第一張影格 */ }
+          } catch (_) { /* ignore */ }
 
+          // 先嘗試 seek
+          try {
+            v.currentTime = t;
+            await new Promise((res) => {
+              const done = () => { v.removeEventListener("seeked", done); res(); };
+              v.addEventListener("seeked", done);
+            });
+          } catch (_) {
+            // 有些檔案/瀏覽器不給 seek，就用 0.01 退回
+            try {
+              v.currentTime = 0.01;
+              await new Promise((res) => {
+                const done = () => { v.removeEventListener("seeked", done); res(); };
+                v.addEventListener("seeked", done);
+              });
+            } catch (_) { /* ignore */ }
+          }
+
+          // 等待畫面真正解碼（RVFC 最可靠）
+          if (typeof v.requestVideoFrameCallback === "function") {
+            await new Promise((res) => v.requestVideoFrameCallback(() => res()));
+          } else {
+            // readyState >= 2 才有 current frame data
+            if (v.readyState < 2) {
+              await Promise.race([
+                new Promise((res) => { v.onloadeddata = () => res(); }),
+                new Promise((res) => setTimeout(res, 150))
+              ]);
+            }
+            await new Promise((res) => setTimeout(res, 30));
+          }
+
+          // iOS 有時仍然黑畫面：試著「靜音播放一下再暫停」逼出 frame
+          try {
+            await v.play();
+            v.pause();
+          } catch (_) { /* ignore */ }
+
+          const w = v.videoWidth || 640;
+          const h = v.videoHeight || 360;
           const c = document.createElement("canvas");
-          c.width = v.videoWidth || 640;
-          c.height = v.videoHeight || 360;
+          c.width = w;
+          c.height = h;
           const g = c.getContext("2d");
-          g.drawImage(v, 0, 0, c.width, c.height);
+          g.drawImage(v, 0, 0, w, h);
           return c;
         } finally {
           URL.revokeObjectURL(vUrl);
