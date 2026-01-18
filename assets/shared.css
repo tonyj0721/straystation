@@ -162,11 +162,11 @@ dialog::backdrop {
 
 .ss-video-play-btn {
   position: absolute;
-  left: 50%;
-  top: 50%;
+  left: 0px;
+  top: 0px;
   transform: translate(-50%, -50%);
-  width: 64px;
-  height: 64px;
+  width: 28px;
+  height: 14px;
   border-radius: 16px;
   background: rgba(0, 0, 0, 0.35);
   display: flex;
@@ -179,8 +179,8 @@ dialog::backdrop {
 }
 
 .ss-video-play-btn svg {
-  width: 26px;
-  height: 26px;
+  width: 21px;
+  height: 21px;
   fill: #fff;
   transform: translateX(1px);
 }
