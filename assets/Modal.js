@@ -6,53 +6,60 @@ function isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
 
-// 讓縮圖 <video> 顯示「第一幀」（iOS 也盡量穩）
-async function primeVideoThumbEl(v) {
-  if (!v || v.dataset._primed) return;
-  v.dataset._primed = "1";
 
-  // 一些 iOS/桌機通用的屬性
-  v.muted = true;
-  v.playsInline = true;
-  v.preload = "metadata";
-  v.controls = false;
-  v.disablePictureInPicture = true;
-  v.setAttribute("playsinline", "");
-  v.setAttribute("webkit-playsinline", "");
+// --- Video thumbnail helpers: show first frame as thumbnail ---
+window.__SS_THUMB_PLAY_SVG = window.__SS_THUMB_PLAY_SVG || `
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <circle cx="32" cy="32" r="30" fill="rgba(0,0,0,0.45)"/>
+  <path d="M26 20 L26 44 L46 32 Z" fill="#fff"/>
+</svg>
+`;
 
+async function primeVideoThumb(video) {
+  if (!video || video.dataset.primed) return;
+  video.dataset.primed = '1';
   try {
-    await new Promise((res, rej) => {
-      if (v.readyState >= 1) return res();
-      v.onloadedmetadata = () => res();
-      v.onerror = () => rej(new Error("video metadata load failed"));
-    });
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'metadata';
 
-    // 目標抓取時間：盡量靠前，但不要是 0（iOS 偶爾拿不到 frame）
-    let t = 0.05;
-    try {
-      if (Number.isFinite(v.duration) && v.duration > 0.2) {
-        t = Math.min(0.2, v.duration / 2);
-        t = Math.max(0.05, Math.min(t, v.duration - 0.05));
-      }
-    } catch (_) { /* ignore */ }
-
-    // seek 到第一幀附近
-    try {
-      v.currentTime = t;
+    // Ensure metadata is loaded
+    if (video.readyState < 1) {
       await new Promise((res) => {
-        const done = () => { v.removeEventListener("seeked", done); res(); };
-        v.addEventListener("seeked", done);
+        const done = () => res();
+        video.addEventListener('loadedmetadata', done, { once: true });
+        video.addEventListener('error', done, { once: true });
+        try { video.load(); } catch (_) {}
       });
-    } catch (_) {
-      // 有些瀏覽器/檔案不讓 seek：忽略
     }
 
-    // iOS 有時還是黑：靜音 play 一下再 pause 逼出 frame
-    try { await v.play(); v.pause(); } catch (_) { /* ignore */ }
-  } catch (_) {
-    // 失敗就保持預設狀態（至少不會壞掉）
-  }
+    const target = 0.01;
+    await new Promise((res) => {
+      let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        res();
+      };
+      video.addEventListener('seeked', finish, { once: true });
+      video.addEventListener('loadeddata', finish, { once: true });
+      try { video.currentTime = target; } catch (_) { finish(); }
+      setTimeout(finish, 800);
+    });
+
+    try { video.pause(); } catch (_) {}
+  } catch (_) {}
 }
+
+function primeVideoThumbs(root = document) {
+  const scope = (root && root.querySelectorAll) ? root : document;
+  scope.querySelectorAll('video[data-video-thumb="1"]').forEach((v) => {
+    primeVideoThumb(v);
+  });
+}
+
+// expose for other modules (e.g. Lightbox/admin)
+window.primeVideoThumbs = primeVideoThumbs;
 
 
 function __lockDialogScroll() {
@@ -472,6 +479,8 @@ let currentDoc = null;
 
 // 開啟 + 渲染 + 編輯預填，全部合併在這一支
 async function openDialog(id) {
+  const dlg = document.getElementById("petDialog");
+
   // 1. 先拿資料：先從 pets 找，沒有就去 Firestore 抓一次
   let p = pets.find((x) => x.id === id);
   if (!p) {
@@ -553,15 +562,7 @@ const dlgImg = document.getElementById("dlgImg");
 
     if (dlgBg) {
       const firstImage = media.find(u => !isVideoUrl(u));
-      // 若全部都是影片，dlgBg 不能用影片 URL（<img> 會壞掉）
-      if (firstImage) {
-        dlgBg.src = firstImage;
-      } else if (!isVid) {
-        dlgBg.src = url;
-      } else {
-        dlgBg.removeAttribute("src");
-        dlgBg.src = "";
-      }
+      dlgBg.src = firstImage || url;
     }
 
     if (dlgThumbs) {
@@ -582,29 +583,29 @@ const dlgImg = document.getElementById("dlgImg");
   media.forEach((url, i) => {
     const isVid = isVideoUrl(url);
     const wrapper = document.createElement("div");
-    wrapper.className = "dlg-thumb relative" + (isVid ? " video-thumb" : "") + (i === 0 ? " active" : "");
+    wrapper.className = "dlg-thumb relative" + (i === 0 ? " active" : "");
 
     if (isVid) {
-      const v = document.createElement("video");
-      // video-preview：沿用 shared.css 裡「隱藏原生控制列」的規則
-      v.className = "video-preview w-full h-full object-cover";
-      // 讓點擊落在 wrapper 上（避免 iOS 點到影片就跳播放器）
-      v.style.pointerEvents = "none";
+      wrapper.classList.add('video-thumb-wrap');
+      const v = document.createElement('video');
       v.src = url;
       v.muted = true;
       v.playsInline = true;
-      v.preload = "metadata";
-      v.controls = false;
-      v.disablePictureInPicture = true;
-      v.setAttribute("playsinline", "");
-      v.setAttribute("webkit-playsinline", "");
-      // 讓縮圖盡量停在第一幀
-      primeVideoThumbEl(v);
+      v.preload = 'metadata';
+      v.className = 'dlg-thumb-media video-thumb-media';
+      v.setAttribute('data-video-thumb', '1');
+      v.setAttribute('tabindex', '-1');
       wrapper.appendChild(v);
+
+      const overlay = document.createElement('div');
+      overlay.className = 'video-thumb-play';
+      overlay.innerHTML = window.__SS_THUMB_PLAY_SVG;
+      wrapper.appendChild(overlay);
     } else {
       const img = document.createElement("img");
       img.src = url;
-      img.className = "w-full h-full object-cover";
+      img.className = 'dlg-thumb-media';
+      img.style.objectFit = 'cover';
       wrapper.appendChild(img);
     }
 
@@ -614,6 +615,9 @@ const dlgImg = document.getElementById("dlgImg");
 
     dlgThumbs.appendChild(wrapper);
   });
+
+  // make video thumbs show first frame
+  try { primeVideoThumbs(dlgThumbs); } catch (_) {}
 
   showDialogMedia(currentIndex);
 
@@ -750,6 +754,8 @@ function bindDialogActions() {
 
 // 刪除目前這筆
 async function onDelete() {
+  const dlg = document.getElementById("petDialog");
+
   const wasOpen = dlg.open;
   if (wasOpen) dlg.close();
 
@@ -1644,6 +1650,8 @@ async function onConfirmAdopted() {
 
 // 退養 → 還原狀態與顯示頁面選項
 async function onUnadopt() {
+  const dlg = document.getElementById("petDialog");
+
   const wasOpen = dlg.open;
   if (wasOpen) dlg.close();
 

@@ -6,46 +6,35 @@ function isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
 
-// 讓縮圖 <video> 顯示「第一幀」（iOS 也盡量穩）
-async function primeVideoThumbEl(v) {
-  if (!v || v.dataset._primed) return;
-  v.dataset._primed = "1";
 
-  v.muted = true;
-  v.playsInline = true;
-  v.preload = "metadata";
-  v.controls = false;
-  v.disablePictureInPicture = true;
-  v.setAttribute("playsinline", "");
-  v.setAttribute("webkit-playsinline", "");
+// --- Video thumbnail helpers (Lightbox thumbs) ---
+window.__SS_THUMB_PLAY_SVG = window.__SS_THUMB_PLAY_SVG || `
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <circle cx="32" cy="32" r="30" fill="rgba(0,0,0,0.45)"/>
+  <path d="M26 20 L26 44 L46 32 Z" fill="#fff"/>
+</svg>
+`;
 
-  try {
-    await new Promise((res, rej) => {
-      if (v.readyState >= 1) return res();
-      v.onloadedmetadata = () => res();
-      v.onerror = () => rej(new Error("video metadata load failed"));
-    });
-
-    let t = 0.05;
+function __primeVideoThumbsFallback(root = document) {
+  const scope = (root && root.querySelectorAll) ? root : document;
+  scope.querySelectorAll('video[data-video-thumb="1"]').forEach((video) => {
+    if (video.dataset.primed) return;
+    video.dataset.primed = '1';
     try {
-      if (Number.isFinite(v.duration) && v.duration > 0.2) {
-        t = Math.min(0.2, v.duration / 2);
-        t = Math.max(0.05, Math.min(t, v.duration - 0.05));
+      video.muted = true;
+      video.playsInline = true;
+      video.preload = 'metadata';
+      if (video.readyState < 1) {
+        try { video.load(); } catch (_) {}
       }
-    } catch (_) { }
-
-    try {
-      v.currentTime = t;
-      await new Promise((res) => {
-        const done = () => { v.removeEventListener("seeked", done); res(); };
-        v.addEventListener("seeked", done);
-      });
-    } catch (_) { }
-
-    try { await v.play(); v.pause(); } catch (_) { }
-  } catch (_) {
-    // ignore
-  }
+      const t = 0.01;
+      const finish = () => { try { video.pause(); } catch (_) {} };
+      video.addEventListener('seeked', finish, { once: true });
+      video.addEventListener('loadeddata', finish, { once: true });
+      try { video.currentTime = t; } catch (_) { finish(); }
+      setTimeout(finish, 800);
+    } catch (_) {}
+  });
 }
 
 
@@ -53,7 +42,7 @@ history.scrollRestoration = "manual";
 window.scrollTo(0, 0);
 
 // ---- Modal + Lightbox 共用狀態 ----
-const dlg = document.getElementById('petDialog');
+var dlg = document.getElementById('petDialog');
 const lb = document.getElementById("lightbox");
 const lbImg = document.getElementById("lbImg");
 const lbVideo = document.getElementById("lbVideo");
@@ -192,20 +181,28 @@ function openLightbox(images, index = 0) {
     lbImages.forEach((url, i) => {
       const isVid = isVideoUrl(url);
       const wrapper = document.createElement("div");
-      wrapper.className = "lb-thumb" + (isVid ? " video-thumb" : "") + (i === lbIndex ? " active" : "");
+      wrapper.className = "lb-thumb" + (i === lbIndex ? " active" : "");
 
       if (isVid) {
-        const v = document.createElement("video");
-        v.className = "video-preview w-14 h-14 md:w-16 md:h-16 object-cover rounded-md";
-        v.style.pointerEvents = "none";
+        wrapper.classList.add('video-thumb-wrap');
+        const v = document.createElement('video');
         v.src = url;
-        // 讓縮圖盡量停在第一幀
-        primeVideoThumbEl(v);
+        v.muted = true;
+        v.playsInline = true;
+        v.preload = 'metadata';
+        v.className = 'lb-thumb-media video-thumb-media';
+        v.setAttribute('data-video-thumb', '1');
+        v.setAttribute('tabindex', '-1');
         wrapper.appendChild(v);
+
+        const overlay = document.createElement('div');
+        overlay.className = 'video-thumb-play';
+        overlay.innerHTML = window.__SS_THUMB_PLAY_SVG;
+        wrapper.appendChild(overlay);
       } else {
         const img = document.createElement("img");
         img.src = url;
-        img.className = "w-14 h-14 md:w-16 md:h-16 object-cover rounded-md";
+        img.className = 'lb-thumb-media';
         wrapper.appendChild(img);
       }
 
@@ -216,6 +213,11 @@ function openLightbox(images, index = 0) {
 
       lbThumbsInner.appendChild(wrapper);
     });
+
+    // make video thumbs show first frame
+    try {
+      (window.primeVideoThumbs || __primeVideoThumbsFallback)(lbThumbsInner);
+    } catch (_) {}
   }
 
   // 一開始顯示當前項目
