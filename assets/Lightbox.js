@@ -6,48 +6,6 @@ function isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
 
-// 讓縮圖 <video> 顯示「第一幀」（iOS 也盡量穩）
-async function primeVideoThumbEl(v) {
-  if (!v || v.dataset._primed) return;
-  v.dataset._primed = "1";
-
-  v.muted = true;
-  v.playsInline = true;
-  v.preload = "metadata";
-  v.controls = false;
-  v.disablePictureInPicture = true;
-  v.setAttribute("playsinline", "");
-  v.setAttribute("webkit-playsinline", "");
-
-  try {
-    await new Promise((res, rej) => {
-      if (v.readyState >= 1) return res();
-      v.onloadedmetadata = () => res();
-      v.onerror = () => rej(new Error("video metadata load failed"));
-    });
-
-    let t = 0.05;
-    try {
-      if (Number.isFinite(v.duration) && v.duration > 0.2) {
-        t = Math.min(0.2, v.duration / 2);
-        t = Math.max(0.05, Math.min(t, v.duration - 0.05));
-      }
-    } catch (_) { }
-
-    try {
-      v.currentTime = t;
-      await new Promise((res) => {
-        const done = () => { v.removeEventListener("seeked", done); res(); };
-        v.addEventListener("seeked", done);
-      });
-    } catch (_) { }
-
-    try { await v.play(); v.pause(); } catch (_) { }
-  } catch (_) {
-    // ignore
-  }
-}
-
 
 history.scrollRestoration = "manual";
 window.scrollTo(0, 0);
@@ -192,16 +150,13 @@ function openLightbox(images, index = 0) {
     lbImages.forEach((url, i) => {
       const isVid = isVideoUrl(url);
       const wrapper = document.createElement("div");
-      wrapper.className = "lb-thumb" + (isVid ? " video-thumb" : "") + (i === lbIndex ? " active" : "");
+      wrapper.className = "lb-thumb" + (i === lbIndex ? " active" : "");
 
       if (isVid) {
-        const v = document.createElement("video");
-        v.className = "video-preview w-14 h-14 md:w-16 md:h-16 object-cover rounded-md";
-        v.style.pointerEvents = "none";
-        v.src = url;
-        // 讓縮圖盡量停在第一幀
-        primeVideoThumbEl(v);
-        wrapper.appendChild(v);
+        const box = document.createElement("div");
+        box.className = "w-14 h-14 md:w-16 md:h-16 rounded-md bg-black/60 text-white flex items-center justify-center text-xs";
+        box.textContent = "🎬 影片";
+        wrapper.appendChild(box);
       } else {
         const img = document.createElement("img");
         img.src = url;

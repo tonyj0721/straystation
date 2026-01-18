@@ -49,37 +49,6 @@ dialog::backdrop {
   opacity: 1;
 }
 
-/* ===============================
-   影片縮圖（列表 / Modal / Lightbox）：顯示第一幀 + 播放圖示（圖4樣式）
-   - JS 會用 <video> 呈現第一幀；這裡負責「填滿裁切」與播放 icon overlay。
-   =============================== */
-
-.video-thumb {
-  position: relative;
-  overflow: hidden;
-}
-
-.video-thumb > img,
-.video-thumb > video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-/* overlay 播放 icon（圓形 + 白色 play） */
-.video-thumb::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 52% 52%;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='38' fill='%23000000' fill-opacity='0.45'/%3E%3Cpath d='M42 34 L70 50 L42 66 Z' fill='white'/%3E%3C/svg%3E");
-}
-
 #lightbox {
   position: fixed;
   inset: 0;
@@ -93,9 +62,7 @@ dialog::backdrop {
   bottom: env(safe-area-inset-bottom);
 }
 
-/* Lightbox 縮圖（img / video 都套同樣規則） */
-#lbThumbs .lb-thumb > img,
-#lbThumbs .lb-thumb > video {
+#lbThumbs img {
   width: 60px;
   height: 60px;
   object-fit: contain;
@@ -105,8 +72,7 @@ dialog::backdrop {
   background: #444;
 }
 
-#lbThumbs .lb-thumb.active > img,
-#lbThumbs .lb-thumb.active > video {
+#lbThumbs img.active {
   opacity: 1;
   border: 2px solid white;
 }
