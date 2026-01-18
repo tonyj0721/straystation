@@ -7,13 +7,6 @@ function isVideoUrl(url) {
 }
 
 
-const VIDEO_PLAY_BADGE_SVG = `
-  <svg viewBox="0 0 80 80" aria-hidden="true" focusable="false">
-    <circle cx="40" cy="40" r="36" fill="rgba(31, 41, 55, 0.85)" />
-    <polygon points="34,28 34,52 54,40" fill="#ffffff" />
-  </svg>
-`;
-
 history.scrollRestoration = "manual";
 window.scrollTo(0, 0);
 

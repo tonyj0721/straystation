@@ -6,6 +6,7 @@ function isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
 
+const dlg = document.getElementById("petDialog");
 
 const VIDEO_PLAY_BADGE_SVG = `
   <svg viewBox="0 0 80 80" aria-hidden="true" focusable="false">
