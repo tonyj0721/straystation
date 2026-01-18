@@ -196,8 +196,6 @@ const PREVIEW_QUALITY = 0.82;  // JPEG 品質（0~1）
 // File → 縮圖 objectURL（避免每次重畫都重新解碼）
 const __thumbUrlCache = new Map();
 const __thumbPromiseCache = new Map();
-// File → 影片播放 objectURL（避免重複建立）
-const __videoSrcCache = new Map();
 
 // 同時跑 2 張縮圖（更快，但不會像全並發那麼容易卡）
 const __THUMB_CONCURRENCY = 2;
@@ -225,12 +223,6 @@ function revokePreviewThumb(file) {
     __thumbUrlCache.delete(file);
   }
   __thumbPromiseCache.delete(file);
-
-  const v = __videoSrcCache.get(file);
-  if (v) {
-    URL.revokeObjectURL(v);
-    __videoSrcCache.delete(file);
-  }
 }
 
 async function __decodeToBitmap(file) {
@@ -893,6 +885,40 @@ const editCount = q("#editCount");
 
 const MAX_EDIT_FILES = 5;
 
+// 影片按鈕 icon（play / pause）
+const __PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
+const __PAUSE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"></path></svg>';
+
+async function __safePlayVideo(v) {
+  try {
+    await v.play();
+    return;
+  } catch (_) {}
+  // iOS / 部分瀏覽器可能需要先靜音才允許播放（至少先讓預覽能播）
+  try {
+    v.muted = true;
+    await v.play();
+  } catch (e) {
+    console.warn('video play failed:', e);
+  }
+}
+
+// File(video) → objectURL（給 <video> 播放用；刪除/關閉編輯時釋放）
+const __editVideoObjUrlCache = new Map();
+function getEditVideoObjURL(file) {
+  if (__editVideoObjUrlCache.has(file)) return __editVideoObjUrlCache.get(file);
+  const u = URL.createObjectURL(file);
+  __editVideoObjUrlCache.set(file, u);
+  return u;
+}
+function revokeEditVideoObjURL(file) {
+  const u = __editVideoObjUrlCache.get(file);
+  if (u) {
+    try { URL.revokeObjectURL(u); } catch (_) {}
+    __editVideoObjUrlCache.delete(file);
+  }
+}
+
 // 狀態：依「目前畫面順序」維護（url=舊圖、file=新圖）
 let editImagesState = { items: [], removeUrls: [] };
 
@@ -901,7 +927,10 @@ btnPickEdit?.addEventListener("click", () => editFiles?.click());
 // 初始化編輯圖片列表（把舊的檔案縮圖快取清掉，避免記憶體累積）
 function renderEditImages(urls) {
   for (const it of editImagesState.items) {
-    if (it?.kind === "file" && it.file) revokePreviewThumb(it.file);
+    if (it?.kind === "file" && it.file) {
+      revokePreviewThumb(it.file);
+      revokeEditVideoObjURL(it.file);
+    }
   }
   editImagesState.items = (urls || []).map((u) => ({ kind: "url", url: u }));
   editImagesState.removeUrls = [];
@@ -917,125 +946,131 @@ function __editKey(it) {
 
 function __makeEditTile(it) {
   const wrap = document.createElement("div");
-  wrap.className = "relative  select-none";
+  wrap.className = "relative select-none overflow-hidden";
   wrap.style.touchAction = "none";
   wrap.style.setProperty("-webkit-touch-callout", "none");
   wrap.style.userSelect = "none";
   wrap.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  const isVideo = it.kind === "url"
+  const isVid = it.kind === "url"
     ? isVideoUrl(it.url)
     : (((it.file && it.file.type) || "").startsWith("video/"));
 
-  if (isVideo) {
-    const video = document.createElement("video");
-    video.className = "ss-preview-video";
-    video.muted = true;
-    video.playsInline = true;
-    video.preload = "metadata";
-    video.controls = false;
-    video.setAttribute("controlslist", "nodownload noplaybackrate noremoteplayback");
-    video.setAttribute("disablepictureinpicture", "");
+  let mediaEl = null;
+  let playBtn = null;
+
+  if (isVid) {
+    const v = document.createElement("video");
+    v.className = "w-full aspect-square object-cover rounded-lg bg-gray-100 video-preview";
+    v.preload = "metadata";
+    v.playsInline = true;
+    v.setAttribute("playsinline", "");
+    v.setAttribute("webkit-playsinline", "");
+    v.controls = false;
+    v.disablePictureInPicture = true;
 
     if (it.kind === "url") {
-      video.src = it.url;
+      v.src = it.url;
     } else {
-      // poster 用縮圖（抓影格），src 用 objectURL（可播放）
-      video.poster = PREVIEW_EMPTY_GIF;
+      v.src = getEditVideoObjURL(it.file);
+      // 用縮圖當 poster，避免黑畫面
       ensurePreviewThumbURL(it.file)
-        .then((u) => { video.poster = u; })
+        .then((u) => { v.poster = u; })
         .catch(() => { /* ignore */ });
-
-      let src = __videoSrcCache.get(it.file);
-      if (!src) {
-        try {
-          src = URL.createObjectURL(it.file);
-          __videoSrcCache.set(it.file, src);
-        } catch { /* ignore */ }
-      }
-      if (src) video.src = src;
     }
 
-    const playBtn = document.createElement("button");
+    const overlay = document.createElement("div");
+    overlay.className = "media-play-overlay";
+
+    playBtn = document.createElement("button");
     playBtn.type = "button";
-    playBtn.className = "ss-video-play-btn";
+    playBtn.className = "media-play-btn";
+    playBtn.innerHTML = __PLAY_SVG;
     playBtn.setAttribute("aria-label", "播放影片");
-    playBtn.innerHTML = `
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M8 5v14l11-7z"></path>
-      </svg>`;
 
-    const showPlay = () => playBtn.classList.remove("is-hidden");
-    const hidePlay = () => playBtn.classList.add("is-hidden");
+    const syncBtn = () => {
+      const playing = !v.paused && !v.ended;
+      playBtn.innerHTML = playing ? __PAUSE_SVG : __PLAY_SVG;
+      playBtn.setAttribute("aria-label", playing ? "暫停影片" : "播放影片");
+    };
 
-    playBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (video.paused || video.ended) {
-        video.play?.().then(hidePlay).catch(() => { /* ignore */ });
+    v.addEventListener("play", syncBtn);
+    v.addEventListener("pause", syncBtn);
+    v.addEventListener("ended", () => {
+      try { v.currentTime = 0; } catch (_) {}
+      syncBtn();
+    });
+
+    playBtn.addEventListener("click", async (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+
+      // 同時只播一支（避免多支一起播）
+      try {
+        editPreview?.querySelectorAll?.("video.video-preview")?.forEach((vv) => {
+          if (vv !== v) {
+            try { vv.pause(); } catch (_) {}
+          }
+        });
+      } catch (_) {}
+
+      if (v.paused || v.ended) {
+        await __safePlayVideo(v);
       } else {
-        video.pause?.();
+        try { v.pause(); } catch (_) {}
       }
+      syncBtn();
     });
 
-    video.addEventListener("play", hidePlay);
-    video.addEventListener("pause", showPlay);
-    video.addEventListener("ended", () => {
-      try { video.currentTime = 0; } catch { }
-      showPlay();
-    });
+    overlay.appendChild(playBtn);
 
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "ss-preview-remove-btn absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
-    btn.textContent = "✕";
-    btn.setAttribute("aria-label", "刪除這個");
-
-    wrap.appendChild(video);
-    wrap.appendChild(playBtn);
-    wrap.appendChild(btn);
-    return wrap;
-  }
-
-  const img = document.createElement("img");
-  img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
-  img.alt = "預覽";
-  img.decoding = "async";
-  img.loading = "lazy";
-  img.draggable = false;
-  img.style.webkitUserDrag = "none";
-  img.style.webkitTouchCallout = "none";
-  img.addEventListener("contextmenu", (e) => e.preventDefault());
-
-  if (it.kind === "url") {
-    img.src = it.url;
+    wrap.appendChild(v);
+    wrap.appendChild(overlay);
+    mediaEl = v;
   } else {
-    img.src = PREVIEW_EMPTY_GIF;
-    ensurePreviewThumbURL(it.file)
-      .then((u) => { img.src = u; })
-      .catch(() => {
-        try {
-          const raw = URL.createObjectURL(it.file);
-          img.src = raw;
-          setTimeout(() => URL.revokeObjectURL(raw), 2000);
-        } catch { }
-      });
+    const img = document.createElement("img");
+    img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+    img.alt = "預覽";
+    img.decoding = "async";
+    img.loading = "lazy";
+    img.draggable = false;
+    img.style.webkitUserDrag = "none";
+    img.style.webkitTouchCallout = "none";
+    img.addEventListener("contextmenu", (e) => e.preventDefault());
+
+    if (it.kind === "url") {
+      img.src = it.url;
+    } else {
+      img.src = PREVIEW_EMPTY_GIF;
+      ensurePreviewThumbURL(it.file)
+        .then((u) => { img.src = u; })
+        .catch(() => {
+          try {
+            const raw = URL.createObjectURL(it.file);
+            img.src = raw;
+            setTimeout(() => URL.revokeObjectURL(raw), 2000);
+          } catch { }
+        });
+    }
+
+    wrap.appendChild(img);
+    mediaEl = img;
   }
 
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = "ss-preview-remove-btn absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
+  btn.className = "absolute top-1 right-1 z-20 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
   btn.textContent = "✕";
   btn.setAttribute("aria-label", "刪除這張");
+  btn.dataset.remove = "1";
 
-  wrap.appendChild(img);
   wrap.appendChild(btn);
   return wrap;
 }
 
 function __setEditIdx(tile, idx) {
   tile.dataset.idx = String(idx);
-  const btn = tile.querySelector(".ss-preview-remove-btn");
+  const btn = tile.querySelector('button[data-remove]');
   if (btn) btn.dataset.idx = String(idx);
 }
 
@@ -1050,6 +1085,7 @@ function paintEditPreview() {
       // 移除 tile 時順便釋放縮圖
       if (k && typeof k === "object") {
         try { revokePreviewThumb(k); } catch { }
+        try { revokeEditVideoObjURL(k); } catch { }
       }
       el.remove();
       __editTileMap.delete(k);
@@ -1070,7 +1106,7 @@ function paintEditPreview() {
 
 // 刪除（事件代理）
 editPreview?.addEventListener("click", (e) => {
-  const btn = e.target.closest?.(".ss-preview-remove-btn[data-idx]");
+  const btn = e.target.closest?.("button[data-remove][data-idx]");
   if (!btn) return;
 
   e.preventDefault();
@@ -1084,6 +1120,7 @@ editPreview?.addEventListener("click", (e) => {
     editImagesState.removeUrls.push(it.url);
   } else if (it.kind === "file") {
     revokePreviewThumb(it.file);
+    revokeEditVideoObjURL(it.file);
   }
 
   editImagesState.items.splice(i, 1);
@@ -1250,7 +1287,7 @@ function __makeAdoptedTile(file) {
 
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = "ss-preview-remove-btn absolute top-1 right-1 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center";
+  btn.className = "absolute top-1 right-1 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center";
   btn.textContent = "✕";
   btn.setAttribute("aria-label", "刪除這張");
 
@@ -1261,7 +1298,7 @@ function __makeAdoptedTile(file) {
 
 function __setAdoptedIdx(tile, idx) {
   tile.dataset.idx = String(idx);
-  const btn = tile.querySelector(".ss-preview-remove-btn");
+  const btn = tile.querySelector("button");
   if (btn) btn.dataset.idx = String(idx);
 }
 
@@ -1290,7 +1327,7 @@ function renderAdoptedPreviews() {
 
 // 刪除（事件代理）
 adoptedPreview.addEventListener("click", (e) => {
-  const btn = e.target.closest?.(".ss-preview-remove-btn[data-idx]");
+  const btn = e.target.closest?.("button[data-idx]");
   if (!btn) return;
 
   e.preventDefault();
