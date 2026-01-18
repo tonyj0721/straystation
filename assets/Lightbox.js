@@ -152,40 +152,35 @@ function openLightbox(images, index = 0) {
       const wrapper = document.createElement("div");
       wrapper.className = "lb-thumb" + (i === lbIndex ? " active" : "");
 
-      if (isVid) {
-        const thumb = document.createElement("div");
-        thumb.className = "relative w-14 h-14 md:w-16 md:h-16 rounded-md overflow-hidden bg-black/70 flex-shrink-0";
+      const inner = document.createElement("div");
+      inner.className = "relative w-full h-full";
 
-        const v = document.createElement("video");
-        v.src = url;
-        v.muted = true;
-        v.playsInline = true;
-        v.preload = "metadata";
-        v.className = "w-full h-full object-cover pointer-events-none";
-        thumb.appendChild(v);
+      if (isVid) {
+        const img = document.createElement("img");
+        img.src = "";
+        img.setAttribute("data-video-src", url);
+        img.className = "w-full h-full object-cover rounded-md bg-black";
+        inner.appendChild(img);
 
         const overlay = document.createElement("div");
-        overlay.style.position = "absolute";
-        overlay.style.inset = "0";
-        overlay.style.display = "flex";
-        overlay.style.alignItems = "center";
-        overlay.style.justifyContent = "center";
-        overlay.style.pointerEvents = "none";
-        overlay.innerHTML = `
-          <div style="width:44px;height:44px;border-radius:9999px;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;">
-            <svg viewBox="0 0 24 24" aria-hidden="true" width="20" height="20" style="display:block;fill:white;">
-              <path d="M9 7v10l8-5z"></path>
-            </svg>
-          </div>`;
-        thumb.appendChild(overlay);
+        overlay.className = "video-thumb-overlay";
+        const icon = document.createElement("div");
+        icon.className = "video-thumb-icon";
+        overlay.appendChild(icon);
 
-        wrapper.appendChild(thumb);
+        inner.appendChild(overlay);
+
+        if (window && typeof window.ensureVideoThumbForImg === "function") {
+          window.ensureVideoThumbForImg(img, url);
+        }
       } else {
         const img = document.createElement("img");
         img.src = url;
-        img.className = "w-14 h-14 md:w-16 md:h-16 object-cover rounded-md";
-        wrapper.appendChild(img);
+        img.className = "w-full h-full object-cover rounded-md";
+        inner.appendChild(img);
       }
+
+      wrapper.appendChild(inner);
 
       wrapper.addEventListener("click", () => {
         lbIndex = i;
@@ -194,6 +189,10 @@ function openLightbox(images, index = 0) {
 
       lbThumbsInner.appendChild(wrapper);
     });
+
+    if (window && typeof window.upgradeVideoThumbs === "function") {
+      window.upgradeVideoThumbs(lbThumbsInner);
+    }
   }
 
   // 一開始顯示當前項目

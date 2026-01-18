@@ -662,6 +662,140 @@
       }
     })();
 
+    function isVideoUrl(url) {
+      if (!url) return false;
+      const u = String(url).split("?", 1)[0];
+      return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
+    }
+
+    // ===============================
+    // 遠端影片縮圖：抓一張影格變成 <img>
+    // ===============================
+    const REMOTE_THUMB_MAX = 720;
+    const REMOTE_THUMB_QUALITY = 0.82;
+    const remoteThumbCache = new Map();
+    const remoteThumbPromiseCache = new Map();
+
+    async function createRemoteVideoThumb(url) {
+      const src = url;
+      const v = document.createElement("video");
+      v.preload = "metadata";
+      v.src = src;
+      v.muted = true;
+      v.playsInline = true;
+      v.setAttribute("playsinline", "");
+      v.setAttribute("webkit-playsinline", "");
+      v.crossOrigin = "anonymous";
+      v.disablePictureInPicture = true;
+
+      await new Promise((res, rej) => {
+        v.onloadedmetadata = () => res();
+        v.onerror = (e) => rej(e || new Error("載入影片失敗"));
+      });
+
+      let t = 0.05;
+      try {
+        if (Number.isFinite(v.duration) && v.duration > 0.2) {
+          t = Math.min(0.2, v.duration / 2);
+          t = Math.max(0.05, Math.min(t, v.duration - 0.05));
+        }
+      } catch (_) { }
+
+      try {
+        v.currentTime = t;
+        await new Promise((res) => {
+          const done = () => { v.removeEventListener("seeked", done); res(); };
+          v.addEventListener("seeked", done);
+        });
+      } catch (_) {
+        try {
+          v.currentTime = 0.01;
+          await new Promise((res) => {
+            const done = () => { v.removeEventListener("seeked", done); res(); };
+            v.addEventListener("seeked", done);
+          });
+        } catch (_) { }
+      }
+
+      if (typeof v.requestVideoFrameCallback === "function") {
+        await new Promise((res) => v.requestVideoFrameCallback(() => res()));
+      } else {
+        if (v.readyState < 2) {
+          await Promise.race([
+            new Promise((res) => { v.onloadeddata = () => res(); }),
+            new Promise((res) => setTimeout(res, 150)),
+          ]);
+        }
+        await new Promise((res) => setTimeout(res, 30));
+      }
+
+      try {
+        await v.play();
+        v.pause();
+      } catch (_) { }
+
+      const W = v.videoWidth || 640;
+      const H = v.videoHeight || 360;
+      const scale = Math.min(1, REMOTE_THUMB_MAX / Math.max(W, H));
+      const w = Math.max(1, Math.round(W * scale));
+      const h = Math.max(1, Math.round(H * scale));
+
+      const c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      const g = c.getContext("2d", { alpha: false, desynchronized: true });
+      g.drawImage(v, 0, 0, w, h);
+
+      const dataUrl = c.toDataURL("image/jpeg", REMOTE_THUMB_QUALITY);
+      return dataUrl;
+    }
+
+    function ensureVideoThumbForImg(img, url) {
+      if (!img || !url) return;
+      const key = String(url).split("?", 1)[0];
+      if (remoteThumbCache.has(key)) {
+        img.src = remoteThumbCache.get(key);
+        return;
+      }
+
+      let p = remoteThumbPromiseCache.get(key);
+      if (!p) {
+        p = createRemoteVideoThumb(url)
+          .then((dataUrl) => {
+            remoteThumbPromiseCache.delete(key);
+            if (dataUrl) {
+              remoteThumbCache.set(key, dataUrl);
+            }
+            return dataUrl;
+          })
+          .catch((err) => {
+            console.warn("createRemoteVideoThumb failed", err);
+            remoteThumbPromiseCache.delete(key);
+            return null;
+          });
+        remoteThumbPromiseCache.set(key, p);
+      }
+
+      p.then((dataUrl) => {
+        if (dataUrl) {
+          img.src = dataUrl;
+        }
+      });
+    }
+
+    function upgradeVideoThumbs(container) {
+      if (!container) return;
+      const imgs = container.querySelectorAll('img[data-video-src]');
+      imgs.forEach((img) => {
+        const src = img.getAttribute('data-video-src');
+        if (src) ensureVideoThumbForImg(img, src);
+      });
+    }
+
+    // 讓非 module 腳本也能共用
+    window.ensureVideoThumbForImg = ensureVideoThumbForImg;
+    window.upgradeVideoThumbs = upgradeVideoThumbs;
+
     // ===============================
     // Firebase 設定與初始化
     // ===============================
@@ -1487,12 +1621,6 @@ async function makeThumbURL(file) {
     // ===============================
     // 列表載入 + 搜尋 + 渲染（桌機/手機）
     // ===============================
-    function isVideoUrlForList(url) {
-      if (!url) return false;
-      const u = String(url).split("?", 1)[0];
-      return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
-    }
-
     async function loadPets() {
       const q = query(collection(db, "pets"), orderBy("createdAt", "desc"));
       const snap = await getDocs(q);
@@ -1691,25 +1819,22 @@ async function makeThumbURL(file) {
 
       wrap.innerHTML = list
         .map((p) => {
-          const first = (Array.isArray(p.images) && p.images[0]) || p.image || "";
-          const isVid = isVideoUrlForList(first);
+          const img = (Array.isArray(p.images) && p.images[0]) || p.image || "";
+          const isVid = isVideoUrl(img);
 
           const thumbHtml = isVid
             ? `
-          <div class="relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-black/70">
-            <video src="${first}" class="w-full h-full object-cover pointer-events-none" muted playsinline preload="metadata"></video>
-            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;">
-              <div style="width:44px;height:44px;border-radius:9999px;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;">
-                <svg viewBox="0 0 24 24" aria-hidden="true" width="20" height="20" style="display:block;fill:white;">
-                  <path d="M9 7v10l8-5z"></path>
-                </svg>
-              </div>
-            </div>
-          </div>`
+        <div class="relative w-16 h-16 flex-shrink-0">
+          <img src="" data-video-src="${img}"
+               class="w-16 h-16 object-cover rounded-lg bg-black" loading="lazy" decoding="async">
+          <div class="video-thumb-overlay">
+            <div class="video-thumb-icon"></div>
+          </div>
+        </div>`
             : `
-          <div class="relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
-            <img src="${first}" class="w-full h-full object-cover" loading="lazy">
-          </div>`;
+        <div class="relative w-16 h-16 flex-shrink-0">
+          <img src="${img}" class="w-16 h-16 object-cover rounded-lg bg-gray-100" loading="lazy" decoding="async">
+        </div>`;
 
           return `
         <div class="rounded-xl ring-1 ring-gray-200 p-3 flex gap-3 items-center cursor-pointer"
@@ -1725,12 +1850,17 @@ async function makeThumbURL(file) {
         })
         .join("");
 
+      // 讓影片項目補上第一張縮圖
+      upgradeVideoThumbs(wrap);
+
       wrap.querySelectorAll("[data-id]").forEach((card) =>
         card.addEventListener("click", () => {
           const data = list.find((p) => p.id === card.dataset.id);
           if (data) openDialog(data.id);
         })
       );
+    }
+
     }
 
     // === 名字輸入：即時重複檢查（建立時用） ===
