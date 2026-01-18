@@ -238,25 +238,36 @@
         <p class="mt-4 text-lg text-gray-600 dark:text-gray-300">在台中簡媽媽狗園，我們致力於<br>為每一隻貓狗找到安全、穩定、充滿愛的家。</p>
         <dl class="mt-8 grid grid-cols-3 gap-4 text-center">
           <div class="p-4 rounded-xl bg-white/70 border border-gray-200">
-            <dt class="text-sm text-gray-500">已成功送養</dt>
-            <dd class="text-xl font-semibold" id="statAdopted">0</dd>
-          </div>
-          <div class="p-4 rounded-xl bg-white/70 border border-gray-200">
             <dt class="text-sm text-gray-500">待領養貓咪</dt>
-            <dd class="text-xl font-semibold" id="statCats">0</dd>
+            <dd class="mt-1 text-xl font-semibold" id="statCats">0</dd>
+            <p class="mt-2 whitespace-nowrap text-xs text-gray-500">檔案陸續建置中</p>
           </div>
           <div class="p-4 rounded-xl bg-white/70 border border-gray-200">
             <dt class="text-sm text-gray-500">待領養狗狗</dt>
-            <dd class="text-xl font-semibold" id="statDogs">0</dd>
+            <dd class="mt-1 text-xl font-semibold" id="statDogs">0</dd>
+            <p class="mt-2 whitespace-nowrap text-xs text-gray-500">檔案陸續建置中</p>
+          </div>
+          <div class="p-4 rounded-xl bg-white/70 border border-gray-200">
+            <dt class="text-sm text-gray-500">歷年以來<br>已成功送養</dt>
+            <dd class="mt-2 text-xl font-semibold" id="statAdopted">0</dd>
           </div>
         </dl>
+        <p class="mt-3 mx-auto max-w-3xl px-4 text-xs leading-relaxed text-gray-500 text-left"
+          style="display:flex; gap:.25rem; align-items:flex-start;">
+          <span style="white-space:nowrap;">註：</span>
+          <span style="min-width:0;">
+            以上數字為「已建檔的送養資料」統計，部分毛孩因年齡、疾病或安置評估暫不送養，實際需照顧與救援總量超過以上數字。
+          </span>
+        </p>
+
       </div>
       <div class="relative">
         <div class="aspect-[4/3] rounded-3xl overflow-hidden shadow-soft ring-1 ring-gray-200">
           <img src="images/hero-bg.jpg" alt="台中簡媽媽狗園" class="w-full h-full object-cover" loading="lazy">
         </div>
         <div
-          class="absolute -bottom-6 -left-6 bg-white rounded-2xl shadow-soft ring-1 ring-gray-200 p-4 flex items-center gap-3">
+          class="absolute -bottom-6 bg-white rounded-2xl shadow-soft ring-1 ring-gray-200 p-4 flex items-center gap-3"
+          style="left: -0.7rem;">
           <span class="text-2xl">🎉</span>
           <div class="text-sm">
             <p class="font-semibold">這週 <span id="statWeeklyAdopted">0</span> 位毛孩找到新家</p>
@@ -337,13 +348,13 @@
       <details class="p-4 rounded-xl bg-white border border-gray-200">
         <summary class="font-medium cursor-pointer">領養需要費用嗎？</summary>
         <p class="mt-2 text-gray-600">園區認養費用說明<br><br>
-          10 公斤以下公犬-$4000<br>
-          10 公斤以下母犬-$5000<br>
-          皆包含結紮手術、4合1快篩血檢、8合一疫苗、狂犬疫苗、體內外驅蟲、晶片移轉費<br>
+          10 公斤以下公犬 $4000<br>
+          10 公斤以下母犬 $5000<br>
+          皆包含：結紮手術、4合1快篩血檢、8合一疫苗、狂犬疫苗、體內外驅蟲、晶片移轉費<br>
           （若體重超過 10 公斤之大型犬，因麻醉劑量需依體重調整，將酌收 1000 元之藥劑加價。）<br><br>
-          公貓-$4400<br>
-          母貓-$5000<br>
-          皆包含結紮手術、白血愛滋快篩、預防針、狂犬疫苗、體內外驅蟲、晶片轉移費</p>
+          公貓 $4400<br>
+          母貓 $5000<br>
+          皆包含：結紮手術、白血愛滋快篩、預防針、狂犬疫苗、體內外驅蟲、晶片轉移費</p>
       </details>
     </div>
   </section>
@@ -814,7 +825,7 @@
     });
 
     // 統計起始基數（已成功送養、待領養貓咪、待領養狗狗）
-    const STATS_BASE = { adopted: 1021, cats: 89, dogs: 743 };
+    const STATS_BASE = { adopted: 200, cats: 0, dogs: 0 };
     const pets = (window.pets ||= []);
     let currentPetId = null;
 
@@ -838,9 +849,9 @@
           const eladopted = document.getElementById('statAdopted');
           const elCats = document.getElementById('statCats');
           const elDogs = document.getElementById('statDogs');
-          if (eladopted) eladopted.textContent = adopted.toLocaleString();
-          if (elCats) elCats.textContent = cats.toLocaleString();
-          if (elDogs) elDogs.textContent = dogs.toLocaleString();
+          if (eladopted) { eladopted.innerHTML = `${adopted.toLocaleString()} <span style="position:relative; top:-0.12em;">↑</span>`; }
+          if (elCats) elCats.textContent = cats.toLocaleString() + ' +';
+          if (elDogs) elDogs.textContent = dogs.toLocaleString() + ' +';
         } catch (err) {
           console.error('applyStats error:', err);
         }
@@ -1068,8 +1079,25 @@
       );
 
       const n = snap.data().count || 0;
+
       const el = document.getElementById("statWeeklyAdopted");
-      if (el) el.textContent = n.toLocaleString();
+      const titleP = el?.closest("p");                 // 第一行
+      const subtitleP = titleP?.nextElementSibling;    // 第二行（灰字那行）
+
+      if (!titleP || !subtitleP) return;
+
+      // 確保第二行是灰字（就算你之後改到 class 也能補回來）
+      subtitleP.classList.add("text-gray-500");
+
+      if (n === 0) {
+        // n = 0
+        titleP.textContent = "這週持續媒合中，謝謝您願意看看牠們";
+        subtitleP.textContent = "也謝謝每位辛苦的志工";
+      } else {
+        // n > 0
+        titleP.innerHTML = `這週 <span id="statWeeklyAdopted">${n.toLocaleString()}</span> 位毛孩找到新家`;
+        subtitleP.textContent = "感謝每位認養人與辛苦的志工";
+      }
     }
     window.loadPets = loadPets;
     loadPets();
