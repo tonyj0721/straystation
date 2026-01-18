@@ -634,8 +634,7 @@
   <div id="lightbox" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[9999]">
     <div id="lbWrap" class="relative inline-block">
       <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg" />
-      <video id="lbVideo" playsinline controls
-        class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg hidden"></video>
+      <video id="lbVideo" playsinline controls class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg hidden"></video>
       <button id="lbClose" class="absolute top-1 right-1 z-10 bg-black/60 hover:bg-black/70 text-white rounded-full p-2
            text-2xl leading-none select-none" aria-label="關閉">✕</button>
     </div>
@@ -1023,7 +1022,7 @@
         URL.revokeObjectURL(raw);
       }
     }
-    async function makeThumbURL(file) {
+async function makeThumbURL(file) {
       const bmp = await decodeToBitmap(file);
       const W = bmp.width, H = bmp.height;
       const scale = Math.min(1, PREVIEW_MAX / Math.max(W, H));
@@ -1686,47 +1685,44 @@
 
       wrap.innerHTML = list
         .map((p) => {
-          const media = (Array.isArray(p.images) && p.images[0]) || p.image || "";
-          let thumbHtml = `
-      <div class="w-16 h-16 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400 text-xl">
-        ?
-      </div>`;
+          const first = (Array.isArray(p.images) && p.images[0]) || p.image || "";
+          const isVid = (() => {
+            if (!first) return false;
+            const u = String(first).split("?", 1)[0];
+            return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
+          })();
 
-          if (media) {
-            if (isVideoUrl(media)) {
-              // 影片：顯示第一幀 + 中央播放鈕
-              thumbHtml = `
-          <div class="thumb-video-wrap w-16 h-16 rounded-lg bg-black/80">
-            <video
-              src="${media}"
-              class="thumb-video"
-              muted
-              playsinline
-              preload="metadata"
-            ></video>
-            <div class="thumb-video-play"></div>
-          </div>`;
-            } else {
-              // 照片：維持原本 <img>
-              thumbHtml = `
-          <img src="${media}" class="w-16 h-16 object-cover rounded-lg bg-gray-100">
-        `;
-            }
-          }
-
-          return `
-            <div class="rounded-xl ring-1 ring-gray-200 p-3 flex gap-3 items-center cursor-pointer"
-                data-id="${p.id}">
-              ${thumbHtml}
-              <div class="min-w-0 flex-1">
-                <div class="font-semibold truncate">${p.name}</div>
-                <div class="text-xs text-gray-600 mt-1 truncate">
-                  ${p.species}・${p.breed}・${p.gender}
+          const mediaHtml = !first
+            ? `<div class="w-16 h-16 rounded-lg bg-gray-100"></div>`
+            : (isVid
+              ? `
+                <div class="video-thumb-wrap w-16 h-16 rounded-lg bg-black">
+                  <video class="w-full h-full object-cover rounded-lg video-preview" src="${first}" muted playsinline webkit-playsinline preload="metadata" data-thumb-video="1"></video>
+                  <div class="video-thumb-overlay-center" aria-hidden="true">
+                    <div class="video-thumb-play-circle">
+                      <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>`;
-              })
+              `
+              : `<img src="${first}" class="w-16 h-16 object-cover rounded-lg bg-gray-100" loading="lazy" decoding="async">`
+            );
+          return `
+        <div class="rounded-xl ring-1 ring-gray-200 p-3 flex gap-3 items-center cursor-pointer"
+             data-id="${p.id}">
+          ${mediaHtml}
+          <div class="min-w-0 flex-1">
+            <div class="font-semibold truncate">${p.name}</div>
+            <div class="text-xs text-gray-600 mt-1 truncate">
+              ${p.species}・${p.breed}・${p.gender}
+            </div>
+          </div>
+        </div>`;
+        })
         .join("");
+
+      // 讓影片縮圖停在第一幀（Modal.js 會掛在 window 上）
+      try { window.primeVideoThumbs && window.primeVideoThumbs(wrap); } catch (_) { }
 
       wrap.querySelectorAll("[data-id]").forEach((card) =>
         card.addEventListener("click", () => {
