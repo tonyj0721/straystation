@@ -130,51 +130,42 @@ dialog::backdrop {
 }
 
 /* ===============================
-   新增/編輯模式：影片縮圖播放按鈕（取代原生控制列）
-   =============================== */
+ * 影片縮圖預覽：關掉原生控制列，改用自訂播放按鈕
+ * - 用在「新增/編輯」的縮圖格子內
+ * =============================== */
 
-/* 中央播放/暫停按鈕（樣式/位置跟截圖一致：圓角矩形 + 半透明底） */
-.media-play-overlay {
+/* 盡量關掉 WebKit 的原生控制列/播放按鈕（不同瀏覽器支援度不同） */
+.video-preview::-webkit-media-controls,
+.video-preview::-webkit-media-controls-enclosure,
+.video-preview::-webkit-media-controls-panel,
+.video-preview::-webkit-media-controls-play-button,
+.video-preview::-webkit-media-controls-start-playback-button {
+  display: none !important;
+  -webkit-appearance: none;
+}
+
+/* 中央播放鍵：尺寸/圓角/底色做成和手機預覽一致 */
+.video-play-btn {
   position: absolute;
-  inset: 0;
-  display: flex;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 64px;
+  height: 44px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.55);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   z-index: 10;
 }
 
-.media-play-btn {
-  width: 64px;
-  height: 40px;
-  border-radius: 12px;
-  background: rgba(0, 0, 0, 0.55);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-  -webkit-tap-highlight-color: transparent;
+.video-play-btn:active {
+  transform: translate(-50%, -50%) scale(0.98);
 }
 
-.media-play-btn:active {
-  transform: scale(0.98);
-}
-
-.media-play-btn svg {
-  width: 18px;
-  height: 18px;
-  fill: #fff;
-}
-
-/* 影片縮圖本體：不顯示原生控制列 */
-video.video-preview {
-  background: #000;
-}
-
-video.video-preview::-webkit-media-controls,
-video.video-preview::-webkit-media-controls-panel,
-video.video-preview::-webkit-media-controls-play-button,
-video.video-preview::-webkit-media-controls-start-playback-button,
-video.video-preview::-webkit-media-controls-enclosure {
-  display: none !important;
-  -webkit-appearance: none;
+.video-play-icon {
+  width: 22px;
+  height: 22px;
+  display: block;
 }
