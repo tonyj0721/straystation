@@ -843,8 +843,21 @@
     const thumbUrlCache = new Map();
     const thumbPromiseCache = new Map();
 
-    // File(影片) → objectURL（播放用；刪除時記得 revoke）
-    const videoSrcCache = new Map();
+    // File(video) → objectURL（給 <video> 播放用；刪除時記得釋放）
+    const videoObjUrlCache = new Map();
+    function getVideoObjURL(file) {
+      if (videoObjUrlCache.has(file)) return videoObjUrlCache.get(file);
+      const u = URL.createObjectURL(file);
+      videoObjUrlCache.set(file, u);
+      return u;
+    }
+    function revokeVideoObjURL(file) {
+      const u = videoObjUrlCache.get(file);
+      if (u) {
+        try { URL.revokeObjectURL(u); } catch (_) { }
+        videoObjUrlCache.delete(file);
+      }
+    }
     // 同時跑 2 張縮圖（更快，但不會像全並發那麼容易卡）
     const THUMB_CONCURRENCY = 2;
     let thumbActive = 0;
@@ -876,11 +889,25 @@
       }
       thumbPromiseCache.delete(file);
 
-      // 影片播放用的 src
-      const v = videoSrcCache.get(file);
-      if (v) {
-        try { URL.revokeObjectURL(v); } catch { }
-        videoSrcCache.delete(file);
+      // 影片播放用的 objectURL 也一起釋放
+      revokeVideoObjURL(file);
+    }
+
+    // 影片按鈕 icon（play / pause）
+    const __PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
+    const __PAUSE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"></path></svg>';
+
+    async function __safePlayVideo(v) {
+      try {
+        await v.play();
+        return;
+      } catch (_) { }
+      // iOS / 部分瀏覽器可能需要先靜音才允許播放（至少先讓預覽能播）
+      try {
+        v.muted = true;
+        await v.play();
+      } catch (e) {
+        console.warn('video play failed:', e);
       }
     }
 
@@ -998,13 +1025,80 @@ async function makeThumbURL(file) {
 
     function __makePreviewTile(file) {
       const wrap = document.createElement("div");
-      wrap.className = "relative touch-none select-none";
+      wrap.className = "relative touch-none select-none overflow-hidden";
 
-      const isVideo = ((file && file.type) || "").startsWith("video/");
+      const type = (file && file.type) || "";
+      const isVid = type.startsWith("video/");
 
-      // 圖片：用 <img> ；影片：用 <video>（不顯示原生控制列，改用自訂播放按鈕）
       let mediaEl;
-      if (!isVideo) {
+      let playBtn = null;
+
+      if (isVid) {
+        const v = document.createElement("video");
+        v.className = "w-full aspect-square object-cover rounded-lg bg-gray-100 video-preview";
+        v.preload = "metadata";
+        v.playsInline = true;
+        v.setAttribute("playsinline", "");
+        v.setAttribute("webkit-playsinline", "");
+        v.controls = false;
+        v.disablePictureInPicture = true;
+        v.src = getVideoObjURL(file);
+
+        // 先顯示縮圖當 poster（更像截圖的效果），避免黑畫面
+        ensureThumbURL(file)
+          .then((url) => { v.poster = url; })
+          .catch(() => { /* poster 失敗就算了 */ });
+
+        // 中央播放/暫停按鈕（取代原生控制列）
+        const overlay = document.createElement("div");
+        overlay.className = "media-play-overlay";
+
+        playBtn = document.createElement("button");
+        playBtn.type = "button";
+        playBtn.className = "media-play-btn";
+        playBtn.innerHTML = __PLAY_SVG;
+        playBtn.setAttribute("aria-label", "播放影片");
+
+        const syncBtn = () => {
+          const playing = !v.paused && !v.ended;
+          playBtn.innerHTML = playing ? __PAUSE_SVG : __PLAY_SVG;
+          playBtn.setAttribute("aria-label", playing ? "暫停影片" : "播放影片");
+        };
+
+        v.addEventListener("play", syncBtn);
+        v.addEventListener("pause", syncBtn);
+        v.addEventListener("ended", () => {
+          try { v.currentTime = 0; } catch (_) { }
+          syncBtn();
+        });
+
+        playBtn.addEventListener("click", async (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+
+          // 同時只播一支（避免多支一起播）
+          try {
+            imgPreview.querySelectorAll("video.video-preview").forEach((vv) => {
+              if (vv !== v) {
+                try { vv.pause(); } catch (_) { }
+              }
+            });
+          } catch (_) { }
+
+          if (v.paused || v.ended) {
+            await __safePlayVideo(v);
+          } else {
+            try { v.pause(); } catch (_) { }
+          }
+          syncBtn();
+        });
+
+        overlay.appendChild(playBtn);
+
+        wrap.appendChild(v);
+        wrap.appendChild(overlay);
+        mediaEl = v;
+      } else {
         const img = document.createElement("img");
         img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
         img.alt = "預覽";
@@ -1024,72 +1118,23 @@ async function makeThumbURL(file) {
             } catch { }
           });
 
+        wrap.appendChild(img);
         mediaEl = img;
-      } else {
-        const video = document.createElement("video");
-        video.className = "video-preview w-full aspect-square object-cover rounded-lg bg-gray-100";
-        video.playsInline = true;
-        video.muted = true; // 預覽避免突然出聲
-        video.preload = "metadata";
-
-        // 影片 src：長期使用的 objectURL（刪除/清空時會 revoke）
-        let vUrl = videoSrcCache.get(file);
-        if (!vUrl) {
-          vUrl = URL.createObjectURL(file);
-          videoSrcCache.set(file, vUrl);
-        }
-        video.src = vUrl;
-
-        // 用縮圖當 poster（還沒播放前就有畫面）
-        ensureThumbURL(file)
-          .then((url) => { video.poster = url; })
-          .catch(() => { /* ignore */ });
-
-        // 自訂播放按鈕（位置/樣式：對齊手機截圖的中央按鈕）
-        const playBtn = document.createElement("button");
-        playBtn.type = "button";
-        playBtn.className = "video-play-btn";
-        playBtn.setAttribute("aria-label", "播放影片");
-        playBtn.innerHTML = `
-          <svg class="video-play-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path d="M9 7.5v9l8-4.5-8-4.5Z" fill="white" />
-          </svg>
-        `;
-
-        playBtn.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          try {
-            if (video.paused || video.ended) {
-              video.play().catch(() => { });
-            } else {
-              video.pause();
-              video.currentTime = 0;
-            }
-          } catch { }
-        });
-
-        wrap.appendChild(video);
-        wrap.appendChild(playBtn);
-        mediaEl = video;
       }
 
       const btn = document.createElement("button");
       btn.className = "absolute top-1 right-1 z-20 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
       btn.type = "button";
       btn.textContent = "✕";
-      btn.dataset.role = "remove";
       btn.setAttribute("aria-label", "刪除這張");
-
-      // 先放媒體，再放刪除鈕（刪除鈕要在最上層）
-      if (mediaEl && !wrap.contains(mediaEl)) wrap.appendChild(mediaEl);
+      btn.dataset.remove = "1";
       wrap.appendChild(btn);
       return wrap;
     }
 
     function __setPreviewIdx(tile, idx) {
       tile.dataset.idx = String(idx);
-      const btn = tile.querySelector('button[data-role="remove"]');
+      const btn = tile.querySelector('button[data-remove]');
       if (btn) btn.dataset.idx = String(idx);
     }
 
@@ -1117,7 +1162,7 @@ async function makeThumbURL(file) {
 
     // 刪除（事件代理）
     imgPreview.addEventListener("click", (e) => {
-      const btn = e.target.closest?.('button[data-role="remove"][data-idx]');
+      const btn = e.target.closest?.("button[data-remove][data-idx]");
       if (!btn) return;
       e.preventDefault();
       e.stopPropagation();
@@ -1351,8 +1396,6 @@ async function makeThumbURL(file) {
         if (window.resetNameCheck) resetNameCheck();
 
         // 重置表單與選擇圖片（先做，避免 DOM 還在變動導致 smooth scroll 卡住）
-        // 先釋放縮圖/影片 objectURL，避免記憶體累積
-        try { selectedFiles.forEach((f) => revokeThumb(f)); } catch { }
         e.target.reset();
         imgPreview.innerHTML = "";
         selectedFiles = [];

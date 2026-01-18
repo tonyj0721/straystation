@@ -885,14 +885,37 @@ const editCount = q("#editCount");
 
 const MAX_EDIT_FILES = 5;
 
-// File(影片) → objectURL（播放用；刪除時記得 revoke）
-const editVideoSrcCache = new Map();
+// 影片按鈕 icon（play / pause）
+const __PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
+const __PAUSE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"></path></svg>';
 
-function revokeEditVideoSrc(file) {
-  const u = editVideoSrcCache.get(file);
+async function __safePlayVideo(v) {
+  try {
+    await v.play();
+    return;
+  } catch (_) {}
+  // iOS / 部分瀏覽器可能需要先靜音才允許播放（至少先讓預覽能播）
+  try {
+    v.muted = true;
+    await v.play();
+  } catch (e) {
+    console.warn('video play failed:', e);
+  }
+}
+
+// File(video) → objectURL（給 <video> 播放用；刪除/關閉編輯時釋放）
+const __editVideoObjUrlCache = new Map();
+function getEditVideoObjURL(file) {
+  if (__editVideoObjUrlCache.has(file)) return __editVideoObjUrlCache.get(file);
+  const u = URL.createObjectURL(file);
+  __editVideoObjUrlCache.set(file, u);
+  return u;
+}
+function revokeEditVideoObjURL(file) {
+  const u = __editVideoObjUrlCache.get(file);
   if (u) {
-    try { URL.revokeObjectURL(u); } catch { }
-    editVideoSrcCache.delete(file);
+    try { URL.revokeObjectURL(u); } catch (_) {}
+    __editVideoObjUrlCache.delete(file);
   }
 }
 
@@ -906,7 +929,7 @@ function renderEditImages(urls) {
   for (const it of editImagesState.items) {
     if (it?.kind === "file" && it.file) {
       revokePreviewThumb(it.file);
-      revokeEditVideoSrc(it.file);
+      revokeEditVideoObjURL(it.file);
     }
   }
   editImagesState.items = (urls || []).map((u) => ({ kind: "url", url: u }));
@@ -923,20 +946,88 @@ function __editKey(it) {
 
 function __makeEditTile(it) {
   const wrap = document.createElement("div");
-  wrap.className = "relative  select-none";
+  wrap.className = "relative select-none overflow-hidden";
   wrap.style.touchAction = "none";
   wrap.style.setProperty("-webkit-touch-callout", "none");
   wrap.style.userSelect = "none";
   wrap.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  const isVid = (it.kind === "url")
+  const isVid = it.kind === "url"
     ? isVideoUrl(it.url)
     : (((it.file && it.file.type) || "").startsWith("video/"));
 
-  // 圖片：用 <img>；影片：用 <video>（不顯示原生控制列，改用自訂播放按鈕）
-  let mediaEl;
+  let mediaEl = null;
+  let playBtn = null;
 
-  if (!isVid) {
+  if (isVid) {
+    const v = document.createElement("video");
+    v.className = "w-full aspect-square object-cover rounded-lg bg-gray-100 video-preview";
+    v.preload = "metadata";
+    v.playsInline = true;
+    v.setAttribute("playsinline", "");
+    v.setAttribute("webkit-playsinline", "");
+    v.controls = false;
+    v.disablePictureInPicture = true;
+
+    if (it.kind === "url") {
+      v.src = it.url;
+    } else {
+      v.src = getEditVideoObjURL(it.file);
+      // 用縮圖當 poster，避免黑畫面
+      ensurePreviewThumbURL(it.file)
+        .then((u) => { v.poster = u; })
+        .catch(() => { /* ignore */ });
+    }
+
+    const overlay = document.createElement("div");
+    overlay.className = "media-play-overlay";
+
+    playBtn = document.createElement("button");
+    playBtn.type = "button";
+    playBtn.className = "media-play-btn";
+    playBtn.innerHTML = __PLAY_SVG;
+    playBtn.setAttribute("aria-label", "播放影片");
+
+    const syncBtn = () => {
+      const playing = !v.paused && !v.ended;
+      playBtn.innerHTML = playing ? __PAUSE_SVG : __PLAY_SVG;
+      playBtn.setAttribute("aria-label", playing ? "暫停影片" : "播放影片");
+    };
+
+    v.addEventListener("play", syncBtn);
+    v.addEventListener("pause", syncBtn);
+    v.addEventListener("ended", () => {
+      try { v.currentTime = 0; } catch (_) {}
+      syncBtn();
+    });
+
+    playBtn.addEventListener("click", async (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+
+      // 同時只播一支（避免多支一起播）
+      try {
+        editPreview?.querySelectorAll?.("video.video-preview")?.forEach((vv) => {
+          if (vv !== v) {
+            try { vv.pause(); } catch (_) {}
+          }
+        });
+      } catch (_) {}
+
+      if (v.paused || v.ended) {
+        await __safePlayVideo(v);
+      } else {
+        try { v.pause(); } catch (_) {}
+      }
+      syncBtn();
+    });
+
+    overlay.appendChild(playBtn);
+
+    wrap.appendChild(v);
+    wrap.appendChild(overlay);
+    mediaEl = v;
+  } else {
     const img = document.createElement("img");
     img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
     img.alt = "預覽";
@@ -962,85 +1053,24 @@ function __makeEditTile(it) {
         });
     }
 
+    wrap.appendChild(img);
     mediaEl = img;
-  } else {
-    const video = document.createElement("video");
-    video.className = "video-preview w-full aspect-square object-cover rounded-lg bg-gray-100";
-    video.playsInline = true;
-    video.muted = true; // 預覽避免突然出聲
-    video.preload = "metadata";
-
-    if (it.kind === "url") {
-      video.src = it.url;
-      // 讓縮圖不要一直黑畫面（可行就跳到前面一點點）
-      video.addEventListener("loadeddata", () => {
-        try {
-          if (!Number.isNaN(video.duration) && video.duration > 0.2) {
-            video.currentTime = Math.min(0.2, video.duration / 2);
-          } else {
-            video.currentTime = 0.01;
-          }
-        } catch { }
-      }, { once: true });
-    } else {
-      let vUrl = editVideoSrcCache.get(it.file);
-      if (!vUrl) {
-        vUrl = URL.createObjectURL(it.file);
-        editVideoSrcCache.set(it.file, vUrl);
-      }
-      video.src = vUrl;
-
-      // 用縮圖當 poster（還沒播放前就有畫面）
-      ensurePreviewThumbURL(it.file)
-        .then((u) => { video.poster = u; })
-        .catch(() => { /* ignore */ });
-    }
-
-    // 自訂播放按鈕（位置/樣式：對齊手機截圖的中央按鈕）
-    const playBtn = document.createElement("button");
-    playBtn.type = "button";
-    playBtn.className = "video-play-btn";
-    playBtn.setAttribute("aria-label", "播放影片");
-    playBtn.innerHTML = `
-      <svg class="video-play-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <path d="M9 7.5v9l8-4.5-8-4.5Z" fill="white" />
-      </svg>
-    `;
-
-    playBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      try {
-        if (video.paused || video.ended) {
-          video.play().catch(() => { });
-        } else {
-          video.pause();
-          video.currentTime = 0;
-        }
-      } catch { }
-    });
-
-    wrap.appendChild(video);
-    wrap.appendChild(playBtn);
-    mediaEl = video;
   }
 
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "absolute top-1 right-1 z-20 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
   btn.textContent = "✕";
-  btn.dataset.role = "remove";
   btn.setAttribute("aria-label", "刪除這張");
+  btn.dataset.remove = "1";
 
-  // 先放媒體，再放刪除鈕（刪除鈕要在最上層）
-  if (mediaEl && !wrap.contains(mediaEl)) wrap.appendChild(mediaEl);
   wrap.appendChild(btn);
   return wrap;
 }
 
 function __setEditIdx(tile, idx) {
   tile.dataset.idx = String(idx);
-  const btn = tile.querySelector('button[data-role="remove"]');
+  const btn = tile.querySelector('button[data-remove]');
   if (btn) btn.dataset.idx = String(idx);
 }
 
@@ -1055,7 +1085,7 @@ function paintEditPreview() {
       // 移除 tile 時順便釋放縮圖
       if (k && typeof k === "object") {
         try { revokePreviewThumb(k); } catch { }
-        try { revokeEditVideoSrc(k); } catch { }
+        try { revokeEditVideoObjURL(k); } catch { }
       }
       el.remove();
       __editTileMap.delete(k);
@@ -1076,7 +1106,7 @@ function paintEditPreview() {
 
 // 刪除（事件代理）
 editPreview?.addEventListener("click", (e) => {
-  const btn = e.target.closest?.('button[data-role="remove"][data-idx]');
+  const btn = e.target.closest?.("button[data-remove][data-idx]");
   if (!btn) return;
 
   e.preventDefault();
@@ -1090,7 +1120,7 @@ editPreview?.addEventListener("click", (e) => {
     editImagesState.removeUrls.push(it.url);
   } else if (it.kind === "file") {
     revokePreviewThumb(it.file);
-    revokeEditVideoSrc(it.file);
+    revokeEditVideoObjURL(it.file);
   }
 
   editImagesState.items.splice(i, 1);
