@@ -662,12 +662,6 @@
       }
     })();
 
-    function isVideoUrl(url) {
-      if (!url) return false;
-      const u = String(url).split("?", 1)[0];
-      return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
-    }
-
     // ===============================
     // Firebase 設定與初始化
     // ===============================
@@ -1493,6 +1487,12 @@ async function makeThumbURL(file) {
     // ===============================
     // 列表載入 + 搜尋 + 渲染（桌機/手機）
     // ===============================
+    function isVideoUrlForList(url) {
+      if (!url) return false;
+      const u = String(url).split("?", 1)[0];
+      return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
+    }
+
     async function loadPets() {
       const q = query(collection(db, "pets"), orderBy("createdAt", "desc"));
       const snap = await getDocs(q);
@@ -1691,22 +1691,25 @@ async function makeThumbURL(file) {
 
       wrap.innerHTML = list
         .map((p) => {
-          const img = (Array.isArray(p.images) && p.images[0]) || p.image || "";
-          const isVid = isVideoUrl(img);
+          const first = (Array.isArray(p.images) && p.images[0]) || p.image || "";
+          const isVid = isVideoUrlForList(first);
 
           const thumbHtml = isVid
             ? `
-        <div class="relative w-16 h-16 flex-shrink-0">
-          <video src="${img}" class="w-16 h-16 object-cover rounded-lg bg-black video-thumb"
-                 muted playsinline preload="metadata" webkit-playsinline></video>
-          <div class="video-thumb-overlay">
-            <div class="video-thumb-icon"></div>
-          </div>
-        </div>`
+          <div class="relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-black/70">
+            <video src="${first}" class="w-full h-full object-cover pointer-events-none" muted playsinline preload="metadata"></video>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;">
+              <div style="width:44px;height:44px;border-radius:9999px;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;">
+                <svg viewBox="0 0 24 24" aria-hidden="true" width="20" height="20" style="display:block;fill:white;">
+                  <path d="M9 7v10l8-5z"></path>
+                </svg>
+              </div>
+            </div>
+          </div>`
             : `
-        <div class="relative w-16 h-16 flex-shrink-0">
-          <img src="${img}" class="w-16 h-16 object-cover rounded-lg bg-gray-100" loading="lazy" decoding="async">
-        </div>`;
+          <div class="relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
+            <img src="${first}" class="w-full h-full object-cover" loading="lazy">
+          </div>`;
 
           return `
         <div class="rounded-xl ring-1 ring-gray-200 p-3 flex gap-3 items-center cursor-pointer"
