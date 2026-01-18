@@ -179,11 +179,6 @@ video.video-preview::-webkit-media-controls-enclosure {
   -webkit-appearance: none;
 }
 
-/* 消掉 inline baseline 底部留白 */
-#imgPreview video.video-preview {
-  display: block;
-}
-
 #imgPreview > div {
   line-height: 0;
 }
