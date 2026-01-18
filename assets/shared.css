@@ -130,51 +130,67 @@ dialog::backdrop {
 }
 
 /* ===============================
-   新增/編輯模式：影片縮圖播放按鈕（取代原生控制列）
+   影片預覽：自訂置中播放鍵（不使用原生控制列）
    =============================== */
 
-/* 中央播放/暫停按鈕（樣式/位置跟截圖一致：圓角矩形 + 半透明底） */
-.media-play-overlay {
+.ss-preview-video {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  height: auto;
+  object-fit: cover;
+  border-radius: 0.5rem; /* rounded-lg */
+  background: #f3f4f6;
+  display: block;
+}
+
+/* 盡量隱藏 iOS/Safari 內建控制 UI */
+.ss-preview-video::-webkit-media-controls,
+.ss-preview-video::-webkit-media-controls-enclosure,
+.ss-preview-video::-webkit-media-controls-panel,
+.ss-preview-video::-webkit-media-controls-play-button,
+.ss-preview-video::-webkit-media-controls-start-playback-button,
+.ss-preview-video::-webkit-media-controls-overlay-play-button,
+.ss-preview-video::-webkit-media-controls-timeline,
+.ss-preview-video::-webkit-media-controls-current-time-display,
+.ss-preview-video::-webkit-media-controls-time-remaining-display,
+.ss-preview-video::-webkit-media-controls-mute-button,
+.ss-preview-video::-webkit-media-controls-volume-slider,
+.ss-preview-video::-webkit-media-controls-fullscreen-button {
+  display: none !important;
+  opacity: 0 !important;
+}
+
+.ss-video-play-btn {
   position: absolute;
-  left: 0px;
-  bottom: 0px;
-  z-index: 10;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ss-video-play-btn svg {
+  width: 26px;
+  height: 26px;
+  fill: #fff;
+  transform: translateX(1px);
+}
+
+.ss-video-play-btn:active {
+  transform: translate(-50%, -50%) scale(0.96);
+}
+
+.ss-video-play-btn.is-hidden {
+  opacity: 0;
   pointer-events: none;
 }
 
-.media-play-btn {
-  width: 44px;
-  height: 28px;
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.55);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-  -webkit-tap-highlight-color: transparent;
-  pointer-events: auto;
-}
-
-.media-play-btn:active {
-  transform: scale(0.98);
-}
-
-.media-play-btn svg {
-  width: 21px;
-  height: 21px;
-  fill: #fff;
-}
-
-/* 影片縮圖本體：不顯示原生控制列 */
-video.video-preview {
-  background: #000;
-}
-
-video.video-preview::-webkit-media-controls,
-video.video-preview::-webkit-media-controls-panel,
-video.video-preview::-webkit-media-controls-play-button,
-video.video-preview::-webkit-media-controls-start-playback-button,
-video.video-preview::-webkit-media-controls-enclosure {
-  display: none !important;
-  -webkit-appearance: none;
-}
