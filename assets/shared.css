@@ -136,8 +136,8 @@ dialog::backdrop {
 /* 中央播放/暫停按鈕（樣式/位置跟截圖一致：圓角矩形 + 半透明底） */
 .media-play-overlay {
   position: absolute;
-  left: 0px;
-  bottom: 0px;
+  left: 4px;
+  bottom: 4px;
   z-index: 10;
   pointer-events: none;
   line-height:0;
