@@ -7,60 +7,12 @@ function isVideoUrl(url) {
 }
 
 
-// --- Video thumbnail helpers: show first frame as thumbnail ---
-window.__SS_THUMB_PLAY_SVG = window.__SS_THUMB_PLAY_SVG || `
-<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-  <circle cx="32" cy="32" r="30" fill="rgba(0,0,0,0.45)"/>
-  <path d="M26 20 L26 44 L46 32 Z" fill="#fff"/>
-</svg>
+const VIDEO_PLAY_BADGE_SVG = `
+  <svg viewBox="0 0 80 80" aria-hidden="true" focusable="false">
+    <circle cx="40" cy="40" r="36" fill="rgba(31, 41, 55, 0.85)" />
+    <polygon points="34,28 34,52 54,40" fill="#ffffff" />
+  </svg>
 `;
-
-async function primeVideoThumb(video) {
-  if (!video || video.dataset.primed) return;
-  video.dataset.primed = '1';
-  try {
-    video.muted = true;
-    video.playsInline = true;
-    video.preload = 'metadata';
-
-    // Ensure metadata is loaded
-    if (video.readyState < 1) {
-      await new Promise((res) => {
-        const done = () => res();
-        video.addEventListener('loadedmetadata', done, { once: true });
-        video.addEventListener('error', done, { once: true });
-        try { video.load(); } catch (_) {}
-      });
-    }
-
-    const target = 0.01;
-    await new Promise((res) => {
-      let finished = false;
-      const finish = () => {
-        if (finished) return;
-        finished = true;
-        res();
-      };
-      video.addEventListener('seeked', finish, { once: true });
-      video.addEventListener('loadeddata', finish, { once: true });
-      try { video.currentTime = target; } catch (_) { finish(); }
-      setTimeout(finish, 800);
-    });
-
-    try { video.pause(); } catch (_) {}
-  } catch (_) {}
-}
-
-function primeVideoThumbs(root = document) {
-  const scope = (root && root.querySelectorAll) ? root : document;
-  scope.querySelectorAll('video[data-video-thumb="1"]').forEach((v) => {
-    primeVideoThumb(v);
-  });
-}
-
-// expose for other modules (e.g. Lightbox/admin)
-window.primeVideoThumbs = primeVideoThumbs;
-
 
 function __lockDialogScroll() {
   try { if (typeof lockScroll === "function") lockScroll(); } catch { }
@@ -479,8 +431,6 @@ let currentDoc = null;
 
 // 開啟 + 渲染 + 編輯預填，全部合併在這一支
 async function openDialog(id) {
-  const dlg = document.getElementById("petDialog");
-
   // 1. 先拿資料：先從 pets 找，沒有就去 Firestore 抓一次
   let p = pets.find((x) => x.id === id);
   if (!p) {
@@ -586,26 +536,30 @@ const dlgImg = document.getElementById("dlgImg");
     wrapper.className = "dlg-thumb relative" + (i === 0 ? " active" : "");
 
     if (isVid) {
-      wrapper.classList.add('video-thumb-wrap');
-      const v = document.createElement('video');
+      const box = document.createElement("div");
+      box.className = "relative w-16 h-16 md:w-20 md:h-20 rounded-md overflow-hidden bg-black";
+      const v = document.createElement("video");
       v.src = url;
+      v.className = "w-full h-full object-cover";
+      v.preload = "metadata";
       v.muted = true;
       v.playsInline = true;
-      v.preload = 'metadata';
-      v.className = 'dlg-thumb-media video-thumb-media';
-      v.setAttribute('data-video-thumb', '1');
-      v.setAttribute('tabindex', '-1');
-      wrapper.appendChild(v);
+      v.setAttribute("playsinline", "");
+      v.setAttribute("webkit-playsinline", "");
+      v.controls = false;
+      v.disablePictureInPicture = true;
 
-      const overlay = document.createElement('div');
-      overlay.className = 'video-thumb-play';
-      overlay.innerHTML = window.__SS_THUMB_PLAY_SVG;
-      wrapper.appendChild(overlay);
+      const overlay = document.createElement("div");
+      overlay.className = "video-thumb-play";
+      overlay.innerHTML = VIDEO_PLAY_BADGE_SVG;
+
+      box.appendChild(v);
+      box.appendChild(overlay);
+      wrapper.appendChild(box);
     } else {
       const img = document.createElement("img");
       img.src = url;
-      img.className = 'dlg-thumb-media';
-      img.style.objectFit = 'cover';
+      img.className = "w-16 h-16 md:w-20 md:h-20 object-cover rounded-md";
       wrapper.appendChild(img);
     }
 
@@ -615,9 +569,6 @@ const dlgImg = document.getElementById("dlgImg");
 
     dlgThumbs.appendChild(wrapper);
   });
-
-  // make video thumbs show first frame
-  try { primeVideoThumbs(dlgThumbs); } catch (_) {}
 
   showDialogMedia(currentIndex);
 
@@ -754,8 +705,6 @@ function bindDialogActions() {
 
 // 刪除目前這筆
 async function onDelete() {
-  const dlg = document.getElementById("petDialog");
-
   const wasOpen = dlg.open;
   if (wasOpen) dlg.close();
 
@@ -1650,8 +1599,6 @@ async function onConfirmAdopted() {
 
 // 退養 → 還原狀態與顯示頁面選項
 async function onUnadopt() {
-  const dlg = document.getElementById("petDialog");
-
   const wasOpen = dlg.open;
   if (wasOpen) dlg.close();
 

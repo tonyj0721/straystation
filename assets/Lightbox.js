@@ -7,42 +7,18 @@ function isVideoUrl(url) {
 }
 
 
-// --- Video thumbnail helpers (Lightbox thumbs) ---
-window.__SS_THUMB_PLAY_SVG = window.__SS_THUMB_PLAY_SVG || `
-<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-  <circle cx="32" cy="32" r="30" fill="rgba(0,0,0,0.45)"/>
-  <path d="M26 20 L26 44 L46 32 Z" fill="#fff"/>
-</svg>
+const VIDEO_PLAY_BADGE_SVG = `
+  <svg viewBox="0 0 80 80" aria-hidden="true" focusable="false">
+    <circle cx="40" cy="40" r="36" fill="rgba(31, 41, 55, 0.85)" />
+    <polygon points="34,28 34,52 54,40" fill="#ffffff" />
+  </svg>
 `;
-
-function __primeVideoThumbsFallback(root = document) {
-  const scope = (root && root.querySelectorAll) ? root : document;
-  scope.querySelectorAll('video[data-video-thumb="1"]').forEach((video) => {
-    if (video.dataset.primed) return;
-    video.dataset.primed = '1';
-    try {
-      video.muted = true;
-      video.playsInline = true;
-      video.preload = 'metadata';
-      if (video.readyState < 1) {
-        try { video.load(); } catch (_) {}
-      }
-      const t = 0.01;
-      const finish = () => { try { video.pause(); } catch (_) {} };
-      video.addEventListener('seeked', finish, { once: true });
-      video.addEventListener('loadeddata', finish, { once: true });
-      try { video.currentTime = t; } catch (_) { finish(); }
-      setTimeout(finish, 800);
-    } catch (_) {}
-  });
-}
-
 
 history.scrollRestoration = "manual";
 window.scrollTo(0, 0);
 
 // ---- Modal + Lightbox 共用狀態 ----
-var dlg = document.getElementById('petDialog');
+const dlg = document.getElementById('petDialog');
 const lb = document.getElementById("lightbox");
 const lbImg = document.getElementById("lbImg");
 const lbVideo = document.getElementById("lbVideo");
@@ -184,25 +160,30 @@ function openLightbox(images, index = 0) {
       wrapper.className = "lb-thumb" + (i === lbIndex ? " active" : "");
 
       if (isVid) {
-        wrapper.classList.add('video-thumb-wrap');
-        const v = document.createElement('video');
+        const box = document.createElement("div");
+        box.className = "relative w-14 h-14 md:w-16 md:h-16 rounded-md overflow-hidden bg-black";
+        const v = document.createElement("video");
         v.src = url;
+        v.className = "w-full h-full object-cover";
+        v.preload = "metadata";
         v.muted = true;
         v.playsInline = true;
-        v.preload = 'metadata';
-        v.className = 'lb-thumb-media video-thumb-media';
-        v.setAttribute('data-video-thumb', '1');
-        v.setAttribute('tabindex', '-1');
-        wrapper.appendChild(v);
+        v.setAttribute("playsinline", "");
+        v.setAttribute("webkit-playsinline", "");
+        v.controls = false;
+        v.disablePictureInPicture = true;
 
-        const overlay = document.createElement('div');
-        overlay.className = 'video-thumb-play';
-        overlay.innerHTML = window.__SS_THUMB_PLAY_SVG;
-        wrapper.appendChild(overlay);
+        const overlay = document.createElement("div");
+        overlay.className = "video-thumb-play";
+        overlay.innerHTML = VIDEO_PLAY_BADGE_SVG;
+
+        box.appendChild(v);
+        box.appendChild(overlay);
+        wrapper.appendChild(box);
       } else {
         const img = document.createElement("img");
         img.src = url;
-        img.className = 'lb-thumb-media';
+        img.className = "w-14 h-14 md:w-16 md:h-16 object-cover rounded-md";
         wrapper.appendChild(img);
       }
 
@@ -213,11 +194,6 @@ function openLightbox(images, index = 0) {
 
       lbThumbsInner.appendChild(wrapper);
     });
-
-    // make video thumbs show first frame
-    try {
-      (window.primeVideoThumbs || __primeVideoThumbsFallback)(lbThumbsInner);
-    } catch (_) {}
   }
 
   // 一開始顯示當前項目

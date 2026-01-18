@@ -62,7 +62,7 @@ dialog::backdrop {
   bottom: env(safe-area-inset-bottom);
 }
 
-#lbThumbs .lb-thumb-media {
+#lbThumbs img {
   width: 60px;
   height: 60px;
   object-fit: contain;
@@ -72,7 +72,7 @@ dialog::backdrop {
   background: #444;
 }
 
-#lbThumbs .lb-thumb.active .lb-thumb-media {
+#lbThumbs img.active {
   opacity: 1;
   border: 2px solid white;
 }
@@ -127,6 +127,22 @@ dialog::backdrop {
   font-size: 14px;
   font-weight: 600;
   border: none;
+}
+
+/* 共用：影片縮圖中央播放 icon（列表 / Modal / Lightbox 共用） */
+.video-thumb-play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.video-thumb-play svg {
+  width: 38px;
+  height: 38px;
+  display: block;
 }
 
 /* ===============================
@@ -198,62 +214,4 @@ video.video-preview::-webkit-media-controls-enclosure {
   width: 14px;
   height: 14px;
   display: block;
-}
-
-
-/* ===============================
-   Video thumbnails: show first frame + play icon (Modal/Lightbox/list)
-   =============================== */
-
-
-.video-thumb-wrap {
-  position: relative;
-  overflow: hidden;
-  border-radius: 6px;
-  background: #000;
-}
-
-/* the actual media element inside a thumb */
-.video-thumb-media {
-  width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: cover;
-  background: #000;
-  pointer-events: none; /* click goes to wrapper */
-}
-
-/* center play icon */
-.video-thumb-play {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-}
-
-.video-thumb-play svg {
-  width: 46%;
-  max-width: 46px;
-  height: auto;
-  opacity: 0.9;
-}
-
-/* Modal thumbs: media fills the .dlg-thumb box */
-.dlg-thumb .dlg-thumb-media {
-  width: 100%;
-  height: 100%;
-  border-radius: 6px;
-}
-
-/* Lightbox thumbs use wrapper active state */
-/* Hide native controls for thumb videos (iOS/Safari) */
-video.video-thumb-media::-webkit-media-controls,
-video.video-thumb-media::-webkit-media-controls-panel,
-video.video-thumb-media::-webkit-media-controls-play-button,
-video.video-thumb-media::-webkit-media-controls-start-playback-button,
-video.video-thumb-media::-webkit-media-controls-enclosure {
-  display: none !important;
-  -webkit-appearance: none;
 }
