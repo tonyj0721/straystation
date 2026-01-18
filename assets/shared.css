@@ -49,6 +49,37 @@ dialog::backdrop {
   opacity: 1;
 }
 
+/* ===============================
+   影片縮圖（列表 / Modal / Lightbox）：顯示第一幀 + 播放圖示（圖4樣式）
+   - JS 會用 <video> 呈現第一幀；這裡負責「填滿裁切」與播放 icon overlay。
+   =============================== */
+
+.video-thumb {
+  position: relative;
+  overflow: hidden;
+}
+
+.video-thumb > img,
+.video-thumb > video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* overlay 播放 icon（圓形 + 白色 play） */
+.video-thumb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 52% 52%;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='38' fill='%23000000' fill-opacity='0.45'/%3E%3Cpath d='M42 34 L70 50 L42 66 Z' fill='white'/%3E%3C/svg%3E");
+}
+
 #lightbox {
   position: fixed;
   inset: 0;
@@ -62,7 +93,9 @@ dialog::backdrop {
   bottom: env(safe-area-inset-bottom);
 }
 
-#lbThumbs img {
+/* Lightbox 縮圖（img / video 都套同樣規則） */
+#lbThumbs .lb-thumb > img,
+#lbThumbs .lb-thumb > video {
   width: 60px;
   height: 60px;
   object-fit: contain;
@@ -72,7 +105,8 @@ dialog::backdrop {
   background: #444;
 }
 
-#lbThumbs img.active {
+#lbThumbs .lb-thumb.active > img,
+#lbThumbs .lb-thumb.active > video {
   opacity: 1;
   border: 2px solid white;
 }
@@ -130,78 +164,72 @@ dialog::backdrop {
 }
 
 /* ===============================
-   Video thumbs (Modal / Lightbox / list)
+   新增/編輯模式：影片縮圖播放按鈕（取代原生控制列）
    =============================== */
 
-.dlg-thumb, .lb-thumb, .pet-thumb {
-  position: relative;
-  overflow: hidden;
-}
-
-.dlg-thumb {
-  width: 70px;
-  height: 70px;
-  border-radius: 6px;
-  background: #f3f4f6;
-  cursor: pointer;
-  opacity: 0.8;
-  transition: 0.2s;
-  flex: 0 0 auto;
-}
-
-.dlg-thumb.active {
-  outline: 3px solid #ff6900;
-  opacity: 1;
-}
-
-/* lightbox thumbs wrapper */
-.lb-thumb {
-  width: 60px;
-  height: 60px;
-  border-radius: 6px;
-  background: #444;
-  opacity: 0.5;
-  cursor: pointer;
-  flex: 0 0 auto;
-}
-
-.lb-thumb.active {
-  opacity: 1;
-  border: 2px solid white;
-}
-
-.thumb-media {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-/* Center play icon like the reference image */
-.is-video::after {
-  content: "";
+/* 中央播放/暫停按鈕（樣式/位置跟截圖一致：圓角矩形 + 半透明底） */
+.media-play-overlay {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 62%;
-  height: 62%;
-  background: url('data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%20100%20100%27%3E%3Ccircle%20cx=%2750%27%20cy=%2750%27%20r=%2748%27%20fill=%27rgb(156,163,175)%27/%3E%3Cpolygon%20points=%2742,30%2042,70%2072,50%27%20fill=%27white%27/%3E%3C/svg%3E') center/contain no-repeat;
-  opacity: 0.9;
+  left: 0px;
+  bottom: 0px;
+  z-index: 10;
   pointer-events: none;
+  line-height:0;
 }
 
-/* Lightbox old selector compatibility (in case some code still adds img.active) */
-#lbThumbs img.active {
-  opacity: 1;
-  border: 2px solid white;
+.media-play-btn {
+  width: 44px;
+  height: 28px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.55);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  -webkit-tap-highlight-color: transparent;
+  pointer-events: auto;
 }
 
-/* override old #lbThumbs img rules when using wrapper thumbs */
-#lbThumbs .thumb-media {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 0;
-  background: transparent;
+.media-play-btn:active {
+  transform: scale(0.98);
+}
+
+.media-play-btn svg {
+  width: 21px;
+  height: 21px;
+  fill: #fff;
+  display:block;
+}
+
+/* 影片縮圖本體：不顯示原生控制列 */
+video.video-preview {
+  background: #000;
+}
+
+video.video-preview::-webkit-media-controls,
+video.video-preview::-webkit-media-controls-panel,
+video.video-preview::-webkit-media-controls-play-button,
+video.video-preview::-webkit-media-controls-start-playback-button,
+video.video-preview::-webkit-media-controls-enclosure {
+  display: none !important;
+  -webkit-appearance: none;
+}
+/* ===============================
+   iOS/桌機一致：縮圖刪除按鈕（避免 iOS text-size-adjust 影響 rem 尺寸）
+   =============================== */
+
+.preview-remove-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  line-height: 0; /* 不走 baseline */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+.preview-remove-btn svg {
+  width: 14px;
+  height: 14px;
+  display: block;
 }

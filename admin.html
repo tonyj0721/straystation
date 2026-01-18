@@ -842,6 +842,22 @@
     // File → 縮圖 objectURL（避免每次重畫都重新解碼）
     const thumbUrlCache = new Map();
     const thumbPromiseCache = new Map();
+
+    // File(video) → objectURL（給 <video> 播放用；刪除時記得釋放）
+    const videoObjUrlCache = new Map();
+    function getVideoObjURL(file) {
+      if (videoObjUrlCache.has(file)) return videoObjUrlCache.get(file);
+      const u = URL.createObjectURL(file);
+      videoObjUrlCache.set(file, u);
+      return u;
+    }
+    function revokeVideoObjURL(file) {
+      const u = videoObjUrlCache.get(file);
+      if (u) {
+        try { URL.revokeObjectURL(u); } catch (_) { }
+        videoObjUrlCache.delete(file);
+      }
+    }
     // 同時跑 2 張縮圖（更快，但不會像全並發那麼容易卡）
     const THUMB_CONCURRENCY = 2;
     let thumbActive = 0;
@@ -872,42 +888,106 @@
         thumbUrlCache.delete(file);
       }
       thumbPromiseCache.delete(file);
+
+      // 影片播放用的 objectURL 也一起釋放
+      revokeVideoObjURL(file);
+    }
+
+    // 影片按鈕 icon（play / pause）
+    const __PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
+    const __PAUSE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"></path></svg>';
+
+    async function __safePlayVideo(v) {
+      try {
+        await v.play();
+        return;
+      } catch (_) { }
+      // iOS / 部分瀏覽器可能需要先靜音才允許播放（至少先讓預覽能播）
+      try {
+        v.muted = true;
+        await v.play();
+      } catch (e) {
+        console.warn('video play failed:', e);
+      }
     }
 
     async function decodeToBitmap(file) {
       const type = (file && file.type) || "";
       const isVideo = type.startsWith("video/");
       const isImage = type.startsWith("image/");
-
-      // 影片：抓一張影格當縮圖
+      // 影片：抓一張影格當縮圖（iOS 需要用 loadedmetadata \+ seek / RVFC 才容易出現畫面）
       if (isVideo) {
         const vUrl = URL.createObjectURL(file);
         try {
           const v = document.createElement("video");
+          v.preload = "metadata";
           v.src = vUrl;
           v.muted = true;
           v.playsInline = true;
+          v.setAttribute("playsinline", "");
+          v.setAttribute("webkit-playsinline", "");
+          v.disablePictureInPicture = true;
 
+          // iOS Safari 有時不會觸發 loadeddata（不播放就不解碼畫面），所以用 loadedmetadata + seek 逼出第一張影格
           await new Promise((res, rej) => {
-            v.onloadeddata = () => res();
+            v.onloadedmetadata = () => res();
             v.onerror = (e) => rej(e || new Error("載入影片失敗"));
           });
 
+          // 目標抓取時間：盡量靠前，但不要是 0（iOS 有時 seek 到 0 會拿不到 frame）
+          let t = 0.05;
           try {
-            if (!Number.isNaN(v.duration) && v.duration > 0.2) {
-              v.currentTime = Math.min(0.2, v.duration / 2);
-              await new Promise((res) => {
-                const h = () => { v.removeEventListener("seeked", h); res(); };
-                v.addEventListener("seeked", h);
-              });
+            if (Number.isFinite(v.duration) && v.duration > 0.2) {
+              t = Math.min(0.2, v.duration / 2);
+              t = Math.max(0.05, Math.min(t, v.duration - 0.05));
             }
-          } catch (_) { /* 忽略定位錯誤，直接用第一張影格 */ }
+          } catch (_) { /* ignore */ }
 
+          // 先嘗試 seek
+          try {
+            v.currentTime = t;
+            await new Promise((res) => {
+              const done = () => { v.removeEventListener("seeked", done); res(); };
+              v.addEventListener("seeked", done);
+            });
+          } catch (_) {
+            // 有些檔案/瀏覽器不給 seek，就用 0.01 退回
+            try {
+              v.currentTime = 0.01;
+              await new Promise((res) => {
+                const done = () => { v.removeEventListener("seeked", done); res(); };
+                v.addEventListener("seeked", done);
+              });
+            } catch (_) { /* ignore */ }
+          }
+
+          // 等待畫面真正解碼（RVFC 最可靠）
+          if (typeof v.requestVideoFrameCallback === "function") {
+            await new Promise((res) => v.requestVideoFrameCallback(() => res()));
+          } else {
+            // readyState >= 2 才有 current frame data
+            if (v.readyState < 2) {
+              await Promise.race([
+                new Promise((res) => { v.onloadeddata = () => res(); }),
+                new Promise((res) => setTimeout(res, 150))
+              ]);
+            }
+            await new Promise((res) => setTimeout(res, 30));
+          }
+
+          // iOS 有時仍然黑畫面：試著「靜音播放一下再暫停」逼出 frame
+          try {
+            await v.play();
+            v.pause();
+          } catch (_) { /* ignore */ }
+
+          const w = v.videoWidth || 640;
+          const h = v.videoHeight || 360;
           const c = document.createElement("canvas");
-          c.width = v.videoWidth || 640;
-          c.height = v.videoHeight || 360;
+          c.width = w;
+          c.height = h;
           const g = c.getContext("2d");
-          g.drawImage(v, 0, 0, c.width, c.height);
+          g.drawImage(v, 0, 0, w, h);
           return c;
         } finally {
           URL.revokeObjectURL(vUrl);
@@ -988,41 +1068,122 @@ async function makeThumbURL(file) {
 
     function __makePreviewTile(file) {
       const wrap = document.createElement("div");
-      wrap.className = "relative touch-none select-none";
+      wrap.className = "relative touch-none select-none overflow-hidden";
 
-      const img = document.createElement("img");
-      img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
-      img.alt = "預覽";
-      img.decoding = "async";
-      img.loading = "lazy";
-      img.src = EMPTY_GIF;
+      const type = (file && file.type) || "";
+      const isVid = type.startsWith("video/");
 
-      // 先顯示空白，再異步塞縮圖，避免解碼瞬間卡頓
-      ensureThumbURL(file)
-        .then((url) => { img.src = url; })
-        .catch(() => {
-          // 真的不行就退回原圖（至少有預覽）
-          try {
-            const raw = URL.createObjectURL(file);
-            img.src = raw;
-            setTimeout(() => URL.revokeObjectURL(raw), 2000);
-          } catch { }
+      let mediaEl;
+      let playBtn = null;
+
+      if (isVid) {
+        const v = document.createElement("video");
+        v.className = "w-full aspect-square object-cover rounded-lg bg-gray-100 video-preview";
+        v.preload = "metadata";
+        v.playsInline = true;
+        v.setAttribute("playsinline", "");
+        v.setAttribute("webkit-playsinline", "");
+        v.controls = false;
+        v.disablePictureInPicture = true;
+        v.src = getVideoObjURL(file);
+
+        // 先顯示縮圖當 poster（更像截圖的效果），避免黑畫面
+        ensureThumbURL(file)
+          .then((url) => { v.poster = url; })
+          .catch(() => { /* poster 失敗就算了 */ });
+
+        // 中央播放/暫停按鈕（取代原生控制列）
+        const overlay = document.createElement("div");
+        overlay.className = "media-play-overlay";
+
+        playBtn = document.createElement("button");
+        playBtn.type = "button";
+        playBtn.className = "media-play-btn";
+        playBtn.innerHTML = __PLAY_SVG;
+        playBtn.setAttribute("aria-label", "播放影片");
+
+        const syncBtn = () => {
+          const playing = !v.paused && !v.ended;
+          playBtn.innerHTML = playing ? __PAUSE_SVG : __PLAY_SVG;
+          playBtn.setAttribute("aria-label", playing ? "暫停影片" : "播放影片");
+        };
+
+        v.addEventListener("play", syncBtn);
+        v.addEventListener("pause", syncBtn);
+        v.addEventListener("ended", () => {
+          try { v.currentTime = 0; } catch (_) { }
+          syncBtn();
         });
 
-      const btn = document.createElement("button");
-      btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
-      btn.type = "button";
-      btn.textContent = "✕";
-      btn.setAttribute("aria-label", "刪除這張");
+        playBtn.addEventListener("click", async (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
 
-      wrap.appendChild(img);
+          // 同時只播一支（避免多支一起播）
+          try {
+            imgPreview.querySelectorAll("video.video-preview").forEach((vv) => {
+              if (vv !== v) {
+                try { vv.pause(); } catch (_) { }
+              }
+            });
+          } catch (_) { }
+
+          if (v.paused || v.ended) {
+            await __safePlayVideo(v);
+          } else {
+            try { v.pause(); } catch (_) { }
+          }
+          syncBtn();
+        });
+
+        overlay.appendChild(playBtn);
+
+        wrap.appendChild(v);
+        wrap.appendChild(overlay);
+        mediaEl = v;
+      } else {
+        const img = document.createElement("img");
+        img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+        img.alt = "預覽";
+        img.decoding = "async";
+        img.loading = "lazy";
+        img.src = EMPTY_GIF;
+
+        // 先顯示空白，再異步塞縮圖，避免解碼瞬間卡頓
+        ensureThumbURL(file)
+          .then((url) => { img.src = url; })
+          .catch(() => {
+            // 真的不行就退回原圖（至少有預覽）
+            try {
+              const raw = URL.createObjectURL(file);
+              img.src = raw;
+              setTimeout(() => URL.revokeObjectURL(raw), 2000);
+            } catch { }
+          });
+
+        wrap.appendChild(img);
+        mediaEl = img;
+      }
+
+      const btn = document.createElement("button");
+      // iOS Safari 會依「文字大小 / text-size-adjust」放大 rem，導致 Tailwind w-7/h-7 變大。
+      // 這裡改用固定 px 尺寸 + SVG，確保手機/桌機一致。
+      btn.className = "preview-remove-btn absolute top-1 right-1 z-20 bg-black/70 text-white rounded-full flex items-center justify-center";
+      btn.type = "button";
+      btn.innerHTML = `
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M18.3 5.7a1 1 0 0 0-1.4 0L12 10.6 7.1 5.7a1 1 0 1 0-1.4 1.4L10.6 12l-4.9 4.9a1 1 0 1 0 1.4 1.4L12 13.4l4.9 4.9a1 1 0 0 0 1.4-1.4L13.4 12l4.9-4.9a1 1 0 0 0 0-1.4z" fill="currentColor"/>
+        </svg>
+      `;
+      btn.setAttribute("aria-label", "刪除這張");
+      btn.dataset.remove = "1";
       wrap.appendChild(btn);
       return wrap;
     }
 
     function __setPreviewIdx(tile, idx) {
       tile.dataset.idx = String(idx);
-      const btn = tile.querySelector("button");
+      const btn = tile.querySelector('button[data-remove]');
       if (btn) btn.dataset.idx = String(idx);
     }
 
@@ -1050,7 +1211,7 @@ async function makeThumbURL(file) {
 
     // 刪除（事件代理）
     imgPreview.addEventListener("click", (e) => {
-      const btn = e.target.closest?.("button[data-idx]");
+      const btn = e.target.closest?.("button[data-remove][data-idx]");
       if (!btn) return;
       e.preventDefault();
       e.stopPropagation();
@@ -1492,6 +1653,54 @@ async function makeThumbURL(file) {
       }
     }
 
+    // ===============================
+    // 影片縮圖：顯示第一幀（列表用；Modal/Lightbox 也會用到同樣邏輯）
+    // ===============================
+    function isVideoUrl(url) {
+      if (!url) return false;
+      const u = String(url).split("?", 1)[0];
+      return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
+    }
+
+    async function primeVideoThumbEl(v) {
+      if (!v || v.dataset._primed) return;
+      v.dataset._primed = "1";
+
+      v.muted = true;
+      v.playsInline = true;
+      v.preload = "metadata";
+      v.controls = false;
+      v.disablePictureInPicture = true;
+      v.setAttribute("playsinline", "");
+      v.setAttribute("webkit-playsinline", "");
+
+      try {
+        await new Promise((res, rej) => {
+          if (v.readyState >= 1) return res();
+          v.onloadedmetadata = () => res();
+          v.onerror = () => rej(new Error("video metadata load failed"));
+        });
+
+        let t = 0.05;
+        try {
+          if (Number.isFinite(v.duration) && v.duration > 0.2) {
+            t = Math.min(0.2, v.duration / 2);
+            t = Math.max(0.05, Math.min(t, v.duration - 0.05));
+          }
+        } catch (_) { }
+
+        try {
+          v.currentTime = t;
+          await new Promise((res) => {
+            const done = () => { v.removeEventListener("seeked", done); res(); };
+            v.addEventListener("seeked", done);
+          });
+        } catch (_) { }
+
+        try { await v.play(); v.pause(); } catch (_) { }
+      } catch (_) { }
+    }
+
     // 桌機表格
     function renderRows(list) {
       const tb = document.getElementById("rows");
@@ -1517,45 +1726,26 @@ async function makeThumbURL(file) {
       );
     }
 
-    const DEFAULT_VIDEO_POSTER = "data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%20100%20100%27%3E%3Ccircle%20cx=%2750%27%20cy=%2750%27%20r=%2748%27%20fill=%27rgb(156,163,175)%27/%3E%3Cpolygon%20points=%2742,30%2042,70%2072,50%27%20fill=%27white%27/%3E%3C/svg%3E";
-
-// 手機卡片
+    // 手機卡片
     function renderRowsMobile(list) {
       const wrap = document.getElementById("rowsMobile");
       if (!wrap) return;
 
-      const isVidUrl = (u) => {
-        if (!u) return false;
-        const s = String(u).split("?", 1)[0];
-        return /\.(mp4|webm|ogg|mov|m4v)$/i.test(s);
-      };
-
       wrap.innerHTML = list
         .map((p) => {
-          const media = (Array.isArray(p.images) && p.images.length)
-            ? p.images
-            : (p.image ? [p.image] : []);
-
-          const firstImg = media.find((u) => !isVidUrl(u)) || "";
-          const firstVid = media.find((u) => isVidUrl(u)) || "";
-
-          const thumbHtml = firstImg
+          const media0 = (Array.isArray(p.images) && p.images[0]) || p.image || "";
+          const isVid = isVideoUrl(media0);
+          const thumb = isVid
             ? `
-              <div class="pet-thumb w-16 h-16 rounded-lg bg-gray-100">
-                <img src="${firstImg}" class="thumb-media" alt="縮圖">
-              </div>`
-            : (firstVid
-              ? `
-              <div class="pet-thumb is-video w-16 h-16 rounded-lg bg-gray-100">
-                <img src="${DEFAULT_VIDEO_POSTER}" data-video-thumb="${firstVid}" class="thumb-media" alt="影片縮圖">
-              </div>`
-              : `
-              <div class="pet-thumb w-16 h-16 rounded-lg bg-gray-100"></div>`);
-
+              <div class="w-16 h-16 rounded-lg bg-gray-100 video-thumb">
+                <video data-thumb-video="1" class="video-preview w-full h-full object-cover" src="${media0}"></video>
+              </div>
+            `
+            : `<img src="${media0}" class="w-16 h-16 object-cover rounded-lg bg-gray-100">`;
           return `
         <div class="rounded-xl ring-1 ring-gray-200 p-3 flex gap-3 items-center cursor-pointer"
              data-id="${p.id}">
-          ${thumbHtml}
+          ${thumb}
           <div class="min-w-0 flex-1">
             <div class="font-semibold truncate">${p.name}</div>
             <div class="text-xs text-gray-600 mt-1 truncate">
@@ -1565,6 +1755,13 @@ async function makeThumbURL(file) {
         </div>`;
         })
         .join("");
+
+      // 影片縮圖：seek 到第一幀
+      wrap.querySelectorAll('video[data-thumb-video="1"]').forEach((v) => {
+        // 避免點到影片就跳播放器：事件交給外層卡片
+        v.style.pointerEvents = "none";
+        primeVideoThumbEl(v);
+      });
 
       wrap.querySelectorAll("[data-id]").forEach((card) =>
         card.addEventListener("click", () => {
