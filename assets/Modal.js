@@ -6,6 +6,14 @@ function isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
 
+const dlg = document.getElementById("petDialog");
+
+const VIDEO_PLAY_BADGE_SVG = `
+  <svg viewBox="0 0 80 80" aria-hidden="true" focusable="false">
+    <circle cx="40" cy="40" r="36" fill="rgba(31, 41, 55, 0.85)" />
+    <polygon points="34,28 34,52 54,40" fill="#ffffff" />
+  </svg>
+`;
 
 function __lockDialogScroll() {
   try { if (typeof lockScroll === "function") lockScroll(); } catch { }
@@ -505,20 +513,7 @@ const dlgImg = document.getElementById("dlgImg");
 
     if (dlgBg) {
       const firstImage = media.find(u => !isVideoUrl(u));
-      if (firstImage) {
-        dlgBg.src = firstImage;
-      } else if (isVid && typeof window !== "undefined" && typeof window.ensureVideoThumbFromUrl === "function") {
-        dlgBg.src = "";
-        try {
-          window.ensureVideoThumbFromUrl(url, 640).then((thumb) => {
-            if (!thumb) return;
-            if (!dlgBg.isConnected) return;
-            dlgBg.src = thumb;
-          }).catch(() => {});
-        } catch (_) {}
-      } else {
-        dlgBg.src = url;
-      }
+      dlgBg.src = firstImage || url;
     }
 
     if (dlgThumbs) {
@@ -543,29 +538,24 @@ const dlgImg = document.getElementById("dlgImg");
 
     if (isVid) {
       const box = document.createElement("div");
-      box.className = "relative w-16 h-16 md:w-20 md:h-20 rounded-md overflow-hidden bg-black/60 dlg-thumb-video";
-      box.dataset.videoUrl = url;
+      box.className = "relative w-16 h-16 md:w-20 md:h-20 rounded-md overflow-hidden bg-black";
+      const v = document.createElement("video");
+      v.src = url;
+      v.className = "w-full h-full object-cover";
+      v.preload = "metadata";
+      v.muted = true;
+      v.playsInline = true;
+      v.setAttribute("playsinline", "");
+      v.setAttribute("webkit-playsinline", "");
+      v.controls = false;
+      v.disablePictureInPicture = true;
 
-      const placeholder = document.createElement("div");
-      placeholder.className = "video-thumb-placeholder";
-      box.appendChild(placeholder);
+      const overlay = document.createElement("div");
+      overlay.className = "video-thumb-play";
+      overlay.innerHTML = VIDEO_PLAY_BADGE_SVG;
 
-      const icon = document.createElement("div");
-      icon.className = "video-play-icon";
-      box.appendChild(icon);
-
-      if (typeof window !== "undefined" && typeof window.ensureVideoThumbFromUrl === "function") {
-        try {
-          window.ensureVideoThumbFromUrl(url, 320).then((thumb) => {
-            if (!thumb || !box.isConnected) return;
-            const img = document.createElement("img");
-            img.src = thumb;
-            img.className = "w-full h-full object-cover";
-            box.insertBefore(img, box.firstChild);
-          }).catch(() => {});
-        } catch (_) {}
-      }
-
+      box.appendChild(v);
+      box.appendChild(overlay);
       wrapper.appendChild(box);
     } else {
       const img = document.createElement("img");
