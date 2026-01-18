@@ -1166,8 +1166,6 @@ async function makeThumbURL(file) {
       }
 
       const btn = document.createElement("button");
-      // iOS Safari 會依「文字大小 / text-size-adjust」放大 rem，導致 Tailwind w-7/h-7 變大。
-      // 這裡改用固定 px 尺寸 + SVG，確保手機/桌機一致。
       btn.className = "preview-remove-btn absolute top-1 right-1 z-20 bg-black/70 text-white rounded-full flex items-center justify-center";
       btn.type = "button";
       btn.innerHTML = `
@@ -1683,13 +1681,36 @@ async function makeThumbURL(file) {
       const wrap = document.getElementById("rowsMobile");
       if (!wrap) return;
 
+      const isVid = (u) => {
+        if (!u) return false;
+        const s = String(u).split("?", 1)[0];
+        return /\.(mp4|webm|ogg|mov|m4v)$/i.test(s);
+      };
+
       wrap.innerHTML = list
         .map((p) => {
-          const img = (Array.isArray(p.images) && p.images[0]) || p.image || "";
+          const media = (Array.isArray(p.images) && p.images.length > 0)
+            ? p.images
+            : (p.image ? [p.image] : []);
+
+          const first = media[0] || "";
+          const thumbImg = media.find((u) => u && !isVid(u)) || "";
+          const hasVideo = media.some((u) => isVid(u));
+
+          let thumbHtml = '';
+          if (thumbImg) {
+            thumbHtml = `<img src="${thumbImg}" class="w-16 h-16 object-cover rounded-lg bg-gray-100" alt="">`;
+          } else if (hasVideo && first) {
+            // 第一個是影片或只有影片：避免 <img src=video> 在 iOS 變破圖
+            thumbHtml = `<div class="w-16 h-16 rounded-lg bg-gray-200 text-gray-700 flex items-center justify-center text-xs">🎬 影片</div>`;
+          } else {
+            thumbHtml = `<div class="w-16 h-16 rounded-lg bg-gray-100"></div>`;
+          }
+
           return `
         <div class="rounded-xl ring-1 ring-gray-200 p-3 flex gap-3 items-center cursor-pointer"
              data-id="${p.id}">
-          <img src="${img}" class="w-16 h-16 object-cover rounded-lg bg-gray-100">
+          ${thumbHtml}
           <div class="min-w-0 flex-1">
             <div class="font-semibold truncate">${p.name}</div>
             <div class="text-xs text-gray-600 mt-1 truncate">

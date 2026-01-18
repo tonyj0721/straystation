@@ -522,6 +522,24 @@ const dlgImg = document.getElementById("dlgImg");
     dlgVideo.onclick = () => openLightbox(media, currentIndex);
   }
 
+    // 縮圖列：圖片用 <img>；影片用 <video>（避免 iOS <img src=video> 破圖），並盡量讓第一幀可見
+  const posterFallback = media.find(u => !isVideoUrl(u)) || "";
+
+  function __primeVideoThumb(v) {
+    // iOS：loadedmetadata 後 seek 一下，通常就會顯示第一幀；不行也至少會顯示 poster
+    v.addEventListener("loadedmetadata", () => {
+      try {
+        const d = v.duration;
+        let t = 0.05;
+        if (Number.isFinite(d) && d > 0.2) {
+          t = Math.min(0.2, d / 2);
+          t = Math.max(0.05, Math.min(t, d - 0.05));
+        }
+        v.currentTime = t;
+      } catch (_) {}
+    }, { once: true });
+  }
+
   dlgThumbs.innerHTML = "";
   media.forEach((url, i) => {
     const isVid = isVideoUrl(url);
@@ -529,10 +547,24 @@ const dlgImg = document.getElementById("dlgImg");
     wrapper.className = "dlg-thumb relative" + (i === 0 ? " active" : "");
 
     if (isVid) {
-      const box = document.createElement("div");
-      box.className = "w-16 h-16 md:w-20 md:h-20 rounded-md bg-black/60 text-white flex items-center justify-center text-xs";
-      box.textContent = "🎬 影片";
-      wrapper.appendChild(box);
+      const v = document.createElement("video");
+      v.src = url;
+      v.muted = true;
+      v.playsInline = true;
+      v.preload = "metadata";
+      v.controls = false;
+      v.disablePictureInPicture = true;
+      v.setAttribute("playsinline", "");
+      v.setAttribute("webkit-playsinline", "");
+      v.className = "w-16 h-16 md:w-20 md:h-20 object-cover rounded-md bg-black";
+      if (posterFallback) v.poster = posterFallback;
+      __primeVideoThumb(v);
+      wrapper.appendChild(v);
+
+      const tag = document.createElement("div");
+      tag.className = "absolute left-1 bottom-1 text-[10px] bg-black/60 text-white px-1.5 py-0.5 rounded";
+      tag.textContent = "影片";
+      wrapper.appendChild(tag);
     } else {
       const img = document.createElement("img");
       img.src = url;
@@ -1103,8 +1135,6 @@ function __makeEditTile(it) {
 
   const btn = document.createElement("button");
   btn.type = "button";
-  // iOS Safari 可能因「文字大小 / text-size-adjust」放大 rem，導致 Tailwind w-7/h-7 變大。
-  // 這裡改用固定 px 尺寸 + SVG，確保手機/桌機一致。
   btn.className = "preview-remove-btn absolute top-1 right-1 z-20 bg-black/70 text-white rounded-full flex items-center justify-center";
   btn.innerHTML = `
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -1337,9 +1367,7 @@ function __makeAdoptedTile(file) {
 
   const btn = document.createElement("button");
   btn.type = "button";
-  // iOS Safari 可能因「文字大小 / text-size-adjust」放大 rem，導致 Tailwind w-7/h-7 變大。
-  // 這裡改用固定 px 尺寸 + SVG，確保手機/桌機一致。
-  btn.className = "preview-remove-btn absolute top-1 right-1 z-20 bg-black/60 text-white rounded-full flex items-center justify-center";
+  btn.className = "preview-remove-btn absolute top-1 right-1 z-20 bg-black/70 text-white rounded-full flex items-center justify-center";
   btn.innerHTML = `
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
       <path d="M18.3 5.7a1 1 0 0 0-1.4 0L12 10.6 7.1 5.7a1 1 0 1 0-1.4 1.4L10.6 12l-4.9 4.9a1 1 0 1 0 1.4 1.4L12 13.4l4.9 4.9a1 1 0 0 0 1.4-1.4L13.4 12l4.9-4.9a1 1 0 0 0 0-1.4z" fill="currentColor"/>
