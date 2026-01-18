@@ -140,6 +140,7 @@ dialog::backdrop {
   bottom: 0px;
   z-index: 10;
   pointer-events: none;
+  line-height:0;
 }
 
 .media-play-btn {
@@ -163,6 +164,7 @@ dialog::backdrop {
   width: 21px;
   height: 21px;
   fill: #fff;
+  display:block;
 }
 
 /* 影片縮圖本體：不顯示原生控制列 */
