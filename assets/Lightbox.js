@@ -154,24 +154,29 @@ function openLightbox(images, index = 0) {
 
       if (isVid) {
         const box = document.createElement("div");
-        box.className = "relative w-14 h-14 md:w-16 md:h-16 rounded-md overflow-hidden bg-black";
-        const v = document.createElement("video");
-        v.src = url;
-        v.className = "w-full h-full object-cover";
-        v.preload = "metadata";
-        v.muted = true;
-        v.playsInline = true;
-        v.setAttribute("playsinline", "");
-        v.setAttribute("webkit-playsinline", "");
-        v.controls = false;
-        v.disablePictureInPicture = true;
+        box.className = "relative w-14 h-14 md:w-16 md:h-16 rounded-md overflow-hidden bg-black/60 lb-thumb-video";
+        box.dataset.videoUrl = url;
 
-        const overlay = document.createElement("div");
-        overlay.className = "video-thumb-play";
-        overlay.innerHTML = VIDEO_PLAY_BADGE_SVG;
+        const placeholder = document.createElement("div");
+        placeholder.className = "video-thumb-placeholder";
+        box.appendChild(placeholder);
 
-        box.appendChild(v);
-        box.appendChild(overlay);
+        const icon = document.createElement("div");
+        icon.className = "video-play-icon";
+        box.appendChild(icon);
+
+        if (typeof window !== "undefined" && typeof window.ensureVideoThumbFromUrl === "function") {
+          try {
+            window.ensureVideoThumbFromUrl(url, 320).then((thumb) => {
+              if (!thumb || !box.isConnected) return;
+              const img = document.createElement("img");
+              img.src = thumb;
+              img.className = "w-full h-full object-cover";
+              box.insertBefore(img, box.firstChild);
+            }).catch(() => {});
+          } catch (_) {}
+        }
+
         wrapper.appendChild(box);
       } else {
         const img = document.createElement("img");

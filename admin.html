@@ -647,19 +647,6 @@
 
   <script src="./assets/firebase-config.js"></script>
   <script type="module">
-    function isVideoUrl(url) {
-      if (!url) return false;
-      const u = String(url).split("?", 1)[0];
-      return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
-    }
-
-    const VIDEO_PLAY_BADGE_SVG = `
-      <svg viewBox="0 0 80 80" aria-hidden="true" focusable="false">
-        <circle cx="40" cy="40" r="36" fill="rgba(31, 41, 55, 0.85)" />
-        <polygon points="34,28 34,52 54,40" fill="#ffffff" />
-      </svg>
-    `;
-
     // 如果 withStableSearchRender 沒定義，就退成「直接渲染」
     const renderStable = (typeof withStableSearchRender === 'function')
       ? withStableSearchRender
@@ -674,6 +661,132 @@
         host.style.minHeight = '685px';
       }
     })();
+
+    // === 通用：影片第一幀縮圖工具（供列表 / Modal / Lightbox 共用） ===
+    function isVideoUrlAdmin(url) {
+      if (!url) return false;
+      const u = String(url).split("?", 1)[0];
+      return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
+    }
+
+    const __videoThumbCache = new Map();
+    const __videoThumbPromiseCache = new Map();
+
+    function ensureVideoThumbFromUrl(url, maxSize = 320) {
+      if (!url) return Promise.resolve(null);
+      if (__videoThumbCache.has(url)) return Promise.resolve(__videoThumbCache.get(url));
+      if (__videoThumbPromiseCache.has(url)) return __videoThumbPromiseCache.get(url);
+
+      const p = __makeVideoThumbFromUrl(url, maxSize)
+        .then((thumb) => {
+          __videoThumbCache.set(url, thumb);
+          __videoThumbPromiseCache.delete(url);
+          return thumb;
+        })
+        .catch((err) => {
+          console.warn('video thumb error', err);
+          __videoThumbPromiseCache.delete(url);
+          return null;
+        });
+
+      __videoThumbPromiseCache.set(url, p);
+      return p;
+    }
+
+    async function __makeVideoThumbFromUrl(url, maxSize = 320) {
+      return new Promise((resolve) => {
+        try {
+          const v = document.createElement('video');
+          v.preload = 'metadata';
+          v.muted = true;
+          v.playsInline = true;
+          v.setAttribute('playsinline', '');
+          v.setAttribute('webkit-playsinline', '');
+          v.crossOrigin = 'anonymous';
+
+          v.onloadedmetadata = async () => {
+            try {
+              let t = 0.05;
+              try {
+                if (Number.isFinite(v.duration) && v.duration > 0.2) {
+                  t = Math.min(0.2, v.duration / 2);
+                  t = Math.max(0.05, Math.min(t, v.duration - 0.05));
+                }
+              } catch (_) {}
+
+              const seek = (time) => new Promise((res) => {
+                const handler = () => {
+                  v.removeEventListener('seeked', handler);
+                  res();
+                };
+                v.addEventListener('seeked', handler);
+                try { v.currentTime = time; } catch (_) { res(); }
+              });
+
+              try {
+                await seek(t);
+              } catch (_) {
+                try { await seek(0.01); } catch (_) {}
+              }
+
+              if (typeof v.requestVideoFrameCallback === 'function') {
+                await new Promise((res) => v.requestVideoFrameCallback(() => res()));
+              } else {
+                if (v.readyState < 2) {
+                  await Promise.race([
+                    new Promise((res) => { v.onloadeddata = () => res(); }),
+                    new Promise((res) => setTimeout(res, 150)),
+                  ]);
+                }
+                await new Promise((res) => setTimeout(res, 30));
+              }
+
+              const W = v.videoWidth || 640;
+              const H = v.videoHeight || 360;
+              const scale = Math.min(1, maxSize / Math.max(W, H));
+              const w = Math.max(1, Math.round(W * scale));
+              const h = Math.max(1, Math.round(H * scale));
+              const c = document.createElement('canvas');
+              c.width = w;
+              c.height = h;
+              const g = c.getContext('2d');
+              g.drawImage(v, 0, 0, w, h);
+
+              let dataUrl = null;
+              try {
+                dataUrl = c.toDataURL('image/jpeg', 0.82);
+              } catch (e) {
+                console.warn('toDataURL failed', e);
+              }
+
+              resolve(dataUrl);
+            } catch (e) {
+              console.warn('__makeVideoThumbFromUrl error', e);
+              resolve(null);
+            } finally {
+              try { v.pause(); } catch (_) {}
+              v.removeAttribute('src');
+              try { v.load && v.load(); } catch (_) {}
+            }
+          };
+
+          v.onerror = () => {
+            resolve(null);
+          };
+
+          v.src = url;
+        } catch (e) {
+          console.warn('video thumb setup failed', e);
+          resolve(null);
+        }
+      });
+    }
+
+    // 提供給非 module 的 Modal.js / Lightbox.js 使用
+    if (!window.ensureVideoThumbFromUrl) {
+      window.ensureVideoThumbFromUrl = ensureVideoThumbFromUrl;
+    }
+
 
     // ===============================
     // Firebase 設定與初始化
@@ -1698,34 +1811,18 @@ async function makeThumbURL(file) {
 
       wrap.innerHTML = list
         .map((p) => {
-          const first = (Array.isArray(p.images) && p.images[0]) || p.image || "";
-          const thumbUrl = String(first || "").trim();
-          const isVid = thumbUrl && isVideoUrl(thumbUrl);
+          const media = Array.isArray(p.images) && p.images.length > 0
+            ? p.images
+            : (p.image ? [p.image] : []);
+          const first = media[0] || "";
+          const isVid = isVideoUrlAdmin(first);
 
-          let thumbHtml = "";
-          if (!thumbUrl) {
-            thumbHtml = `
-          <div class="w-16 h-16 rounded-lg bg-gray-100 flex items-center justify-center text-xs text-gray-400">
-            無圖片
-          </div>`;
-          } else if (isVid) {
-            thumbHtml = `
-          <div class="relative w-16 h-16 rounded-lg overflow-hidden bg-black">
-            <video
-              src="${thumbUrl}"
-              class="w-full h-full object-cover"
-              preload="metadata"
-              muted
-              playsinline
-              webkit-playsinline
-            ></video>
-            <div class="video-thumb-play">
-              ${VIDEO_PLAY_BADGE_SVG}
-            </div>
-          </div>`;
-          } else {
-            thumbHtml = `<img src="${thumbUrl}" class="w-16 h-16 object-cover rounded-lg bg-gray-100">`;
-          }
+          const thumbHtml = isVid
+            ? `<div class="relative w-16 h-16 rounded-lg overflow-hidden bg-black/60 js-video-thumb" data-video-url="${first}">
+                 <div class="video-thumb-placeholder"></div>
+                 <div class="video-play-icon"></div>
+               </div>`
+            : `<img src="${first}" class="w-16 h-16 object-cover rounded-lg bg-gray-100">`;
 
           return `
         <div class="rounded-xl ring-1 ring-gray-200 p-3 flex gap-3 items-center cursor-pointer"
@@ -1747,9 +1844,37 @@ async function makeThumbURL(file) {
           if (data) openDialog(data.id);
         })
       );
-    }
 
-    // === 名字輸入：即時重複檢查（建立時用） ===
+      // 動態產生影片第一幀縮圖
+      wrap.querySelectorAll('.js-video-thumb[data-video-url]').forEach((box) => {
+        const url = box.getAttribute('data-video-url');
+        if (!url) return;
+
+        if (typeof ensureVideoThumbFromUrl === 'function') {
+          ensureVideoThumbFromUrl(url, 320)
+            .then((thumb) => {
+              if (!box.isConnected) return;
+              if (thumb) {
+                const img = document.createElement('img');
+                img.src = thumb;
+                img.className = 'w-16 h-16 object-cover rounded-lg';
+                box.insertBefore(img, box.firstChild);
+              } else {
+                const v = document.createElement('video');
+                v.src = url;
+                v.preload = 'metadata';
+                v.muted = true;
+                v.playsInline = true;
+                v.setAttribute('playsinline', '');
+                v.setAttribute('webkit-playsinline', '');
+                v.className = 'w-16 h-16 object-cover rounded-lg video-thumb-video';
+                box.insertBefore(v, box.firstChild);
+              }
+            })
+            .catch(() => {});
+        }
+      });
+    }    // === 名字輸入：即時重複檢查（建立時用） ===
     (() => {
       const input = document.getElementById("name");
       if (!input) return;
