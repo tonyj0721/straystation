@@ -6,14 +6,6 @@ function isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
 
-const dlg = document.getElementById("petDialog");
-
-const VIDEO_PLAY_BADGE_SVG = `
-  <svg viewBox="0 0 80 80" aria-hidden="true" focusable="false">
-    <circle cx="40" cy="40" r="36" fill="rgba(31, 41, 55, 0.85)" />
-    <polygon points="34,28 34,52 54,40" fill="#ffffff" />
-  </svg>
-`;
 
 function __lockDialogScroll() {
   try { if (typeof lockScroll === "function") lockScroll(); } catch { }
@@ -534,14 +526,14 @@ const dlgImg = document.getElementById("dlgImg");
   media.forEach((url, i) => {
     const isVid = isVideoUrl(url);
     const wrapper = document.createElement("div");
-    wrapper.className = "dlg-thumb relative" + (i === 0 ? " active" : "");
+    wrapper.className = "dlg-thumb" + (i === 0 ? " active" : "");
+
+    const inner = document.createElement("div");
+    inner.className = "relative w-full h-full";
 
     if (isVid) {
-      const box = document.createElement("div");
-      box.className = "relative w-16 h-16 md:w-20 md:h-20 rounded-md overflow-hidden bg-black";
       const v = document.createElement("video");
       v.src = url;
-      v.className = "w-full h-full object-cover";
       v.preload = "metadata";
       v.muted = true;
       v.playsInline = true;
@@ -549,20 +541,24 @@ const dlgImg = document.getElementById("dlgImg");
       v.setAttribute("webkit-playsinline", "");
       v.controls = false;
       v.disablePictureInPicture = true;
+      v.className = "w-full h-full object-cover rounded-md bg-black video-thumb";
 
       const overlay = document.createElement("div");
-      overlay.className = "video-thumb-play";
-      overlay.innerHTML = VIDEO_PLAY_BADGE_SVG;
+      overlay.className = "video-thumb-overlay";
+      const icon = document.createElement("div");
+      icon.className = "video-thumb-icon";
+      overlay.appendChild(icon);
 
-      box.appendChild(v);
-      box.appendChild(overlay);
-      wrapper.appendChild(box);
+      inner.appendChild(v);
+      inner.appendChild(overlay);
     } else {
       const img = document.createElement("img");
       img.src = url;
-      img.className = "w-16 h-16 md:w-20 md:h-20 object-cover rounded-md";
-      wrapper.appendChild(img);
+      img.className = "w-full h-full object-cover rounded-md";
+      inner.appendChild(img);
     }
+
+    wrapper.appendChild(inner);
 
     wrapper.addEventListener("click", () => {
       showDialogMedia(i);

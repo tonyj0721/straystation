@@ -11,6 +11,7 @@ history.scrollRestoration = "manual";
 window.scrollTo(0, 0);
 
 // ---- Modal + Lightbox 共用狀態 ----
+const dlg = document.getElementById('petDialog');
 const lb = document.getElementById("lightbox");
 const lbImg = document.getElementById("lbImg");
 const lbVideo = document.getElementById("lbVideo");
@@ -151,12 +152,12 @@ function openLightbox(images, index = 0) {
       const wrapper = document.createElement("div");
       wrapper.className = "lb-thumb" + (i === lbIndex ? " active" : "");
 
+      const inner = document.createElement("div");
+      inner.className = "relative w-full h-full";
+
       if (isVid) {
-        const box = document.createElement("div");
-        box.className = "relative w-14 h-14 md:w-16 md:h-16 rounded-md overflow-hidden bg-black";
         const v = document.createElement("video");
         v.src = url;
-        v.className = "w-full h-full object-cover";
         v.preload = "metadata";
         v.muted = true;
         v.playsInline = true;
@@ -164,20 +165,24 @@ function openLightbox(images, index = 0) {
         v.setAttribute("webkit-playsinline", "");
         v.controls = false;
         v.disablePictureInPicture = true;
+        v.className = "w-full h-full object-cover rounded-md bg-black video-thumb";
 
         const overlay = document.createElement("div");
-        overlay.className = "video-thumb-play";
-        overlay.innerHTML = VIDEO_PLAY_BADGE_SVG;
+        overlay.className = "video-thumb-overlay";
+        const icon = document.createElement("div");
+        icon.className = "video-thumb-icon";
+        overlay.appendChild(icon);
 
-        box.appendChild(v);
-        box.appendChild(overlay);
-        wrapper.appendChild(box);
+        inner.appendChild(v);
+        inner.appendChild(overlay);
       } else {
         const img = document.createElement("img");
         img.src = url;
-        img.className = "w-14 h-14 md:w-16 md:h-16 object-cover rounded-md";
-        wrapper.appendChild(img);
+        img.className = "w-full h-full object-cover rounded-md";
+        inner.appendChild(img);
       }
+
+      wrapper.appendChild(inner);
 
       wrapper.addEventListener("click", () => {
         lbIndex = i;

@@ -647,19 +647,6 @@
 
   <script src="./assets/firebase-config.js"></script>
   <script type="module">
-    function isVideoUrl(url) {
-      if (!url) return false;
-      const u = String(url).split("?", 1)[0];
-      return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
-    }
-
-    const VIDEO_PLAY_BADGE_SVG = `
-      <svg viewBox="0 0 80 80" aria-hidden="true" focusable="false">
-        <circle cx="40" cy="40" r="36" fill="rgba(31, 41, 55, 0.85)" />
-        <polygon points="34,28 34,52 54,40" fill="#ffffff" />
-      </svg>
-    `;
-
     // 如果 withStableSearchRender 沒定義，就退成「直接渲染」
     const renderStable = (typeof withStableSearchRender === 'function')
       ? withStableSearchRender
@@ -674,6 +661,12 @@
         host.style.minHeight = '685px';
       }
     })();
+
+    function isVideoUrl(url) {
+      if (!url) return false;
+      const u = String(url).split("?", 1)[0];
+      return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
+    }
 
     // ===============================
     // Firebase 設定與初始化
@@ -1698,34 +1691,22 @@ async function makeThumbURL(file) {
 
       wrap.innerHTML = list
         .map((p) => {
-          const first = (Array.isArray(p.images) && p.images[0]) || p.image || "";
-          const thumbUrl = String(first || "").trim();
-          const isVid = thumbUrl && isVideoUrl(thumbUrl);
+          const img = (Array.isArray(p.images) && p.images[0]) || p.image || "";
+          const isVid = isVideoUrl(img);
 
-          let thumbHtml = "";
-          if (!thumbUrl) {
-            thumbHtml = `
-          <div class="w-16 h-16 rounded-lg bg-gray-100 flex items-center justify-center text-xs text-gray-400">
-            無圖片
-          </div>`;
-          } else if (isVid) {
-            thumbHtml = `
-          <div class="relative w-16 h-16 rounded-lg overflow-hidden bg-black">
-            <video
-              src="${thumbUrl}"
-              class="w-full h-full object-cover"
-              preload="metadata"
-              muted
-              playsinline
-              webkit-playsinline
-            ></video>
-            <div class="video-thumb-play">
-              ${VIDEO_PLAY_BADGE_SVG}
-            </div>
-          </div>`;
-          } else {
-            thumbHtml = `<img src="${thumbUrl}" class="w-16 h-16 object-cover rounded-lg bg-gray-100">`;
-          }
+          const thumbHtml = isVid
+            ? `
+        <div class="relative w-16 h-16 flex-shrink-0">
+          <video src="${img}" class="w-16 h-16 object-cover rounded-lg bg-black video-thumb"
+                 muted playsinline preload="metadata" webkit-playsinline></video>
+          <div class="video-thumb-overlay">
+            <div class="video-thumb-icon"></div>
+          </div>
+        </div>`
+            : `
+        <div class="relative w-16 h-16 flex-shrink-0">
+          <img src="${img}" class="w-16 h-16 object-cover rounded-lg bg-gray-100" loading="lazy" decoding="async">
+        </div>`;
 
           return `
         <div class="rounded-xl ring-1 ring-gray-200 p-3 flex gap-3 items-center cursor-pointer"
@@ -1747,6 +1728,8 @@ async function makeThumbURL(file) {
           if (data) openDialog(data.id);
         })
       );
+    }
+
     }
 
     // === 名字輸入：即時重複檢查（建立時用） ===
