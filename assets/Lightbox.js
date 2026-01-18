@@ -146,49 +146,21 @@ function openLightbox(images, index = 0) {
   // 建立縮圖列
   const lbThumbsInner = document.getElementById("lbThumbsInner");
   if (lbThumbsInner) {
-        lbThumbsInner.innerHTML = "";
-    const posterFallback = lbImages.find(u => (typeof isVideoUrl === 'function') ? !isVideoUrl(u) : true) || "";
-
-    function __primeVideoThumb(v) {
-      v.addEventListener("loadedmetadata", () => {
-        try {
-          const d = v.duration;
-          let t = 0.05;
-          if (Number.isFinite(d) && d > 0.2) {
-            t = Math.min(0.2, d / 2);
-            t = Math.max(0.05, Math.min(t, d - 0.05));
-          }
-          v.currentTime = t;
-        } catch (_) {}
-      }, { once: true });
-    }
-
+    lbThumbsInner.innerHTML = "";
     lbImages.forEach((url, i) => {
       const isVid = isVideoUrl(url);
       const wrapper = document.createElement("div");
       wrapper.className = "lb-thumb" + (i === lbIndex ? " active" : "");
 
       if (isVid) {
-        const v = document.createElement("video");
-        v.src = url;
-        v.muted = true;
-        v.playsInline = true;
-        v.preload = "metadata";
-        v.controls = false;
-        v.disablePictureInPicture = true;
-        v.setAttribute("playsinline", "");
-        v.setAttribute("webkit-playsinline", "");
-        if (posterFallback && !isVideoUrl(posterFallback)) v.poster = posterFallback;
-        __primeVideoThumb(v);
-        wrapper.appendChild(v);
-
-        const tag = document.createElement("div");
-        tag.className = "lb-thumb-tag";
-        tag.textContent = "影片";
-        wrapper.appendChild(tag);
+        const box = document.createElement("div");
+        box.className = "w-14 h-14 md:w-16 md:h-16 rounded-md bg-black/60 text-white flex items-center justify-center text-xs";
+        box.textContent = "🎬 影片";
+        wrapper.appendChild(box);
       } else {
         const img = document.createElement("img");
         img.src = url;
+        img.className = "w-14 h-14 md:w-16 md:h-16 object-cover rounded-md";
         wrapper.appendChild(img);
       }
 
