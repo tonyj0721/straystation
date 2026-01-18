@@ -7,37 +7,6 @@ function isVideoUrl(url) {
 }
 
 
-// --- Video thumbnail helpers (Lightbox thumbs) ---
-const __THUMB_PLAY_SVG = `
-<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-  <circle cx="32" cy="32" r="30" fill="rgba(0,0,0,0.45)"/>
-  <path d="M26 20 L26 44 L46 32 Z" fill="#fff"/>
-</svg>
-`;
-
-function __primeVideoThumbsFallback(root = document) {
-  const scope = (root && root.querySelectorAll) ? root : document;
-  scope.querySelectorAll('video[data-video-thumb="1"]').forEach((video) => {
-    if (video.dataset.primed) return;
-    video.dataset.primed = '1';
-    try {
-      video.muted = true;
-      video.playsInline = true;
-      video.preload = 'metadata';
-      if (video.readyState < 1) {
-        try { video.load(); } catch (_) {}
-      }
-      const t = 0.01;
-      const finish = () => { try { video.pause(); } catch (_) {} };
-      video.addEventListener('seeked', finish, { once: true });
-      video.addEventListener('loadeddata', finish, { once: true });
-      try { video.currentTime = t; } catch (_) { finish(); }
-      setTimeout(finish, 800);
-    } catch (_) {}
-  });
-}
-
-
 history.scrollRestoration = "manual";
 window.scrollTo(0, 0);
 
@@ -184,25 +153,14 @@ function openLightbox(images, index = 0) {
       wrapper.className = "lb-thumb" + (i === lbIndex ? " active" : "");
 
       if (isVid) {
-        wrapper.classList.add('video-thumb-wrap');
-        const v = document.createElement('video');
-        v.src = url;
-        v.muted = true;
-        v.playsInline = true;
-        v.preload = 'metadata';
-        v.className = 'lb-thumb-media video-thumb-media';
-        v.setAttribute('data-video-thumb', '1');
-        v.setAttribute('tabindex', '-1');
-        wrapper.appendChild(v);
-
-        const overlay = document.createElement('div');
-        overlay.className = 'video-thumb-play';
-        overlay.innerHTML = __THUMB_PLAY_SVG;
-        wrapper.appendChild(overlay);
+        const box = document.createElement("div");
+        box.className = "w-14 h-14 md:w-16 md:h-16 rounded-md bg-black/60 text-white flex items-center justify-center text-xs";
+        box.textContent = "🎬 影片";
+        wrapper.appendChild(box);
       } else {
         const img = document.createElement("img");
         img.src = url;
-        img.className = 'lb-thumb-media';
+        img.className = "w-14 h-14 md:w-16 md:h-16 object-cover rounded-md";
         wrapper.appendChild(img);
       }
 
@@ -213,11 +171,6 @@ function openLightbox(images, index = 0) {
 
       lbThumbsInner.appendChild(wrapper);
     });
-
-    // make video thumbs show first frame
-    try {
-      (window.primeVideoThumbs || __primeVideoThumbsFallback)(lbThumbsInner);
-    } catch (_) {}
   }
 
   // 一開始顯示當前項目

@@ -7,61 +7,6 @@ function isVideoUrl(url) {
 }
 
 
-// --- Video thumbnail helpers: show first frame as thumbnail ---
-const __THUMB_PLAY_SVG = `
-<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-  <circle cx="32" cy="32" r="30" fill="rgba(0,0,0,0.45)"/>
-  <path d="M26 20 L26 44 L46 32 Z" fill="#fff"/>
-</svg>
-`;
-
-async function primeVideoThumb(video) {
-  if (!video || video.dataset.primed) return;
-  video.dataset.primed = '1';
-  try {
-    video.muted = true;
-    video.playsInline = true;
-    video.preload = 'metadata';
-
-    // Ensure metadata is loaded
-    if (video.readyState < 1) {
-      await new Promise((res) => {
-        const done = () => res();
-        video.addEventListener('loadedmetadata', done, { once: true });
-        video.addEventListener('error', done, { once: true });
-        try { video.load(); } catch (_) {}
-      });
-    }
-
-    const target = 0.01;
-    await new Promise((res) => {
-      let finished = false;
-      const finish = () => {
-        if (finished) return;
-        finished = true;
-        res();
-      };
-      video.addEventListener('seeked', finish, { once: true });
-      video.addEventListener('loadeddata', finish, { once: true });
-      try { video.currentTime = target; } catch (_) { finish(); }
-      setTimeout(finish, 800);
-    });
-
-    try { video.pause(); } catch (_) {}
-  } catch (_) {}
-}
-
-function primeVideoThumbs(root = document) {
-  const scope = (root && root.querySelectorAll) ? root : document;
-  scope.querySelectorAll('video[data-video-thumb="1"]').forEach((v) => {
-    primeVideoThumb(v);
-  });
-}
-
-// expose for other modules (e.g. Lightbox/admin)
-window.primeVideoThumbs = primeVideoThumbs;
-
-
 function __lockDialogScroll() {
   try { if (typeof lockScroll === "function") lockScroll(); } catch { }
 }
@@ -584,26 +529,14 @@ const dlgImg = document.getElementById("dlgImg");
     wrapper.className = "dlg-thumb relative" + (i === 0 ? " active" : "");
 
     if (isVid) {
-      wrapper.classList.add('video-thumb-wrap');
-      const v = document.createElement('video');
-      v.src = url;
-      v.muted = true;
-      v.playsInline = true;
-      v.preload = 'metadata';
-      v.className = 'dlg-thumb-media video-thumb-media';
-      v.setAttribute('data-video-thumb', '1');
-      v.setAttribute('tabindex', '-1');
-      wrapper.appendChild(v);
-
-      const overlay = document.createElement('div');
-      overlay.className = 'video-thumb-play';
-      overlay.innerHTML = __THUMB_PLAY_SVG;
-      wrapper.appendChild(overlay);
+      const box = document.createElement("div");
+      box.className = "w-16 h-16 md:w-20 md:h-20 rounded-md bg-black/60 text-white flex items-center justify-center text-xs";
+      box.textContent = "🎬 影片";
+      wrapper.appendChild(box);
     } else {
       const img = document.createElement("img");
       img.src = url;
-      img.className = 'dlg-thumb-media';
-      img.style.objectFit = 'cover';
+      img.className = "w-16 h-16 md:w-20 md:h-20 object-cover rounded-md";
       wrapper.appendChild(img);
     }
 
@@ -613,9 +546,6 @@ const dlgImg = document.getElementById("dlgImg");
 
     dlgThumbs.appendChild(wrapper);
   });
-
-  // make video thumbs show first frame
-  try { primeVideoThumbs(dlgThumbs); } catch (_) {}
 
   showDialogMedia(currentIndex);
 
