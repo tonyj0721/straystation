@@ -7,6 +7,93 @@ function isVideoUrl(url) {
 }
 
 
+// If Modal.js didn't define poster helper, provide a fallback
+(function(){
+  if (window.__getVideoPoster) return;
+  window.__DEFAULT_VIDEO_POSTER = window.__DEFAULT_VIDEO_POSTER || "data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%20100%20100%27%3E%3Ccircle%20cx=%2750%27%20cy=%2750%27%20r=%2748%27%20fill=%27rgb(156,163,175)%27/%3E%3Cpolygon%20points=%2742,30%2042,70%2072,50%27%20fill=%27white%27/%3E%3C/svg%3E";
+  const cache = window.__videoPosterCache || (window.__videoPosterCache = new Map());
+  const inflight = window.__videoPosterInflight || (window.__videoPosterInflight = new Map());
+
+  async function _makeFirstFramePoster(url){
+    const v = document.createElement('video');
+    v.preload = 'metadata';
+    v.muted = true;
+    v.playsInline = true;
+    v.setAttribute('playsinline','');
+    v.setAttribute('webkit-playsinline','');
+    v.crossOrigin = 'anonymous';
+    v.src = url;
+
+    const wait = (ev, ms=2500) => new Promise((res, rej) => {
+      let t = setTimeout(() => { cleanup(); rej(new Error('timeout:'+ev)); }, ms);
+      const on = () => { cleanup(); res(); };
+      const cleanup = () => { clearTimeout(t); v.removeEventListener(ev, on); };
+      v.addEventListener(ev, on, { once:true });
+    });
+
+    try {
+      await Promise.race([wait('loadedmetadata', 3500), wait('loadeddata', 3500)]);
+      let t = 0.12;
+      try {
+        if (Number.isFinite(v.duration) && v.duration > 0.25) {
+          t = Math.min(0.25, v.duration / 2);
+          t = Math.max(0.08, Math.min(t, v.duration - 0.05));
+        }
+        v.currentTime = t;
+        await wait('seeked', 2500);
+      } catch (_) {}
+
+      if (typeof v.requestVideoFrameCallback === 'function') {
+        await new Promise((res) => v.requestVideoFrameCallback(() => res()));
+      } else {
+        await new Promise((r) => setTimeout(r, 30));
+      }
+
+      const vw = v.videoWidth || 640;
+      const vh = v.videoHeight || 360;
+      const maxW = 480;
+      const scale = Math.min(1, maxW / Math.max(vw, vh));
+      const w = Math.max(1, Math.round(vw * scale));
+      const h = Math.max(1, Math.round(vh * scale));
+
+      const c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      const g = c.getContext('2d', { alpha:false });
+      g.drawImage(v, 0, 0, w, h);
+
+      let dataUrl = '';
+      try { dataUrl = c.toDataURL('image/jpeg', 0.82); } catch (_) { dataUrl = ''; }
+      return dataUrl || '';
+    } finally {
+      try { v.pause(); } catch (_) {}
+      v.removeAttribute('src');
+      try { v.load(); } catch (_) {}
+    }
+  }
+
+  async function getVideoPoster(url){
+    if (!url) return window.__DEFAULT_VIDEO_POSTER;
+    if (cache.has(url)) return cache.get(url);
+    if (inflight.has(url)) return inflight.get(url);
+
+    const p = (async () => {
+      let poster = '';
+      try { poster = await _makeFirstFramePoster(url); } catch (_) { poster = ''; }
+      poster = poster || window.__DEFAULT_VIDEO_POSTER;
+      cache.set(url, poster);
+      inflight.delete(url);
+      return poster;
+    })();
+
+    inflight.set(url, p);
+    return p;
+  }
+
+  window.__getVideoPoster = getVideoPoster;
+})();
+
+
 history.scrollRestoration = "manual";
 window.scrollTo(0, 0);
 
@@ -147,21 +234,25 @@ function openLightbox(images, index = 0) {
   const lbThumbsInner = document.getElementById("lbThumbsInner");
   if (lbThumbsInner) {
     lbThumbsInner.innerHTML = "";
+
     lbImages.forEach((url, i) => {
       const isVid = isVideoUrl(url);
       const wrapper = document.createElement("div");
       wrapper.className = "lb-thumb" + (i === lbIndex ? " active" : "");
+      wrapper.dataset.index = String(i);
+      if (isVid) wrapper.classList.add("is-video");
 
-      if (isVid) {
-        const box = document.createElement("div");
-        box.className = "w-14 h-14 md:w-16 md:h-16 rounded-md bg-black/60 text-white flex items-center justify-center text-xs";
-        box.textContent = "🎬 影片";
-        wrapper.appendChild(box);
-      } else {
-        const img = document.createElement("img");
-        img.src = url;
-        img.className = "w-14 h-14 md:w-16 md:h-16 object-cover rounded-md";
-        wrapper.appendChild(img);
+      const img = document.createElement("img");
+      img.className = "thumb-media";
+      img.alt = isVid ? "影片" : "照片";
+      img.src = isVid ? (window.__DEFAULT_VIDEO_POSTER || "") : url;
+      wrapper.appendChild(img);
+
+      if (isVid && window.__getVideoPoster) {
+        window.__getVideoPoster(url).then((poster) => {
+          if (!img.isConnected) return;
+          if (poster) img.src = poster;
+        });
       }
 
       wrapper.addEventListener("click", () => {
@@ -171,6 +262,7 @@ function openLightbox(images, index = 0) {
 
       lbThumbsInner.appendChild(wrapper);
     });
+
   }
 
   // 一開始顯示當前項目

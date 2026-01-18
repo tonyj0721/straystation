@@ -7,6 +7,126 @@ function isVideoUrl(url) {
 }
 
 
+// ===============================
+// Video thumbnail (first frame) helpers
+// ===============================
+(function(){
+  const DEFAULT_POSTER = "data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%20100%20100%27%3E%3Ccircle%20cx=%2750%27%20cy=%2750%27%20r=%2748%27%20fill=%27rgb(156,163,175)%27/%3E%3Cpolygon%20points=%2742,30%2042,70%2072,50%27%20fill=%27white%27/%3E%3C/svg%3E";
+  window.__DEFAULT_VIDEO_POSTER = window.__DEFAULT_VIDEO_POSTER || DEFAULT_POSTER;
+
+  const cache = window.__videoPosterCache || (window.__videoPosterCache = new Map());
+  const inflight = window.__videoPosterInflight || (window.__videoPosterInflight = new Map());
+
+  function _isProbablyBlank(canvas){
+    try {
+      const g = canvas.getContext('2d');
+      const w = canvas.width, h = canvas.height;
+      const x = Math.max(0, (w/2)|0), y = Math.max(0, (h/2)|0);
+      const d = g.getImageData(x, y, 1, 1).data;
+      // If center pixel is fully transparent or near-black, treat as possibly blank
+      return (d[3] === 0) || (d[0] < 5 && d[1] < 5 && d[2] < 5);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  async function _makeFirstFramePoster(url){
+    const v = document.createElement('video');
+    v.preload = 'metadata';
+    v.muted = true;
+    v.playsInline = true;
+    v.setAttribute('playsinline', '');
+    v.setAttribute('webkit-playsinline', '');
+    v.crossOrigin = 'anonymous';
+    v.src = url;
+
+    const wait = (ev, ms=2500) => new Promise((res, rej) => {
+      let t = setTimeout(() => { cleanup(); rej(new Error('timeout:'+ev)); }, ms);
+      const on = () => { cleanup(); res(); };
+      const cleanup = () => { clearTimeout(t); v.removeEventListener(ev, on); };
+      v.addEventListener(ev, on, { once:true });
+    });
+
+    try {
+      // iOS: loadedmetadata is more reliable than loadeddata
+      await Promise.race([wait('loadedmetadata', 3500), wait('loadeddata', 3500)]);
+
+      let t = 0.12;
+      try {
+        if (Number.isFinite(v.duration) && v.duration > 0.25) {
+          t = Math.min(0.25, v.duration / 2);
+          t = Math.max(0.08, Math.min(t, v.duration - 0.05));
+        }
+        v.currentTime = t;
+        await wait('seeked', 2500);
+      } catch (_) {
+        // ignore
+      }
+
+      // If supported, wait for a decoded frame
+      if (typeof v.requestVideoFrameCallback === 'function') {
+        await new Promise((res) => v.requestVideoFrameCallback(() => res()));
+      } else {
+        // small delay for rendering
+        await new Promise((r) => setTimeout(r, 30));
+      }
+
+      const vw = v.videoWidth || 640;
+      const vh = v.videoHeight || 360;
+      const maxW = 480;
+      const scale = Math.min(1, maxW / Math.max(vw, vh));
+      const w = Math.max(1, Math.round(vw * scale));
+      const h = Math.max(1, Math.round(vh * scale));
+
+      const c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      const g = c.getContext('2d', { alpha:false });
+      g.drawImage(v, 0, 0, w, h);
+
+      // Export poster; may fail if CORS not allowed
+      let dataUrl = '';
+      try {
+        dataUrl = c.toDataURL('image/jpeg', 0.82);
+      } catch (_) {
+        dataUrl = '';
+      }
+
+      if (!dataUrl) return '';
+      return dataUrl;
+    } finally {
+      try { v.pause(); } catch (_) {}
+      v.removeAttribute('src');
+      try { v.load(); } catch (_) {}
+    }
+  }
+
+  async function getVideoPoster(url){
+    if (!url) return window.__DEFAULT_VIDEO_POSTER;
+    if (cache.has(url)) return cache.get(url);
+    if (inflight.has(url)) return inflight.get(url);
+
+    const p = (async () => {
+      let poster = '';
+      try {
+        poster = await _makeFirstFramePoster(url);
+      } catch (_) {
+        poster = '';
+      }
+      poster = poster || window.__DEFAULT_VIDEO_POSTER;
+      cache.set(url, poster);
+      inflight.delete(url);
+      return poster;
+    })();
+
+    inflight.set(url, p);
+    return p;
+  }
+
+  window.__getVideoPoster = window.__getVideoPoster || getVideoPoster;
+})();
+
+
 function __lockDialogScroll() {
   try { if (typeof lockScroll === "function") lockScroll(); } catch { }
 }
@@ -229,85 +349,41 @@ async function __decodeToBitmap(file) {
   const type = (file && file.type) || "";
   const isVideo = type.startsWith("video/");
   const isImage = type.startsWith("image/");
-  // 影片：抓一張影格當縮圖（iOS 需要用 loadedmetadata + seek / RVFC 才容易出現畫面）
+
+  // 影片：抓一張影格當縮圖
   if (isVideo) {
     const vUrl = URL.createObjectURL(file);
     try {
       const v = document.createElement("video");
-      v.preload = "metadata";
       v.src = vUrl;
       v.muted = true;
       v.playsInline = true;
-      v.setAttribute("playsinline", "");
-      v.setAttribute("webkit-playsinline", "");
-      v.disablePictureInPicture = true;
 
-      // iOS Safari 有時不會觸發 loadeddata（不播放就不解碼畫面），所以用 loadedmetadata + seek 逼出第一張影格
       await new Promise((res, rej) => {
-        v.onloadedmetadata = () => res();
+        v.onloadeddata = () => res();
         v.onerror = (e) => rej(e || new Error("載入影片失敗"));
       });
 
-      // 目標抓取時間：盡量靠前，但不要是 0（iOS 有時 seek 到 0 會拿不到 frame）
-      let t = 0.05;
       try {
-        if (Number.isFinite(v.duration) && v.duration > 0.2) {
-          t = Math.min(0.2, v.duration / 2);
-          t = Math.max(0.05, Math.min(t, v.duration - 0.05));
-        }
-      } catch (_) { /* ignore */ }
-
-      // 先嘗試 seek
-      try {
-        v.currentTime = t;
-        await new Promise((res) => {
-          const done = () => { v.removeEventListener("seeked", done); res(); };
-          v.addEventListener("seeked", done);
-        });
-      } catch (_) {
-        // 有些檔案/瀏覽器不給 seek，就用 0.01 退回
-        try {
-          v.currentTime = 0.01;
+        if (!Number.isNaN(v.duration) && v.duration > 0.2) {
+          v.currentTime = Math.min(0.2, v.duration / 2);
           await new Promise((res) => {
-            const done = () => { v.removeEventListener("seeked", done); res(); };
-            v.addEventListener("seeked", done);
+            const h = () => { v.removeEventListener("seeked", h); res(); };
+            v.addEventListener("seeked", h);
           });
-        } catch (_) { /* ignore */ }
-      }
-
-      // 等待畫面真正解碼（RVFC 最可靠）
-      if (typeof v.requestVideoFrameCallback === "function") {
-        await new Promise((res) => v.requestVideoFrameCallback(() => res()));
-      } else {
-        // readyState >= 2 才有 current frame data
-        if (v.readyState < 2) {
-          await Promise.race([
-            new Promise((res) => { v.onloadeddata = () => res(); }),
-            new Promise((res) => setTimeout(res, 150))
-          ]);
         }
-        await new Promise((res) => setTimeout(res, 30));
-      }
+      } catch (_) { /* 忽略定位錯誤，直接用第一張影格 */ }
 
-      // iOS 有時仍然黑畫面：試著「靜音播放一下再暫停」逼出 frame
-      try {
-        await v.play();
-        v.pause();
-      } catch (_) { /* ignore */ }
-
-      const w = v.videoWidth || 640;
-      const h = v.videoHeight || 360;
       const c = document.createElement("canvas");
-      c.width = w;
-      c.height = h;
+      c.width = v.videoWidth || 640;
+      c.height = v.videoHeight || 360;
       const g = c.getContext("2d");
-      g.drawImage(v, 0, 0, w, h);
+      g.drawImage(v, 0, 0, c.width, c.height);
       return c;
     } finally {
       URL.revokeObjectURL(vUrl);
     }
   }
-
 
   // 圖片：優先用 createImageBitmap（非阻塞解碼）
   if (window.createImageBitmap && isImage) {
@@ -526,18 +602,21 @@ const dlgImg = document.getElementById("dlgImg");
   media.forEach((url, i) => {
     const isVid = isVideoUrl(url);
     const wrapper = document.createElement("div");
-    wrapper.className = "dlg-thumb relative" + (i === 0 ? " active" : "");
+    wrapper.className = "dlg-thumb" + (i === currentIndex ? " active" : "");
+    wrapper.dataset.index = String(i);
+    if (isVid) wrapper.classList.add("is-video");
 
-    if (isVid) {
-      const box = document.createElement("div");
-      box.className = "w-16 h-16 md:w-20 md:h-20 rounded-md bg-black/60 text-white flex items-center justify-center text-xs";
-      box.textContent = "🎬 影片";
-      wrapper.appendChild(box);
-    } else {
-      const img = document.createElement("img");
-      img.src = url;
-      img.className = "w-16 h-16 md:w-20 md:h-20 object-cover rounded-md";
-      wrapper.appendChild(img);
+    const img = document.createElement("img");
+    img.className = "thumb-media";
+    img.alt = isVid ? "影片" : "照片";
+    img.src = isVid ? (window.__DEFAULT_VIDEO_POSTER || "") : url;
+    wrapper.appendChild(img);
+
+    if (isVid && window.__getVideoPoster) {
+      window.__getVideoPoster(url).then((poster) => {
+        if (!img.isConnected) return;
+        if (poster) img.src = poster;
+      });
     }
 
     wrapper.addEventListener("click", () => {
@@ -548,6 +627,7 @@ const dlgImg = document.getElementById("dlgImg");
   });
 
   showDialogMedia(currentIndex);
+
 
 // 5. 顯示用文字
   document.getElementById('dlgName').textContent = p.name;
@@ -929,40 +1009,6 @@ const editCount = q("#editCount");
 
 const MAX_EDIT_FILES = 5;
 
-// 影片按鈕 icon（play / pause）
-const __PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
-const __PAUSE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"></path></svg>';
-
-async function __safePlayVideo(v) {
-  try {
-    await v.play();
-    return;
-  } catch (_) {}
-  // iOS / 部分瀏覽器可能需要先靜音才允許播放（至少先讓預覽能播）
-  try {
-    v.muted = true;
-    await v.play();
-  } catch (e) {
-    console.warn('video play failed:', e);
-  }
-}
-
-// File(video) → objectURL（給 <video> 播放用；刪除/關閉編輯時釋放）
-const __editVideoObjUrlCache = new Map();
-function getEditVideoObjURL(file) {
-  if (__editVideoObjUrlCache.has(file)) return __editVideoObjUrlCache.get(file);
-  const u = URL.createObjectURL(file);
-  __editVideoObjUrlCache.set(file, u);
-  return u;
-}
-function revokeEditVideoObjURL(file) {
-  const u = __editVideoObjUrlCache.get(file);
-  if (u) {
-    try { URL.revokeObjectURL(u); } catch (_) {}
-    __editVideoObjUrlCache.delete(file);
-  }
-}
-
 // 狀態：依「目前畫面順序」維護（url=舊圖、file=新圖）
 let editImagesState = { items: [], removeUrls: [] };
 
@@ -971,10 +1017,7 @@ btnPickEdit?.addEventListener("click", () => editFiles?.click());
 // 初始化編輯圖片列表（把舊的檔案縮圖快取清掉，避免記憶體累積）
 function renderEditImages(urls) {
   for (const it of editImagesState.items) {
-    if (it?.kind === "file" && it.file) {
-      revokePreviewThumb(it.file);
-      revokeEditVideoObjURL(it.file);
-    }
+    if (it?.kind === "file" && it.file) revokePreviewThumb(it.file);
   }
   editImagesState.items = (urls || []).map((u) => ({ kind: "url", url: u }));
   editImagesState.removeUrls = [];
@@ -990,137 +1033,51 @@ function __editKey(it) {
 
 function __makeEditTile(it) {
   const wrap = document.createElement("div");
-  wrap.className = "relative select-none overflow-hidden";
+  wrap.className = "relative  select-none";
   wrap.style.touchAction = "none";
   wrap.style.setProperty("-webkit-touch-callout", "none");
   wrap.style.userSelect = "none";
   wrap.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  const isVid = it.kind === "url"
-    ? isVideoUrl(it.url)
-    : (((it.file && it.file.type) || "").startsWith("video/"));
+  const img = document.createElement("img");
+  img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+  img.alt = "預覽";
+  img.decoding = "async";
+  img.loading = "lazy";
+  img.draggable = false;
+  img.style.webkitUserDrag = "none";
+  img.style.webkitTouchCallout = "none";
+  img.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  let mediaEl = null;
-  let playBtn = null;
-
-  if (isVid) {
-    const v = document.createElement("video");
-    v.className = "w-full aspect-square object-cover rounded-lg bg-gray-100 video-preview";
-    v.preload = "metadata";
-    v.playsInline = true;
-    v.setAttribute("playsinline", "");
-    v.setAttribute("webkit-playsinline", "");
-    v.controls = false;
-    v.disablePictureInPicture = true;
-
-    if (it.kind === "url") {
-      v.src = it.url;
-    } else {
-      v.src = getEditVideoObjURL(it.file);
-      // 用縮圖當 poster，避免黑畫面
-      ensurePreviewThumbURL(it.file)
-        .then((u) => { v.poster = u; })
-        .catch(() => { /* ignore */ });
-    }
-
-    const overlay = document.createElement("div");
-    overlay.className = "media-play-overlay";
-
-    playBtn = document.createElement("button");
-    playBtn.type = "button";
-    playBtn.className = "media-play-btn";
-    playBtn.innerHTML = __PLAY_SVG;
-    playBtn.setAttribute("aria-label", "播放影片");
-
-    const syncBtn = () => {
-      const playing = !v.paused && !v.ended;
-      playBtn.innerHTML = playing ? __PAUSE_SVG : __PLAY_SVG;
-      playBtn.setAttribute("aria-label", playing ? "暫停影片" : "播放影片");
-    };
-
-    v.addEventListener("play", syncBtn);
-    v.addEventListener("pause", syncBtn);
-    v.addEventListener("ended", () => {
-      try { v.currentTime = 0; } catch (_) {}
-      syncBtn();
-    });
-
-    playBtn.addEventListener("click", async (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
-
-      // 同時只播一支（避免多支一起播）
-      try {
-        editPreview?.querySelectorAll?.("video.video-preview")?.forEach((vv) => {
-          if (vv !== v) {
-            try { vv.pause(); } catch (_) {}
-          }
-        });
-      } catch (_) {}
-
-      if (v.paused || v.ended) {
-        await __safePlayVideo(v);
-      } else {
-        try { v.pause(); } catch (_) {}
-      }
-      syncBtn();
-    });
-
-    overlay.appendChild(playBtn);
-
-    wrap.appendChild(v);
-    wrap.appendChild(overlay);
-    mediaEl = v;
+  if (it.kind === "url") {
+    img.src = it.url;
   } else {
-    const img = document.createElement("img");
-    img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
-    img.alt = "預覽";
-    img.decoding = "async";
-    img.loading = "lazy";
-    img.draggable = false;
-    img.style.webkitUserDrag = "none";
-    img.style.webkitTouchCallout = "none";
-    img.addEventListener("contextmenu", (e) => e.preventDefault());
-
-    if (it.kind === "url") {
-      img.src = it.url;
-    } else {
-      img.src = PREVIEW_EMPTY_GIF;
-      ensurePreviewThumbURL(it.file)
-        .then((u) => { img.src = u; })
-        .catch(() => {
-          try {
-            const raw = URL.createObjectURL(it.file);
-            img.src = raw;
-            setTimeout(() => URL.revokeObjectURL(raw), 2000);
-          } catch { }
-        });
-    }
-
-    wrap.appendChild(img);
-    mediaEl = img;
+    img.src = PREVIEW_EMPTY_GIF;
+    ensurePreviewThumbURL(it.file)
+      .then((u) => { img.src = u; })
+      .catch(() => {
+        try {
+          const raw = URL.createObjectURL(it.file);
+          img.src = raw;
+          setTimeout(() => URL.revokeObjectURL(raw), 2000);
+        } catch { }
+      });
   }
 
   const btn = document.createElement("button");
   btn.type = "button";
-  // iOS Safari 可能因「文字大小 / text-size-adjust」放大 rem，導致 Tailwind w-7/h-7 變大。
-  // 這裡改用固定 px 尺寸 + SVG，確保手機/桌機一致。
-  btn.className = "preview-remove-btn absolute top-1 right-1 z-20 bg-black/70 text-white rounded-full flex items-center justify-center";
-  btn.innerHTML = `
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path d="M18.3 5.7a1 1 0 0 0-1.4 0L12 10.6 7.1 5.7a1 1 0 1 0-1.4 1.4L10.6 12l-4.9 4.9a1 1 0 1 0 1.4 1.4L12 13.4l4.9 4.9a1 1 0 0 0 1.4-1.4L13.4 12l4.9-4.9a1 1 0 0 0 0-1.4z" fill="currentColor"/>
-    </svg>
-  `;
+  btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
+  btn.textContent = "✕";
   btn.setAttribute("aria-label", "刪除這張");
-  btn.dataset.remove = "1";
 
+  wrap.appendChild(img);
   wrap.appendChild(btn);
   return wrap;
 }
 
 function __setEditIdx(tile, idx) {
   tile.dataset.idx = String(idx);
-  const btn = tile.querySelector('button[data-remove]');
+  const btn = tile.querySelector("button");
   if (btn) btn.dataset.idx = String(idx);
 }
 
@@ -1135,7 +1092,6 @@ function paintEditPreview() {
       // 移除 tile 時順便釋放縮圖
       if (k && typeof k === "object") {
         try { revokePreviewThumb(k); } catch { }
-        try { revokeEditVideoObjURL(k); } catch { }
       }
       el.remove();
       __editTileMap.delete(k);
@@ -1156,7 +1112,7 @@ function paintEditPreview() {
 
 // 刪除（事件代理）
 editPreview?.addEventListener("click", (e) => {
-  const btn = e.target.closest?.("button[data-remove][data-idx]");
+  const btn = e.target.closest?.("button[data-idx]");
   if (!btn) return;
 
   e.preventDefault();
@@ -1170,7 +1126,6 @@ editPreview?.addEventListener("click", (e) => {
     editImagesState.removeUrls.push(it.url);
   } else if (it.kind === "file") {
     revokePreviewThumb(it.file);
-    revokeEditVideoObjURL(it.file);
   }
 
   editImagesState.items.splice(i, 1);
@@ -1337,14 +1292,8 @@ function __makeAdoptedTile(file) {
 
   const btn = document.createElement("button");
   btn.type = "button";
-  // iOS Safari 可能因「文字大小 / text-size-adjust」放大 rem，導致 Tailwind w-7/h-7 變大。
-  // 這裡改用固定 px 尺寸 + SVG，確保手機/桌機一致。
-  btn.className = "preview-remove-btn absolute top-1 right-1 z-20 bg-black/60 text-white rounded-full flex items-center justify-center";
-  btn.innerHTML = `
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path d="M18.3 5.7a1 1 0 0 0-1.4 0L12 10.6 7.1 5.7a1 1 0 1 0-1.4 1.4L10.6 12l-4.9 4.9a1 1 0 1 0 1.4 1.4L12 13.4l4.9 4.9a1 1 0 0 0 1.4-1.4L13.4 12l4.9-4.9a1 1 0 0 0 0-1.4z" fill="currentColor"/>
-    </svg>
-  `;
+  btn.className = "absolute top-1 right-1 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center";
+  btn.textContent = "✕";
   btn.setAttribute("aria-label", "刪除這張");
 
   wrap.appendChild(img);
@@ -1748,4 +1697,36 @@ async function deleteAllUnder(path) {
     if (dup) setBad(`「${name}」已被使用`);
     else clearState();
   });
+})();
+
+// ===============================
+// Upgrade list thumbnails for videos (rowsMobile)
+// ===============================
+(function(){
+  function upgrade(root){
+    if (!root || !window.__getVideoPoster) return;
+    const nodes = root.querySelectorAll ? root.querySelectorAll('[data-video-thumb]:not([data-video-thumb-ready])') : [];
+    nodes.forEach((img) => {
+      const url = img.getAttribute('data-video-thumb');
+      if (!url) return;
+      img.setAttribute('data-video-thumb-ready','1');
+      window.__getVideoPoster(url).then((poster) => {
+        if (!img.isConnected) return;
+        if (poster) img.src = poster;
+      });
+    });
+  }
+
+  const run = () => {
+    upgrade(document);
+    const wrap = document.getElementById('rowsMobile');
+    if (wrap && !wrap.__videoThumbObserver){
+      const mo = new MutationObserver(() => upgrade(wrap));
+      mo.observe(wrap, { childList:true, subtree:true });
+      wrap.__videoThumbObserver = mo;
+    }
+  };
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
+  else run();
 })();
