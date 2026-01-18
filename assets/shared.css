@@ -182,3 +182,7 @@ video.video-preview::-webkit-media-controls-enclosure {
 #imgPreview > div {
   line-height: 0;
 }
+
+#editCount > div {
+  line-height: 0;
+}
