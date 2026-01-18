@@ -178,7 +178,3 @@ video.video-preview::-webkit-media-controls-enclosure {
   display: none !important;
   -webkit-appearance: none;
 }
-
-#imgPreview > div {
-  line-height: 0;
-}
