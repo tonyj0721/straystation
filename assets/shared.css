@@ -183,3 +183,7 @@ video.video-preview::-webkit-media-controls-enclosure {
 #imgPreview video.video-preview {
   display: block;
 }
+
+#imgPreview > div {
+  line-height: 0;
+}
