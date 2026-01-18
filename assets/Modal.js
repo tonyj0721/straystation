@@ -6,6 +6,54 @@ function isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
 
+// 讓縮圖 <video> 顯示「第一幀」（iOS 也盡量穩）
+async function primeVideoThumbEl(v) {
+  if (!v || v.dataset._primed) return;
+  v.dataset._primed = "1";
+
+  // 一些 iOS/桌機通用的屬性
+  v.muted = true;
+  v.playsInline = true;
+  v.preload = "metadata";
+  v.controls = false;
+  v.disablePictureInPicture = true;
+  v.setAttribute("playsinline", "");
+  v.setAttribute("webkit-playsinline", "");
+
+  try {
+    await new Promise((res, rej) => {
+      if (v.readyState >= 1) return res();
+      v.onloadedmetadata = () => res();
+      v.onerror = () => rej(new Error("video metadata load failed"));
+    });
+
+    // 目標抓取時間：盡量靠前，但不要是 0（iOS 偶爾拿不到 frame）
+    let t = 0.05;
+    try {
+      if (Number.isFinite(v.duration) && v.duration > 0.2) {
+        t = Math.min(0.2, v.duration / 2);
+        t = Math.max(0.05, Math.min(t, v.duration - 0.05));
+      }
+    } catch (_) { /* ignore */ }
+
+    // seek 到第一幀附近
+    try {
+      v.currentTime = t;
+      await new Promise((res) => {
+        const done = () => { v.removeEventListener("seeked", done); res(); };
+        v.addEventListener("seeked", done);
+      });
+    } catch (_) {
+      // 有些瀏覽器/檔案不讓 seek：忽略
+    }
+
+    // iOS 有時還是黑：靜音 play 一下再 pause 逼出 frame
+    try { await v.play(); v.pause(); } catch (_) { /* ignore */ }
+  } catch (_) {
+    // 失敗就保持預設狀態（至少不會壞掉）
+  }
+}
+
 
 function __lockDialogScroll() {
   try { if (typeof lockScroll === "function") lockScroll(); } catch { }
@@ -505,7 +553,15 @@ const dlgImg = document.getElementById("dlgImg");
 
     if (dlgBg) {
       const firstImage = media.find(u => !isVideoUrl(u));
-      dlgBg.src = firstImage || url;
+      // 若全部都是影片，dlgBg 不能用影片 URL（<img> 會壞掉）
+      if (firstImage) {
+        dlgBg.src = firstImage;
+      } else if (!isVid) {
+        dlgBg.src = url;
+      } else {
+        dlgBg.removeAttribute("src");
+        dlgBg.src = "";
+      }
     }
 
     if (dlgThumbs) {
@@ -526,17 +582,29 @@ const dlgImg = document.getElementById("dlgImg");
   media.forEach((url, i) => {
     const isVid = isVideoUrl(url);
     const wrapper = document.createElement("div");
-    wrapper.className = "dlg-thumb relative" + (i === 0 ? " active" : "");
+    wrapper.className = "dlg-thumb relative" + (isVid ? " video-thumb" : "") + (i === 0 ? " active" : "");
 
     if (isVid) {
-      const box = document.createElement("div");
-      box.className = "w-16 h-16 md:w-20 md:h-20 rounded-md bg-black/60 text-white flex items-center justify-center text-xs";
-      box.textContent = "🎬 影片";
-      wrapper.appendChild(box);
+      const v = document.createElement("video");
+      // video-preview：沿用 shared.css 裡「隱藏原生控制列」的規則
+      v.className = "video-preview w-full h-full object-cover";
+      // 讓點擊落在 wrapper 上（避免 iOS 點到影片就跳播放器）
+      v.style.pointerEvents = "none";
+      v.src = url;
+      v.muted = true;
+      v.playsInline = true;
+      v.preload = "metadata";
+      v.controls = false;
+      v.disablePictureInPicture = true;
+      v.setAttribute("playsinline", "");
+      v.setAttribute("webkit-playsinline", "");
+      // 讓縮圖盡量停在第一幀
+      primeVideoThumbEl(v);
+      wrapper.appendChild(v);
     } else {
       const img = document.createElement("img");
       img.src = url;
-      img.className = "w-16 h-16 md:w-20 md:h-20 object-cover rounded-md";
+      img.className = "w-full h-full object-cover";
       wrapper.appendChild(img);
     }
 

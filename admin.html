@@ -634,8 +634,7 @@
   <div id="lightbox" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[9999]">
     <div id="lbWrap" class="relative inline-block">
       <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg" />
-      <video id="lbVideo" playsinline controls
-        class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg hidden"></video>
+      <video id="lbVideo" playsinline controls class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg hidden"></video>
       <button id="lbClose" class="absolute top-1 right-1 z-10 bg-black/60 hover:bg-black/70 text-white rounded-full p-2
            text-2xl leading-none select-none" aria-label="關閉">✕</button>
     </div>
@@ -1023,7 +1022,7 @@
         URL.revokeObjectURL(raw);
       }
     }
-    async function makeThumbURL(file) {
+async function makeThumbURL(file) {
       const bmp = await decodeToBitmap(file);
       const W = bmp.width, H = bmp.height;
       const scale = Math.min(1, PREVIEW_MAX / Math.max(W, H));
@@ -1654,6 +1653,54 @@
       }
     }
 
+    // ===============================
+    // 影片縮圖：顯示第一幀（列表用；Modal/Lightbox 也會用到同樣邏輯）
+    // ===============================
+    function isVideoUrl(url) {
+      if (!url) return false;
+      const u = String(url).split("?", 1)[0];
+      return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
+    }
+
+    async function primeVideoThumbEl(v) {
+      if (!v || v.dataset._primed) return;
+      v.dataset._primed = "1";
+
+      v.muted = true;
+      v.playsInline = true;
+      v.preload = "metadata";
+      v.controls = false;
+      v.disablePictureInPicture = true;
+      v.setAttribute("playsinline", "");
+      v.setAttribute("webkit-playsinline", "");
+
+      try {
+        await new Promise((res, rej) => {
+          if (v.readyState >= 1) return res();
+          v.onloadedmetadata = () => res();
+          v.onerror = () => rej(new Error("video metadata load failed"));
+        });
+
+        let t = 0.05;
+        try {
+          if (Number.isFinite(v.duration) && v.duration > 0.2) {
+            t = Math.min(0.2, v.duration / 2);
+            t = Math.max(0.05, Math.min(t, v.duration - 0.05));
+          }
+        } catch (_) { }
+
+        try {
+          v.currentTime = t;
+          await new Promise((res) => {
+            const done = () => { v.removeEventListener("seeked", done); res(); };
+            v.addEventListener("seeked", done);
+          });
+        } catch (_) { }
+
+        try { await v.play(); v.pause(); } catch (_) { }
+      } catch (_) { }
+    }
+
     // 桌機表格
     function renderRows(list) {
       const tb = document.getElementById("rows");
@@ -1679,55 +1726,6 @@
       );
     }
 
-    // 專門處理縮圖用的 <video>，讓 iPhone 會顯示第一幀
-    function prepareVideoThumb(el) {
-      if (!el) return;
-
-      el.muted = true;
-      el.playsInline = true;
-      el.setAttribute("playsinline", "");
-      el.setAttribute("webkit-playsinline", "");
-      el.disablePictureInPicture = true;
-      el.preload = "metadata";
-
-      const doSeek = () => {
-        // 目標時間：不要剛好是 0，iOS 有時會拿不到 frame
-        let t = 0.05;
-        try {
-          if (Number.isFinite(el.duration) && el.duration > 0.2) {
-            t = Math.min(0.2, el.duration / 2);
-            t = Math.max(0.05, Math.min(t, el.duration - 0.05));
-          }
-        } catch (_) { }
-
-        const onSeeked = () => {
-          el.removeEventListener("seeked", onSeeked);
-          // 有些 iOS 要「靜音播放一下再暫停」才會真的畫出畫面
-          try {
-            const p = el.play();
-            if (p && typeof p.then === "function") {
-              p.then(() => el.pause()).catch(() => { });
-            } else {
-              el.play();
-              el.pause();
-            }
-          } catch (_) { }
-        };
-
-        el.addEventListener("seeked", onSeeked, { once: true });
-
-        try {
-          el.currentTime = t;
-        } catch (_) {
-          // 如果時間太前面被擋，退一點點
-          try { el.currentTime = 0.01; } catch (_) { }
-        }
-      };
-
-      // 等 metadata 出來再 seek，比較穩
-      el.addEventListener("loadedmetadata", doSeek, { once: true });
-    }
-
     // 手機卡片
     function renderRowsMobile(list) {
       const wrap = document.getElementById("rowsMobile");
@@ -1735,39 +1733,19 @@
 
       wrap.innerHTML = list
         .map((p) => {
-          const media = (Array.isArray(p.images) && p.images[0]) || p.image || "";
-          let thumbHtml = `
-        <div class="w-16 h-16 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400 text-xl">
-          ?
-        </div>`;
-
-          if (media) {
-            if (isVideoUrl(media)) {
-              // 影片：thumb-video-wrap + 圓形播放鈕（圖4），video 上加 data-thumb-video
-              thumbHtml = `
-            <div class="thumb-video-wrap w-16 h-16 rounded-lg bg-black">
-              <video
-                src="${media}"
-                class="thumb-video"
-                muted
-                playsinline
-                preload="metadata"
-                data-thumb-video="1"
-              ></video>
-              <div class="thumb-video-play"></div>
-            </div>`;
-            } else {
-              // 照片：維持原本 <img>
-              thumbHtml = `
-            <img src="${media}" class="w-16 h-16 object-cover rounded-lg bg-gray-100">
-          `;
-            }
-          }
-
+          const media0 = (Array.isArray(p.images) && p.images[0]) || p.image || "";
+          const isVid = isVideoUrl(media0);
+          const thumb = isVid
+            ? `
+              <div class="w-16 h-16 rounded-lg bg-gray-100 video-thumb">
+                <video data-thumb-video="1" class="video-preview w-full h-full object-cover" src="${media0}"></video>
+              </div>
+            `
+            : `<img src="${media0}" class="w-16 h-16 object-cover rounded-lg bg-gray-100">`;
           return `
         <div class="rounded-xl ring-1 ring-gray-200 p-3 flex gap-3 items-center cursor-pointer"
              data-id="${p.id}">
-          ${thumbHtml}
+          ${thumb}
           <div class="min-w-0 flex-1">
             <div class="font-semibold truncate">${p.name}</div>
             <div class="text-xs text-gray-600 mt-1 truncate">
@@ -1778,18 +1756,19 @@
         })
         .join("");
 
-      // 卡片點擊開 dialog
+      // 影片縮圖：seek 到第一幀
+      wrap.querySelectorAll('video[data-thumb-video="1"]').forEach((v) => {
+        // 避免點到影片就跳播放器：事件交給外層卡片
+        v.style.pointerEvents = "none";
+        primeVideoThumbEl(v);
+      });
+
       wrap.querySelectorAll("[data-id]").forEach((card) =>
         card.addEventListener("click", () => {
           const data = list.find((p) => p.id === card.dataset.id);
           if (data) openDialog(data.id);
         })
       );
-
-      // ✅ 關鍵：把所有縮圖用的 <video> 丟給 helper 處理，避免 iPhone 全黑
-      wrap.querySelectorAll("video[data-thumb-video]").forEach((v) => {
-        prepareVideoThumb(v);
-      });
     }
 
     // === 名字輸入：即時重複檢查（建立時用） ===
