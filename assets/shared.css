@@ -180,23 +180,23 @@ video.thumb-video::-webkit-media-controls-enclosure {
 
 #lbPrev {
   left: 0rem;
-  top: 332px;
+  top: 40%;
 }
 
 #lbNext {
   right: 0rem;
-  top: 332px;
+  top: 40%;
 }
 
 @media (min-width:768px) {
   #lbPrev {
     left: 2.5rem;
-    top: 332px;
+    top: 40%;
   }
 
   #lbNext {
     right: 2.5rem;
-    top: 332px;
+    top: 40%;
   }
 }
 
