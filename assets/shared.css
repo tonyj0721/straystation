@@ -155,8 +155,8 @@ dialog::backdrop {
 }
 
 .video-badge svg {
-  width: 23px;
-  height: 23px;
+  width: 32px;
+  height: 32px;
   fill: #fff;
   margin-left: 2px;
   display: block;
