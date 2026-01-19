@@ -302,8 +302,8 @@ video.video-preview::-webkit-media-controls-enclosure {
    =============================== */
 
 .ui-close-btn {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   border: 0;
   border-radius: 9999px;
