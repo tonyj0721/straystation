@@ -73,7 +73,7 @@ dialog::backdrop {
   /* 下面是新加的： */
   align-items: flex-end;   /* 原本 class 有 items-center，這裡改成貼上面 */
   justify-content: center;   /* 水平維持置中 */
-  padding-bottom: 70px;         /* 上方預留 36px 給你放關閉按鈕或其他 UI */
+  padding-bottom: 80px;         /* 上方預留 36px 給你放關閉按鈕或其他 UI */
   box-sizing: border-box;
 }
 
@@ -85,7 +85,7 @@ dialog::backdrop {
 /* 🔥 Lightbox 縮圖：改用 wrapper（支援影片） */
 .lb-thumb {
   width: 70px;
-  height: 704px;
+  height: 70px;
   border-radius: 6px;
   opacity: 0.5;
   cursor: pointer;
