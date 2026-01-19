@@ -359,5 +359,5 @@ video.video-preview::-webkit-media-controls-enclosure {
 
 /* Lightbox 影片：預留空間給底部縮圖列，避免進度條被擋住 */
 #lightbox #lbVideo {
-  max-height: calc(90vh - 50px);  /* 100px 可依實際 UI 再微調 */
+  max-height: calc(90vh - 70px);  /* 100px 可依實際 UI 再微調 */
 }
