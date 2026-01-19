@@ -23,10 +23,10 @@ function __primeThumbVideoFrameLightbox(v) {
         t = Math.max(0.05, Math.min(t, dur - 0.05));
       }
       v.currentTime = t;
-    } catch (_) {}
+    } catch (_) { }
   };
 
-  const onSeeked = () => { try { v.pause(); } catch (_) {} };
+  const onSeeked = () => { try { v.pause(); } catch (_) { } };
 
   v.addEventListener("loadedmetadata", onMeta, { once: true });
   v.addEventListener("seeked", onSeeked, { once: true });
@@ -34,7 +34,7 @@ function __primeThumbVideoFrameLightbox(v) {
     try {
       if (v.readyState < 2) return;
       if (v.currentTime === 0) v.currentTime = 0.05;
-    } catch (_) {}
+    } catch (_) { }
   }, 120);
 }
 
@@ -60,7 +60,7 @@ function renderLightboxMedia() {
   if (!lbImages.length) {
     if (lbImg) lbImg.src = "";
     if (lbVideo) {
-      try { lbVideo.pause(); } catch (_) {}
+      try { lbVideo.pause(); } catch (_) { }
       lbVideo.src = "";
       lbVideo.classList.add("hidden");
     }
@@ -83,9 +83,9 @@ function renderLightboxMedia() {
       lbVideo.src = url;
       lbVideo.playsInline = true;
       lbVideo.controls = true;
-      try { lbVideo.play().catch(() => {}); } catch (_) {}
+      try { lbVideo.play().catch(() => { }); } catch (_) { }
     } else {
-      try { lbVideo.pause && lbVideo.pause(); } catch (_) {}
+      try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
       lbVideo.classList.add("hidden");
       lbImg.classList.remove("hidden");
       lbImg.src = url;
@@ -162,9 +162,9 @@ dlg?.addEventListener('close', () => {
   // 關掉 dialog 一律先把影片停掉
   const v = document.getElementById("dlgVideo");
   if (v) {
-    try { v.pause(); } catch (_) {}
+    try { v.pause(); } catch (_) { }
     v.removeAttribute("src");
-    try { v.load && v.load(); } catch (_) {}
+    try { v.load && v.load(); } catch (_) { }
   }
 
   // 如果是切到 Lightbox 才關掉 dialog：不要清 currentPetId、不要解鎖
@@ -244,9 +244,9 @@ function openLightbox(images, index = 0) {
 function closeLightbox() {
   // 關閉前一定要把影片停掉
   if (lbVideo) {
-    try { lbVideo.pause(); } catch (_) {}
+    try { lbVideo.pause(); } catch (_) { }
     lbVideo.removeAttribute("src");
-    try { lbVideo.load && lbVideo.load(); } catch (_) {}
+    try { lbVideo.load && lbVideo.load(); } catch (_) { }
   }
 
   if (lb) {
