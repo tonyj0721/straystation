@@ -71,7 +71,7 @@ dialog::backdrop {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   /* 下面是新加的： */
-  align-items: flex-start;   /* 原本 class 有 items-center，這裡改成貼上面 */
+  align-items: flex-end;   /* 原本 class 有 items-center，這裡改成貼上面 */
   justify-content: center;   /* 水平維持置中 */
   padding-top: 36px;         /* 上方預留 36px 給你放關閉按鈕或其他 UI */
   box-sizing: border-box;
@@ -344,16 +344,16 @@ video.video-preview::-webkit-media-controls-enclosure {
 
 /* Lightbox：影片時，把關閉按鈕移到影片右邊（紅圈位置附近） */
 #lbWrap.lb-video-mode #lbClose {
-  right: -36px;
-  top: -36px;
+  right: -34px;
+  top: -34px;
   /* 可以依實際感覺微調 */
 }
 
 /* 桌機寬一點時可以再往右一些 */
 @media (min-width: 768px) {
   #lbWrap.lb-video-mode #lbClose {
-    right: -36px;
-    top: -36px;
+    right: -34px;
+    top: -34px;
   }
 }
 
