@@ -73,7 +73,7 @@ dialog::backdrop {
   /* 下面是新加的： */
   align-items: flex-end;   /* 原本 class 有 items-center，這裡改成貼上面 */
   justify-content: center;   /* 水平維持置中 */
-  padding-top: 36px;         /* 上方預留 36px 給你放關閉按鈕或其他 UI */
+  padding-bottom: 80px;         /* 上方預留 36px 給你放關閉按鈕或其他 UI */
   box-sizing: border-box;
 }
 
@@ -180,23 +180,23 @@ video.thumb-video::-webkit-media-controls-enclosure {
 
 #lbPrev {
   left: 0rem;
-  top: 50%;
+  top: 332px;
 }
 
 #lbNext {
   right: 0rem;
-  top: 50%;
+  top: 332px;
 }
 
 @media (min-width:768px) {
   #lbPrev {
     left: 2.5rem;
-    top: 50%;
+    top: 332px;
   }
 
   #lbNext {
     right: 2.5rem;
-    top: 50%;
+    top: 332px;
   }
 }
 
@@ -344,20 +344,20 @@ video.video-preview::-webkit-media-controls-enclosure {
 
 /* Lightbox：影片時，把關閉按鈕移到影片右邊（紅圈位置附近） */
 #lbWrap.lb-video-mode #lbClose {
-  right: -34px;
-  top: -34px;
+  right: -30px;
+  top: -30px;
   /* 可以依實際感覺微調 */
 }
 
 /* 桌機寬一點時可以再往右一些 */
-@media (min-width: 768px) {
+/*@media (min-width: 768px) {
   #lbWrap.lb-video-mode #lbClose {
-    right: -34px;
-    top: -34px;
+    right: -42px;
+    top: -42px;
   }
-}
+}*/
 
 /* Lightbox 影片：預留空間給底部縮圖列，避免進度條被擋住 */
 #lightbox #lbVideo {
-  max-height: calc(90vh - 75px);  /* 100px 可依實際 UI 再微調 */
+  max-height: calc(90vh - 40px);  /* 100px 可依實際 UI 再微調 */
 }
