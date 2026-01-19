@@ -78,8 +78,8 @@ dialog::backdrop {
 
 /* 🔥 Lightbox 縮圖：改用 wrapper（支援影片） */
 .lb-thumb {
-  width: 60px;
-  height: 60px;
+  width: 70px;
+  height: 70px;
   border-radius: 6px;
   opacity: 0.5;
   cursor: pointer;
@@ -110,8 +110,8 @@ dialog::backdrop {
 
 /* 一般列表（手機卡片）的媒體縮圖 wrapper */
 .media-thumb {
-  width: 64px;
-  height: 64px;
+  width: 70px;
+  height: 70px;
   border-radius: 8px;
   background: #f3f4f6;
   position: relative;
@@ -143,8 +143,8 @@ dialog::backdrop {
 }
 
 .video-badge .video-badge-inner {
-  width: 57%;
-  /*max-width: 44px;*/
+  width: 40px;
+  height: 40px;
   aspect-ratio: 1 / 1;
   border-radius: 9999px;
   /* 參考圖 4：偏灰的圓形播放鍵 */
@@ -155,8 +155,8 @@ dialog::backdrop {
 }
 
 .video-badge svg {
-  width: 57%;
-  height: 57%;
+  width: 40px;
+  height: 40px;
   fill: #fff;
   margin-left: 2px;
   display: block;
