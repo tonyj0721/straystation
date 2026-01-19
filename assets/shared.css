@@ -85,7 +85,7 @@ dialog::backdrop {
 /* 🔥 Lightbox 縮圖：改用 wrapper（支援影片） */
 .lb-thumb {
   width: 70px;
-  height: 694px;
+  height: 704px;
   border-radius: 6px;
   opacity: 0.5;
   cursor: pointer;
@@ -359,5 +359,5 @@ video.video-preview::-webkit-media-controls-enclosure {
 
 /* Lightbox 影片：預留空間給底部縮圖列，避免進度條被擋住 */
 #lightbox #lbVideo {
-  max-height: calc(90vh - 40px);  /* 100px 可依實際 UI 再微調 */
+  max-height: calc(90vh - 100px);  /* 100px 可依實際 UI 再微調 */
 }
