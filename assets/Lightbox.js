@@ -50,6 +50,7 @@ const lbVideo = document.getElementById("lbVideo");
 const lbPrev = document.getElementById("lbPrev");
 const lbNext = document.getElementById("lbNext");
 const lbClose = document.getElementById("lbClose");
+const lbWrap = document.getElementById("lbWrap");
 
 let lbImages = [];
 let lbIndex = 0;
@@ -63,11 +64,17 @@ function renderLightboxMedia() {
       lbVideo.src = "";
       lbVideo.classList.add("hidden");
     }
+    if (lbWrap) lbWrap.classList.remove("lb-video-mode"); // ← 新增
     return;
   }
 
   const url = lbImages[lbIndex] || "";
   const isVid = isVideoUrl(url);
+
+  // 根據是否為影片切換 class
+  if (lbWrap) {
+    lbWrap.classList.toggle("lb-video-mode", !!isVid);   // ← 新增
+  }
 
   if (lbImg && lbVideo) {
     if (isVid) {
