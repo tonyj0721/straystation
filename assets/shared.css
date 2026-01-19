@@ -85,7 +85,7 @@ dialog::backdrop {
 /* 🔥 Lightbox 縮圖：改用 wrapper（支援影片） */
 .lb-thumb {
   width: 70px;
-  height: 714px;
+  height: 694px;
   border-radius: 6px;
   opacity: 0.5;
   cursor: pointer;
