@@ -143,8 +143,8 @@ dialog::backdrop {
 }
 
 .video-badge .video-badge-inner {
-  width: 70%;
-  max-width: 44px;
+  width: 57%;
+  /*max-width: 44px;*/
   aspect-ratio: 1 / 1;
   border-radius: 9999px;
   /* 參考圖 4：偏灰的圓形播放鍵 */
@@ -155,8 +155,8 @@ dialog::backdrop {
 }
 
 .video-badge svg {
-  width: 56%;
-  height: 56%;
+  width: 57%;
+  height: 57%;
   fill: #fff;
   margin-left: 2px;
   display: block;

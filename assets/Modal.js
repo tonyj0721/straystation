@@ -495,8 +495,8 @@ async function openDialog(id) {
     ? '已注射預防針' : '未注射預防針';
 
   // 4. 圖片 + Lightbox（搭配 shared.js）
-  
-const dlgImg = document.getElementById("dlgImg");
+
+  const dlgImg = document.getElementById("dlgImg");
   const dlgVideo = document.getElementById("dlgVideo");
   const dlgBg = document.getElementById("dlgBg");
   const dlgThumbs = document.getElementById("dlgThumbs");
@@ -511,7 +511,7 @@ const dlgImg = document.getElementById("dlgImg");
     if (!media.length) {
       if (dlgImg) dlgImg.src = "";
       if (dlgVideo) {
-        try { dlgVideo.pause(); } catch (_) {}
+        try { dlgVideo.pause(); } catch (_) { }
         dlgVideo.src = "";
         dlgVideo.classList.add("hidden");
       }
@@ -529,11 +529,11 @@ const dlgImg = document.getElementById("dlgImg");
         dlgVideo.src = url;
         dlgVideo.playsInline = true;
         dlgVideo.controls = true;
-        try { dlgVideo.play().catch(() => {}); } catch (_) {}
+        try { dlgVideo.play().catch(() => { }); } catch (_) { }
       } else {
         try {
           dlgVideo.pause && dlgVideo.pause();
-        } catch (_) {}
+        } catch (_) { }
         dlgVideo.classList.add("hidden");
         dlgImg.classList.remove("hidden");
         dlgImg.src = url;
@@ -559,7 +559,17 @@ const dlgImg = document.getElementById("dlgImg");
     dlgImg.onclick = () => openLightbox(media, currentIndex);
   }
   if (dlgVideo) {
-    dlgVideo.onclick = () => openLightbox(media, currentIndex);
+    // 影片：改成「點兩下」主圖才進 Lightbox，單擊留給播放/暫停用
+    let __dlgVideoLastTap = 0;
+    dlgVideo.onclick = (ev) => {
+      const now = Date.now();
+      if (now - __dlgVideoLastTap < 320) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        openLightbox(media, currentIndex);
+      }
+      __dlgVideoLastTap = now;
+    };
   }
 
   dlgThumbs.innerHTML = "";
@@ -605,7 +615,7 @@ const dlgImg = document.getElementById("dlgImg");
 
   showDialogMedia(currentIndex);
 
-// 5. 顯示用文字
+  // 5. 顯示用文字
   document.getElementById('dlgName').textContent = p.name;
   document.getElementById('dlgDesc').textContent = p.desc;
   document.getElementById('dlgTagBreed').textContent = p.breed;
@@ -993,7 +1003,7 @@ async function __safePlayVideo(v) {
   try {
     await v.play();
     return;
-  } catch (_) {}
+  } catch (_) { }
   // iOS / 部分瀏覽器可能需要先靜音才允許播放（至少先讓預覽能播）
   try {
     v.muted = true;
@@ -1014,7 +1024,7 @@ function getEditVideoObjURL(file) {
 function revokeEditVideoObjURL(file) {
   const u = __editVideoObjUrlCache.get(file);
   if (u) {
-    try { URL.revokeObjectURL(u); } catch (_) {}
+    try { URL.revokeObjectURL(u); } catch (_) { }
     __editVideoObjUrlCache.delete(file);
   }
 }
@@ -1097,7 +1107,7 @@ function __makeEditTile(it) {
     v.addEventListener("play", syncBtn);
     v.addEventListener("pause", syncBtn);
     v.addEventListener("ended", () => {
-      try { v.currentTime = 0; } catch (_) {}
+      try { v.currentTime = 0; } catch (_) { }
       syncBtn();
     });
 
@@ -1109,15 +1119,15 @@ function __makeEditTile(it) {
       try {
         editPreview?.querySelectorAll?.("video.video-preview")?.forEach((vv) => {
           if (vv !== v) {
-            try { vv.pause(); } catch (_) {}
+            try { vv.pause(); } catch (_) { }
           }
         });
-      } catch (_) {}
+      } catch (_) { }
 
       if (v.paused || v.ended) {
         await __safePlayVideo(v);
       } else {
-        try { v.pause(); } catch (_) {}
+        try { v.pause(); } catch (_) { }
       }
       syncBtn();
     });
@@ -1577,7 +1587,7 @@ async function onConfirmAdopted() {
   try {
     for (const f of files) {
       const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
-            const type = wmBlob.type || '';
+      const type = wmBlob.type || '';
       let ext = 'bin';
       if (type.startsWith('image/')) {
         ext = type === 'image/png' ? 'png' : 'jpg';
