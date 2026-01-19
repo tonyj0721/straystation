@@ -6,6 +6,38 @@ function isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
 
+// Lightbox 縮圖播放 icon（避免與 Modal.js 的 __PLAY_SVG 命名衝突）
+const __THUMB_PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
+
+// 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
+function __primeThumbVideoFrameLightbox(v) {
+  if (!v || v.dataset.__primed === "1") return;
+  v.dataset.__primed = "1";
+
+  const onMeta = () => {
+    try {
+      const dur = Number.isFinite(v.duration) ? v.duration : 0;
+      let t = 0.05;
+      if (dur && dur > 0.2) {
+        t = Math.min(0.2, dur / 2);
+        t = Math.max(0.05, Math.min(t, dur - 0.05));
+      }
+      v.currentTime = t;
+    } catch (_) {}
+  };
+
+  const onSeeked = () => { try { v.pause(); } catch (_) {} };
+
+  v.addEventListener("loadedmetadata", onMeta, { once: true });
+  v.addEventListener("seeked", onSeeked, { once: true });
+  setTimeout(() => {
+    try {
+      if (v.readyState < 2) return;
+      if (v.currentTime === 0) v.currentTime = 0.05;
+    } catch (_) {}
+  }, 120);
+}
+
 
 history.scrollRestoration = "manual";
 window.scrollTo(0, 0);
@@ -152,35 +184,30 @@ function openLightbox(images, index = 0) {
       const wrapper = document.createElement("div");
       wrapper.className = "lb-thumb" + (i === lbIndex ? " active" : "");
 
-      const inner = document.createElement("div");
-      inner.className = "relative w-full h-full";
-
       if (isVid) {
-        const img = document.createElement("img");
-        img.src = "";
-        img.setAttribute("data-video-src", url);
-        img.className = "w-full h-full object-cover rounded-md bg-black";
-        inner.appendChild(img);
+        const v = document.createElement("video");
+        v.className = "thumb-video";
+        v.preload = "metadata";
+        v.muted = true;
+        v.playsInline = true;
+        v.setAttribute("playsinline", "");
+        v.setAttribute("webkit-playsinline", "");
+        v.controls = false;
+        v.disablePictureInPicture = true;
+        v.src = url;
+        __primeThumbVideoFrameLightbox(v);
 
-        const overlay = document.createElement("div");
-        overlay.className = "video-thumb-overlay";
-        const icon = document.createElement("div");
-        icon.className = "video-thumb-icon";
-        overlay.appendChild(icon);
+        const badge = document.createElement("div");
+        badge.className = "video-badge";
+        badge.innerHTML = `<div class="video-badge-inner">${__THUMB_PLAY_SVG}</div>`;
 
-        inner.appendChild(overlay);
-
-        if (window && typeof window.ensureVideoThumbForImg === "function") {
-          window.ensureVideoThumbForImg(img, url);
-        }
+        wrapper.appendChild(v);
+        wrapper.appendChild(badge);
       } else {
         const img = document.createElement("img");
         img.src = url;
-        img.className = "w-full h-full object-cover rounded-md";
-        inner.appendChild(img);
+        wrapper.appendChild(img);
       }
-
-      wrapper.appendChild(inner);
 
       wrapper.addEventListener("click", () => {
         lbIndex = i;
@@ -189,10 +216,6 @@ function openLightbox(images, index = 0) {
 
       lbThumbsInner.appendChild(wrapper);
     });
-
-    if (window && typeof window.upgradeVideoThumbs === "function") {
-      window.upgradeVideoThumbs(lbThumbsInner);
-    }
   }
 
   // 一開始顯示當前項目

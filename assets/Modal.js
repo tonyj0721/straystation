@@ -6,6 +6,45 @@ function isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
 
+// ===============================
+// 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
+// ===============================
+function __primeThumbVideoFrame(v) {
+  if (!v || v.dataset.__primed === "1") return;
+  v.dataset.__primed = "1";
+
+  // 只要能顯示某個 frame 就好：loadedmetadata 後 seek 一下
+  const onMeta = () => {
+    try {
+      const dur = Number.isFinite(v.duration) ? v.duration : 0;
+      let t = 0.05;
+      if (dur && dur > 0.2) {
+        t = Math.min(0.2, dur / 2);
+        t = Math.max(0.05, Math.min(t, dur - 0.05));
+      }
+      v.currentTime = t;
+    } catch (_) {
+      // ignore
+    }
+  };
+
+  const onSeeked = () => {
+    try { v.pause(); } catch (_) { }
+  };
+
+  v.addEventListener("loadedmetadata", onMeta, { once: true });
+  v.addEventListener("seeked", onSeeked, { once: true });
+
+  // 有些 Safari 不會立刻解碼畫面：加個保險
+  setTimeout(() => {
+    try {
+      if (v.readyState < 2) return;
+      // 觸發一次 seek（若上面沒成功）
+      if (v.currentTime === 0) v.currentTime = 0.05;
+    } catch (_) { }
+  }, 120);
+}
+
 
 function __lockDialogScroll() {
   try { if (typeof lockScroll === "function") lockScroll(); } catch { }
@@ -505,7 +544,8 @@ const dlgImg = document.getElementById("dlgImg");
 
     if (dlgBg) {
       const firstImage = media.find(u => !isVideoUrl(u));
-      dlgBg.src = firstImage || url;
+      // 只有影片時不要把 <img> 的 src 設成影片網址（會出現破圖）
+      dlgBg.src = firstImage || (isVid ? "" : url);
     }
 
     if (dlgThumbs) {
@@ -528,35 +568,33 @@ const dlgImg = document.getElementById("dlgImg");
     const wrapper = document.createElement("div");
     wrapper.className = "dlg-thumb" + (i === 0 ? " active" : "");
 
-    const inner = document.createElement("div");
-    inner.className = "relative w-full h-full";
-
     if (isVid) {
-      const img = document.createElement("img");
-      img.src = "";
-      img.setAttribute("data-video-src", url);
-      img.className = "w-full h-full object-cover rounded-md bg-black";
-      inner.appendChild(img);
+      const v = document.createElement("video");
+      v.className = "thumb-video";
+      v.preload = "metadata";
+      v.muted = true;
+      v.playsInline = true;
+      v.setAttribute("playsinline", "");
+      v.setAttribute("webkit-playsinline", "");
+      v.controls = false;
+      v.disablePictureInPicture = true;
+      v.src = url;
 
-      const overlay = document.createElement("div");
-      overlay.className = "video-thumb-overlay";
-      const icon = document.createElement("div");
-      icon.className = "video-thumb-icon";
-      overlay.appendChild(icon);
+      // 抓第一幀（避免黑畫面/空白）
+      __primeThumbVideoFrame(v);
 
-      inner.appendChild(overlay);
+      // 覆蓋播放 icon（圖 4 的樣式）
+      const badge = document.createElement("div");
+      badge.className = "video-badge";
+      badge.innerHTML = `<div class="video-badge-inner">${__PLAY_SVG}</div>`;
 
-      if (window && typeof window.ensureVideoThumbForImg === "function") {
-        window.ensureVideoThumbForImg(img, url);
-      }
+      wrapper.appendChild(v);
+      wrapper.appendChild(badge);
     } else {
       const img = document.createElement("img");
       img.src = url;
-      img.className = "w-full h-full object-cover rounded-md";
-      inner.appendChild(img);
+      wrapper.appendChild(img);
     }
-
-    wrapper.appendChild(inner);
 
     wrapper.addEventListener("click", () => {
       showDialogMedia(i);
@@ -564,10 +602,6 @@ const dlgImg = document.getElementById("dlgImg");
 
     dlgThumbs.appendChild(wrapper);
   });
-
-  if (window && typeof window.upgradeVideoThumbs === "function") {
-    window.upgradeVideoThumbs(dlgThumbs);
-  }
 
   showDialogMedia(currentIndex);
 

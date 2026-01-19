@@ -29,13 +29,13 @@ dialog::backdrop {
   background: rgba(0, 0, 0, 0.9);
 }
 
-/* 🔥 Modal / Lightbox 縮圖通用樣式 */
-.dlg-thumb,
-.lb-thumb {
+/* 🔥 Modal 縮圖 */
+.dlg-thumb {
   width: 70px;
   height: 70px;
+  background-color: #f3f4f6;
   border-radius: 6px;
-  background-color: #111827; /* gray-900 */
+  /* 你想多圓都可調整 */
   cursor: pointer;
   opacity: 0.8;
   transition: 0.2s;
@@ -43,21 +43,24 @@ dialog::backdrop {
   overflow: hidden;
 }
 
-.dlg-thumb.active,
-.lb-thumb.active {
-  outline: 3px solid #ff6900; /* 品牌色 */
-  opacity: 1;
-}
-
-.dlg-thumb img,
-.dlg-thumb video,
-.lb-thumb img,
-.lb-thumb video {
+/* 縮圖內容（圖片/影片）都填滿容器 */
+.dlg-thumb > img,
+.dlg-thumb > video {
   width: 100%;
   height: 100%;
   object-fit: cover;
   border-radius: 6px;
   display: block;
+}
+
+.dlg-thumb > video {
+  background: #000;
+}
+
+.dlg-thumb.active {
+  outline: 3px solid #ff6900;
+  /* 或你的品牌色都可以 */
+  opacity: 1;
 }
 
 #lightbox {
@@ -73,19 +76,100 @@ dialog::backdrop {
   bottom: env(safe-area-inset-bottom);
 }
 
-#lbThumbs img {
+/* 🔥 Lightbox 縮圖：改用 wrapper（支援影片） */
+.lb-thumb {
   width: 60px;
   height: 60px;
-  object-fit: contain;
   border-radius: 6px;
   opacity: 0.5;
   cursor: pointer;
   background: #444;
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-#lbThumbs img.active {
+.lb-thumb.active {
   opacity: 1;
   border: 2px solid white;
+}
+
+.lb-thumb > img,
+.lb-thumb > video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.lb-thumb > video {
+  background: #000;
+}
+
+/* 一般列表（手機卡片）的媒體縮圖 wrapper */
+.media-thumb {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  background: #f3f4f6;
+  position: relative;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+
+.media-thumb > img,
+.media-thumb > video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.media-thumb > video {
+  background: #000;
+}
+
+/* 影片縮圖：播放圖示（參考圖 4 的圓形播放鍵） */
+.video-badge {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.video-badge .video-badge-inner {
+  width: 70%;
+  max-width: 44px;
+  aspect-ratio: 1 / 1;
+  border-radius: 9999px;
+  /* 參考圖 4：偏灰的圓形播放鍵 */
+  background: rgba(156, 163, 175, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-badge svg {
+  width: 56%;
+  height: 56%;
+  fill: #fff;
+  margin-left: 2px;
+  display: block;
+}
+
+/* 縮圖影片：不顯示原生控制列 */
+video.thumb-video::-webkit-media-controls,
+video.thumb-video::-webkit-media-controls-panel,
+video.thumb-video::-webkit-media-controls-play-button,
+video.thumb-video::-webkit-media-controls-start-playback-button,
+video.thumb-video::-webkit-media-controls-enclosure {
+  display: none !important;
+  -webkit-appearance: none;
 }
 
 #lbPrev {
@@ -209,37 +293,4 @@ video.video-preview::-webkit-media-controls-enclosure {
   width: 14px;
   height: 14px;
   display: block;
-}
-
-
-/* 影片縮圖上的播放按鈕覆蓋層（列表、Modal、Lightbox 共用） */
-.video-thumb-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-}
-
-.video-thumb-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 9999px;
-  background: rgba(0, 0, 0, 0.55);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-  position: relative;
-}
-
-.video-thumb-icon::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-35%, -50%);
-  width: 0;
-  height: 0;
-  border-top: 8px solid transparent;
-  border-bottom: 8px solid transparent;
-  border-left: 14px solid #ffffff;
 }
