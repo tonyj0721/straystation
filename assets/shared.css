@@ -71,7 +71,7 @@ dialog::backdrop {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
   padding-top: 36px;
   padding-bottom: 86px;
