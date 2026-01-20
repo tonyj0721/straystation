@@ -346,7 +346,7 @@ video.video-preview::-webkit-media-controls-enclosure {
 
 /* Lightbox：影片時，把關閉按鈕移到影片右邊（紅圈位置附近） */
 #lbWrap.lb-video-mode #lbClose {
-  /*right: -30px;*/
+  right: 0px;
   top: -36px;
   /* 可以依實際感覺微調 */
 }
