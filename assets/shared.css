@@ -71,13 +71,19 @@ dialog::backdrop {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
   padding-top: 36px;
   padding-bottom: 86px;
   box-sizing: border-box;
 }
 
+/* 影片模式：只讓 #lbWrap 自己到底（不影響照片） */
+#lbWrap.lb-video-mode{
+  align-self: flex-end;    /* 影片：貼底 */
+}
+
+#lightbox #lbImg,
 #lightbox #lbVideo {
   max-height: calc(100dvh - 122px);
   max-width: calc(100vw - 72px);
@@ -184,21 +190,28 @@ video.thumb-video::-webkit-media-controls-enclosure {
   -webkit-appearance: none;
 }
 
+#lbPrev,
+#lbNext {
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 20;
+}
+
 #lbPrev {
-  left: 0rem;
+  left: -27px;
 }
 
 #lbNext {
-  right: 0rem;
+  right: -27px;
 }
 
 @media (min-width:768px) {
   #lbPrev {
-    left: 2.5rem;
+    left: -108px;
   }
 
   #lbNext {
-    right: 2.5rem;
+    right: -108px;
   }
 }
 
@@ -346,8 +359,8 @@ video.video-preview::-webkit-media-controls-enclosure {
 
 /* Lightbox：影片時，把關閉按鈕移到影片右邊（紅圈位置附近） */
 #lbWrap.lb-video-mode #lbClose {
-  right: 0px;
-  top: -36px;
+  right: -30px;
+  top: -30px;
   /* 可以依實際感覺微調 */
 }
 

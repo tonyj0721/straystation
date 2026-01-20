@@ -102,6 +102,11 @@ function renderLightboxMedia() {
   }
 }
 
+function isCurrentLightboxVideo() {
+  if (!lbImages.length) return false;
+  const url = lbImages[lbIndex] || "";
+  return isVideoUrl(url);
+}
 
 // 用來記住原本 scroll 狀態（iOS 點螢幕頂端也不會把背景捲動）
 let __lockDepth = 0;
@@ -298,16 +303,35 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-// 🔥 手機滑動切換（加去抖，避免 iOS 偶發觸發兩次而跳 2 張）
+// 🔥 手機滑動切換（上面 80% 可以左右滑，最下面 20% 給影片進度條用）
 let touchStartX = 0;
+let touchStartY = 0;     // 起手的 Y 位置
+let isSwipeZone = true;  // 這次觸控是不是在「可以滑動」的區域
 let __lastSwipeAt = 0;
+
 lb?.addEventListener("touchstart", (e) => {
-  touchStartX = e.touches[0].clientX;
+  const t = e.touches[0];
+  touchStartX = t.clientX;
+  touchStartY = t.clientY;
+
+  const h = window.innerHeight || document.documentElement.clientHeight || 0;
+
+  if (isCurrentLightboxVideo()) {
+    // 影片時：上面 80% 可以左右滑，下面 20% 留給進度條
+    isSwipeZone = touchStartY < h * 0.8;
+  } else {
+    // 圖片時：整個畫面都可以左右滑
+    isSwipeZone = true;
+  }
 }, { passive: true });
 
 lb?.addEventListener("touchend", (e) => {
+  // 如果這次觸控是在「下面那一塊」，直接讓影片自己處理（拉進度條等）
+  if (!isSwipeZone) return;
+
   const now = Date.now();
   if (now - __lastSwipeAt < 220) return;
+
   const diff = e.changedTouches[0].clientX - touchStartX;
   if (diff > 50) { __lastSwipeAt = now; lbShow(-1); }
   else if (diff < -50) { __lastSwipeAt = now; lbShow(1); }
@@ -320,6 +344,9 @@ lb?.addEventListener("wheel", (e) => {
 }, { passive: false });
 
 lb?.addEventListener("touchmove", (e) => {
+  // 在下面 20% 那一塊，就不要吃掉事件，讓影片進度條可以拖
+  if (!isSwipeZone) return;
+
   e.preventDefault();
   e.stopPropagation();
 }, { passive: false });
