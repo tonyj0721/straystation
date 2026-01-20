@@ -70,11 +70,6 @@ dialog::backdrop {
   min-height: 100dvh;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  /* 下面是新加的： */
-  align-items: flex-end;   /* 原本 class 有 items-center，這裡改成貼上面 */
-  justify-content: center;   /* 水平維持置中 */
-  padding-bottom: 80px;         /* 上方預留 36px 給你放關閉按鈕或其他 UI */
-  box-sizing: border-box;
 }
 
 #lbThumbs {
@@ -97,11 +92,6 @@ dialog::backdrop {
   justify-content: center;
 }
 
-.lb-thumb.active {
-  opacity: 1;
-  border: 2px solid white;
-}
-
 .lb-thumb>img,
 .lb-thumb>video {
   width: 100%;
@@ -112,6 +102,11 @@ dialog::backdrop {
 
 .lb-thumb>video {
   background: #000;
+}
+
+.lb-thumb.active {
+  opacity: 1;
+  border: 2px solid white;
 }
 
 /* 一般列表（手機卡片）的媒體縮圖 wrapper */
@@ -180,23 +175,19 @@ video.thumb-video::-webkit-media-controls-enclosure {
 
 #lbPrev {
   left: 0rem;
-  top: 50%;
 }
 
 #lbNext {
   right: 0rem;
-  top: 50%;
 }
 
 @media (min-width:768px) {
   #lbPrev {
     left: 2.5rem;
-    top: 50%;
   }
 
   #lbNext {
     right: 2.5rem;
-    top: 50%;
   }
 }
 
@@ -350,14 +341,9 @@ video.video-preview::-webkit-media-controls-enclosure {
 }
 
 /* 桌機寬一點時可以再往右一些 */
-/*@media (min-width: 768px) {
+@media (min-width: 768px) {
   #lbWrap.lb-video-mode #lbClose {
     right: -42px;
     top: -42px;
   }
-}*/
-
-/* Lightbox 影片：預留空間給底部縮圖列，避免進度條被擋住 */
-#lightbox #lbVideo {
-  max-height: calc(90vh - 80px);  /* 100px 可依實際 UI 再微調 */
 }

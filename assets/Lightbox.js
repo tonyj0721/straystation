@@ -50,7 +50,7 @@ const lbVideo = document.getElementById("lbVideo");
 const lbPrev = document.getElementById("lbPrev");
 const lbNext = document.getElementById("lbNext");
 const lbClose = document.getElementById("lbClose");
-const lbWrap = document.getElementById("lbWrap");
+const lbWrap = document.getElementById("lbWrap");   // ← 新增
 
 let lbImages = [];
 let lbIndex = 0;
