@@ -70,6 +70,16 @@ dialog::backdrop {
   min-height: 100dvh;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+
+  align-items: center;
+  justify-content: center;
+  padding-top: 36px;
+  padding-bottom: 86px;
+  box-sizing: border-box;
+}
+
+#lightbox #lbVideo {
+  max-height: calc(100dvh - 122px);
 }
 
 #lbThumbs {
@@ -343,7 +353,7 @@ video.video-preview::-webkit-media-controls-enclosure {
 /* 桌機寬一點時可以再往右一些 */
 @media (min-width: 768px) {
   #lbWrap.lb-video-mode #lbClose {
-    right: -42px;
-    top: -42px;
+    right: -36px;
+    top: -36px;
   }
 }
