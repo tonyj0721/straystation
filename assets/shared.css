@@ -355,6 +355,20 @@ video.video-preview::-webkit-media-controls-enclosure {
   display: block;
 }
 
+/* ✅ 只有影片時：往上移，避開 iOS 原生控制列的右上角按鈕 */
+#dlgStageWrap.dlg-video-mode #dlgClose {
+  top: -36px;   /* 你可以調 -30 ~ -48 之間，看最順的距離 */
+  right: 4px;
+}
+
+/* 桌機可稍微少移一點（可選） */
+@media (min-width: 768px) {
+  #dlgStageWrap.dlg-video-mode #dlgClose {
+    top: -30px;
+    right: 0px;
+  }
+}
+
 /* Lightbox：影片時，把關閉按鈕移到影片右邊（紅圈位置附近） */
 #lbWrap.lb-video-mode #lbClose {
   right: -30px;

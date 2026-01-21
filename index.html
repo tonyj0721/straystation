@@ -380,19 +380,21 @@
     <div class="bg-white">
       <!-- 新增：與下方縮圖 p-3 對齊 -->
       <div class="px-3 pt-2">
-        <p id="dlgHint" class="text-center text-xs text-gray-500 mb-1">點主圖可放大</p>
-        <div class="relative aspect-video bg-gray-100 overflow-hidden rounded-lg">
-          <!-- 只模糊這張背景圖 -->
-          <img id="dlgBg" aria-hidden="true" class="absolute inset-0 w-full h-full object-cover blur-md scale-110">
+        <p id="dlgHint" class="text-center text-sm text-gray-500 mb-1">點主圖可放大</p>
+        <div id="dlgStageWrap" class="relative">
+          <div class="relative aspect-video bg-gray-100 overflow-hidden rounded-lg">
+            <!-- 只模糊這張背景圖 -->
+            <img id="dlgBg" aria-hidden="true" class="absolute inset-0 w-full h-full object-cover blur-md scale-110">
 
-          <!-- 可選：柔化一下背景，沒有加任何 blur -->
-          <div class="absolute inset-0 bg-white/20"></div>
+            <!-- 可選：柔化一下背景，沒有加任何 blur -->
+            <div class="absolute inset-0 bg-white/20"></div>
 
-          <!-- 主圖在最上層，沒有 blur -->
-          <img id="dlgImg" alt="毛孩照片"
-            class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg">
-          <video id="dlgVideo" playsinline controls
-            class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg hidden"></video>
+            <!-- 主圖在最上層，沒有 blur -->
+            <img id="dlgImg" alt="毛孩照片"
+              class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg">
+            <video id="dlgVideo" playsinline controls
+              class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg hidden"></video>
+          </div>
 
           <button id="dlgClose" class="ui-close-btn absolute top-1 right-1 z-20" aria-label="關閉"><svg
               viewBox="0 0 24 24" aria-hidden="true" focusable="false" class="ui-close-icon">

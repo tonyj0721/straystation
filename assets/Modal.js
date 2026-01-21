@@ -501,6 +501,7 @@ async function openDialog(id) {
   const dlgBg = document.getElementById("dlgBg");
   const dlgThumbs = document.getElementById("dlgThumbs");
   const dlgHint = document.getElementById("dlgHint");
+  const dlgStageWrap = document.getElementById("dlgStageWrap");
 
   const media = Array.isArray(p.images) && p.images.length > 0
     ? p.images
@@ -525,6 +526,8 @@ async function openDialog(id) {
 
       if (dlgHint) dlgHint.textContent = "";
 
+      if (dlgStageWrap) dlgStageWrap.classList.remove("dlg-video-mode");
+
       return;
     }
 
@@ -532,10 +535,17 @@ async function openDialog(id) {
     const url = media[currentIndex];
     const isVid = isVideoUrl(url);
 
+    if (dlgStageWrap) dlgStageWrap.classList.toggle("dlg-video-mode", isVid);
+
     if (dlgHint) {
       dlgHint.textContent = isVid
-        ? "雙擊主圖可放大（單擊播放/暫停）"
+        ? "雙擊主圖可放大"
         : "點主圖可放大";
+
+      // 影片：加 mt-2；圖片：移除 mt-2
+      dlgHint.classList.toggle("mt-2", isVid);
+      // （可選）確保圖片時沒有 mt-2 殘留
+      if (!isVid) dlgHint.classList.remove("mt-2");
     }
 
     if (dlgImg && dlgVideo) {
