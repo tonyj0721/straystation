@@ -66,21 +66,20 @@ dialog::backdrop {
 #lightbox {
   position: fixed;
   inset: 0;
-  width: 100vw;
-  min-height: 100dvh;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
 
   align-items: center;
   justify-content: center;
   padding-top: 36px;
   padding-bottom: 86px;
   box-sizing: border-box;
+
+  --stageW: 100vw;
 }
 
 /* 影片模式：只讓 #lbWrap 自己到底（不影響照片） */
-#lbWrap.lb-video-mode{
-  align-self: flex-end;    /* 影片：貼底 */
+#lbWrap.lb-video-mode {
+  align-self: flex-end;
+  /* 影片：貼底 */
 }
 
 #lightbox #lbImg,
@@ -163,7 +162,6 @@ dialog::backdrop {
 .video-badge .video-badge-inner {
   width: 40px;
   height: 40px;
-  aspect-ratio: 1 / 1;
   border-radius: 9999px;
   /* 參考圖 4：偏灰的圓形播放鍵 */
   background: rgba(156, 163, 175, 0.7);
@@ -198,20 +196,20 @@ video.thumb-video::-webkit-media-controls-enclosure {
 }
 
 #lbPrev {
-  left: -27px;
+  left: calc(50% - (var(--stageW) / 2) + 9px);
 }
 
 #lbNext {
-  right: -27px;
+  right: calc(50% - (var(--stageW) / 2) + 9px);
 }
 
 @media (min-width:768px) {
   #lbPrev {
-    left: -108px;
+    left: calc(50% - (var(--stageW) / 4));
   }
 
   #lbNext {
-    right: -108px;
+    right: calc(50% - (var(--stageW) / 4));
   }
 }
 

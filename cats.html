@@ -332,7 +332,7 @@
     <div class="bg-white">
       <!-- 新增：與下方縮圖 p-3 對齊 -->
       <div class="px-3 pt-2">
-        <p class="text-center text-xs text-gray-500 mb-1">點主圖可放大</p>
+        <p id="dlgHint" class="text-center text-xs text-gray-500 mb-1">點主圖可放大</p>
         <div class="relative aspect-video bg-gray-100 overflow-hidden rounded-lg">
           <!-- 只模糊這張背景圖 -->
           <img id="dlgBg" aria-hidden="true" class="absolute inset-0 w-full h-full object-cover blur-md scale-110">
@@ -548,19 +548,18 @@
   <!-- Lightbox -->
   <div id="lightbox" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[9999]">
     <div id="lbWrap" class="relative inline-block">
-      <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg" />
-      <video id="lbVideo" playsinline controls
-        class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg hidden"></video>
+      <img id="lbImg" class="object-contain rounded-lg" />
+      <video id="lbVideo" playsinline controls class="object-contain rounded-lg hidden"></video>
       <button id="lbClose" class="ui-close-btn absolute top-1 right-1 z-10" aria-label="關閉"><svg viewBox="0 0 24 24"
           aria-hidden="true" focusable="false" class="ui-close-icon">
           <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
         </svg></button>
+      <button id="lbPrev" class="absolute text-white text-4xl select-none">❮</button>
+      <button id="lbNext" class="absolute text-white text-4xl select-none">❯</button>
     </div>
     <div id="lbThumbs" class="absolute w-full flex justify-center px-4 py-2">
-      <div id="lbThumbsInner" class="flex gap-3"></div>
+      <div id="lbThumbsInner" class="flex gap-2"></div>
     </div>
-    <button id="lbPrev" class="absolute text-white text-4xl select-none">❮</button>
-    <button id="lbNext" class="absolute text-white text-4xl select-none">❯</button>
   </div>
 
   <script src="./assets/firebase-config.js"></script>

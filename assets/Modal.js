@@ -500,6 +500,7 @@ async function openDialog(id) {
   const dlgVideo = document.getElementById("dlgVideo");
   const dlgBg = document.getElementById("dlgBg");
   const dlgThumbs = document.getElementById("dlgThumbs");
+  const dlgHint = document.getElementById("dlgHint");
 
   const media = Array.isArray(p.images) && p.images.length > 0
     ? p.images
@@ -509,18 +510,33 @@ async function openDialog(id) {
 
   function showDialogMedia(index) {
     if (!media.length) {
-      if (dlgImg) dlgImg.src = "";
+      if (dlgImg) {
+        dlgImg.src = "";
+        dlgImg.classList.add("hidden");
+      }
+
       if (dlgVideo) {
         try { dlgVideo.pause(); } catch (_) { }
         dlgVideo.src = "";
         dlgVideo.classList.add("hidden");
       }
+
+      if (dlgThumbs) dlgThumbs.innerHTML = "";
+
+      if (dlgHint) dlgHint.textContent = "";
+
       return;
     }
 
     currentIndex = Math.max(0, Math.min(index, media.length - 1));
     const url = media[currentIndex];
     const isVid = isVideoUrl(url);
+
+    if (dlgHint) {
+      dlgHint.textContent = isVid
+        ? "雙擊主圖可放大（單擊播放/暫停）"
+        : "點主圖可放大";
+    }
 
     if (dlgImg && dlgVideo) {
       if (isVid) {
@@ -558,6 +574,7 @@ async function openDialog(id) {
   if (dlgImg) {
     dlgImg.onclick = () => openLightbox(media, currentIndex);
   }
+
   if (dlgVideo) {
     // 影片：改成「點兩下」主圖才進 Lightbox，單擊留給播放/暫停用
     let __dlgVideoLastTap = 0;
