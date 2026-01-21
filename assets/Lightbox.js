@@ -6,6 +6,17 @@ function isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
 
+function storagePathFromDownloadUrl(url) {
+  try {
+    const p = String(url).split("/o/")[1].split("?")[0];
+    return decodeURIComponent(p);
+  } catch (_) {
+    return "";
+  }
+}
+
+
+
 // Lightbox 縮圖播放 icon（避免與 Modal.js 的 __PLAY_SVG 命名衝突）
 const __THUMB_PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
 

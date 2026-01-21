@@ -6,6 +6,17 @@ function isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
 
+function storagePathFromDownloadUrl(url) {
+  try {
+    const p = String(url).split("/o/")[1].split("?")[0];
+    return decodeURIComponent(p);
+  } catch (_) {
+    return "";
+  }
+}
+
+
+
 // ===============================
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
 // ===============================
