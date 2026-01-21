@@ -1705,12 +1705,24 @@
       const onSeeked = () => { try { v.pause(); } catch (_) { } };
       v.addEventListener("loadedmetadata", onMeta, { once: true });
       v.addEventListener("seeked", onSeeked, { once: true });
+
+      // ✅ 新增：有些 iOS 只會丟 loadeddata，不會乖乖進 loadedmetadata
+      v.addEventListener("loadeddata", onMeta, { once: true });
       setTimeout(() => {
         try {
           if (v.readyState < 2) return;
           if (v.currentTime === 0) v.currentTime = 0.05;
         } catch (_) { }
       }, 120);
+
+      // ✅ 再加一個比較久的保險（應付快取 / 慢連線）
+      setTimeout(() => {
+        try {
+          if (v.readyState >= 2 && v.currentTime === 0) {
+            onMeta();
+          }
+        } catch (_) { }
+      }, 800);
     }
 
     // 手機卡片
