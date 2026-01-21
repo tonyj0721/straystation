@@ -1690,27 +1690,50 @@
       if (!v || v.dataset.__primed === "1") return;
       v.dataset.__primed = "1";
 
-      const onMeta = () => {
-        try {
-          const dur = Number.isFinite(v.duration) ? v.duration : 0;
-          let t = 0.05;
-          if (dur && dur > 0.2) {
-            t = Math.min(0.2, dur / 2);
-            t = Math.max(0.05, Math.min(t, dur - 0.05));
-          }
-          v.currentTime = t;
-        } catch (_) { }
+      // 強制開始載入 metadata（有些瀏覽器不會主動 load）
+      try { v.load(); } catch (_) { }
+
+      // 選一個靠前一點的時間點
+      const pickTime = () => {
+        const dur = Number.isFinite(v.duration) ? v.duration : 0;
+        if (!dur || dur <= 0.1) return 0.05;
+        let t = dur * 0.1;
+        t = Math.max(0.05, Math.min(t, dur - 0.05));
+        return t;
       };
 
-      const onSeeked = () => { try { v.pause(); } catch (_) { } };
-      v.addEventListener("loadedmetadata", onMeta, { once: true });
-      v.addEventListener("seeked", onSeeked, { once: true });
-      setTimeout(() => {
+      let tries = 0;
+      const maxTries = 10;
+
+      const trySeek = () => {
+        tries++;
         try {
-          if (v.readyState < 2) return;
-          if (v.currentTime === 0) v.currentTime = 0.05;
-        } catch (_) { }
-      }, 120);
+          // 還沒解好資料就再等一下
+          if (v.readyState < 2 || !Number.isFinite(v.duration)) {
+            if (tries < maxTries) {
+              setTimeout(trySeek, 200);
+            }
+            return;
+          }
+
+          v.currentTime = pickTime();
+        } catch (_) {
+          if (tries < maxTries) setTimeout(trySeek, 200);
+        }
+      };
+
+      // seek 完成後停住（只要畫面）
+      v.addEventListener("seeked", () => {
+        try { v.pause(); } catch (_) { }
+      }, { once: true });
+
+      if (v.readyState >= 2) {
+        trySeek();
+      } else {
+        // metadata 還沒來就掛事件＋保險重試
+        v.addEventListener("loadedmetadata", trySeek, { once: true });
+        setTimeout(trySeek, 200);
+      }
     }
 
     // 手機卡片
