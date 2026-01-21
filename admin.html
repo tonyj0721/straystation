@@ -1414,10 +1414,13 @@
         // 1) 新增基本文件
         const docRef = await addDoc(collection(db, "pets"), payload);
 
-        // 2) 逐張上傳圖片，取得 Storage URL
+        // 2) 逐張上傳圖片，取得 Storage URL ＋ 縮圖 URL
         const urls = [];
+        const thumbs = [];
+
         for (const f of selectedFiles) {
-          const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+          // 1. 先做有浮水印的大檔（保持原本做法）
+          const wmBlob = await addWatermarkToFile(f);
           const type = wmBlob.type || '';
           let ext = 'bin';
           if (type.startsWith('image/')) {
@@ -1429,16 +1432,32 @@
             else ext = 'mp4';
           }
           const base = f.name.replace(/\.[^.]+$/, '');
-          const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
-          const r = sRef(storage, path);
-          await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
-          urls.push(await getDownloadURL(r));
+          const filePath = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
+          const fileRef = sRef(storage, filePath);
+          await uploadBytes(fileRef, wmBlob, { contentType: wmBlob.type });
+          const fileUrl = await getDownloadURL(fileRef);
+          urls.push(fileUrl);
+
+          // 2. 再從「原始檔案 f」做一張縮圖（不加水印）
+          try {
+            const thumbBlob = await createThumbBlobFromFile(f);
+            const thumbPath = `pets/${docRef.id}/${Date.now()}_${base}_thumb.jpg`;
+            const thumbRef = sRef(storage, thumbPath);
+            await uploadBytes(thumbRef, thumbBlob, { contentType: "image/jpeg" });
+            const thumbUrl = await getDownloadURL(thumbRef);
+            thumbs.push(thumbUrl);
+          } catch (e) {
+            console.error("產縮圖失敗，先跳過縮圖：", e);
+            thumbs.push(null); // 占位，之後前端可以用 url 當 fallback
+          }
         }
 
-        // 3) 回寫 images 欄位
-        if (urls.length) {
-          await updateDoc(doc(db, "pets", docRef.id), { images: urls });
+        // 3) 回寫 images + thumbs 欄位
+        const update = { images: urls };
+        if (thumbs.some(x => !!x)) {
+          update.thumbs = thumbs;
         }
+        await updateDoc(doc(db, "pets", docRef.id), update);
 
         // UI 收尾
         stopDots();
@@ -1707,21 +1726,10 @@
       v.addEventListener("seeked", onSeeked, { once: true });
       setTimeout(() => {
         try {
-          // 只要 metadata 讀好了 (readyState >= 1)，就把時間往後拉一點
-          if (v.readyState >= 1 && v.currentTime === 0) {
-            v.currentTime = 0.05;
-          }
+          if (v.readyState < 2) return;
+          if (v.currentTime === 0) v.currentTime = 0.05;
         } catch (_) { }
-      }, 400);  // 稍微等久一點
-
-      // 再保險多試一次（網路更慢的時候）
-      setTimeout(() => {
-        try {
-          if (v.readyState >= 1 && v.currentTime === 0) {
-            v.currentTime = 0.05;
-          }
-        } catch (_) { }
-      }, 1200);
+      }, 120);
     }
 
     // 手機卡片
