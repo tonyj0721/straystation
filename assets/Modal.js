@@ -6,45 +6,26 @@ function isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
 
-// 同一個影片 URL → 固定用同一個縮圖時間點
-const __videoThumbTimeCache = new Map();
-
-function __getVideoThumbTime(v) {
-  const src = v.currentSrc || v.src || "";
-  if (!src) return 0.05;
-
-  if (__videoThumbTimeCache.has(src)) {
-    return __videoThumbTimeCache.get(src);
-  }
-
-  let t = 0.05;
-  const dur = Number.isFinite(v.duration) ? v.duration : 0;
-  if (dur && dur > 0.2) {
-    t = Math.min(0.2, dur / 2);
-    t = Math.max(0.05, Math.min(t, dur - 0.05));
-  }
-
-  __videoThumbTimeCache.set(src, t);
-  return t;
-}
-
 // ===============================
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
 // ===============================
-// 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
 function __primeThumbVideoFrame(v) {
   if (!v || v.dataset.__primed === "1") return;
   v.dataset.__primed = "1";
 
-  const seekToThumb = () => {
-    try {
-      const t = __getVideoThumbTime(v);
-      v.currentTime = t;
-    } catch (_) { }
-  };
-
+  // 只要能顯示某個 frame 就好：loadedmetadata 後 seek 一下
   const onMeta = () => {
-    seekToThumb();
+    try {
+      const dur = Number.isFinite(v.duration) ? v.duration : 0;
+      let t = 0.05;
+      if (dur && dur > 0.2) {
+        t = Math.min(0.2, dur / 2);
+        t = Math.max(0.05, Math.min(t, dur - 0.05));
+      }
+      v.currentTime = t;
+    } catch (_) {
+      // ignore
+    }
   };
 
   const onSeeked = () => {
@@ -54,14 +35,16 @@ function __primeThumbVideoFrame(v) {
   v.addEventListener("loadedmetadata", onMeta, { once: true });
   v.addEventListener("seeked", onSeeked, { once: true });
 
-  // 保險：有些情況 loadedmetadata 早就發生了，或 event 沒接到
+  // 有些 Safari 不會立刻解碼畫面：加個保險
   setTimeout(() => {
     try {
       if (v.readyState < 2) return;
-      seekToThumb();
+      // 觸發一次 seek（若上面沒成功）
+      if (v.currentTime === 0) v.currentTime = 0.05;
     } catch (_) { }
-  }, 200);
+  }, 120);
 }
+
 
 function __lockDialogScroll() {
   try { if (typeof lockScroll === "function") lockScroll(); } catch { }
@@ -239,6 +222,68 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
     return new File([blob], name, { type: mime });
   } finally {
     URL.revokeObjectURL(src);
+  }
+}
+
+// 針對影片檔建立一張 JPEG 縮圖（用加過浮水印的影片檔）
+async function makeVideoThumbnailBlob(videoFile) {
+  const url = URL.createObjectURL(videoFile);
+  try {
+    const v = document.createElement("video");
+    v.src = url;
+    v.muted = true;
+    v.playsInline = true;
+    v.setAttribute("playsinline", "");
+    v.setAttribute("webkit-playsinline", "");
+    v.preload = "metadata";
+
+    await new Promise((resolve, reject) => {
+      v.onloadedmetadata = () => resolve();
+      v.onerror = () => reject(new Error("載入影片失敗"));
+    });
+
+    // 避免抓到開頭全黑：抓稍微靠前的一個時間點
+    const dur = Number.isFinite(v.duration) ? v.duration : 0;
+    let t = 0.2;
+    if (dur && dur > 0.4) {
+      t = Math.min(0.2, dur / 3);
+      t = Math.max(0.05, Math.min(t, dur - 0.05));
+    }
+    v.currentTime = t;
+
+    await new Promise((resolve) => {
+      v.onseeked = () => resolve();
+    });
+
+    // 播一下再暫停，確保畫面真的被解碼
+    try {
+      const p = v.play();
+      if (p && typeof p.then === "function") {
+        await p.catch(() => { });
+      }
+      v.pause();
+    } catch (_) { }
+
+    const W = v.videoWidth || 720;
+    const H = v.videoHeight || Math.round(720 * 9 / 16);
+    const MAX_SIDE = 720;
+    const scale = Math.min(1, MAX_SIDE / Math.max(W, H));
+    const w = Math.max(1, Math.round(W * scale));
+    const h = Math.max(1, Math.round(H * scale));
+
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    const g = c.getContext("2d");
+    g.drawImage(v, 0, 0, w, h);
+
+    const blob = await new Promise((resolve) =>
+      c.toBlob(resolve, "image/jpeg", 0.82)
+    );
+    if (!blob) throw new Error("產生縮圖失敗");
+    return blob;
+  } finally {
+    URL.revokeObjectURL(url);
   }
 }
 
@@ -902,17 +947,26 @@ async function saveEdit() {
     // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
     const { items, removeUrls } = editImagesState;
     const newUrls = [];
+    const newThumbs = [];
+
+    const oldImages = Array.isArray(currentDoc?.images) ? currentDoc.images : [];
+    const oldThumbs = Array.isArray(currentDoc?.imageThumbs) ? currentDoc.imageThumbs : [];
 
     // 依序處理（保持順序）
     for (const it of items) {
       if (it.kind === "url") {
+        // 保留原有順序與對應縮圖
         newUrls.push(it.url);
+        const idxOld = oldImages.indexOf(it.url);
+        const oldThumb = idxOld >= 0 ? oldThumbs[idxOld] : null;
+        newThumbs.push(oldThumb || it.url);
         continue;
       }
 
       if (it.kind === "file") {
         const f = it.file;
-        const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+        // 1) 先加浮水印（圖片或影片）
+        const wmBlob = await addWatermarkToFile(f);
         const type = wmBlob.type || '';
         let ext = 'bin';
         if (type.startsWith('image/')) {
@@ -924,24 +978,58 @@ async function saveEdit() {
           else ext = 'mp4';
         }
         const base = f.name.replace(/\.[^.]+$/, '');
-        const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
-        const r = sRef(storage, path);
-        await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
-        newUrls.push(await getDownloadURL(r));
+        const ts = Date.now();
+
+        // 2) 上傳加過浮水印的原始檔
+        const mainPath = `pets/${currentDocId}/${ts}_${base}.${ext}`;
+        const mainRef = sRef(storage, mainPath);
+        await uploadBytes(mainRef, wmBlob, { contentType: wmBlob.type });
+        const mainUrl = await getDownloadURL(mainRef);
+        newUrls.push(mainUrl);
+
+        // 3) 如果是影片，再另外產一張縮圖 jpg 上傳
+        let thumbUrl = null;
+        try {
+          if (type.startsWith('video/')) {
+            const thumbBlob = await makeVideoThumbnailBlob(wmBlob);
+            const thumbPath = `pets/${currentDocId}/${ts}_${base}_thumb.jpg`;
+            const thumbRef = sRef(storage, thumbPath);
+            await uploadBytes(thumbRef, thumbBlob, { contentType: thumbBlob.type || 'image/jpeg' });
+            thumbUrl = await getDownloadURL(thumbRef);
+          }
+        } catch (e) {
+          // 縮圖失敗就略過，之後會用 mainUrl 當縮圖
+          console.warn('makeVideoThumbnailBlob failed', e);
+        }
+        newThumbs.push(thumbUrl || mainUrl);
       }
     }
 
-    // 刪除被移除的舊圖（忽略刪失敗）
+    // 刪除被移除的舊圖（忽略刪失敗，連同舊縮圖一起刪）
     for (const url of (removeUrls || [])) {
+      // 刪主檔
       try {
         const path = url.split("/o/")[1].split("?")[0];
         await deleteObject(sRef(storage, decodeURIComponent(path)));
       } catch (e) {
         // 靜默忽略
       }
+
+      // 刪縮圖
+      const idxOld = oldImages.indexOf(url);
+      const oldThumb = idxOld >= 0 ? oldThumbs[idxOld] : null;
+      if (oldThumb && typeof oldThumb === "string") {
+        try {
+          const tPath = oldThumb.split("/o/")[1].split("?")[0];
+          await deleteObject(sRef(storage, decodeURIComponent(tPath)));
+        } catch (e) {
+          // 一樣忽略
+        }
+      }
     }
 
     newData.images = newUrls;
+    newData.imageThumbs = newThumbs;
 
     // ③ 寫回 Firestore
     await updateDoc(doc(db, "pets", currentDocId), newData);
