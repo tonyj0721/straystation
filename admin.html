@@ -423,21 +423,19 @@
     <div class="bg-white">
       <!-- 新增：與下方縮圖 p-3 對齊 -->
       <div class="px-3 pt-2">
-        <p id="dlgHint" class="text-center text-sm text-gray-500 mb-1">點主圖可放大</p>
-        <div id="dlgStageWrap" class="relative">
-          <div class="relative aspect-video bg-gray-100 overflow-hidden rounded-lg">
-            <!-- 只模糊這張背景圖 -->
-            <img id="dlgBg" aria-hidden="true" class="absolute inset-0 w-full h-full object-cover blur-md scale-110">
+        <p id="dlgHint" class="text-center text-xs text-gray-500 mb-1">點主圖可放大</p>
+        <div class="relative aspect-video bg-gray-100 overflow-hidden rounded-lg">
+          <!-- 只模糊這張背景圖 -->
+          <img id="dlgBg" aria-hidden="true" class="absolute inset-0 w-full h-full object-cover blur-md scale-110">
 
-            <!-- 可選：柔化一下背景，沒有加任何 blur -->
-            <div class="absolute inset-0 bg-white/20"></div>
+          <!-- 可選：柔化一下背景，沒有加任何 blur -->
+          <div class="absolute inset-0 bg-white/20"></div>
 
-            <!-- 主圖在最上層，沒有 blur -->
-            <img id="dlgImg" alt="毛孩照片"
-              class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg">
-            <video id="dlgVideo" playsinline controls
-              class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg hidden"></video>
-          </div>
+          <!-- 主圖在最上層，沒有 blur -->
+          <img id="dlgImg" alt="毛孩照片"
+            class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg">
+          <video id="dlgVideo" playsinline controls
+            class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg hidden"></video>
 
           <button id="dlgClose" class="ui-close-btn absolute top-1 right-1 z-20" aria-label="關閉"><svg
               viewBox="0 0 24 24" aria-hidden="true" focusable="false" class="ui-close-icon">
@@ -1713,6 +1711,16 @@
       }, 120);
     }
 
+    // downloadUrl → Storage path（用於 thumbByPath）
+    function storagePathFromDownloadUrl(url) {
+      try {
+        const p = String(url || "").split("/o/")[1].split("?")[0];
+        return decodeURIComponent(p);
+      } catch (_) {
+        return "";
+      }
+    }
+
     // 手機卡片
     function renderRowsMobile(list) {
       const wrap = document.getElementById("rowsMobile");
@@ -1722,19 +1730,30 @@
         .map((p) => {
           const mediaUrl = (Array.isArray(p.images) && p.images[0]) || p.image || "";
           const isVid = typeof isVideoUrl === "function" && isVideoUrl(mediaUrl);
+          const videoPath = isVid ? storagePathFromDownloadUrl(mediaUrl) : "";
+          const videoThumb = (isVid && p.thumbByPath && videoPath) ? (p.thumbByPath[videoPath] || "") : "";
+
           const thumb = isVid
-            ? `
-              <div class="media-thumb">
-                <video class="thumb-video" preload="metadata" muted playsinline webkit-playsinline disablepictureinpicture src="${mediaUrl}"></video>
-                <div class="video-badge"><div class="video-badge-inner">${__THUMB_PLAY_SVG}</div></div>
-              </div>
-            `
+            ? (videoThumb
+              ? `
+               <div class="media-thumb">
+                 <img src="${videoThumb}" alt="" loading="lazy" decoding="async">
+                 <div class="video-badge"><div class="video-badge-inner">${__THUMB_PLAY_SVG}</div></div>
+               </div>
+              `
+              : `
+               <div class="media-thumb">
+                 <video class="thumb-video" preload="metadata" muted playsinline webkit-playsinline disablepictureinpicture src="${mediaUrl}"></video>
+                 <div class="video-badge"><div class="video-badge-inner">${__THUMB_PLAY_SVG}</div></div>
+               </div>
+              `)
             : `
-              <div class="media-thumb">
-                <img src="${mediaUrl}" alt="" loading="lazy" decoding="async">
-              </div>
-            `;
-          return `
+               <div class="media-thumb">
+                 <img src="${mediaUrl}" alt="" loading="lazy" decoding="async">
+               </div>
+              `;
+
+return `
         <div class="rounded-xl ring-1 ring-gray-200 p-3 flex gap-3 items-center cursor-pointer"
              data-id="${p.id}">
           ${thumb}
