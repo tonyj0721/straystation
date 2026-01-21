@@ -1690,50 +1690,27 @@
       if (!v || v.dataset.__primed === "1") return;
       v.dataset.__primed = "1";
 
-      // 強制開始載入 metadata（有些瀏覽器不會主動 load）
-      try { v.load(); } catch (_) { }
-
-      // 選一個靠前一點的時間點
-      const pickTime = () => {
-        const dur = Number.isFinite(v.duration) ? v.duration : 0;
-        if (!dur || dur <= 0.1) return 0.05;
-        let t = dur * 0.1;
-        t = Math.max(0.05, Math.min(t, dur - 0.05));
-        return t;
-      };
-
-      let tries = 0;
-      const maxTries = 10;
-
-      const trySeek = () => {
-        tries++;
+      const onMeta = () => {
         try {
-          // 還沒解好資料就再等一下
-          if (v.readyState < 2 || !Number.isFinite(v.duration)) {
-            if (tries < maxTries) {
-              setTimeout(trySeek, 200);
-            }
-            return;
+          const dur = Number.isFinite(v.duration) ? v.duration : 0;
+          let t = 0.05;
+          if (dur && dur > 0.2) {
+            t = Math.min(0.2, dur / 2);
+            t = Math.max(0.05, Math.min(t, dur - 0.05));
           }
-
-          v.currentTime = pickTime();
-        } catch (_) {
-          if (tries < maxTries) setTimeout(trySeek, 200);
-        }
+          v.currentTime = t;
+        } catch (_) { }
       };
 
-      // seek 完成後停住（只要畫面）
-      v.addEventListener("seeked", () => {
-        try { v.pause(); } catch (_) { }
-      }, { once: true });
-
-      if (v.readyState >= 2) {
-        trySeek();
-      } else {
-        // metadata 還沒來就掛事件＋保險重試
-        v.addEventListener("loadedmetadata", trySeek, { once: true });
-        setTimeout(trySeek, 200);
-      }
+      const onSeeked = () => { try { v.pause(); } catch (_) { } };
+      v.addEventListener("loadedmetadata", onMeta, { once: true });
+      v.addEventListener("seeked", onSeeked, { once: true });
+      setTimeout(() => {
+        try {
+          if (v.readyState < 2) return;
+          if (v.currentTime === 0) v.currentTime = 0.05;
+        } catch (_) { }
+      }, 120);
     }
 
     // 手機卡片
@@ -1743,57 +1720,31 @@
 
       wrap.innerHTML = list
         .map((p) => {
-          // 主檔（圖片或影片）的網址
           const mediaUrl = (Array.isArray(p.images) && p.images[0]) || p.image || "";
-
-          // 對應的縮圖網址（如果有的話）
-          const thumbFromDoc = Array.isArray(p.imageThumbs) && p.imageThumbs.length > 0
-            ? p.imageThumbs[0]
-            : "";
-
           const isVid = typeof isVideoUrl === "function" && isVideoUrl(mediaUrl);
-          const hasThumb = !!thumbFromDoc;
-
           const thumb = isVid
-            ? (
-              // 有獨立縮圖：用 <img> + 播放 icon（畫面會跟別的地方一樣）
-              hasThumb
-                ? `
+            ? `
               <div class="media-thumb">
-                <img src="${thumbFromDoc}" alt="" loading="lazy" decoding="async">
+                <video class="thumb-video" preload="metadata" muted playsinline webkit-playsinline disablepictureinpicture src="${mediaUrl}"></video>
                 <div class="video-badge"><div class="video-badge-inner">${__THUMB_PLAY_SVG}</div></div>
               </div>
             `
-                // 舊資料沒有 imageThumbs：退回原本的 <video> 縮圖邏輯
-                : `
-              <div class="media-thumb">
-                <video
-                  class="thumb-video"
-                  preload="metadata"
-                  muted
-                  playsinline
-                  webkit-playsinline
-                  disablepictureinpicture
-                  src="${mediaUrl}"
-                ></video>
-                <div class="video-badge"><div class="video-badge-inner">${__THUMB_PLAY_SVG}</div></div>
-              </div>
-            `
-            )
             : `
-          <div class="media-thumb">
-            <img src="${mediaUrl}" alt="" loading="lazy" decoding="async">
-          </div>
-        `;
-
+              <div class="media-thumb">
+                <img src="${mediaUrl}" alt="" loading="lazy" decoding="async">
+              </div>
+            `;
           return `
         <div class="rounded-xl ring-1 ring-gray-200 p-3 flex gap-3 items-center cursor-pointer"
              data-id="${p.id}">
           ${thumb}
           <div class="min-w-0 flex-1">
             <div class="font-semibold truncate">${p.name}</div>
-            ...
-      `;
+            <div class="text-xs text-gray-600 mt-1 truncate">
+              ${p.species}・${p.breed}・${p.gender}
+            </div>
+          </div>
+        </div>`;
         })
         .join("");
 
