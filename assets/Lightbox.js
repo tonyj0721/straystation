@@ -14,30 +14,29 @@ function __primeThumbVideoFrameLightbox(v) {
   if (!v || v.dataset.__primed === "1") return;
   v.dataset.__primed = "1";
 
-  const onMeta = () => {
+  const seekToThumb = () => {
     try {
-      const dur = Number.isFinite(v.duration) ? v.duration : 0;
-      let t = 0.05;
-      if (dur && dur > 0.2) {
-        t = Math.min(0.2, dur / 2);
-        t = Math.max(0.05, Math.min(t, dur - 0.05));
-      }
+      const t = __getVideoThumbTime(v);
       v.currentTime = t;
     } catch (_) { }
+  };
+
+  const onMeta = () => {
+    seekToThumb();
   };
 
   const onSeeked = () => { try { v.pause(); } catch (_) { } };
 
   v.addEventListener("loadedmetadata", onMeta, { once: true });
   v.addEventListener("seeked", onSeeked, { once: true });
+
   setTimeout(() => {
     try {
       if (v.readyState < 2) return;
-      if (v.currentTime === 0) v.currentTime = 0.05;
+      seekToThumb();
     } catch (_) { }
-  }, 120);
+  }, 200);
 }
-
 
 history.scrollRestoration = "manual";
 window.scrollTo(0, 0);

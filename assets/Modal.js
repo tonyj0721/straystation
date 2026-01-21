@@ -6,26 +6,45 @@ function isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
 
+// 同一個影片 URL → 固定用同一個縮圖時間點
+const __videoThumbTimeCache = new Map();
+
+function __getVideoThumbTime(v) {
+  const src = v.currentSrc || v.src || "";
+  if (!src) return 0.05;
+
+  if (__videoThumbTimeCache.has(src)) {
+    return __videoThumbTimeCache.get(src);
+  }
+
+  let t = 0.05;
+  const dur = Number.isFinite(v.duration) ? v.duration : 0;
+  if (dur && dur > 0.2) {
+    t = Math.min(0.2, dur / 2);
+    t = Math.max(0.05, Math.min(t, dur - 0.05));
+  }
+
+  __videoThumbTimeCache.set(src, t);
+  return t;
+}
+
 // ===============================
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
 // ===============================
+// 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
 function __primeThumbVideoFrame(v) {
   if (!v || v.dataset.__primed === "1") return;
   v.dataset.__primed = "1";
 
-  // 只要能顯示某個 frame 就好：loadedmetadata 後 seek 一下
-  const onMeta = () => {
+  const seekToThumb = () => {
     try {
-      const dur = Number.isFinite(v.duration) ? v.duration : 0;
-      let t = 0.05;
-      if (dur && dur > 0.2) {
-        t = Math.min(0.2, dur / 2);
-        t = Math.max(0.05, Math.min(t, dur - 0.05));
-      }
+      const t = __getVideoThumbTime(v);
       v.currentTime = t;
-    } catch (_) {
-      // ignore
-    }
+    } catch (_) { }
+  };
+
+  const onMeta = () => {
+    seekToThumb();
   };
 
   const onSeeked = () => {
@@ -35,16 +54,14 @@ function __primeThumbVideoFrame(v) {
   v.addEventListener("loadedmetadata", onMeta, { once: true });
   v.addEventListener("seeked", onSeeked, { once: true });
 
-  // 有些 Safari 不會立刻解碼畫面：加個保險
+  // 保險：有些情況 loadedmetadata 早就發生了，或 event 沒接到
   setTimeout(() => {
     try {
       if (v.readyState < 2) return;
-      // 觸發一次 seek（若上面沒成功）
-      if (v.currentTime === 0) v.currentTime = 0.05;
+      seekToThumb();
     } catch (_) { }
-  }, 120);
+  }, 200);
 }
-
 
 function __lockDialogScroll() {
   try { if (typeof lockScroll === "function") lockScroll(); } catch { }
@@ -376,30 +393,6 @@ async function __decodeToBitmap(file) {
     URL.revokeObjectURL(raw);
   }
 }
-
-
-// 用你現有的 __decodeToBitmap，直接產一張縮圖 Blob
-async function createThumbBlobFromFile(file) {
-  const bmp = await __decodeToBitmap(file);   // 這個函式在 Modal.js 裡已經定義好了
-  const W = bmp.width, H = bmp.height;
-  const PREVIEW_MAX = 720;
-  const PREVIEW_QUALITY = 0.82;
-
-  const scale = Math.min(1, PREVIEW_MAX / Math.max(W, H));
-  const w = Math.max(1, Math.round(W * scale));
-  const h = Math.max(1, Math.round(H * scale));
-
-  const c = document.createElement("canvas");
-  c.width = w;
-  c.height = h;
-  const g = c.getContext("2d", { alpha: false, desynchronized: true });
-  g.drawImage(bmp, 0, 0, w, h);
-  bmp.close?.();
-
-  const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", PREVIEW_QUALITY));
-  return blob; // 這個 Blob 就是要上傳的縮圖
-}
-
 async function __makePreviewThumbURL(file) {
   const bmp = await __decodeToBitmap(file);
   const W = bmp.width, H = bmp.height;
@@ -531,8 +524,6 @@ async function openDialog(id) {
     ? p.images
     : (p.image ? [p.image] : []);
 
-  const thumbs = Array.isArray(p.thumbs) ? p.thumbs : [];
-
   let currentIndex = 0;
 
   function showDialogMedia(index) {
@@ -631,51 +622,32 @@ async function openDialog(id) {
     const wrapper = document.createElement("div");
     wrapper.className = "dlg-thumb" + (i === 0 ? " active" : "");
 
-    // 優先用 Firestore 裡的縮圖 URL
-    const thumbUrl = thumbs[i] || null;
+    if (isVid) {
+      const v = document.createElement("video");
+      v.className = "thumb-video";
+      v.preload = "metadata";
+      v.muted = true;
+      v.playsInline = true;
+      v.setAttribute("playsinline", "");
+      v.setAttribute("webkit-playsinline", "");
+      v.controls = false;
+      v.disablePictureInPicture = true;
+      v.src = url;
 
-    if (thumbUrl) {
-      // ✅ 有縮圖：一律用 <img>（圖片 / 影片都走這裡）
-      const img = document.createElement("img");
-      img.src = thumbUrl;
-      wrapper.appendChild(img);
+      // 抓第一幀（避免黑畫面/空白）
+      __primeThumbVideoFrame(v);
 
-      if (isVid) {
-        // 影片縮圖一樣疊一個播放 icon
-        const badge = document.createElement("div");
-        badge.className = "video-badge";
-        badge.innerHTML = `<div class="video-badge-inner">${__PLAY_SVG}</div>`;
-        wrapper.appendChild(badge);
-      }
+      // 覆蓋播放 icon（圖 4 的樣式）
+      const badge = document.createElement("div");
+      badge.className = "video-badge";
+      badge.innerHTML = `<div class="video-badge-inner">${__PLAY_SVG}</div>`;
+
+      wrapper.appendChild(v);
+      wrapper.appendChild(badge);
     } else {
-      // ⬇️ 沒有縮圖（舊資料或還沒產好），走你原本的邏輯
-      if (isVid) {
-        const v = document.createElement("video");
-        v.className = "thumb-video";
-        v.preload = "metadata";
-        v.muted = true;
-        v.playsInline = true;
-        v.setAttribute("playsinline", "");
-        v.setAttribute("webkit-playsinline", "");
-        v.controls = false;
-        v.disablePictureInPicture = true;
-        v.src = url;
-
-        // 抓第一幀（避免黑畫面/空白）
-        __primeThumbVideoFrame(v);
-
-        // 覆蓋播放 icon（圖 4 的樣式）
-        const badge = document.createElement("div");
-        badge.className = "video-badge";
-        badge.innerHTML = `<div class="video-badge-inner">${__PLAY_SVG}</div>`;
-
-        wrapper.appendChild(v);
-        wrapper.appendChild(badge);
-      } else {
-        const img = document.createElement("img");
-        img.src = url;
-        wrapper.appendChild(img);
-      }
+      const img = document.createElement("img");
+      img.src = url;
+      wrapper.appendChild(img);
     }
 
     wrapper.addEventListener("click", () => {
