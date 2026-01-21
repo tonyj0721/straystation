@@ -176,6 +176,7 @@ dlg?.addEventListener('close', () => {
   if (lb && lb.classList.contains("flex")) return;
 
   window.currentPetId = null;
+  window.currentPetThumbByPath = null;
   history.replaceState(null, '', location.pathname);
   unlockScroll();
 });
@@ -197,23 +198,32 @@ function openLightbox(images, index = 0) {
       wrapper.className = "lb-thumb" + (i === lbIndex ? " active" : "");
 
       if (isVid) {
-        const v = document.createElement("video");
-        v.className = "thumb-video";
-        v.preload = "metadata";
-        v.muted = true;
-        v.playsInline = true;
-        v.setAttribute("playsinline", "");
-        v.setAttribute("webkit-playsinline", "");
-        v.controls = false;
-        v.disablePictureInPicture = true;
-        v.src = url;
-        __primeThumbVideoFrameLightbox(v);
+        const map = (window.currentPetThumbByPath || {});
+        const videoPath = storagePathFromDownloadUrl(url);
+        const videoThumb = (videoPath && map) ? (map[videoPath] || "") : "";
+
+        if (videoThumb) {
+          const img = document.createElement("img");
+          img.src = videoThumb;
+          wrapper.appendChild(img);
+        } else {
+          const v = document.createElement("video");
+          v.className = "thumb-video";
+          v.preload = "metadata";
+          v.muted = true;
+          v.playsInline = true;
+          v.setAttribute("playsinline", "");
+          v.setAttribute("webkit-playsinline", "");
+          v.controls = false;
+          v.disablePictureInPicture = true;
+          v.src = url;
+          __primeThumbVideoFrameLightbox(v);
+          wrapper.appendChild(v);
+        }
 
         const badge = document.createElement("div");
         badge.className = "video-badge";
         badge.innerHTML = `<div class="video-badge-inner">${__THUMB_PLAY_SVG}</div>`;
-
-        wrapper.appendChild(v);
         wrapper.appendChild(badge);
       } else {
         const img = document.createElement("img");

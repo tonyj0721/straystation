@@ -483,6 +483,7 @@ async function openDialog(id) {
   currentDoc = p;
   currentDocId = p.id;
   window.currentPetId = p.id;
+  window.currentPetThumbByPath = p.thumbByPath || {};
   history.replaceState(null, '', `?pet=${encodeURIComponent(p.id)}`);
 
   // 3. 健康標籤（第二排）
@@ -501,7 +502,6 @@ async function openDialog(id) {
   const dlgBg = document.getElementById("dlgBg");
   const dlgThumbs = document.getElementById("dlgThumbs");
   const dlgHint = document.getElementById("dlgHint");
-  const dlgStageWrap = document.getElementById("dlgStageWrap");
 
   const media = Array.isArray(p.images) && p.images.length > 0
     ? p.images
@@ -526,8 +526,6 @@ async function openDialog(id) {
 
       if (dlgHint) dlgHint.textContent = "";
 
-      if (dlgStageWrap) dlgStageWrap.classList.remove("dlg-video-mode");
-
       return;
     }
 
@@ -535,17 +533,10 @@ async function openDialog(id) {
     const url = media[currentIndex];
     const isVid = isVideoUrl(url);
 
-    if (dlgStageWrap) dlgStageWrap.classList.toggle("dlg-video-mode", isVid);
-
     if (dlgHint) {
       dlgHint.textContent = isVid
         ? "雙擊主圖可放大"
         : "點主圖可放大";
-
-      // 影片：加 mt-2；圖片：移除 mt-2
-      dlgHint.classList.toggle("mt-2", isVid);
-      // （可選）確保圖片時沒有 mt-2 殘留
-      if (!isVid) dlgHint.classList.remove("mt-2");
     }
 
     if (dlgImg && dlgVideo) {
@@ -606,26 +597,35 @@ async function openDialog(id) {
     wrapper.className = "dlg-thumb" + (i === 0 ? " active" : "");
 
     if (isVid) {
-      const v = document.createElement("video");
-      v.className = "thumb-video";
-      v.preload = "metadata";
-      v.muted = true;
-      v.playsInline = true;
-      v.setAttribute("playsinline", "");
-      v.setAttribute("webkit-playsinline", "");
-      v.controls = false;
-      v.disablePictureInPicture = true;
-      v.src = url;
+      const videoPath = storagePathFromDownloadUrl(url);
+      const videoThumb = (p.thumbByPath && videoPath) ? (p.thumbByPath[videoPath] || "") : "";
 
-      // 抓第一幀（避免黑畫面/空白）
-      __primeThumbVideoFrame(v);
+      if (videoThumb) {
+        const img = document.createElement("img");
+        img.src = videoThumb;
+        wrapper.appendChild(img);
+      } else {
+        const v = document.createElement("video");
+        v.className = "thumb-video";
+        v.preload = "metadata";
+        v.muted = true;
+        v.playsInline = true;
+        v.setAttribute("playsinline", "");
+        v.setAttribute("webkit-playsinline", "");
+        v.controls = false;
+        v.disablePictureInPicture = true;
+        v.src = url;
+
+        // 後端縮圖還沒產出時才 fallback 用影片抓第一幀
+        __primeThumbVideoFrame(v);
+
+        wrapper.appendChild(v);
+      }
 
       // 覆蓋播放 icon（圖 4 的樣式）
       const badge = document.createElement("div");
       badge.className = "video-badge";
       badge.innerHTML = `<div class="video-badge-inner">${__PLAY_SVG}</div>`;
-
-      wrapper.appendChild(v);
       wrapper.appendChild(badge);
     } else {
       const img = document.createElement("img");
