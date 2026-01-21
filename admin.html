@@ -1690,21 +1690,6 @@
       if (!v || v.dataset.__primed === "1") return;
       v.dataset.__primed = "1";
 
-      // 確保真的解碼並畫出一幀
-      const ensurePainted = () => {
-        try {
-          const p = v.play();
-          if (p && typeof p.then === "function") {
-            p.then(() => v.pause()).catch(() => { /* ignore */ });
-          } else {
-            v.play();
-            v.pause();
-          }
-        } catch (_) {
-          // iOS 偶爾會丟錯，直接忽略
-        }
-      };
-
       const onMeta = () => {
         try {
           const dur = Number.isFinite(v.duration) ? v.duration : 0;
@@ -1717,23 +1702,26 @@
         } catch (_) { }
       };
 
-      const onSeeked = () => {
-        // seek 完成後播一下再停住 → 通常就會有縮圖
-        ensurePainted();
-      };
+      const onSeeked = () => { try { v.pause(); } catch (_) { } };
 
       v.addEventListener("loadedmetadata", onMeta, { once: true });
       v.addEventListener("seeked", onSeeked, { once: true });
 
-      // 保險：有些情況 event 沒來，超時再試一次
-      setTimeout(() => {
+      let tries = 0;
+      const ensureThumb = () => {
+        tries++;
         try {
           if (v.readyState >= 2 && v.currentTime === 0) {
             v.currentTime = 0.05;
-            ensurePainted();
+            return;
+          }
+          if (tries < 5) {
+            setTimeout(ensureThumb, 200);
           }
         } catch (_) { }
-      }, 200);
+      };
+
+      setTimeout(ensureThumb, 200);
     }
 
     // 手機卡片
