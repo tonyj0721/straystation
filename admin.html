@@ -1690,38 +1690,47 @@
       if (!v || v.dataset.__primed === "1") return;
       v.dataset.__primed = "1";
 
-      const onMeta = () => {
+      const seekToThumb = () => {
         try {
           const dur = Number.isFinite(v.duration) ? v.duration : 0;
-          let t = 0.05;
-          if (dur && dur > 0.2) {
-            t = Math.min(0.2, dur / 2);
+          let t = 0.08;
+          if (dur && dur > 0.3) {
+            t = Math.min(0.25, dur / 2);
             t = Math.max(0.05, Math.min(t, dur - 0.05));
           }
           v.currentTime = t;
         } catch (_) { }
       };
 
-      const onSeeked = () => { try { v.pause(); } catch (_) { } };
-
-      v.addEventListener("loadedmetadata", onMeta, { once: true });
-      v.addEventListener("seeked", onSeeked, { once: true });
-
-      let tries = 0;
-      const ensureThumb = () => {
-        tries++;
-        try {
-          if (v.readyState >= 2 && v.currentTime === 0) {
-            v.currentTime = 0.05;
-            return;
-          }
-          if (tries < 5) {
-            setTimeout(ensureThumb, 200);
-          }
-        } catch (_) { }
+      const stop = () => {
+        v.dataset.__thumb_done = "1";
+        try { v.pause(); } catch (_) { }
       };
 
-      setTimeout(ensureThumb, 200);
+      // 1. metadata 到了：seek 到前面一點 + 播一下（iOS Safari 需要真正播放才會畫面）
+      v.addEventListener("loadedmetadata", () => {
+        seekToThumb();
+        const p = v.play();
+        if (p && typeof p.then === "function") {
+          p.catch(() => { /* iOS 若擋 autoplay 就忽略 */ });
+        }
+      }, { once: true });
+
+      // 2. 只要有畫面更新就馬上停掉
+      v.addEventListener("timeupdate", stop, { once: true });
+      v.addEventListener("seeked", stop, { once: true });
+
+      // 3. 防止事件沒來（快取 / 網路很慢）
+      setTimeout(() => {
+        if (v.dataset.__thumb_done === "1") return;
+        try {
+          seekToThumb();
+          const p = v.play();
+          if (p && typeof p.then === "function") {
+            p.catch(() => { });
+          }
+        } catch (_) { }
+      }, 1000);
     }
 
     // 手機卡片
