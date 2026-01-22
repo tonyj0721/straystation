@@ -423,19 +423,21 @@
     <div class="bg-white">
       <!-- 新增：與下方縮圖 p-3 對齊 -->
       <div class="px-3 pt-2">
-        <p id="dlgHint" class="text-center text-xs text-gray-500 mb-1">點主圖可放大</p>
-        <div class="relative aspect-video bg-gray-100 overflow-hidden rounded-lg">
-          <!-- 只模糊這張背景圖 -->
-          <img id="dlgBg" aria-hidden="true" class="absolute inset-0 w-full h-full object-cover blur-md scale-110">
+        <p id="dlgHint" class="text-center text-sm text-gray-500 mb-1">點主圖可放大</p>
+        <div id="dlgStageWrap" class="relative">
+          <div class="relative aspect-video bg-gray-100 overflow-hidden rounded-lg">
+            <!-- 只模糊這張背景圖 -->
+            <img id="dlgBg" aria-hidden="true" class="absolute inset-0 w-full h-full object-cover blur-md scale-110">
 
-          <!-- 可選：柔化一下背景，沒有加任何 blur -->
-          <div class="absolute inset-0 bg-white/20"></div>
+            <!-- 可選：柔化一下背景，沒有加任何 blur -->
+            <div class="absolute inset-0 bg-white/20"></div>
 
-          <!-- 主圖在最上層，沒有 blur -->
-          <img id="dlgImg" alt="毛孩照片"
-            class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg">
-          <video id="dlgVideo" playsinline controls
-            class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg hidden"></video>
+            <!-- 主圖在最上層，沒有 blur -->
+            <img id="dlgImg" alt="毛孩照片"
+              class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg">
+            <video id="dlgVideo" playsinline controls
+              class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg hidden"></video>
+          </div>
 
           <button id="dlgClose" class="ui-close-btn absolute top-1 right-1 z-20" aria-label="關閉"><svg
               viewBox="0 0 24 24" aria-hidden="true" focusable="false" class="ui-close-icon">
@@ -919,111 +921,84 @@
       const type = (file && file.type) || "";
       const isVideo = type.startsWith("video/");
       const isImage = type.startsWith("image/");
-// 影片：抓一張影格當縮圖（iOS Safari 需要更強的「等 frame」與重試）
-if (isVideo) {
-  const vUrl = URL.createObjectURL(file);
-  let v = null;
-  try {
-    v = document.createElement("video");
-    v.preload = "auto";
-    v.src = vUrl;
-    v.muted = true;
-    v.playsInline = true;
-    v.setAttribute("playsinline", "");
-    v.setAttribute("webkit-playsinline", "");
-    v.disablePictureInPicture = true;
-    v.controls = false;
+      // 影片：抓一張影格當縮圖（iOS 需要用 loadedmetadata \+ seek / RVFC 才容易出現畫面）
+      if (isVideo) {
+        const vUrl = URL.createObjectURL(file);
+        try {
+          const v = document.createElement("video");
+          v.preload = "metadata";
+          v.src = vUrl;
+          v.muted = true;
+          v.playsInline = true;
+          v.setAttribute("playsinline", "");
+          v.setAttribute("webkit-playsinline", "");
+          v.disablePictureInPicture = true;
 
-    // iOS 有些情況不把 <video> 放進 DOM 就不願意解碼 frame
-    v.style.position = "fixed";
-    v.style.left = "-9999px";
-    v.style.top = "0";
-    v.style.width = "1px";
-    v.style.height = "1px";
-    v.style.opacity = "0";
-    document.body.appendChild(v);
+          // iOS Safari 有時不會觸發 loadeddata（不播放就不解碼畫面），所以用 loadedmetadata + seek 逼出第一張影格
+          await new Promise((res, rej) => {
+            v.onloadedmetadata = () => res();
+            v.onerror = (e) => rej(e || new Error("載入影片失敗"));
+          });
 
-    const waitEvt = (ev, ms) => new Promise((res, rej) => {
-      let done = false;
-      const t = setTimeout(() => { if (!done) rej(new Error(`timeout:${ev}`)); }, ms);
-      const on = () => {
-        if (done) return;
-        done = true;
-        clearTimeout(t);
-        v.removeEventListener(ev, on);
-        res(true);
-      };
-      v.addEventListener(ev, on);
-    });
+          // 目標抓取時間：盡量靠前，但不要是 0（iOS 有時 seek 到 0 會拿不到 frame）
+          let t = 0.05;
+          try {
+            if (Number.isFinite(v.duration) && v.duration > 0.2) {
+              t = Math.min(0.2, v.duration / 2);
+              t = Math.max(0.05, Math.min(t, v.duration - 0.05));
+            }
+          } catch (_) { /* ignore */ }
 
-    const waitFrame = async (ms=500) => {
-      if (typeof v.requestVideoFrameCallback === "function") {
-        await new Promise((res) => v.requestVideoFrameCallback(() => res()));
-        return;
-      }
-      if (v.readyState < 2) {
-        await Promise.race([
-          waitEvt("loadeddata", ms).catch(()=>false),
-          new Promise((res)=>setTimeout(res, ms))
-        ]);
-      } else {
-        await new Promise((res)=>setTimeout(res, 30));
-      }
-    };
+          // 先嘗試 seek
+          try {
+            v.currentTime = t;
+            await new Promise((res) => {
+              const done = () => { v.removeEventListener("seeked", done); res(); };
+              v.addEventListener("seeked", done);
+            });
+          } catch (_) {
+            // 有些檔案/瀏覽器不給 seek，就用 0.01 退回
+            try {
+              v.currentTime = 0.01;
+              await new Promise((res) => {
+                const done = () => { v.removeEventListener("seeked", done); res(); };
+                v.addEventListener("seeked", done);
+              });
+            } catch (_) { /* ignore */ }
+          }
 
-    try { v.load?.(); } catch (_) { }
-    await waitEvt("loadedmetadata", 2500);
+          // 等待畫面真正解碼（RVFC 最可靠）
+          if (typeof v.requestVideoFrameCallback === "function") {
+            await new Promise((res) => v.requestVideoFrameCallback(() => res()));
+          } else {
+            // readyState >= 2 才有 current frame data
+            if (v.readyState < 2) {
+              await Promise.race([
+                new Promise((res) => { v.onloadeddata = () => res(); }),
+                new Promise((res) => setTimeout(res, 150))
+              ]);
+            }
+            await new Promise((res) => setTimeout(res, 30));
+          }
 
-    const dur = (Number.isFinite(v.duration) && v.duration > 0) ? v.duration : 0;
-    const candidates = [0.12, 0.25, 0.5, 1.0]
-      .map((t) => (dur ? Math.min(Math.max(0.05, t), Math.max(0.05, dur - 0.05)) : t));
-
-    let ok = false;
-    for (const t of candidates) {
-      try {
-        v.currentTime = t;
-        await waitEvt("seeked", 1200);
-        await waitFrame(500);
-
-        if (v.readyState < 2 || v.videoWidth === 0) {
+          // iOS 有時仍然黑畫面：試著「靜音播放一下再暫停」逼出 frame
           try {
             await v.play();
-            await new Promise((res)=>setTimeout(res, 120));
             v.pause();
-            await waitFrame(500);
-          } catch (_) { }
+          } catch (_) { /* ignore */ }
+
+          const w = v.videoWidth || 640;
+          const h = v.videoHeight || 360;
+          const c = document.createElement("canvas");
+          c.width = w;
+          c.height = h;
+          const g = c.getContext("2d");
+          g.drawImage(v, 0, 0, w, h);
+          return c;
+        } finally {
+          URL.revokeObjectURL(vUrl);
         }
-
-        if (v.videoWidth > 0 && v.videoHeight > 0) {
-          ok = true;
-          break;
-        }
-      } catch (_) { /* try next */ }
-    }
-
-    if (!ok) {
-      try {
-        await v.play();
-        await new Promise((res)=>setTimeout(res, 200));
-        v.pause();
-        await waitFrame(500);
-      } catch (_) { }
-    }
-
-    const w = v.videoWidth || 640;
-    const h = v.videoHeight || 360;
-
-    const c = document.createElement("canvas");
-    c.width = w;
-    c.height = h;
-    const g = c.getContext("2d");
-    g.drawImage(v, 0, 0, w, h);
-    return c;
-  } finally {
-    try { if (v && v.parentNode) v.parentNode.removeChild(v); } catch (_) { }
-    try { URL.revokeObjectURL(vUrl); } catch (_) { }
-  }
-}
+      }
 
       // 圖片：優先用 createImageBitmap（非阻塞解碼）
       if (window.createImageBitmap && isImage) {
@@ -1505,22 +1480,6 @@ if (isVideo) {
           }
           forceScrollTop(); // ✅ 保證捲到最上面（不會卡在一半）
           openDialog(docRef.id);
-
-// 後端縮圖（thumbByPath）是非同步產生的：幫你自動補抓幾次，避免 iPhone 需要手動重整
-const __thumbRefresh = (delayMs) => {
-  setTimeout(async () => {
-    try {
-      await loadPets();
-      const dlg = document.getElementById("petDialog");
-      if (dlg && dlg.open) openDialog(docRef.id);
-    } catch (e) {
-      console.warn("thumb refresh failed:", e);
-    }
-  }, delayMs);
-};
-__thumbRefresh(4000);
-__thumbRefresh(12000);
-
         });
 
       } catch (err) {
@@ -1796,7 +1755,7 @@ __thumbRefresh(12000);
                </div>
               `;
 
-return `
+          return `
         <div class="rounded-xl ring-1 ring-gray-200 p-3 flex gap-3 items-center cursor-pointer"
              data-id="${p.id}">
           ${thumb}
