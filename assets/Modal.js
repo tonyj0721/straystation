@@ -522,6 +522,7 @@ async function openDialog(id) {
   const dlgBg = document.getElementById("dlgBg");
   const dlgThumbs = document.getElementById("dlgThumbs");
   const dlgHint = document.getElementById("dlgHint");
+  const dlgStageWrap = document.getElementById("dlgStageWrap");
 
   const media = Array.isArray(p.images) && p.images.length > 0
     ? p.images
@@ -546,6 +547,8 @@ async function openDialog(id) {
 
       if (dlgHint) dlgHint.textContent = "";
 
+      if (dlgStageWrap) dlgStageWrap.classList.remove("dlg-video-mode");
+
       return;
     }
 
@@ -553,10 +556,17 @@ async function openDialog(id) {
     const url = media[currentIndex];
     const isVid = isVideoUrl(url);
 
+    if (dlgStageWrap) dlgStageWrap.classList.toggle("dlg-video-mode", isVid);
+
     if (dlgHint) {
       dlgHint.textContent = isVid
         ? "雙擊主圖可放大"
         : "點主圖可放大";
+
+      // 影片：加 mt-2；圖片：移除 mt-2
+      dlgHint.classList.toggle("mt-2", isVid);
+      // （可選）確保圖片時沒有 mt-2 殘留
+      if (!isVid) dlgHint.classList.remove("mt-2");
     }
 
     if (dlgImg && dlgVideo) {
@@ -815,7 +825,6 @@ async function onDelete() {
     await deleteAllUnder(`pets/${currentDocId}`);
     await deleteAllUnder(`adopted/${currentDocId}`);
     await deleteAllUnder(`thumbs/pets/${currentDocId}`);
-    await deleteAllUnder(`thumbs/adopted/${currentDocId}`);
     // 最後刪 Firestore 文件
     await deleteDoc(doc(db, "pets", currentDocId));
     await loadPets();
@@ -937,32 +946,32 @@ async function saveEdit() {
     }
 
     // 刪除被移除的舊圖（忽略刪失敗）
-// 同步刪掉後端產生的縮圖：thumbs/<原路徑去副檔名>.jpg
-// 並清理 Firestore 的 thumbByPath 對應 key（避免越積越多）
-const __thumbFieldDeletes = {};
-for (const url of (removeUrls || [])) {
-  try {
-    const enc = String(url).split("/o/")[1].split("?")[0];
-    const mediaPath = decodeURIComponent(enc);
+    // 同步刪掉後端產生的縮圖：thumbs/<原路徑去副檔名>.jpg
+    // 並清理 Firestore 的 thumbByPath 對應 key（避免越積越多）
+    const __thumbFieldDeletes = {};
+    for (const url of (removeUrls || [])) {
+      try {
+        const enc = String(url).split("/o/")[1].split("?")[0];
+        const mediaPath = decodeURIComponent(enc);
 
-    // 1) 刪原檔
-    await deleteObject(sRef(storage, mediaPath));
+        // 1) 刪原檔
+        await deleteObject(sRef(storage, mediaPath));
 
-    // 2) 若是影片：刪縮圖 + 刪欄位 key
-    if (isVideoUrl(url)) {
-      const tPath = thumbPathFromMediaPath(mediaPath);
-      if (tPath) {
-        try { await deleteObject(sRef(storage, tPath)); } catch (_) { /* ignore */ }
+        // 2) 若是影片：刪縮圖 + 刪欄位 key
+        if (isVideoUrl(url)) {
+          const tPath = thumbPathFromMediaPath(mediaPath);
+          if (tPath) {
+            try { await deleteObject(sRef(storage, tPath)); } catch (_) { /* ignore */ }
+          }
+          __thumbFieldDeletes[`thumbByPath.${mediaPath}`] = deleteField();
+        }
+      } catch (e) {
+        // 靜默忽略
       }
-      __thumbFieldDeletes[`thumbByPath.${mediaPath}`] = deleteField();
     }
-  } catch (e) {
-    // 靜默忽略
-  }
-}
 
-newData.images = newUrls;
-const __updatePayload = { ...newData, ...__thumbFieldDeletes };
+    newData.images = newUrls;
+    const __updatePayload = { ...newData, ...__thumbFieldDeletes };
 
     // ③ 寫回 Firestore
     await updateDoc(doc(db, "pets", currentDocId), __updatePayload);
@@ -1726,7 +1735,6 @@ async function onUnadopt() {
 
   try {
     await deleteAllUnder(`adopted/${currentDocId}`); // 清掉合照
-    await deleteAllUnder(`thumbs/adopted/${currentDocId}`); // 清掉合照縮圖
     await updateDoc(doc(db, "pets", currentDocId), {
       status: "available",
       adoptedAt: deleteField(),
