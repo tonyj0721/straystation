@@ -926,9 +926,8 @@
         const vUrl = URL.createObjectURL(file);
         try {
           const v = document.createElement("video");
-          v.preload = "auto";
+          v.preload = "metadata";
           v.src = vUrl;
-          try { v.load && v.load(); } catch (_) { }
           v.muted = true;
           v.playsInline = true;
           v.setAttribute("playsinline", "");
@@ -985,13 +984,7 @@
           // iOS 有時仍然黑畫面：試著「靜音播放一下再暫停」逼出 frame
           try {
             await v.play();
-            if (typeof v.requestVideoFrameCallback === "function") {
-              await new Promise((res) => v.requestVideoFrameCallback(() => res()));
-            } else {
-              await new Promise((res) => setTimeout(res, 120));
-            }
             v.pause();
-            await new Promise((res) => setTimeout(res, 40));
           } catch (_) { /* ignore */ }
 
           const w = v.videoWidth || 640;
@@ -1092,7 +1085,7 @@
       if (isVid) {
         const v = document.createElement("video");
         v.className = "w-full aspect-square object-cover rounded-lg bg-gray-100 video-preview";
-        v.preload = "auto";
+        v.preload = "metadata";
         v.playsInline = true;
         v.setAttribute("playsinline", "");
         v.setAttribute("webkit-playsinline", "");
@@ -1752,7 +1745,7 @@
               `
               : `
                <div class="media-thumb">
-                 <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="" loading="lazy" decoding="async" style="background:#000">
+                 <video class="thumb-video" preload="metadata" muted playsinline webkit-playsinline disablepictureinpicture src="${mediaUrl}"></video>
                  <div class="video-badge"><div class="video-badge-inner">${__THUMB_PLAY_SVG}</div></div>
                </div>
               `)
@@ -1775,6 +1768,12 @@
         </div>`;
         })
         .join("");
+
+      // 影片縮圖：seek 到前面一點，顯示第一幀
+      wrap.querySelectorAll("video.thumb-video").forEach((v) => {
+        __primeThumbVideoFrameAdmin(v);
+      });
+
       wrap.querySelectorAll("[data-id]").forEach((card) =>
         card.addEventListener("click", () => {
           const data = list.find((p) => p.id === card.dataset.id);

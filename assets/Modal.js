@@ -293,9 +293,8 @@ async function __decodeToBitmap(file) {
     const vUrl = URL.createObjectURL(file);
     try {
       const v = document.createElement("video");
-      v.preload = "auto";
+      v.preload = "metadata";
       v.src = vUrl;
-      try { v.load && v.load(); } catch (_) { }
       v.muted = true;
       v.playsInline = true;
       v.setAttribute("playsinline", "");
@@ -352,13 +351,7 @@ async function __decodeToBitmap(file) {
       // iOS 有時仍然黑畫面：試著「靜音播放一下再暫停」逼出 frame
       try {
         await v.play();
-        if (typeof v.requestVideoFrameCallback === "function") {
-          await new Promise((res) => v.requestVideoFrameCallback(() => res()));
-        } else {
-          await new Promise((res) => setTimeout(res, 120));
-        }
         v.pause();
-        await new Promise((res) => setTimeout(res, 40));
       } catch (_) { /* ignore */ }
 
       const w = v.videoWidth || 640;
@@ -580,29 +573,10 @@ async function openDialog(id) {
       if (isVid) {
         dlgImg.classList.add("hidden");
         dlgVideo.classList.remove("hidden");
-        // 先重置（避免 iOS 第一次播放 duration 變 0:00）
-        try { dlgVideo.pause(); } catch (_) { }
-        try { dlgVideo.removeAttribute("src"); } catch (_) { }
-        try { dlgVideo.load && dlgVideo.load(); } catch (_) { }
-
         dlgVideo.src = url;
-        dlgVideo.preload = "metadata";
         dlgVideo.playsInline = true;
         dlgVideo.controls = true;
-        dlgVideo.setAttribute("playsinline", "");
-        dlgVideo.setAttribute("webkit-playsinline", "");
-        dlgVideo.disablePictureInPicture = true;
-
-        // 等 metadata 才播，進度條才會正常（避免前幾秒不動、最後爆衝）
-        const __tok = String(Date.now()) + Math.random().toString(16).slice(2);
-        dlgVideo.dataset._srcTok = __tok;
-        const __onMeta = () => {
-          if (dlgVideo.dataset._srcTok !== __tok) return;
-          try { dlgVideo.currentTime = 0; } catch (_) { }
-          try { dlgVideo.play().catch(() => { }); } catch (_) { }
-        };
-        dlgVideo.addEventListener("loadedmetadata", __onMeta, { once: true });
-        try { dlgVideo.load && dlgVideo.load(); } catch (_) { }
+        try { dlgVideo.play().catch(() => { }); } catch (_) { }
       } else {
         try {
           dlgVideo.pause && dlgVideo.pause();
@@ -616,13 +590,9 @@ async function openDialog(id) {
     }
 
     if (dlgBg) {
-      if (isVid) {
-        const vp = storagePathFromDownloadUrl(url);
-        const t = (p.thumbByPath && vp) ? (p.thumbByPath[vp] || "") : "";
-        dlgBg.src = t || "";
-      } else {
-        dlgBg.src = url;
-      }
+      const firstImage = media.find(u => !isVideoUrl(u));
+      // 只有影片時不要把 <img> 的 src 設成影片網址（會出現破圖）
+      dlgBg.src = firstImage || (isVid ? "" : url);
     }
 
     if (dlgThumbs) {
@@ -660,17 +630,26 @@ async function openDialog(id) {
       const videoPath = storagePathFromDownloadUrl(url);
       const videoThumb = (p.thumbByPath && videoPath) ? (p.thumbByPath[videoPath] || "") : "";
 
-      wrapper.dataset.videoPath = videoPath || "";
-
       if (videoThumb) {
         const img = document.createElement("img");
         img.src = videoThumb;
         wrapper.appendChild(img);
       } else {
-        const img = document.createElement("img");
-        img.src = PREVIEW_EMPTY_GIF;
-        img.style.background = "#000";
-        wrapper.appendChild(img);
+        const v = document.createElement("video");
+        v.className = "thumb-video";
+        v.preload = "metadata";
+        v.muted = true;
+        v.playsInline = true;
+        v.setAttribute("playsinline", "");
+        v.setAttribute("webkit-playsinline", "");
+        v.controls = false;
+        v.disablePictureInPicture = true;
+        v.src = url;
+
+        // 後端縮圖還沒產出時才 fallback 用影片抓第一幀
+        __primeThumbVideoFrame(v);
+
+        wrapper.appendChild(v);
       }
 
       // 覆蓋播放 icon（圖 4 的樣式）
@@ -692,88 +671,6 @@ async function openDialog(id) {
   });
 
   showDialogMedia(currentIndex);
-  // 若後端縮圖還沒寫回（常見：剛上傳影片），自動輪詢更新，不必手動重整
-  (function __pollThumbByPath() {
-    try {
-      const missing = (media || [])
-        .filter((u) => isVideoUrl(u))
-        .map((u) => storagePathFromDownloadUrl(u))
-        .filter((pth) => pth && !(p.thumbByPath && p.thumbByPath[pth]));
-
-      if (!missing.length) return;
-
-      let tries = 0;
-      const maxTries = 6;
-
-      const tick = async () => {
-        tries++;
-        try {
-          const snap = await getDoc(doc(db, "pets", currentDocId));
-          if (!snap.exists()) return;
-
-          const latest = snap.data().thumbByPath || {};
-          let updated = false;
-
-          for (const pth of missing) {
-            if (latest[pth]) {
-              p.thumbByPath = p.thumbByPath || {};
-              if (!p.thumbByPath[pth]) {
-                p.thumbByPath[pth] = latest[pth];
-                updated = true;
-              }
-            }
-          }
-
-          if (updated) {
-            window.currentPetThumbByPath = p.thumbByPath || {};
-
-            // 更新縮圖列：把 data-video-path 對應的 placeholder 換成真正縮圖
-            try {
-              dlgThumbs?.querySelectorAll?.(".dlg-thumb[data-video-path]")?.forEach((w) => {
-                const vpth = w.dataset.videoPath || "";
-                const t = (p.thumbByPath && vpth) ? (p.thumbByPath[vpth] || "") : "";
-                if (!t) return;
-
-                // 移除可能存在的 <video>
-                w.querySelectorAll("video.thumb-video").forEach((vv) => {
-                  try { vv.pause(); } catch { }
-                  vv.remove();
-                });
-
-                const img = w.querySelector("img");
-                if (img) {
-                  img.src = t;
-                  img.style.background = "";
-                } else {
-                  const im = document.createElement("img");
-                  im.src = t;
-                  w.insertBefore(im, w.firstChild);
-                }
-
-                // 如果目前顯示的是這支影片，同步更新背景模糊圖
-                try {
-                  const curUrl = media[currentIndex];
-                  if (isVideoUrl(curUrl) && storagePathFromDownloadUrl(curUrl) === vpth && dlgBg) {
-                    dlgBg.src = t;
-                  }
-                } catch { }
-              });
-            } catch { }
-          }
-
-          const stillMissing = missing.filter((pth) => !(p.thumbByPath && p.thumbByPath[pth]));
-          if (stillMissing.length && tries < maxTries) {
-            setTimeout(tick, 1500);
-          }
-        } catch (_) {
-          if (tries < maxTries) setTimeout(tick, 1500);
-        }
-      };
-
-      setTimeout(tick, 1500);
-    } catch { }
-  })();
-
 
   // 5. 顯示用文字
   document.getElementById('dlgName').textContent = p.name;
@@ -1249,7 +1146,7 @@ function __makeEditTile(it) {
   if (isVid) {
     const v = document.createElement("video");
     v.className = "w-full aspect-square object-cover rounded-lg bg-gray-100 video-preview";
-    v.preload = "auto";
+    v.preload = "metadata";
     v.playsInline = true;
     v.setAttribute("playsinline", "");
     v.setAttribute("webkit-playsinline", "");
@@ -1258,13 +1155,6 @@ function __makeEditTile(it) {
 
     if (it.kind === "url") {
       v.src = it.url;
-      // 後端縮圖（thumbByPath）當 poster：避免 iOS/桌機偶發黑幕
-      try {
-        const vp = storagePathFromDownloadUrl(it.url);
-        const map = (window.currentPetThumbByPath || (currentDoc && currentDoc.thumbByPath) || {});
-        const t = (vp && map) ? (map[vp] || "") : "";
-        v.poster = t || PREVIEW_EMPTY_GIF;
-      } catch { }
     } else {
       v.src = getEditVideoObjURL(it.file);
       // 用縮圖當 poster，避免黑畫面
