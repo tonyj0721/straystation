@@ -62,11 +62,6 @@ const lbPrev = document.getElementById("lbPrev");
 const lbNext = document.getElementById("lbNext");
 const lbClose = document.getElementById("lbClose");
 const lbWrap = document.getElementById("lbWrap");   // ← 新增
-const lbThumbs = document.getElementById("lbThumbs");
-const lbVControls = document.getElementById("lbVControls");
-const lbVPlay = document.getElementById("lbVPlay");
-const lbVSeek = document.getElementById("lbVSeek");
-const lbVMute = document.getElementById("lbVMute");
 
 let lbImages = [];
 let lbIndex = 0;
@@ -98,16 +93,13 @@ function renderLightboxMedia() {
       lbVideo.classList.remove("hidden");
       lbVideo.src = url;
       lbVideo.playsInline = true;
-      lbVideo.controls = false; // 用自訂控制列
-      __bindLbVideoControlsOnce();
-      __enableLbVideoControls(true);
+      lbVideo.controls = true;
       try { lbVideo.play().catch(() => { }); } catch (_) { }
     } else {
       try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
       lbVideo.classList.add("hidden");
       lbImg.classList.remove("hidden");
       lbImg.src = url;
-      __enableLbVideoControls(false);
     }
   } else if (lbImg) {
     lbImg.src = url;
@@ -119,135 +111,6 @@ function renderLightboxMedia() {
       el.classList.toggle("active", i === lbIndex);
     });
   }
-}
-
-const __LB_PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
-const __LB_PAUSE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>';
-const __LB_MUTE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.5 12l3.5 3.5-1.4 1.4L15.1 13.4 11.6 17H8v-6H5V9h3V3h3.6l3.5 3.6 3.5-3.5 1.4 1.4L16.5 12z"/></svg>';
-const __LB_UNMUTE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2c0-1.77-1.02-3.29-2.5-4.03v8.06c1.48-.74 2.5-2.26 2.5-4.03z"/></svg>';
-
-let __lbSeeking = false;
-
-function __setSeekBarProgress(pct) {
-  if (!lbVSeek) return;
-  lbVSeek.style.setProperty("--p", `${Math.max(0, Math.min(100, pct))}%`);
-}
-
-function __syncLbVideoButtons() {
-  if (!lbVideo) return;
-  if (lbVPlay) lbVPlay.innerHTML = lbVideo.paused ? __LB_PLAY : __LB_PAUSE;
-  if (lbVMute) lbVMute.innerHTML = lbVideo.muted ? __LB_MUTE : __LB_UNMUTE;
-}
-
-function __syncLbVideoTime() {
-  if (!lbVideo || !lbVSeek) return;
-  const dur = Number.isFinite(lbVideo.duration) ? lbVideo.duration : 0;
-  const cur = Number.isFinite(lbVideo.currentTime) ? lbVideo.currentTime : 0;
-  if (!__lbSeeking) lbVSeek.value = String(cur);
-  __setSeekBarProgress(dur > 0 ? (cur / dur) * 100 : 0);
-}
-
-function __enableLbVideoControls(enable) {
-  if (!lbVControls) return;
-  lbVControls.classList.toggle("hidden", !enable);
-}
-
-function __bindLbVideoControlsOnce() {
-  if (!lbVControls || lbVControls.__bound) return;
-  lbVControls.__bound = true;
-
-  // 不要讓點擊冒泡（避免跟「點一下切換 UI」衝突）
-  lbVControls.addEventListener("click", (e) => e.stopPropagation(), true);
-
-  lbVPlay?.addEventListener("click", async (e) => {
-    e.stopPropagation();
-    if (!lbVideo) return;
-    try {
-      if (lbVideo.paused) await lbVideo.play();
-      else lbVideo.pause();
-    } catch (_) { }
-    __syncLbVideoButtons();
-  });
-
-  lbVMute?.addEventListener("click", (e) => {
-    e.stopPropagation();
-    if (!lbVideo) return;
-    lbVideo.muted = !lbVideo.muted;
-    __syncLbVideoButtons();
-  });
-
-  const startSeek = (e) => { __lbSeeking = true; e.stopPropagation(); };
-  const endSeek = (e) => { __lbSeeking = false; e.stopPropagation(); };
-
-  lbVSeek?.addEventListener("pointerdown", startSeek);
-  lbVSeek?.addEventListener("pointerup", endSeek);
-  lbVSeek?.addEventListener("touchstart", startSeek, { passive: true });
-  lbVSeek?.addEventListener("touchend", endSeek, { passive: true });
-
-  lbVSeek?.addEventListener("input", (e) => {
-    if (!lbVideo) return;
-    const t = parseFloat(e.target.value || "0");
-    if (Number.isFinite(t)) lbVideo.currentTime = t;
-    __syncLbVideoTime();
-  });
-}
-
-lbVideo?.addEventListener("loadedmetadata", () => {
-  if (!lbVSeek || !lbVideo) return;
-  const dur = Number.isFinite(lbVideo.duration) ? lbVideo.duration : 0;
-  lbVSeek.max = String(dur || 1);
-  __syncLbVideoButtons();
-  __syncLbVideoTime();
-});
-
-lbVideo?.addEventListener("timeupdate", __syncLbVideoTime);
-lbVideo?.addEventListener("play", __syncLbVideoButtons);
-lbVideo?.addEventListener("pause", __syncLbVideoButtons);
-lbVideo?.addEventListener("volumechange", __syncLbVideoButtons);
-
-// ========== iPhone 相簿：點一下切 UI ==========
-let __lbUiHidden = false;
-let __suppressTapUntil = 0;
-
-function setLbUiHidden(v) {
-  __lbUiHidden = !!v;
-  lb?.classList.toggle("lb-ui-hidden", __lbUiHidden);
-}
-function toggleLbUi() {
-  setLbUiHidden(!__lbUiHidden);
-}
-
-// ========== iPhone 相簿：下拉關閉（拖曳視覺） ==========
-let __dragActive = false;
-let __dragDy = 0;
-let __uiHiddenBeforeDrag = false;
-
-function __applyDrag(dy) {
-  __dragDy = dy;
-
-  const vh = window.innerHeight || document.documentElement.clientHeight || 0;
-  const max = Math.min(360, Math.max(220, vh * 0.45)); // 拖多少算「快要關」
-  const p = Math.min(1, dy / max);
-  const scale = 1 - p * 0.08;
-
-  if (lbWrap) {
-    lbWrap.style.transition = "none";
-    lbWrap.style.transform = `translateY(${dy}px) scale(${scale})`;
-  }
-  if (lb) {
-    const a = 0.9 * (1 - p);
-    lb.style.backgroundColor = `rgba(0,0,0,${Math.max(0, a)})`;
-  }
-}
-
-function __resetDrag(animated = true) {
-  if (lbWrap) {
-    lbWrap.style.transition = animated ? "transform 180ms ease" : "none";
-    lbWrap.style.transform = "";
-    if (animated) setTimeout(() => { if (lbWrap) lbWrap.style.transition = ""; }, 200);
-  }
-  if (lb) lb.style.backgroundColor = "";
-  __dragDy = 0;
 }
 
 function isCurrentLightboxVideo() {
@@ -402,16 +265,9 @@ function openLightbox(images, index = 0) {
 
   // 鎖背景（避免底層頁面被捲動）
   lockScroll();
-
-  setLbUiHidden(false);
-  __resetDrag(false);
 }
-
 // 🔥 關閉 Lightbox：回到 dialog 或直接解鎖
 function closeLightbox() {
-  setLbUiHidden(false);
-  __resetDrag(false);
-
   // 關閉前一定要把影片停掉
   if (lbVideo) {
     try { lbVideo.pause(); } catch (_) { }
@@ -456,26 +312,10 @@ lbClose?.addEventListener('click', (e) => {
   closeLightbox();
 });
 
-// 點一下：切換 UI（像 iPhone 相簿）
+// 🔥 點黑幕關閉
 lb?.addEventListener("click", (e) => {
-  if (Date.now() < __suppressTapUntil) return;
-
-  // 點在按鈕 / 縮圖列就不要切 UI
-  if (e.target.closest("#lbPrev, #lbNext, #lbClose, #lbThumbs")) return;
-
-  // 影片：下方 20% 留給控制列，不切 UI（你原本 swipe 也是這樣分區 :contentReference[oaicite:9]{index=9}）
-  if (isCurrentLightboxVideo()) {
-    const h = window.innerHeight || document.documentElement.clientHeight || 0;
-    if (e.clientY > h * 0.8) return;
-  }
-
-  toggleLbUi();
+  if (e.target === lb) closeLightbox();
 });
-
-// 縮圖列本身點擊不要冒泡到 lb（避免「點縮圖也把 UI 隱藏」）
-lbThumbs?.addEventListener("click", (e) => {
-  e.stopPropagation();
-}, true);
 
 // 🔥 ESC 關閉
 document.addEventListener("keydown", (e) => {
@@ -510,33 +350,12 @@ lb?.addEventListener("touchend", (e) => {
   // 如果這次觸控是在「下面那一塊」，直接讓影片自己處理（拉進度條等）
   if (!isSwipeZone) return;
 
-  const endX = e.changedTouches[0].clientX;
-  const endY = e.changedTouches[0].clientY;
-  const dx = endX - touchStartX;
-  const dy = endY - touchStartY;
-
-  // 1) 先處理「下拉關閉」
-  if (__dragActive) {
-    __dragActive = false;
-
-    if (dy > 140) {
-      __resetDrag(false);
-      closeLightbox();
-      return;
-    }
-
-    // 沒拉夠：彈回去，並恢復原本 UI 顯示狀態
-    __resetDrag(true);
-    setLbUiHidden(__uiHiddenBeforeDrag);
-    return;
-  }
-
-  // 2) 沒有下拉：才走你原本的左右滑切換
   const now = Date.now();
   if (now - __lastSwipeAt < 220) return;
 
-  if (dx > 50) { __lastSwipeAt = now; lbShow(-1); }
-  else if (dx < -50) { __lastSwipeAt = now; lbShow(1); }
+  const diff = e.changedTouches[0].clientX - touchStartX;
+  if (diff > 50) { __lastSwipeAt = now; lbShow(-1); }
+  else if (diff < -50) { __lastSwipeAt = now; lbShow(1); }
 }, { passive: true });
 
 // 🔥 完全阻止背景滑動（桌機 + 手機都有效）
@@ -549,29 +368,8 @@ lb?.addEventListener("touchmove", (e) => {
   // 在下面 20% 那一塊，就不要吃掉事件，讓影片進度條可以拖
   if (!isSwipeZone) return;
 
-  const t = e.touches[0];
-  const dx = t.clientX - touchStartX;
-  const dy = t.clientY - touchStartY;
-
-  // 還沒進入下拉：先判斷是不是「往下」且「垂直為主」
-  if (!__dragActive) {
-    const TH = 8;
-    if (dy > TH && Math.abs(dy) > Math.abs(dx) * 1.1) {
-      __dragActive = true;
-      __uiHiddenBeforeDrag = __lbUiHidden;
-      setLbUiHidden(true);                 // 拖曳時先把 UI 收起來
-      __suppressTapUntil = Date.now() + 350; // 避免拖完觸發 click 切 UI
-    }
-  }
-
-  // 只要在可滑區域，就阻止背景捲動（你原本就這樣做 :contentReference[oaicite:12]{index=12}）
   e.preventDefault();
   e.stopPropagation();
-
-  // 如果正在下拉，就套用拖曳視覺
-  if (__dragActive) {
-    __applyDrag(Math.max(0, dy));
-  }
 }, { passive: false });
 
 const y = document.getElementById('year');
