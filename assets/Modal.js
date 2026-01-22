@@ -15,6 +15,15 @@ function storagePathFromDownloadUrl(url) {
   }
 }
 
+function thumbPathFromMediaPath(mediaPath) {
+  try {
+    const noExt = String(mediaPath).replace(/\.[^.]+$/i, "");
+    return `thumbs/${noExt}.jpg`;
+  } catch (_) {
+    return "";
+  }
+}
+
 
 
 // ===============================
@@ -805,6 +814,8 @@ async function onDelete() {
     // 刪掉這筆的所有圖片與合照資料夾
     await deleteAllUnder(`pets/${currentDocId}`);
     await deleteAllUnder(`adopted/${currentDocId}`);
+    await deleteAllUnder(`thumbs/pets/${currentDocId}`);
+    await deleteAllUnder(`thumbs/adopted/${currentDocId}`);
     // 最後刪 Firestore 文件
     await deleteDoc(doc(db, "pets", currentDocId));
     await loadPets();
@@ -926,19 +937,35 @@ async function saveEdit() {
     }
 
     // 刪除被移除的舊圖（忽略刪失敗）
-    for (const url of (removeUrls || [])) {
-      try {
-        const path = url.split("/o/")[1].split("?")[0];
-        await deleteObject(sRef(storage, decodeURIComponent(path)));
-      } catch (e) {
-        // 靜默忽略
-      }
-    }
+// 同步刪掉後端產生的縮圖：thumbs/<原路徑去副檔名>.jpg
+// 並清理 Firestore 的 thumbByPath 對應 key（避免越積越多）
+const __thumbFieldDeletes = {};
+for (const url of (removeUrls || [])) {
+  try {
+    const enc = String(url).split("/o/")[1].split("?")[0];
+    const mediaPath = decodeURIComponent(enc);
 
-    newData.images = newUrls;
+    // 1) 刪原檔
+    await deleteObject(sRef(storage, mediaPath));
+
+    // 2) 若是影片：刪縮圖 + 刪欄位 key
+    if (isVideoUrl(url)) {
+      const tPath = thumbPathFromMediaPath(mediaPath);
+      if (tPath) {
+        try { await deleteObject(sRef(storage, tPath)); } catch (_) { /* ignore */ }
+      }
+      __thumbFieldDeletes[`thumbByPath.${mediaPath}`] = deleteField();
+    }
+  } catch (e) {
+    // 靜默忽略
+  }
+}
+
+newData.images = newUrls;
+const __updatePayload = { ...newData, ...__thumbFieldDeletes };
 
     // ③ 寫回 Firestore
-    await updateDoc(doc(db, "pets", currentDocId), newData);
+    await updateDoc(doc(db, "pets", currentDocId), __updatePayload);
 
     // ④ 重載列表並同步當前物件
     await loadPets();
@@ -1699,6 +1726,7 @@ async function onUnadopt() {
 
   try {
     await deleteAllUnder(`adopted/${currentDocId}`); // 清掉合照
+    await deleteAllUnder(`thumbs/adopted/${currentDocId}`); // 清掉合照縮圖
     await updateDoc(doc(db, "pets", currentDocId), {
       status: "available",
       adoptedAt: deleteField(),
