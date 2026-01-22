@@ -1024,58 +1024,6 @@ if (isVideo) {
     try { URL.revokeObjectURL(vUrl); } catch (_) { }
   }
 }
-          } catch (_) { /* ignore */ }
-
-          // 先嘗試 seek
-          try {
-            v.currentTime = t;
-            await new Promise((res) => {
-              const done = () => { v.removeEventListener("seeked", done); res(); };
-              v.addEventListener("seeked", done);
-            });
-          } catch (_) {
-            // 有些檔案/瀏覽器不給 seek，就用 0.01 退回
-            try {
-              v.currentTime = 0.01;
-              await new Promise((res) => {
-                const done = () => { v.removeEventListener("seeked", done); res(); };
-                v.addEventListener("seeked", done);
-              });
-            } catch (_) { /* ignore */ }
-          }
-
-          // 等待畫面真正解碼（RVFC 最可靠）
-          if (typeof v.requestVideoFrameCallback === "function") {
-            await new Promise((res) => v.requestVideoFrameCallback(() => res()));
-          } else {
-            // readyState >= 2 才有 current frame data
-            if (v.readyState < 2) {
-              await Promise.race([
-                new Promise((res) => { v.onloadeddata = () => res(); }),
-                new Promise((res) => setTimeout(res, 150))
-              ]);
-            }
-            await new Promise((res) => setTimeout(res, 30));
-          }
-
-          // iOS 有時仍然黑畫面：試著「靜音播放一下再暫停」逼出 frame
-          try {
-            await v.play();
-            v.pause();
-          } catch (_) { /* ignore */ }
-
-          const w = v.videoWidth || 640;
-          const h = v.videoHeight || 360;
-          const c = document.createElement("canvas");
-          c.width = w;
-          c.height = h;
-          const g = c.getContext("2d");
-          g.drawImage(v, 0, 0, w, h);
-          return c;
-        } finally {
-          URL.revokeObjectURL(vUrl);
-        }
-      }
 
       // 圖片：優先用 createImageBitmap（非阻塞解碼）
       if (window.createImageBitmap && isImage) {
