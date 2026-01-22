@@ -63,6 +63,10 @@ const lbNext = document.getElementById("lbNext");
 const lbClose = document.getElementById("lbClose");
 const lbWrap = document.getElementById("lbWrap");   // ← 新增
 const lbThumbs = document.getElementById("lbThumbs");
+const lbVControls = document.getElementById("lbVControls");
+const lbVPlay = document.getElementById("lbVPlay");
+const lbVSeek = document.getElementById("lbVSeek");
+const lbVMute = document.getElementById("lbVMute");
 
 let lbImages = [];
 let lbIndex = 0;
@@ -94,13 +98,16 @@ function renderLightboxMedia() {
       lbVideo.classList.remove("hidden");
       lbVideo.src = url;
       lbVideo.playsInline = true;
-      lbVideo.controls = true;
+      lbVideo.controls = false; // 用自訂控制列
+      __bindLbVideoControlsOnce();
+      __enableLbVideoControls(true);
       try { lbVideo.play().catch(() => { }); } catch (_) { }
     } else {
       try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
       lbVideo.classList.add("hidden");
       lbImg.classList.remove("hidden");
       lbImg.src = url;
+      __enableLbVideoControls(false);
     }
   } else if (lbImg) {
     lbImg.src = url;
@@ -113,6 +120,90 @@ function renderLightboxMedia() {
     });
   }
 }
+
+const __LB_PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
+const __LB_PAUSE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>';
+const __LB_MUTE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.5 12l3.5 3.5-1.4 1.4L15.1 13.4 11.6 17H8v-6H5V9h3V3h3.6l3.5 3.6 3.5-3.5 1.4 1.4L16.5 12z"/></svg>';
+const __LB_UNMUTE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2c0-1.77-1.02-3.29-2.5-4.03v8.06c1.48-.74 2.5-2.26 2.5-4.03z"/></svg>';
+
+let __lbSeeking = false;
+
+function __setSeekBarProgress(pct) {
+  if (!lbVSeek) return;
+  lbVSeek.style.setProperty("--p", `${Math.max(0, Math.min(100, pct))}%`);
+}
+
+function __syncLbVideoButtons() {
+  if (!lbVideo) return;
+  if (lbVPlay) lbVPlay.innerHTML = lbVideo.paused ? __LB_PLAY : __LB_PAUSE;
+  if (lbVMute) lbVMute.innerHTML = lbVideo.muted ? __LB_MUTE : __LB_UNMUTE;
+}
+
+function __syncLbVideoTime() {
+  if (!lbVideo || !lbVSeek) return;
+  const dur = Number.isFinite(lbVideo.duration) ? lbVideo.duration : 0;
+  const cur = Number.isFinite(lbVideo.currentTime) ? lbVideo.currentTime : 0;
+  if (!__lbSeeking) lbVSeek.value = String(cur);
+  __setSeekBarProgress(dur > 0 ? (cur / dur) * 100 : 0);
+}
+
+function __enableLbVideoControls(enable) {
+  if (!lbVControls) return;
+  lbVControls.classList.toggle("hidden", !enable);
+}
+
+function __bindLbVideoControlsOnce() {
+  if (!lbVControls || lbVControls.__bound) return;
+  lbVControls.__bound = true;
+
+  // 不要讓點擊冒泡（避免跟「點一下切換 UI」衝突）
+  lbVControls.addEventListener("click", (e) => e.stopPropagation(), true);
+
+  lbVPlay?.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    if (!lbVideo) return;
+    try {
+      if (lbVideo.paused) await lbVideo.play();
+      else lbVideo.pause();
+    } catch (_) { }
+    __syncLbVideoButtons();
+  });
+
+  lbVMute?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (!lbVideo) return;
+    lbVideo.muted = !lbVideo.muted;
+    __syncLbVideoButtons();
+  });
+
+  const startSeek = (e) => { __lbSeeking = true; e.stopPropagation(); };
+  const endSeek = (e) => { __lbSeeking = false; e.stopPropagation(); };
+
+  lbVSeek?.addEventListener("pointerdown", startSeek);
+  lbVSeek?.addEventListener("pointerup", endSeek);
+  lbVSeek?.addEventListener("touchstart", startSeek, { passive: true });
+  lbVSeek?.addEventListener("touchend", endSeek, { passive: true });
+
+  lbVSeek?.addEventListener("input", (e) => {
+    if (!lbVideo) return;
+    const t = parseFloat(e.target.value || "0");
+    if (Number.isFinite(t)) lbVideo.currentTime = t;
+    __syncLbVideoTime();
+  });
+}
+
+lbVideo?.addEventListener("loadedmetadata", () => {
+  if (!lbVSeek || !lbVideo) return;
+  const dur = Number.isFinite(lbVideo.duration) ? lbVideo.duration : 0;
+  lbVSeek.max = String(dur || 1);
+  __syncLbVideoButtons();
+  __syncLbVideoTime();
+});
+
+lbVideo?.addEventListener("timeupdate", __syncLbVideoTime);
+lbVideo?.addEventListener("play", __syncLbVideoButtons);
+lbVideo?.addEventListener("pause", __syncLbVideoButtons);
+lbVideo?.addEventListener("volumechange", __syncLbVideoButtons);
 
 // ========== iPhone 相簿：點一下切 UI ==========
 let __lbUiHidden = false;
