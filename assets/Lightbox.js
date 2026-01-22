@@ -62,6 +62,7 @@ const lbPrev = document.getElementById("lbPrev");
 const lbNext = document.getElementById("lbNext");
 const lbClose = document.getElementById("lbClose");
 const lbWrap = document.getElementById("lbWrap");   // ← 新增
+const lbThumbs = document.getElementById("lbThumbs");
 
 let lbImages = [];
 let lbIndex = 0;
@@ -111,6 +112,51 @@ function renderLightboxMedia() {
       el.classList.toggle("active", i === lbIndex);
     });
   }
+}
+
+// ========== iPhone 相簿：點一下切 UI ==========
+let __lbUiHidden = false;
+let __suppressTapUntil = 0;
+
+function setLbUiHidden(v) {
+  __lbUiHidden = !!v;
+  lb?.classList.toggle("lb-ui-hidden", __lbUiHidden);
+}
+function toggleLbUi() {
+  setLbUiHidden(!__lbUiHidden);
+}
+
+// ========== iPhone 相簿：下拉關閉（拖曳視覺） ==========
+let __dragActive = false;
+let __dragDy = 0;
+let __uiHiddenBeforeDrag = false;
+
+function __applyDrag(dy) {
+  __dragDy = dy;
+
+  const vh = window.innerHeight || document.documentElement.clientHeight || 0;
+  const max = Math.min(360, Math.max(220, vh * 0.45)); // 拖多少算「快要關」
+  const p = Math.min(1, dy / max);
+  const scale = 1 - p * 0.08;
+
+  if (lbWrap) {
+    lbWrap.style.transition = "none";
+    lbWrap.style.transform = `translateY(${dy}px) scale(${scale})`;
+  }
+  if (lb) {
+    const a = 0.9 * (1 - p);
+    lb.style.backgroundColor = `rgba(0,0,0,${Math.max(0, a)})`;
+  }
+}
+
+function __resetDrag(animated = true) {
+  if (lbWrap) {
+    lbWrap.style.transition = animated ? "transform 180ms ease" : "none";
+    lbWrap.style.transform = "";
+    if (animated) setTimeout(() => { if (lbWrap) lbWrap.style.transition = ""; }, 200);
+  }
+  if (lb) lb.style.backgroundColor = "";
+  __dragDy = 0;
 }
 
 function isCurrentLightboxVideo() {
@@ -265,9 +311,16 @@ function openLightbox(images, index = 0) {
 
   // 鎖背景（避免底層頁面被捲動）
   lockScroll();
+
+  setLbUiHidden(false);
+  __resetDrag(false);
 }
+
 // 🔥 關閉 Lightbox：回到 dialog 或直接解鎖
 function closeLightbox() {
+  setLbUiHidden(false);
+  __resetDrag(false);
+
   // 關閉前一定要把影片停掉
   if (lbVideo) {
     try { lbVideo.pause(); } catch (_) { }
@@ -312,10 +365,26 @@ lbClose?.addEventListener('click', (e) => {
   closeLightbox();
 });
 
-// 🔥 點黑幕關閉
+// 點一下：切換 UI（像 iPhone 相簿）
 lb?.addEventListener("click", (e) => {
-  if (e.target === lb) closeLightbox();
+  if (Date.now() < __suppressTapUntil) return;
+
+  // 點在按鈕 / 縮圖列就不要切 UI
+  if (e.target.closest("#lbPrev, #lbNext, #lbClose, #lbThumbs")) return;
+
+  // 影片：下方 20% 留給控制列，不切 UI（你原本 swipe 也是這樣分區 :contentReference[oaicite:9]{index=9}）
+  if (isCurrentLightboxVideo()) {
+    const h = window.innerHeight || document.documentElement.clientHeight || 0;
+    if (e.clientY > h * 0.8) return;
+  }
+
+  toggleLbUi();
 });
+
+// 縮圖列本身點擊不要冒泡到 lb（避免「點縮圖也把 UI 隱藏」）
+lbThumbs?.addEventListener("click", (e) => {
+  e.stopPropagation();
+}, true);
 
 // 🔥 ESC 關閉
 document.addEventListener("keydown", (e) => {
@@ -350,12 +419,33 @@ lb?.addEventListener("touchend", (e) => {
   // 如果這次觸控是在「下面那一塊」，直接讓影片自己處理（拉進度條等）
   if (!isSwipeZone) return;
 
+  const endX = e.changedTouches[0].clientX;
+  const endY = e.changedTouches[0].clientY;
+  const dx = endX - touchStartX;
+  const dy = endY - touchStartY;
+
+  // 1) 先處理「下拉關閉」
+  if (__dragActive) {
+    __dragActive = false;
+
+    if (dy > 140) {
+      __resetDrag(false);
+      closeLightbox();
+      return;
+    }
+
+    // 沒拉夠：彈回去，並恢復原本 UI 顯示狀態
+    __resetDrag(true);
+    setLbUiHidden(__uiHiddenBeforeDrag);
+    return;
+  }
+
+  // 2) 沒有下拉：才走你原本的左右滑切換
   const now = Date.now();
   if (now - __lastSwipeAt < 220) return;
 
-  const diff = e.changedTouches[0].clientX - touchStartX;
-  if (diff > 50) { __lastSwipeAt = now; lbShow(-1); }
-  else if (diff < -50) { __lastSwipeAt = now; lbShow(1); }
+  if (dx > 50) { __lastSwipeAt = now; lbShow(-1); }
+  else if (dx < -50) { __lastSwipeAt = now; lbShow(1); }
 }, { passive: true });
 
 // 🔥 完全阻止背景滑動（桌機 + 手機都有效）
@@ -368,8 +458,29 @@ lb?.addEventListener("touchmove", (e) => {
   // 在下面 20% 那一塊，就不要吃掉事件，讓影片進度條可以拖
   if (!isSwipeZone) return;
 
+  const t = e.touches[0];
+  const dx = t.clientX - touchStartX;
+  const dy = t.clientY - touchStartY;
+
+  // 還沒進入下拉：先判斷是不是「往下」且「垂直為主」
+  if (!__dragActive) {
+    const TH = 8;
+    if (dy > TH && Math.abs(dy) > Math.abs(dx) * 1.1) {
+      __dragActive = true;
+      __uiHiddenBeforeDrag = __lbUiHidden;
+      setLbUiHidden(true);                 // 拖曳時先把 UI 收起來
+      __suppressTapUntil = Date.now() + 350; // 避免拖完觸發 click 切 UI
+    }
+  }
+
+  // 只要在可滑區域，就阻止背景捲動（你原本就這樣做 :contentReference[oaicite:12]{index=12}）
   e.preventDefault();
   e.stopPropagation();
+
+  // 如果正在下拉，就套用拖曳視覺
+  if (__dragActive) {
+    __applyDrag(Math.max(0, dy));
+  }
 }, { passive: false });
 
 const y = document.getElementById('year');

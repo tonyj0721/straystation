@@ -125,6 +125,29 @@ dialog::backdrop {
   border: 2px solid white;
 }
 
+/* iPhone 相簿感：點一下隱藏/顯示 UI */
+#lightbox.lb-ui-hidden #lbThumbs,
+#lightbox.lb-ui-hidden #lbClose,
+#lightbox.lb-ui-hidden #lbPrev,
+#lightbox.lb-ui-hidden #lbNext {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* UI 隱藏時真的滿版（你原本 #lightbox 有 padding-top/bottom :contentReference[oaicite:3]{index=3}） */
+#lightbox.lb-ui-hidden {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+/* UI 隱藏時把主圖吃滿 */
+#lightbox.lb-ui-hidden #lbImg,
+#lightbox.lb-ui-hidden #lbVideo {
+  max-height: 100dvh;
+  max-width: 100vw;
+  border-radius: 0;
+}
+
 /* 一般列表（手機卡片）的媒體縮圖 wrapper */
 .media-thumb {
   width: 70px;
