@@ -91,10 +91,28 @@ function renderLightboxMedia() {
     if (isVid) {
       lbImg.classList.add("hidden");
       lbVideo.classList.remove("hidden");
+      // 先重置（避免第一次播放 duration 變 0:00 / 進度條卡住）
+      try { lbVideo.pause(); } catch (_) { }
+      try { lbVideo.removeAttribute("src"); } catch (_) { }
+      try { lbVideo.load && lbVideo.load(); } catch (_) { }
+
       lbVideo.src = url;
+      lbVideo.preload = "metadata";
       lbVideo.playsInline = true;
       lbVideo.controls = true;
-      try { lbVideo.play().catch(() => { }); } catch (_) { }
+      lbVideo.setAttribute("playsinline", "");
+      lbVideo.setAttribute("webkit-playsinline", "");
+      lbVideo.disablePictureInPicture = true;
+
+      const __tok = String(Date.now()) + Math.random().toString(16).slice(2);
+      lbVideo.dataset._srcTok = __tok;
+      const __onMeta = () => {
+        if (lbVideo.dataset._srcTok !== __tok) return;
+        try { lbVideo.currentTime = 0; } catch (_) { }
+        try { lbVideo.play().catch(() => { }); } catch (_) { }
+      };
+      lbVideo.addEventListener("loadedmetadata", __onMeta, { once: true });
+      try { lbVideo.load && lbVideo.load(); } catch (_) { }
     } else {
       try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
       lbVideo.classList.add("hidden");
@@ -175,16 +193,16 @@ $('#dlgClose')?.addEventListener('click', () => {
 
 // 防止使用者按 ESC 或點 backdrop 關掉時，背景卡死
 dlg?.addEventListener('close', () => {
-  // 關掉 dialog 一律先把影片停掉
+  // 如果是切到 Lightbox 才關掉 dialog：不要清 currentPetId、不要解鎖，也不要把 dlgVideo 的 src 清掉
+  if (lb && lb.classList.contains("flex")) return;
+
+  // 關掉 dialog：把影片停掉並清空 src（避免背景還在播/占資源）
   const v = document.getElementById("dlgVideo");
   if (v) {
     try { v.pause(); } catch (_) { }
     v.removeAttribute("src");
     try { v.load && v.load(); } catch (_) { }
   }
-
-  // 如果是切到 Lightbox 才關掉 dialog：不要清 currentPetId、不要解鎖
-  if (lb && lb.classList.contains("flex")) return;
 
   window.currentPetId = null;
   window.currentPetThumbByPath = null;
@@ -218,18 +236,10 @@ function openLightbox(images, index = 0) {
           img.src = videoThumb;
           wrapper.appendChild(img);
         } else {
-          const v = document.createElement("video");
-          v.className = "thumb-video";
-          v.preload = "metadata";
-          v.muted = true;
-          v.playsInline = true;
-          v.setAttribute("playsinline", "");
-          v.setAttribute("webkit-playsinline", "");
-          v.controls = false;
-          v.disablePictureInPicture = true;
-          v.src = url;
-          __primeThumbVideoFrameLightbox(v);
-          wrapper.appendChild(v);
+          const img = document.createElement("img");
+          img.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+          img.style.background = "#000";
+          wrapper.appendChild(img);
         }
 
         const badge = document.createElement("div");
@@ -260,6 +270,12 @@ function openLightbox(images, index = 0) {
     lb.classList.add("flex");
   }
 
+  // 關掉 Modal 前先把 dlgVideo 暫停（但保留 src，回來才不用重新點縮圖）
+  try {
+    const dv = document.getElementById("dlgVideo");
+    if (dv) { try { dv.pause(); } catch (_) { } }
+  } catch (_) { }
+
   // 關掉 Modal（移除 backdrop）
   if (dlg?.open) dlg.close();
 
@@ -280,8 +296,11 @@ function closeLightbox() {
     lb.classList.remove("flex");
   }
 
+  // 回到 Modal：保持 lockScroll（交給 dialog 的 close handler 解鎖）
   if (lbReturnToDialog && dlg) {
     dlg.showModal();
+    lbReturnToDialog = false;
+    return;
   }
 
   // Lightbox 自己佔用過一次 lockScroll，這裡對應解一次
