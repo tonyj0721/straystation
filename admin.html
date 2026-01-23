@@ -1093,10 +1093,8 @@
         v.disablePictureInPicture = true;
         v.src = getVideoObjURL(file);
 
-        // 先顯示縮圖當 poster（更像截圖的效果），避免黑畫面
-        ensureThumbURL(file)
-          .then((url) => { v.poster = url; })
-          .catch(() => { /* poster 失敗就算了 */ });
+        // ✅ 直接用影片本身抓第一幀，避免黑畫面
+        __primeThumbVideoFrameAdmin(v);
 
         // 中央播放/暫停按鈕（取代原生控制列）
         const overlay = document.createElement("div");
@@ -1755,7 +1753,7 @@
                </div>
               `;
 
-return `
+          return `
         <div class="rounded-xl ring-1 ring-gray-200 p-3 flex gap-3 items-center cursor-pointer"
              data-id="${p.id}">
           ${thumb}
