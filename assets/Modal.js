@@ -522,6 +522,7 @@ async function openDialog(id) {
   const dlgBg = document.getElementById("dlgBg");
   const dlgThumbs = document.getElementById("dlgThumbs");
   const dlgHint = document.getElementById("dlgHint");
+  const dlgStageWrap = document.getElementById("dlgStageWrap");
 
   const media = Array.isArray(p.images) && p.images.length > 0
     ? p.images
@@ -546,6 +547,8 @@ async function openDialog(id) {
 
       if (dlgHint) dlgHint.textContent = "";
 
+      if (dlgStageWrap) dlgStageWrap.classList.remove("dlg-video-mode");
+
       return;
     }
 
@@ -553,10 +556,17 @@ async function openDialog(id) {
     const url = media[currentIndex];
     const isVid = isVideoUrl(url);
 
+    if (dlgStageWrap) dlgStageWrap.classList.toggle("dlg-video-mode", isVid);
+
     if (dlgHint) {
       dlgHint.textContent = isVid
         ? "雙擊主圖可放大"
         : "點主圖可放大";
+
+      // 影片：加 mt-2；圖片：移除 mt-2
+      dlgHint.classList.toggle("mt-2", isVid);
+      // （可選）確保圖片時沒有 mt-2 殘留
+      if (!isVid) dlgHint.classList.remove("mt-2");
     }
 
     if (dlgImg && dlgVideo) {
@@ -1794,18 +1804,16 @@ function swalInDialog(opts) {
 
   // 1) 標準：dialog 關閉事件（按 X、點遮罩、呼叫 close() 都會觸發）
   dlg.addEventListener("close", () => {
-    try { __unlockDialogScroll(); } catch (_) { }
     resetAdoptedSelection();
   });
 
-// 2) 取消事件（按 Esc）
+  // 2) 取消事件（按 Esc）
   dlg.addEventListener("cancel", () => {
-    try { __unlockDialogScroll(); } catch (_) { }
     resetAdoptedSelection();
     // 不阻止預設，讓它照常關閉
   });
 
-// 3) 若你的程式是用移除 open / 切 aria-hidden 來關閉，也一併偵測
+  // 3) 若你的程式是用移除 open / 切 aria-hidden 來關閉，也一併偵測
   const mo = new MutationObserver(() => {
     if (!dlg.open) {
       resetAdoptedSelection();
