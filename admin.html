@@ -1093,7 +1093,7 @@
         v.disablePictureInPicture = true;
         v.src = getVideoObjURL(file);
 
-        // ✅ 直接用影片本身抓第一幀，避免黑畫面
+        // ✅ 直接用影片本身抓一個 frame，避免黑畫面（特別是 iOS / Safari）
         __primeThumbVideoFrameAdmin(v);
 
         // 中央播放/暫停按鈕（取代原生控制列）

@@ -946,32 +946,32 @@ async function saveEdit() {
     }
 
     // 刪除被移除的舊圖（忽略刪失敗）
-    // 同步刪掉後端產生的縮圖：thumbs/<原路徑去副檔名>.jpg
-    // 並清理 Firestore 的 thumbByPath 對應 key（避免越積越多）
-    const __thumbFieldDeletes = {};
-    for (const url of (removeUrls || [])) {
-      try {
-        const enc = String(url).split("/o/")[1].split("?")[0];
-        const mediaPath = decodeURIComponent(enc);
+// 同步刪掉後端產生的縮圖：thumbs/<原路徑去副檔名>.jpg
+// 並清理 Firestore 的 thumbByPath 對應 key（避免越積越多）
+const __thumbFieldDeletes = {};
+for (const url of (removeUrls || [])) {
+  try {
+    const enc = String(url).split("/o/")[1].split("?")[0];
+    const mediaPath = decodeURIComponent(enc);
 
-        // 1) 刪原檔
-        await deleteObject(sRef(storage, mediaPath));
+    // 1) 刪原檔
+    await deleteObject(sRef(storage, mediaPath));
 
-        // 2) 若是影片：刪縮圖 + 刪欄位 key
-        if (isVideoUrl(url)) {
-          const tPath = thumbPathFromMediaPath(mediaPath);
-          if (tPath) {
-            try { await deleteObject(sRef(storage, tPath)); } catch (_) { /* ignore */ }
-          }
-          __thumbFieldDeletes[`thumbByPath.${mediaPath}`] = deleteField();
-        }
-      } catch (e) {
-        // 靜默忽略
+    // 2) 若是影片：刪縮圖 + 刪欄位 key
+    if (isVideoUrl(url)) {
+      const tPath = thumbPathFromMediaPath(mediaPath);
+      if (tPath) {
+        try { await deleteObject(sRef(storage, tPath)); } catch (_) { /* ignore */ }
       }
+      __thumbFieldDeletes[`thumbByPath.${mediaPath}`] = deleteField();
     }
+  } catch (e) {
+    // 靜默忽略
+  }
+}
 
-    newData.images = newUrls;
-    const __updatePayload = { ...newData, ...__thumbFieldDeletes };
+newData.images = newUrls;
+const __updatePayload = { ...newData, ...__thumbFieldDeletes };
 
     // ③ 寫回 Firestore
     await updateDoc(doc(db, "pets", currentDocId), __updatePayload);
@@ -1156,29 +1156,30 @@ function __makeEditTile(it) {
     if (it.kind === "url") {
       v.src = it.url;
 
+      // 先嘗試用後端產出的縮圖（thumbByPath）
       try {
-        // 1) 優先用後端縮圖
         const path = storagePathFromDownloadUrl(it.url);
-        const thumbs = window.currentPetThumbByPath || {};
-        if (path && thumbs[path]) {
-          v.poster = thumbs[path];   // Firestore thumbByPath 產的圖
+        const thumbMap = window.currentPetThumbByPath || {};
+        const thumbUrl = path && thumbMap[path];
+        if (thumbUrl) {
+          v.poster = thumbUrl;
         } else {
-          // 2) 沒縮圖就用影片自身抓第一幀
+          // 沒有縮圖就用影片本身抓第一幀，避免黑畫面
           __primeThumbVideoFrame(v);
         }
       } catch (_) {
         __primeThumbVideoFrame(v);
       }
     } else {
-      // 新選的檔案：保留原本邏輯，再加個 fallback
       v.src = getEditVideoObjURL(it.file);
-      __primeThumbVideoFrame(v); // 先確保至少有一幀
 
+      // 先抓一幀，確保一開始就有畫面
+      __primeThumbVideoFrame(v);
+
+      // 若能產出高品質縮圖就覆蓋上去
       ensurePreviewThumbURL(it.file)
         .then((u) => { v.poster = u; })
-        .catch(() => {
-          // 失敗就維持用第一幀
-        });
+        .catch(() => { /* 失敗就維持第一幀 */ });
     }
 
     const overlay = document.createElement("div");
