@@ -15,8 +15,6 @@ function storagePathFromDownloadUrl(url) {
   }
 }
 
-
-
 // Lightbox 縮圖播放 icon（避免與 Modal.js 的 __PLAY_SVG 命名衝突）
 const __THUMB_PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
 
@@ -25,30 +23,52 @@ function __primeThumbVideoFrameLightbox(v) {
   if (!v || v.dataset.__primed === "1") return;
   v.dataset.__primed = "1";
 
-  const onMeta = () => {
+  const seekTo = (t) => {
     try {
       const dur = Number.isFinite(v.duration) ? v.duration : 0;
-      let t = 0.05;
-      if (dur && dur > 0.2) {
-        t = Math.min(0.2, dur / 2);
+      if (dur) {
         t = Math.max(0.05, Math.min(t, dur - 0.05));
       }
       v.currentTime = t;
     } catch (_) { }
   };
 
-  const onSeeked = () => { try { v.pause(); } catch (_) { } };
+  const playOnce = () => {
+    try {
+      v.muted = true;
+      v.playsInline = true;
+      v.setAttribute("playsinline", "");
+      v.setAttribute("webkit-playsinline", "");
+
+      const p = v.play();
+      if (p && typeof p.then === "function") {
+        p.then(() => {
+          setTimeout(() => { try { v.pause(); } catch (_) { } }, 80);
+        }).catch(() => { });
+      }
+    } catch (_) { }
+  };
+
+  const onMeta = () => {
+    seekTo(0.1);
+    playOnce();
+  };
 
   v.addEventListener("loadedmetadata", onMeta, { once: true });
-  v.addEventListener("seeked", onSeeked, { once: true });
+
+  if (v.readyState >= 1) {
+    onMeta();
+  }
+
   setTimeout(() => {
     try {
-      if (v.readyState < 2) return;
-      if (v.currentTime === 0) v.currentTime = 0.05;
+      if (v.readyState >= 2 && v.currentTime === 0) {
+        seekTo(0.1);
+        playOnce();
+      }
     } catch (_) { }
-  }, 120);
+  }, 300);
 }
-
 
 history.scrollRestoration = "manual";
 window.scrollTo(0, 0);

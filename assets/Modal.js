@@ -24,47 +24,57 @@ function thumbPathFromMediaPath(mediaPath) {
   }
 }
 
-
-
-// ===============================
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
-// ===============================
 function __primeThumbVideoFrame(v) {
   if (!v || v.dataset.__primed === "1") return;
   v.dataset.__primed = "1";
 
-  // 只要能顯示某個 frame 就好：loadedmetadata 後 seek 一下
-  const onMeta = () => {
+  const seekTo = (t) => {
     try {
       const dur = Number.isFinite(v.duration) ? v.duration : 0;
-      let t = 0.05;
-      if (dur && dur > 0.2) {
-        t = Math.min(0.2, dur / 2);
+      if (dur) {
         t = Math.max(0.05, Math.min(t, dur - 0.05));
       }
       v.currentTime = t;
-    } catch (_) {
-      // ignore
-    }
+    } catch (_) { }
   };
 
-  const onSeeked = () => {
-    try { v.pause(); } catch (_) { }
+  const playOnce = () => {
+    try {
+      v.muted = true;
+      v.playsInline = true;
+      v.setAttribute("playsinline", "");
+      v.setAttribute("webkit-playsinline", "");
+
+      const p = v.play();
+      if (p && typeof p.then === "function") {
+        p.then(() => {
+          setTimeout(() => { try { v.pause(); } catch (_) { } }, 80);
+        }).catch(() => { });
+      }
+    } catch (_) { }
+  };
+
+  const onMeta = () => {
+    seekTo(0.1);
+    playOnce();
   };
 
   v.addEventListener("loadedmetadata", onMeta, { once: true });
-  v.addEventListener("seeked", onSeeked, { once: true });
 
-  // 有些 Safari 不會立刻解碼畫面：加個保險
+  if (v.readyState >= 1) {
+    onMeta();
+  }
+
   setTimeout(() => {
     try {
-      if (v.readyState < 2) return;
-      // 觸發一次 seek（若上面沒成功）
-      if (v.currentTime === 0) v.currentTime = 0.05;
+      if (v.readyState >= 2 && v.currentTime === 0) {
+        seekTo(0.1);
+        playOnce();
+      }
     } catch (_) { }
-  }, 120);
+  }, 300);
 }
-
 
 function __lockDialogScroll() {
   try { if (typeof lockScroll === "function") lockScroll(); } catch { }
