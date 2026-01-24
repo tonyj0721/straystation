@@ -66,48 +66,118 @@ function __primeThumbVideoFrame(v) {
 }
 
 
+
+// ===============================
+// 修正部分瀏覽器/MediaRecorder 產生的 WebM「duration=Infinity」問題
+// 會導致原生控制列進度條卡住/跳動（第一次播放特別明顯）
+// ===============================
+function __ensureFiniteDuration(v, timeoutMs = 2500) {
+  return new Promise((resolve) => {
+    if (!v) return resolve();
+
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      cleanup();
+      resolve();
+    };
+
+    const cleanup = () => {
+      v.removeEventListener("loadedmetadata", onMeta);
+      v.removeEventListener("durationchange", onDur);
+      v.removeEventListener("timeupdate", onTime);
+      v.removeEventListener("seeked", onSeeked);
+    };
+
+    const isOk = () => Number.isFinite(v.duration) && v.duration > 0;
+
+    const tryFix = () => {
+      if (isOk()) return finish();
+
+      // 部分 WebM（特別是 MediaRecorder 產出）第一次載入時 duration 可能是 Infinity
+      // 透過「seek 到很大的時間」逼瀏覽器解析結尾，拿到正確 duration
+      if (v.duration === Infinity || !Number.isFinite(v.duration) || v.duration === 0) {
+        const wasMuted = v.muted;
+        v.muted = true;
+
+        // 用 seeked/timeupdate 任一個事件都行；不同瀏覽器觸發行為不一致，所以兩個都掛
+        try {
+          v.addEventListener("timeupdate", onTime, { once: true });
+          v.addEventListener("seeked", onSeeked, { once: true });
+          v.currentTime = 1e101;
+        } catch (_) {
+          v.muted = wasMuted;
+          finish();
+          return;
+        }
+
+        // 若事件沒觸發，仍然要保底結束
+        setTimeout(() => {
+          try { v.muted = wasMuted; } catch (_) { }
+          if (isOk()) {
+            try { v.currentTime = 0; } catch (_) { }
+          }
+          finish();
+        }, Math.min(1200, timeoutMs));
+      }
+    };
+
+    const onMeta = () => tryFix();
+    const onDur = () => { if (isOk()) finish(); };
+    const onTime = () => { try { v.currentTime = 0; } catch (_) { } finish(); };
+    const onSeeked = () => { try { v.currentTime = 0; } catch (_) { } finish(); };
+
+    v.addEventListener("loadedmetadata", onMeta, { once: true });
+    v.addEventListener("durationchange", onDur);
+
+    // 可能已經有 metadata 了
+    setTimeout(() => {
+      tryFix();
+      setTimeout(finish, timeoutMs);
+    }, 0);
+  });
+}
+
+function __setVideoSrcAndPlay(v, url) {
+  if (!v) return;
+
+  // 用 token 避免切換媒體時舊的 async 回來把狀態蓋掉
+  const token = String(Date.now()) + "_" + Math.random().toString(16).slice(2);
+  v.dataset.__playToken = token;
+
+  try { v.pause(); } catch (_) { }
+  try {
+    v.removeAttribute("src");
+    v.load && v.load();
+  } catch (_) { }
+
+  v.preload = "metadata";
+  v.playsInline = true;
+  v.setAttribute("playsinline", "");
+  v.setAttribute("webkit-playsinline", "");
+
+  // 先暫時關掉 controls，避免 duration 修正時進度條閃跳
+  v.controls = false;
+
+  v.src = url;
+  try { v.load && v.load(); } catch (_) { }
+
+  __ensureFiniteDuration(v).then(() => {
+    if (v.dataset.__playToken !== token) return;
+    try { v.currentTime = 0; } catch (_) { }
+    v.controls = true;
+    try { v.play().catch(() => { }); } catch (_) { }
+  });
+}
+
+
 function __lockDialogScroll() {
   try { if (typeof lockScroll === "function") lockScroll(); } catch { }
 }
 
 function __unlockDialogScroll() {
   try { if (typeof unlockScroll === "function") unlockScroll(); } catch { }
-}
-
-
-// ===============================
-// 影片播放：避免「第一次進 dialog / lightbox 時 controls 進度條不同步」
-// - 不在 display:none 時就 play
-// - 換 src 後先 load，等 loadedmetadata 再 play
-// ===============================
-function __resetVideoEl(v) {
-  if (!v) return;
-  try { v.pause(); } catch (_) { }
-  try { v.removeAttribute("src"); } catch (_) { }
-  try { v.load && v.load(); } catch (_) { }
-}
-
-function __setVideoSrc(v, url) {
-  if (!v) return;
-  __resetVideoEl(v);
-  v.src = url || "";
-  try { v.load && v.load(); } catch (_) { }
-}
-
-function __playWhenReady(v) {
-  if (!v) return;
-  const kick = () => {
-    // 連兩個 RAF：等 DOM/controls 真正顯示後再開播（特別是 iOS / dialog / overlay）
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        try { v.currentTime = 0; } catch (_) { }
-        try { v.play().catch(() => { }); } catch (_) { }
-      });
-    });
-  };
-
-  if (v.readyState >= 1) kick();
-  else v.addEventListener("loadedmetadata", kick, { once: true });
 }
 
 // ===============================
@@ -575,7 +645,8 @@ async function openDialog(id) {
 
       if (dlgVideo) {
         try { dlgVideo.pause(); } catch (_) { }
-        dlgVideo.src = "";
+        dlgVideo.removeAttribute("src");
+        try { dlgVideo.load && dlgVideo.load(); } catch (_) { }
         dlgVideo.classList.add("hidden");
       }
 
@@ -609,19 +680,13 @@ async function openDialog(id) {
       if (isVid) {
         dlgImg.classList.add("hidden");
         dlgVideo.classList.remove("hidden");
-        dlgVideo.playsInline = true;
-        dlgVideo.controls = true;
-        __setVideoSrc(dlgVideo, url);
-
-        // 如果 dialog 還沒打開，先記一下，等 showModal() 後再播放，避免第一次 controls 進度條不同步
-        dlgVideo.dataset.__autoplayWhenOpen = "1";
-        if (typeof dlg !== "undefined" && dlg && dlg.open) {
-          dlgVideo.dataset.__autoplayWhenOpen = "0";
-          __playWhenReady(dlgVideo);
-        }} else {
+              __setVideoSrcAndPlay(dlgVideo, url);
+} else {
         try {
           dlgVideo.pause && dlgVideo.pause();
         } catch (_) { }
+        dlgVideo.removeAttribute("src");
+        try { dlgVideo.load && dlgVideo.load(); } catch (_) { }
         dlgVideo.classList.add("hidden");
         dlgImg.classList.remove("hidden");
         dlgImg.src = url;
@@ -823,13 +888,6 @@ async function openDialog(id) {
   if (!dlg.open) {
     __lockDialogScroll();
     dlg.showModal();
-
-    // 如果主圖是影片：等 dialog 開啟後再 kick 一次 play（避免第一次 controls 進度條不同步）
-    const v = document.getElementById("dlgVideo");
-    if (v && v.dataset.__autoplayWhenOpen === "1") {
-      v.dataset.__autoplayWhenOpen = "0";
-      __playWhenReady(v);
-    }
   }
 }
 
