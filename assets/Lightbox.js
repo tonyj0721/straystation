@@ -173,6 +173,7 @@ $('#dlgClose')?.addEventListener('click', () => {
   dlg?.close();
 });
 
+// 防止使用者按 ESC 或點 backdrop 關掉時，背景卡死
 dlg?.addEventListener('close', () => {
   const switchingToLB = !!(lb && lb.classList.contains("flex"));
   const v = document.getElementById("dlgVideo");
@@ -195,7 +196,6 @@ dlg?.addEventListener('close', () => {
   history.replaceState(null, '', location.pathname);
   unlockScroll();
 });
-
 
 // 🔥 開啟 Lightbox：關掉 dialog + 維持背景鎖定
 

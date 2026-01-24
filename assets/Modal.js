@@ -590,9 +590,34 @@ async function openDialog(id) {
     }
 
     if (dlgBg) {
-      const firstImage = media.find(u => !isVideoUrl(u));
-      // 只有影片時不要把 <img> 的 src 設成影片網址（會出現破圖）
-      dlgBg.src = firstImage || (isVid ? "" : url);
+      let bgSrc = "";
+
+      if (!isVid) {
+        // 主圖是照片：直接用當前這張照片做背景
+        bgSrc = url;
+      } else {
+        // 主圖是影片：優先用「這支影片自己的縮圖」
+        try {
+          const videoPath = storagePathFromDownloadUrl(url);
+          const thumbMap = (p.thumbByPath) || {};
+          const videoThumb = videoPath ? (thumbMap[videoPath] || "") : "";
+
+          if (videoThumb) {
+            bgSrc = videoThumb;
+          } else {
+            // 沒有縮圖時，再退而求其次：用第一張照片當背景
+            const firstImage = media.find(u => !isVideoUrl(u));
+            bgSrc = firstImage || "";
+          }
+        } catch (_) {
+          // 萬一解析 path 出錯，就跟上面一樣退回用第一張照片
+          const firstImage = media.find(u => !isVideoUrl(u));
+          bgSrc = firstImage || "";
+        }
+      }
+
+      // 只有真的有圖才塞 src，避免誤把影片網址塞進 <img> 變成破圖
+      dlgBg.src = bgSrc;
     }
 
     if (dlgThumbs) {
@@ -946,32 +971,32 @@ async function saveEdit() {
     }
 
     // 刪除被移除的舊圖（忽略刪失敗）
-// 同步刪掉後端產生的縮圖：thumbs/<原路徑去副檔名>.jpg
-// 並清理 Firestore 的 thumbByPath 對應 key（避免越積越多）
-const __thumbFieldDeletes = {};
-for (const url of (removeUrls || [])) {
-  try {
-    const enc = String(url).split("/o/")[1].split("?")[0];
-    const mediaPath = decodeURIComponent(enc);
+    // 同步刪掉後端產生的縮圖：thumbs/<原路徑去副檔名>.jpg
+    // 並清理 Firestore 的 thumbByPath 對應 key（避免越積越多）
+    const __thumbFieldDeletes = {};
+    for (const url of (removeUrls || [])) {
+      try {
+        const enc = String(url).split("/o/")[1].split("?")[0];
+        const mediaPath = decodeURIComponent(enc);
 
-    // 1) 刪原檔
-    await deleteObject(sRef(storage, mediaPath));
+        // 1) 刪原檔
+        await deleteObject(sRef(storage, mediaPath));
 
-    // 2) 若是影片：刪縮圖 + 刪欄位 key
-    if (isVideoUrl(url)) {
-      const tPath = thumbPathFromMediaPath(mediaPath);
-      if (tPath) {
-        try { await deleteObject(sRef(storage, tPath)); } catch (_) { /* ignore */ }
+        // 2) 若是影片：刪縮圖 + 刪欄位 key
+        if (isVideoUrl(url)) {
+          const tPath = thumbPathFromMediaPath(mediaPath);
+          if (tPath) {
+            try { await deleteObject(sRef(storage, tPath)); } catch (_) { /* ignore */ }
+          }
+          __thumbFieldDeletes[`thumbByPath.${mediaPath}`] = deleteField();
+        }
+      } catch (e) {
+        // 靜默忽略
       }
-      __thumbFieldDeletes[`thumbByPath.${mediaPath}`] = deleteField();
     }
-  } catch (e) {
-    // 靜默忽略
-  }
-}
 
-newData.images = newUrls;
-const __updatePayload = { ...newData, ...__thumbFieldDeletes };
+    newData.images = newUrls;
+    const __updatePayload = { ...newData, ...__thumbFieldDeletes };
 
     // ③ 寫回 Firestore
     await updateDoc(doc(db, "pets", currentDocId), __updatePayload);
@@ -1155,12 +1180,31 @@ function __makeEditTile(it) {
 
     if (it.kind === "url") {
       v.src = it.url;
+
+      // 先嘗試用後端產出的縮圖（thumbByPath）
+      try {
+        const path = storagePathFromDownloadUrl(it.url);
+        const thumbMap = window.currentPetThumbByPath || {};
+        const thumbUrl = path && thumbMap[path];
+        if (thumbUrl) {
+          v.poster = thumbUrl;
+        } else {
+          // 沒有縮圖就用影片本身抓第一幀，避免黑畫面
+          __primeThumbVideoFrame(v);
+        }
+      } catch (_) {
+        __primeThumbVideoFrame(v);
+      }
     } else {
       v.src = getEditVideoObjURL(it.file);
-      // 用縮圖當 poster，避免黑畫面
+
+      // 先抓一幀，確保一開始就有畫面
+      __primeThumbVideoFrame(v);
+
+      // 若能產出高品質縮圖就覆蓋上去
       ensurePreviewThumbURL(it.file)
         .then((u) => { v.poster = u; })
-        .catch(() => { /* ignore */ });
+        .catch(() => { /* 失敗就維持第一幀 */ });
     }
 
     const overlay = document.createElement("div");
