@@ -75,122 +75,39 @@ function __unlockDialogScroll() {
 }
 
 
-
 // ===============================
-// 主影片播放：修正 iOS/Safari 首播「進度條不動/亂跳」
-// - 先等 loadedmetadata（拿到 duration）再 play
-// - 若 duration 仍是 0/Infinity/NaN（常見於「未 faststart」的 mp4 或某些串流回應）
-//   退而求其次：把影片整支抓成 Blob，再用 objectURL 播放（確保進度條正常）
+// 影片播放：避免「第一次進 dialog / lightbox 時 controls 進度條不同步」
+// - 不在 display:none 時就 play
+// - 換 src 後先 load，等 loadedmetadata 再 play
 // ===============================
-const __videoBlobUrlCache = new Map(); // url -> objectURL（避免同支影片一直重抓）
-
-function __nextFrame() {
-  return new Promise((r) => requestAnimationFrame(() => r()));
-}
-
-function __waitOnce(el, ev, timeout = 1200) {
-  return new Promise((resolve, reject) => {
-    let done = false;
-    const on = () => {
-      if (done) return;
-      done = true;
-      cleanup();
-      resolve();
-    };
-    const to = setTimeout(() => {
-      if (done) return;
-      done = true;
-      cleanup();
-      reject(new Error("timeout"));
-    }, timeout);
-
-    function cleanup() {
-      clearTimeout(to);
-      try { el.removeEventListener(ev, on); } catch (_) { }
-    }
-
-    try { el.addEventListener(ev, on, { once: true }); } catch (_) { /* ignore */ }
-  });
-}
-
-const __videoTaskToken = new WeakMap();
-function __bumpToken(v) {
-  const t = (__videoTaskToken.get(v) || 0) + 1;
-  __videoTaskToken.set(v, t);
-  return t;
-}
-function __isLatest(v, t) { return (__videoTaskToken.get(v) || 0) === t; }
-
-async function __getVideoBlobUrl(url) {
-  if (__videoBlobUrlCache.has(url)) return __videoBlobUrlCache.get(url);
-
-  // 讓瀏覽器/HTTP cache 幫忙（第二次通常就很快）
-  const res = await fetch(url, { cache: "force-cache" });
-  const blob = await res.blob();
-  const obj = URL.createObjectURL(blob);
-  __videoBlobUrlCache.set(url, obj);
-  return obj;
-}
-
-function __stopVideoHard(v) {
+function __resetVideoEl(v) {
   if (!v) return;
-  __bumpToken(v); // 讓舊的 async 任務自動失效
   try { v.pause(); } catch (_) { }
   try { v.removeAttribute("src"); } catch (_) { }
   try { v.load && v.load(); } catch (_) { }
 }
 
-async function __playVideoWithStableProgress(v, url) {
-  if (!v || !url) return;
-  const t = __bumpToken(v);
-
-  // 先硬重置（避免 src 切換時 Safari 狀態殘留）
-  try { v.pause(); } catch (_) { }
-  try { v.removeAttribute("src"); } catch (_) { }
+function __setVideoSrc(v, url) {
+  if (!v) return;
+  __resetVideoEl(v);
+  v.src = url || "";
   try { v.load && v.load(); } catch (_) { }
+}
 
-  v.preload = "metadata";
-  v.src = url;
-  try { v.load && v.load(); } catch (_) { }
+function __playWhenReady(v) {
+  if (!v) return;
+  const kick = () => {
+    // 連兩個 RAF：等 DOM/controls 真正顯示後再開播（特別是 iOS / dialog / overlay）
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        try { v.currentTime = 0; } catch (_) { }
+        try { v.play().catch(() => { }); } catch (_) { }
+      });
+    });
+  };
 
-  // 等一點點讓元素真正出現在畫面上（dialog/lightbox 顯示時 Safari 比較挑）
-  await __nextFrame();
-  await __nextFrame();
-  if (!__isLatest(v, t)) return;
-
-  // 先等 metadata（拿到 duration）
-  try { await __waitOnce(v, "loadedmetadata", 1500); } catch (_) { }
-  if (!__isLatest(v, t)) return;
-
-  // 若 duration 還是不正常，改用 Blob 播放（會先把影片抓完整）
-  const dur = v.duration;
-  const durOk = Number.isFinite(dur) && dur > 0;
-  if (!durOk) {
-    try {
-      const blobUrl = await __getVideoBlobUrl(url);
-      if (!__isLatest(v, t)) return;
-      v.src = blobUrl;
-      try { v.load && v.load(); } catch (_) { }
-      try { await __waitOnce(v, "loadedmetadata", 2500); } catch (_) { }
-    } catch (_) { /* ignore */ }
-  }
-
-  if (!__isLatest(v, t)) return;
-
-  // 刷新一下 UI（有些 Safari 首播 controls 會卡住）
-  try { v.currentTime = 0; } catch (_) { }
-  await __nextFrame();
-  if (!__isLatest(v, t)) return;
-
-  // 開播（若被政策擋住就先靜音）
-  try {
-    await v.play();
-  } catch (_) {
-    try {
-      v.muted = true;
-      await v.play();
-    } catch (_) { }
-  }
+  if (v.readyState >= 1) kick();
+  else v.addEventListener("loadedmetadata", kick, { once: true });
 }
 
 // ===============================
@@ -339,8 +256,7 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
         video.requestVideoFrameCallback(cb);
       };
       video.requestVideoFrameCallback(cb);
-    
-      } else {
+    } else {
       const t = setInterval(() => {
         if (video.paused || video.ended) {
           clearInterval(t);
@@ -457,7 +373,6 @@ async function __decodeToBitmap(file) {
       // 等待畫面真正解碼（RVFC 最可靠）
       if (typeof v.requestVideoFrameCallback === "function") {
         await new Promise((res) => v.requestVideoFrameCallback(() => res()));
-      
       } else {
         // readyState >= 2 才有 current frame data
         if (v.readyState < 2) {
@@ -659,7 +574,8 @@ async function openDialog(id) {
       }
 
       if (dlgVideo) {
-        __stopVideoHard(dlgVideo);
+        try { dlgVideo.pause(); } catch (_) { }
+        dlgVideo.src = "";
         dlgVideo.classList.add("hidden");
       }
 
@@ -695,10 +611,17 @@ async function openDialog(id) {
         dlgVideo.classList.remove("hidden");
         dlgVideo.playsInline = true;
         dlgVideo.controls = true;
-        __playVideoWithStableProgress(dlgVideo, url);
-      
-      } else {
-        __stopVideoHard(dlgVideo);
+        __setVideoSrc(dlgVideo, url);
+
+        // 如果 dialog 還沒打開，先記一下，等 showModal() 後再播放，避免第一次 controls 進度條不同步
+        dlgVideo.dataset.__autoplayWhenOpen = "1";
+        if (typeof dlg !== "undefined" && dlg && dlg.open) {
+          dlgVideo.dataset.__autoplayWhenOpen = "0";
+          __playWhenReady(dlgVideo);
+        }} else {
+        try {
+          dlgVideo.pause && dlgVideo.pause();
+        } catch (_) { }
         dlgVideo.classList.add("hidden");
         dlgImg.classList.remove("hidden");
         dlgImg.src = url;
@@ -713,7 +636,6 @@ async function openDialog(id) {
       if (!isVid) {
         // 主圖是照片：直接用當前這張照片做背景
         bgSrc = url;
-      
       } else {
         // 主圖是影片：優先用「這支影片自己的縮圖」
         try {
@@ -723,8 +645,7 @@ async function openDialog(id) {
 
           if (videoThumb) {
             bgSrc = videoThumb;
-          
-      } else {
+          } else {
             // 沒有縮圖時，再退而求其次：用第一張照片當背景
             const firstImage = media.find(u => !isVideoUrl(u));
             bgSrc = firstImage || "";
@@ -779,7 +700,6 @@ async function openDialog(id) {
         const img = document.createElement("img");
         img.src = videoThumb;
         wrapper.appendChild(img);
-      
       } else {
         const v = document.createElement("video");
         v.className = "thumb-video";
@@ -803,8 +723,7 @@ async function openDialog(id) {
       badge.className = "video-badge";
       badge.innerHTML = `<div class="video-badge-inner">${__PLAY_SVG}</div>`;
       wrapper.appendChild(badge);
-    
-      } else {
+    } else {
       const img = document.createElement("img");
       img.src = url;
       wrapper.appendChild(img);
@@ -873,8 +792,7 @@ async function openDialog(id) {
       btSel.value = "";
       resetEditBreedRight();       // 會塞入「請先選擇品種」並 disabled :contentReference[oaicite:8]{index=8}
       updateEditBreedLabel();
-    
-      } else {
+    } else {
       btSel.value = breedType;
       buildEditBreedOptions();     // 右邊會變成可選 + 第一個 option「請選擇」:contentReference[oaicite:9]{index=9}
       updateEditBreedLabel();
@@ -905,6 +823,13 @@ async function openDialog(id) {
   if (!dlg.open) {
     __lockDialogScroll();
     dlg.showModal();
+
+    // 如果主圖是影片：等 dialog 開啟後再 kick 一次 play（避免第一次 controls 進度條不同步）
+    const v = document.getElementById("dlgVideo");
+    if (v && v.dataset.__autoplayWhenOpen === "1") {
+      v.dataset.__autoplayWhenOpen = "0";
+      __playWhenReady(v);
+    }
   }
 }
 
@@ -1013,8 +938,7 @@ async function saveEdit() {
     breed = "品種不詳";
   } else if (rawBreedType === "米克斯") {
     breed = rawBreed ? `米克斯/${rawBreed}` : "米克斯";
-  
-      } else {
+  } else {
     breed = rawBreed || "品種不詳";
   }
 
@@ -1312,16 +1236,14 @@ function __makeEditTile(it) {
         const thumbUrl = path && thumbMap[path];
         if (thumbUrl) {
           v.poster = thumbUrl;
-        
-      } else {
+        } else {
           // 沒有縮圖就用影片本身抓第一幀，避免黑畫面
           __primeThumbVideoFrame(v);
         }
       } catch (_) {
         __primeThumbVideoFrame(v);
       }
-    
-      } else {
+    } else {
       v.src = getEditVideoObjURL(it.file);
 
       // 先抓一幀，確保一開始就有畫面
@@ -1370,7 +1292,6 @@ function __makeEditTile(it) {
 
       if (v.paused || v.ended) {
         await __safePlayVideo(v);
-      
       } else {
         try { v.pause(); } catch (_) { }
       }
@@ -1382,8 +1303,7 @@ function __makeEditTile(it) {
     wrap.appendChild(v);
     wrap.appendChild(overlay);
     mediaEl = v;
-  
-      } else {
+  } else {
     const img = document.createElement("img");
     img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
     img.alt = "預覽";
@@ -1396,8 +1316,7 @@ function __makeEditTile(it) {
 
     if (it.kind === "url") {
       img.src = it.url;
-    
-      } else {
+    } else {
       img.src = PREVIEW_EMPTY_GIF;
       ensurePreviewThumbURL(it.file)
         .then((u) => { img.src = u; })
@@ -2062,3 +1981,11 @@ async function deleteAllUnder(path) {
     else clearState();
   });
 })();
+
+function __forceControlsRefresh(v) {
+  if (!v) return;
+  const had = !!v.controls;
+  try { v.controls = false; } catch (_) { }
+  try { v.controls = had; } catch (_) { }
+  try { void v.offsetHeight; } catch (_) { }
+}

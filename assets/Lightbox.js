@@ -17,6 +17,42 @@ function storagePathFromDownloadUrl(url) {
 
 
 
+// ===============================
+// 影片播放：避免「第一次進 dialog / lightbox 時 controls 進度條不同步」
+// - 不在 display:none 時就 play
+// - 換 src 後先 load，等 loadedmetadata 再 play
+// ===============================
+function __resetVideoEl(v) {
+  if (!v) return;
+  try { v.pause(); } catch (_) { }
+  try { v.removeAttribute("src"); } catch (_) { }
+  try { v.load && v.load(); } catch (_) { }
+}
+
+function __setVideoSrc(v, url) {
+  if (!v) return;
+  __resetVideoEl(v);
+  v.src = url || "";
+  try { v.load && v.load(); } catch (_) { }
+}
+
+function __playWhenReady(v) {
+  if (!v) return;
+  const kick = () => {
+    // 連兩個 RAF：等 DOM/controls 真正顯示後再開播（特別是 iOS / dialog / overlay）
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        try { v.currentTime = 0; } catch (_) { }
+        try { v.play().catch(() => { }); } catch (_) { }
+      });
+    });
+  };
+
+  if (v.readyState >= 1) kick();
+  else v.addEventListener("loadedmetadata", kick, { once: true });
+}
+
+
 // Lightbox 縮圖播放 icon（避免與 Modal.js 的 __PLAY_SVG 命名衝突）
 const __THUMB_PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
 
@@ -71,7 +107,8 @@ function renderLightboxMedia() {
   if (!lbImages.length) {
     if (lbImg) lbImg.src = "";
     if (lbVideo) {
-      __stopVideoHard(lbVideo);
+      try { lbVideo.pause(); } catch (_) { }
+      lbVideo.src = "";
       lbVideo.classList.add("hidden");
     }
     if (lbWrap) lbWrap.classList.remove("lb-video-mode"); // ← 新增
@@ -92,10 +129,15 @@ function renderLightboxMedia() {
       lbVideo.classList.remove("hidden");
       lbVideo.playsInline = true;
       lbVideo.controls = true;
-      __playVideoWithStableProgress(lbVideo, url);
-    
-    } else {
-      __stopVideoHard(lbVideo);
+      __setVideoSrc(lbVideo, url);
+
+      // 若 Lightbox 還沒顯示出來（display:none），先等顯示後再播放，避免 controls 進度條不同步
+      lbVideo.dataset.__autoplayWhenVisible = "1";
+      if (lb && !lb.classList.contains("hidden")) {
+        lbVideo.dataset.__autoplayWhenVisible = "0";
+        __playWhenReady(lbVideo);
+      }} else {
+      try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
       lbVideo.classList.add("hidden");
       lbImg.classList.remove("hidden");
       lbImg.src = url;
@@ -216,8 +258,7 @@ function openLightbox(images, index = 0) {
           const img = document.createElement("img");
           img.src = videoThumb;
           wrapper.appendChild(img);
-        
-    } else {
+        } else {
           const v = document.createElement("video");
           v.className = "thumb-video";
           v.preload = "metadata";
@@ -236,8 +277,7 @@ function openLightbox(images, index = 0) {
         badge.className = "video-badge";
         badge.innerHTML = `<div class="video-badge-inner">${__THUMB_PLAY_SVG}</div>`;
         wrapper.appendChild(badge);
-      
-    } else {
+      } else {
         const img = document.createElement("img");
         img.src = url;
         wrapper.appendChild(img);
@@ -252,9 +292,6 @@ function openLightbox(images, index = 0) {
     });
   }
 
-  // 一開始顯示當前項目
-  renderLightboxMedia();
-
   // 顯示 Lightbox（先顯示，讓 dlg.close() 的 close handler 知道是要切到 Lightbox）
   if (lb) {
     lb.classList.remove("hidden");
@@ -266,6 +303,16 @@ function openLightbox(images, index = 0) {
 
   // 鎖背景（避免底層頁面被捲動）
   lockScroll();
+
+  // 一開始顯示當前項目（等 Lightbox 真正顯示後再 render，避免影片 controls 進度條第一次不同步）
+  requestAnimationFrame(() => {
+    renderLightboxMedia();
+    const v = lbVideo;
+    if (v && v.dataset.__autoplayWhenVisible === "1") {
+      v.dataset.__autoplayWhenVisible = "0";
+      __playWhenReady(v);
+    }
+  });
 }
 // 🔥 關閉 Lightbox：回到 dialog 或直接解鎖
 function closeLightbox() {
@@ -341,8 +388,7 @@ lb?.addEventListener("touchstart", (e) => {
   if (isCurrentLightboxVideo()) {
     // 影片時：上面 80% 可以左右滑，下面 20% 留給進度條
     isSwipeZone = touchStartY < h * 0.8;
-  
-    } else {
+  } else {
     // 圖片時：整個畫面都可以左右滑
     isSwipeZone = true;
   }
@@ -382,3 +428,11 @@ window.openLightbox = openLightbox;
 window.closeLightbox = closeLightbox;
 window.lockScroll = lockScroll;
 window.unlockScroll = unlockScroll;
+
+function __forceControlsRefresh(v) {
+  if (!v) return;
+  const had = !!v.controls;
+  try { v.controls = false; } catch (_) { }
+  try { v.controls = had; } catch (_) { }
+  try { void v.offsetHeight; } catch (_) { }
+}
