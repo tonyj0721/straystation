@@ -24,56 +24,73 @@ function thumbPathFromMediaPath(mediaPath) {
   }
 }
 
+
+
+// ===============================
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
+// ===============================
 function __primeThumbVideoFrame(v) {
   if (!v || v.dataset.__primed === "1") return;
   v.dataset.__primed = "1";
 
-  const seekTo = (t) => {
+  // 保險：確保是靜音 + 行動裝置可 inline 播放
+  try {
+    v.muted = true;
+    v.playsInline = true;
+    v.setAttribute("playsinline", "");
+    v.setAttribute("webkit-playsinline", "");
+    if (!v.preload) v.preload = "metadata";
+    v.disablePictureInPicture = true;
+  } catch (_) { }
+
+  const seekToFrame = () => {
     try {
       const dur = Number.isFinite(v.duration) ? v.duration : 0;
-      if (dur) {
+      let t = 0.05;
+      if (dur && dur > 0.2) {
+        t = Math.min(0.2, dur / 2);
         t = Math.max(0.05, Math.min(t, dur - 0.05));
       }
-      v.currentTime = t;
+      if (!Number.isFinite(v.currentTime) || v.currentTime === 0) {
+        v.currentTime = t;
+      }
     } catch (_) { }
   };
 
-  const playOnce = () => {
+  const tryPlayPause = () => {
     try {
-      v.muted = true;
-      v.playsInline = true;
-      v.setAttribute("playsinline", "");
-      v.setAttribute("webkit-playsinline", "");
-
       const p = v.play();
       if (p && typeof p.then === "function") {
         p.then(() => {
-          setTimeout(() => { try { v.pause(); } catch (_) { } }, 80);
-        }).catch(() => { });
+          // 給瀏覽器一點時間真的畫出畫面
+          setTimeout(() => {
+            try { v.pause(); } catch (_) { }
+          }, 80);
+        }).catch(() => { /* iOS 拒絕也沒關係，只是當作保險 */ });
       }
     } catch (_) { }
   };
 
   const onMeta = () => {
-    seekTo(0.1);
-    playOnce();
+    seekToFrame();
+    tryPlayPause();
+  };
+
+  const onSeeked = () => {
+    tryPlayPause();
   };
 
   v.addEventListener("loadedmetadata", onMeta, { once: true });
+  v.addEventListener("seeked", onSeeked, { once: true });
 
-  if (v.readyState >= 1) {
-    onMeta();
-  }
-
+  // 有些 Safari 事件順序很怪，補一個 timeout 當後援
   setTimeout(() => {
     try {
-      if (v.readyState >= 2 && v.currentTime === 0) {
-        seekTo(0.1);
-        playOnce();
-      }
+      if (v.readyState < 2) return;
+      if (!v.currentTime) seekToFrame();
+      tryPlayPause();
     } catch (_) { }
-  }, 300);
+  }, 200);
 }
 
 function __lockDialogScroll() {
