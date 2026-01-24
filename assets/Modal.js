@@ -74,42 +74,6 @@ function __unlockDialogScroll() {
   try { if (typeof unlockScroll === "function") unlockScroll(); } catch { }
 }
 
-
-// ===============================
-// 影片播放：避免「第一次進 dialog / lightbox 時 controls 進度條不同步」
-// - 不在 display:none 時就 play
-// - 換 src 後先 load，等 loadedmetadata 再 play
-// ===============================
-function __resetVideoEl(v) {
-  if (!v) return;
-  try { v.pause(); } catch (_) { }
-  try { v.removeAttribute("src"); } catch (_) { }
-  try { v.load && v.load(); } catch (_) { }
-}
-
-function __setVideoSrc(v, url) {
-  if (!v) return;
-  __resetVideoEl(v);
-  v.src = url || "";
-  try { v.load && v.load(); } catch (_) { }
-}
-
-function __playWhenReady(v) {
-  if (!v) return;
-  const kick = () => {
-    // 連兩個 RAF：等 DOM/controls 真正顯示後再開播（特別是 iOS / dialog / overlay）
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        try { v.currentTime = 0; } catch (_) { }
-        try { v.play().catch(() => { }); } catch (_) { }
-      });
-    });
-  };
-
-  if (v.readyState >= 1) kick();
-  else v.addEventListener("loadedmetadata", kick, { once: true });
-}
-
 // ===============================
 // 品種資料與「品種/毛色」連動邏輯
 // ===============================
@@ -609,16 +573,11 @@ async function openDialog(id) {
       if (isVid) {
         dlgImg.classList.add("hidden");
         dlgVideo.classList.remove("hidden");
+        dlgVideo.src = url;
         dlgVideo.playsInline = true;
         dlgVideo.controls = true;
-        __setVideoSrc(dlgVideo, url);
-
-        // 如果 dialog 還沒打開，先記一下，等 showModal() 後再播放，避免第一次 controls 進度條不同步
-        dlgVideo.dataset.__autoplayWhenOpen = "1";
-        if (typeof dlg !== "undefined" && dlg && dlg.open) {
-          dlgVideo.dataset.__autoplayWhenOpen = "0";
-          __playWhenReady(dlgVideo);
-        }} else {
+        try { dlgVideo.play().catch(() => { }); } catch (_) { }
+      } else {
         try {
           dlgVideo.pause && dlgVideo.pause();
         } catch (_) { }
@@ -823,13 +782,6 @@ async function openDialog(id) {
   if (!dlg.open) {
     __lockDialogScroll();
     dlg.showModal();
-
-    // 如果主圖是影片：等 dialog 開啟後再 kick 一次 play（避免第一次 controls 進度條不同步）
-    const v = document.getElementById("dlgVideo");
-    if (v && v.dataset.__autoplayWhenOpen === "1") {
-      v.dataset.__autoplayWhenOpen = "0";
-      __playWhenReady(v);
-    }
   }
 }
 
@@ -1981,11 +1933,3 @@ async function deleteAllUnder(path) {
     else clearState();
   });
 })();
-
-function __forceControlsRefresh(v) {
-  if (!v) return;
-  const had = !!v.controls;
-  try { v.controls = false; } catch (_) { }
-  try { v.controls = had; } catch (_) { }
-  try { void v.offsetHeight; } catch (_) { }
-}
