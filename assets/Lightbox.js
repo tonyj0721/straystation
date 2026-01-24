@@ -49,27 +49,6 @@ function __primeThumbVideoFrameLightbox(v) {
   }, 120);
 }
 
-// Lightbox 影片自動播放：等 metadata 再播
-function __autoPlayLbVideoOnceReady(v, url) {
-  if (!v) return;
-  const targetSrc = url;
-
-  const playNow = () => {
-    if (!v || v.src !== targetSrc) return;
-    try { v.currentTime = 0; } catch (_) { }
-    try { v.play().catch(() => { }); } catch (_) { }
-  };
-
-  if (v.readyState >= 1 && !isNaN(v.duration) && v.duration > 0) {
-    playNow();
-  } else {
-    const onMeta = () => {
-      v.removeEventListener("loadedmetadata", onMeta);
-      playNow();
-    };
-    v.addEventListener("loadedmetadata", onMeta);
-  }
-}
 
 history.scrollRestoration = "manual";
 window.scrollTo(0, 0);
@@ -112,11 +91,18 @@ function renderLightboxMedia() {
     if (isVid) {
       lbImg.classList.add("hidden");
       lbVideo.classList.remove("hidden");
+
+      // 換片前先停掉上一支影片
+      try { lbVideo.pause(); } catch (_) {}
+      lbVideo.removeAttribute("src");
+      try { lbVideo.load && lbVideo.load(); } catch (_) {}
+
       lbVideo.src = url;
       lbVideo.playsInline = true;
       lbVideo.controls = true;
-      // ✅ 等 canplay 再播，避免第一次進度條亂跳
-      __autoPlayLbVideoOnceReady(lbVideo, url);
+
+      // 不自動播放，保持在 0 秒
+      try { lbVideo.currentTime = 0; } catch (_) {}
     } else {
       try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
       lbVideo.classList.add("hidden");
