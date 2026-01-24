@@ -74,6 +74,42 @@ function __unlockDialogScroll() {
   try { if (typeof unlockScroll === "function") unlockScroll(); } catch { }
 }
 
+
+// ===============================
+// 影片播放：避免「第一次進 dialog / lightbox 時 controls 進度條不同步」
+// - 不在 display:none 時就 play
+// - 換 src 後先 load，等 loadedmetadata 再 play
+// ===============================
+function __resetVideoEl(v) {
+  if (!v) return;
+  try { v.pause(); } catch (_) { }
+  try { v.removeAttribute("src"); } catch (_) { }
+  try { v.load && v.load(); } catch (_) { }
+}
+
+function __setVideoSrc(v, url) {
+  if (!v) return;
+  __resetVideoEl(v);
+  v.src = url || "";
+  try { v.load && v.load(); } catch (_) { }
+}
+
+function __playWhenReady(v) {
+  if (!v) return;
+  const kick = () => {
+    // 連兩個 RAF：等 DOM/controls 真正顯示後再開播（特別是 iOS / dialog / overlay）
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        try { v.currentTime = 0; } catch (_) { }
+        try { v.play().catch(() => { }); } catch (_) { }
+      });
+    });
+  };
+
+  if (v.readyState >= 1) kick();
+  else v.addEventListener("loadedmetadata", kick, { once: true });
+}
+
 // ===============================
 // 品種資料與「品種/毛色」連動邏輯
 // ===============================
@@ -573,19 +609,16 @@ async function openDialog(id) {
       if (isVid) {
         dlgImg.classList.add("hidden");
         dlgVideo.classList.remove("hidden");
-
-        // 換片前先停掉上一支影片，避免殘留播放 / 進度
-        try { dlgVideo.pause(); } catch (_) {}
-        dlgVideo.removeAttribute("src");
-        try { dlgVideo.load && dlgVideo.load(); } catch (_) {}
-
-        dlgVideo.src = url;
         dlgVideo.playsInline = true;
         dlgVideo.controls = true;
+        __setVideoSrc(dlgVideo, url);
 
-        // 不自動播放，保持在 0 秒，讓使用者自己按播放
-        try { dlgVideo.currentTime = 0; } catch (_) {}
-      } else {
+        // 如果 dialog 還沒打開，先記一下，等 showModal() 後再播放，避免第一次 controls 進度條不同步
+        dlgVideo.dataset.__autoplayWhenOpen = "1";
+        if (typeof dlg !== "undefined" && dlg && dlg.open) {
+          dlgVideo.dataset.__autoplayWhenOpen = "0";
+          __playWhenReady(dlgVideo);
+        }} else {
         try {
           dlgVideo.pause && dlgVideo.pause();
         } catch (_) { }
@@ -618,6 +651,7 @@ async function openDialog(id) {
             bgSrc = firstImage || "";
           }
         } catch (_) {
+          // 萬一解析 path 出錯，就跟上面一樣退回用第一張照片
           const firstImage = media.find(u => !isVideoUrl(u));
           bgSrc = firstImage || "";
         }
@@ -789,6 +823,13 @@ async function openDialog(id) {
   if (!dlg.open) {
     __lockDialogScroll();
     dlg.showModal();
+
+    // 如果主圖是影片：等 dialog 開啟後再 kick 一次 play（避免第一次 controls 進度條不同步）
+    const v = document.getElementById("dlgVideo");
+    if (v && v.dataset.__autoplayWhenOpen === "1") {
+      v.dataset.__autoplayWhenOpen = "0";
+      __playWhenReady(v);
+    }
   }
 }
 
@@ -978,32 +1019,32 @@ async function saveEdit() {
     }
 
     // 刪除被移除的舊圖（忽略刪失敗）
-// 同步刪掉後端產生的縮圖：thumbs/<原路徑去副檔名>.jpg
-// 並清理 Firestore 的 thumbByPath 對應 key（避免越積越多）
-const __thumbFieldDeletes = {};
-for (const url of (removeUrls || [])) {
-  try {
-    const enc = String(url).split("/o/")[1].split("?")[0];
-    const mediaPath = decodeURIComponent(enc);
+    // 同步刪掉後端產生的縮圖：thumbs/<原路徑去副檔名>.jpg
+    // 並清理 Firestore 的 thumbByPath 對應 key（避免越積越多）
+    const __thumbFieldDeletes = {};
+    for (const url of (removeUrls || [])) {
+      try {
+        const enc = String(url).split("/o/")[1].split("?")[0];
+        const mediaPath = decodeURIComponent(enc);
 
-    // 1) 刪原檔
-    await deleteObject(sRef(storage, mediaPath));
+        // 1) 刪原檔
+        await deleteObject(sRef(storage, mediaPath));
 
-    // 2) 若是影片：刪縮圖 + 刪欄位 key
-    if (isVideoUrl(url)) {
-      const tPath = thumbPathFromMediaPath(mediaPath);
-      if (tPath) {
-        try { await deleteObject(sRef(storage, tPath)); } catch (_) { /* ignore */ }
+        // 2) 若是影片：刪縮圖 + 刪欄位 key
+        if (isVideoUrl(url)) {
+          const tPath = thumbPathFromMediaPath(mediaPath);
+          if (tPath) {
+            try { await deleteObject(sRef(storage, tPath)); } catch (_) { /* ignore */ }
+          }
+          __thumbFieldDeletes[`thumbByPath.${mediaPath}`] = deleteField();
+        }
+      } catch (e) {
+        // 靜默忽略
       }
-      __thumbFieldDeletes[`thumbByPath.${mediaPath}`] = deleteField();
     }
-  } catch (e) {
-    // 靜默忽略
-  }
-}
 
-newData.images = newUrls;
-const __updatePayload = { ...newData, ...__thumbFieldDeletes };
+    newData.images = newUrls;
+    const __updatePayload = { ...newData, ...__thumbFieldDeletes };
 
     // ③ 寫回 Firestore
     await updateDoc(doc(db, "pets", currentDocId), __updatePayload);
@@ -1187,12 +1228,31 @@ function __makeEditTile(it) {
 
     if (it.kind === "url") {
       v.src = it.url;
+
+      // 先嘗試用後端產出的縮圖（thumbByPath）
+      try {
+        const path = storagePathFromDownloadUrl(it.url);
+        const thumbMap = window.currentPetThumbByPath || {};
+        const thumbUrl = path && thumbMap[path];
+        if (thumbUrl) {
+          v.poster = thumbUrl;
+        } else {
+          // 沒有縮圖就用影片本身抓第一幀，避免黑畫面
+          __primeThumbVideoFrame(v);
+        }
+      } catch (_) {
+        __primeThumbVideoFrame(v);
+      }
     } else {
       v.src = getEditVideoObjURL(it.file);
-      // 用縮圖當 poster，避免黑畫面
+
+      // 先抓一幀，確保一開始就有畫面
+      __primeThumbVideoFrame(v);
+
+      // 若能產出高品質縮圖就覆蓋上去
       ensurePreviewThumbURL(it.file)
         .then((u) => { v.poster = u; })
-        .catch(() => { /* ignore */ });
+        .catch(() => { /* 失敗就維持第一幀 */ });
     }
 
     const overlay = document.createElement("div");
