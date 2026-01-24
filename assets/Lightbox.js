@@ -173,24 +173,29 @@ $('#dlgClose')?.addEventListener('click', () => {
   dlg?.close();
 });
 
-// 防止使用者按 ESC 或點 backdrop 關掉時，背景卡死
 dlg?.addEventListener('close', () => {
-  // 關掉 dialog 一律先把影片停掉
+  const switchingToLB = !!(lb && lb.classList.contains("flex"));
   const v = document.getElementById("dlgVideo");
+
+  // ✅ 切到 Lightbox：只暫停，不清 src（回來才不用點縮圖重設）
+  if (switchingToLB) {
+    try { v?.pause(); } catch (_) { }
+    return;
+  }
+
+  // ✅ 真正關掉 dialog：才清 src / load，釋放資源
   if (v) {
     try { v.pause(); } catch (_) { }
     v.removeAttribute("src");
     try { v.load && v.load(); } catch (_) { }
   }
 
-  // 如果是切到 Lightbox 才關掉 dialog：不要清 currentPetId、不要解鎖
-  if (lb && lb.classList.contains("flex")) return;
-
   window.currentPetId = null;
   window.currentPetThumbByPath = null;
   history.replaceState(null, '', location.pathname);
   unlockScroll();
 });
+
 
 // 🔥 開啟 Lightbox：關掉 dialog + 維持背景鎖定
 
