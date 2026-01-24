@@ -49,6 +49,27 @@ function __primeThumbVideoFrameLightbox(v) {
   }, 120);
 }
 
+// Lightbox 專用：等 canplay 再自動播放影片
+function __autoPlayLbVideoOnceReady(v, url) {
+  if (!v) return;
+  const targetSrc = url;
+
+  const playNow = () => {
+    if (!v || v.src !== targetSrc) return;
+    try { v.currentTime = 0; } catch (_) { }
+    try { v.play().catch(() => { }); } catch (_) { }
+  };
+
+  if (v.readyState >= 3) {
+    playNow();
+  } else {
+    const onCanPlay = () => {
+      v.removeEventListener("canplay", onCanPlay);
+      playNow();
+    };
+    v.addEventListener("canplay", onCanPlay);
+  }
+}
 
 history.scrollRestoration = "manual";
 window.scrollTo(0, 0);
@@ -94,7 +115,8 @@ function renderLightboxMedia() {
       lbVideo.src = url;
       lbVideo.playsInline = true;
       lbVideo.controls = true;
-      try { lbVideo.play().catch(() => { }); } catch (_) { }
+      // ✅ 等 canplay 再播，避免第一次進度條亂跳
+      __autoPlayLbVideoOnceReady(lbVideo, url);
     } else {
       try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
       lbVideo.classList.add("hidden");

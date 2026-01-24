@@ -65,6 +65,29 @@ function __primeThumbVideoFrame(v) {
   }, 120);
 }
 
+// 影片自動播放：等到 canplay 再 play，避免進度條怪怪的
+function __autoPlayVideoOnceReady(v, url) {
+  if (!v) return;
+  const targetSrc = url;
+
+  const playNow = () => {
+    // 如果期間換片了，就不要播舊的
+    if (!v || v.src !== targetSrc) return;
+    try { v.currentTime = 0; } catch (_) { }
+    try { v.play().catch(() => { }); } catch (_) { }
+  };
+
+  // readyState >= 3 表示 metadata + 畫面都差不多準備好了
+  if (v.readyState >= 3) {
+    playNow();
+  } else {
+    const onCanPlay = () => {
+      v.removeEventListener("canplay", onCanPlay);
+      playNow();
+    };
+    v.addEventListener("canplay", onCanPlay);
+  }
+}
 
 function __lockDialogScroll() {
   try { if (typeof lockScroll === "function") lockScroll(); } catch { }
@@ -576,7 +599,8 @@ async function openDialog(id) {
         dlgVideo.src = url;
         dlgVideo.playsInline = true;
         dlgVideo.controls = true;
-        try { dlgVideo.play().catch(() => { }); } catch (_) { }
+        // ✅ 等 canplay 再 play，避免第一次進度條卡住
+        __autoPlayVideoOnceReady(dlgVideo, url);
       } else {
         try {
           dlgVideo.pause && dlgVideo.pause();
