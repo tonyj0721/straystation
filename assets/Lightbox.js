@@ -175,21 +175,16 @@ $('#dlgClose')?.addEventListener('click', () => {
 
 // 防止使用者按 ESC 或點 backdrop 關掉時，背景卡死
 dlg?.addEventListener('close', () => {
+  // 關掉 dialog 一律先把影片停掉
   const v = document.getElementById("dlgVideo");
-  // 這次 close 是否是為了切到 Lightbox
-  const goingToLightbox = lb && lb.classList.contains("flex");
-
   if (v) {
     try { v.pause(); } catch (_) { }
-    // ✅ 如果是切到 Lightbox，就只暫停，不清 src
-    if (!goingToLightbox) {
-      v.removeAttribute("src");
-      try { v.load && v.load(); } catch (_) { }
-    }
+    v.removeAttribute("src");
+    try { v.load && v.load(); } catch (_) { }
   }
 
-  // 切到 Lightbox 的情況：不要清 state / 不要解鎖 scroll
-  if (goingToLightbox) return;
+  // 如果是切到 Lightbox 才關掉 dialog：不要清 currentPetId、不要解鎖
+  if (lb && lb.classList.contains("flex")) return;
 
   window.currentPetId = null;
   window.currentPetThumbByPath = null;
