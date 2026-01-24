@@ -49,7 +49,7 @@ function __primeThumbVideoFrameLightbox(v) {
   }, 120);
 }
 
-// Lightbox 專用：等 canplay 再自動播放影片
+// Lightbox 影片自動播放：等 metadata 再播
 function __autoPlayLbVideoOnceReady(v, url) {
   if (!v) return;
   const targetSrc = url;
@@ -60,14 +60,14 @@ function __autoPlayLbVideoOnceReady(v, url) {
     try { v.play().catch(() => { }); } catch (_) { }
   };
 
-  if (v.readyState >= 3) {
+  if (v.readyState >= 1 && !isNaN(v.duration) && v.duration > 0) {
     playNow();
   } else {
-    const onCanPlay = () => {
-      v.removeEventListener("canplay", onCanPlay);
+    const onMeta = () => {
+      v.removeEventListener("loadedmetadata", onMeta);
       playNow();
     };
-    v.addEventListener("canplay", onCanPlay);
+    v.addEventListener("loadedmetadata", onMeta);
   }
 }
 

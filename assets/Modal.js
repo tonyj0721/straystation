@@ -65,7 +65,7 @@ function __primeThumbVideoFrame(v) {
   }, 120);
 }
 
-// 影片自動播放：等到 canplay 再 play，避免進度條怪怪的
+// 影片自動播放：等 metadata（包含 duration）準備好再播
 function __autoPlayVideoOnceReady(v, url) {
   if (!v) return;
   const targetSrc = url;
@@ -77,15 +77,15 @@ function __autoPlayVideoOnceReady(v, url) {
     try { v.play().catch(() => { }); } catch (_) { }
   };
 
-  // readyState >= 3 表示 metadata + 畫面都差不多準備好了
-  if (v.readyState >= 3) {
+  // readyState >= 1 且 duration 已知，代表 metadata 好了
+  if (v.readyState >= 1 && !isNaN(v.duration) && v.duration > 0) {
     playNow();
   } else {
-    const onCanPlay = () => {
-      v.removeEventListener("canplay", onCanPlay);
+    const onMeta = () => {
+      v.removeEventListener("loadedmetadata", onMeta);
       playNow();
     };
-    v.addEventListener("canplay", onCanPlay);
+    v.addEventListener("loadedmetadata", onMeta);
   }
 }
 
