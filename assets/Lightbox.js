@@ -50,112 +50,6 @@ function __primeThumbVideoFrameLightbox(v) {
 }
 
 
-
-// ===============================
-// 修正部分瀏覽器/MediaRecorder 產生的 WebM「duration=Infinity」問題
-// 會導致原生控制列進度條卡住/跳動（第一次播放特別明顯）
-// ===============================
-function __ensureFiniteDuration(v, timeoutMs = 2500) {
-  return new Promise((resolve) => {
-    if (!v) return resolve();
-
-    let done = false;
-    const finish = () => {
-      if (done) return;
-      done = true;
-      cleanup();
-      resolve();
-    };
-
-    const cleanup = () => {
-      v.removeEventListener("loadedmetadata", onMeta);
-      v.removeEventListener("durationchange", onDur);
-      v.removeEventListener("timeupdate", onTime);
-      v.removeEventListener("seeked", onSeeked);
-    };
-
-    const isOk = () => Number.isFinite(v.duration) && v.duration > 0;
-
-    const tryFix = () => {
-      if (isOk()) return finish();
-
-      // 部分 WebM（特別是 MediaRecorder 產出）第一次載入時 duration 可能是 Infinity
-      // 透過「seek 到很大的時間」逼瀏覽器解析結尾，拿到正確 duration
-      if (v.duration === Infinity || !Number.isFinite(v.duration) || v.duration === 0) {
-        const wasMuted = v.muted;
-        v.muted = true;
-
-        // 用 seeked/timeupdate 任一個事件都行；不同瀏覽器觸發行為不一致，所以兩個都掛
-        try {
-          v.addEventListener("timeupdate", onTime, { once: true });
-          v.addEventListener("seeked", onSeeked, { once: true });
-          v.currentTime = 1e101;
-        } catch (_) {
-          v.muted = wasMuted;
-          finish();
-          return;
-        }
-
-        // 若事件沒觸發，仍然要保底結束
-        setTimeout(() => {
-          try { v.muted = wasMuted; } catch (_) { }
-          if (isOk()) {
-            try { v.currentTime = 0; } catch (_) { }
-          }
-          finish();
-        }, Math.min(1200, timeoutMs));
-      }
-    };
-
-    const onMeta = () => tryFix();
-    const onDur = () => { if (isOk()) finish(); };
-    const onTime = () => { try { v.currentTime = 0; } catch (_) { } finish(); };
-    const onSeeked = () => { try { v.currentTime = 0; } catch (_) { } finish(); };
-
-    v.addEventListener("loadedmetadata", onMeta, { once: true });
-    v.addEventListener("durationchange", onDur);
-
-    // 可能已經有 metadata 了
-    setTimeout(() => {
-      tryFix();
-      setTimeout(finish, timeoutMs);
-    }, 0);
-  });
-}
-
-function __setVideoSrcAndPlay(v, url) {
-  if (!v) return;
-
-  // 用 token 避免切換媒體時舊的 async 回來把狀態蓋掉
-  const token = String(Date.now()) + "_" + Math.random().toString(16).slice(2);
-  v.dataset.__playToken = token;
-
-  try { v.pause(); } catch (_) { }
-  try {
-    v.removeAttribute("src");
-    v.load && v.load();
-  } catch (_) { }
-
-  v.preload = "metadata";
-  v.playsInline = true;
-  v.setAttribute("playsinline", "");
-  v.setAttribute("webkit-playsinline", "");
-
-  // 先暫時關掉 controls，避免 duration 修正時進度條閃跳
-  v.controls = false;
-
-  v.src = url;
-  try { v.load && v.load(); } catch (_) { }
-
-  __ensureFiniteDuration(v).then(() => {
-    if (v.dataset.__playToken !== token) return;
-    try { v.currentTime = 0; } catch (_) { }
-    v.controls = true;
-    try { v.play().catch(() => { }); } catch (_) { }
-  });
-}
-
-
 history.scrollRestoration = "manual";
 window.scrollTo(0, 0);
 
@@ -177,8 +71,7 @@ function renderLightboxMedia() {
   if (!lbImages.length) {
     if (lbImg) lbImg.src = "";
     if (lbVideo) {
-      try { lbVideo.pause(); } catch (_) { }
-      lbVideo.src = "";
+      __stopVideoHard(lbVideo);
       lbVideo.classList.add("hidden");
     }
     if (lbWrap) lbWrap.classList.remove("lb-video-mode"); // ← 新增
@@ -197,11 +90,12 @@ function renderLightboxMedia() {
     if (isVid) {
       lbImg.classList.add("hidden");
       lbVideo.classList.remove("hidden");
-            __setVideoSrcAndPlay(lbVideo, url);
-} else {
-      try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
-      lbVideo.removeAttribute("src");
-      try { lbVideo.load && lbVideo.load(); } catch (_) { }
+      lbVideo.playsInline = true;
+      lbVideo.controls = true;
+      __playVideoWithStableProgress(lbVideo, url);
+    
+    } else {
+      __stopVideoHard(lbVideo);
       lbVideo.classList.add("hidden");
       lbImg.classList.remove("hidden");
       lbImg.src = url;
@@ -322,7 +216,8 @@ function openLightbox(images, index = 0) {
           const img = document.createElement("img");
           img.src = videoThumb;
           wrapper.appendChild(img);
-        } else {
+        
+    } else {
           const v = document.createElement("video");
           v.className = "thumb-video";
           v.preload = "metadata";
@@ -341,7 +236,8 @@ function openLightbox(images, index = 0) {
         badge.className = "video-badge";
         badge.innerHTML = `<div class="video-badge-inner">${__THUMB_PLAY_SVG}</div>`;
         wrapper.appendChild(badge);
-      } else {
+      
+    } else {
         const img = document.createElement("img");
         img.src = url;
         wrapper.appendChild(img);
@@ -445,7 +341,8 @@ lb?.addEventListener("touchstart", (e) => {
   if (isCurrentLightboxVideo()) {
     // 影片時：上面 80% 可以左右滑，下面 20% 留給進度條
     isSwipeZone = touchStartY < h * 0.8;
-  } else {
+  
+    } else {
     // 圖片時：整個畫面都可以左右滑
     isSwipeZone = true;
   }

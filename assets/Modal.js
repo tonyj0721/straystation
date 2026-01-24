@@ -66,118 +66,131 @@ function __primeThumbVideoFrame(v) {
 }
 
 
-
-// ===============================
-// 修正部分瀏覽器/MediaRecorder 產生的 WebM「duration=Infinity」問題
-// 會導致原生控制列進度條卡住/跳動（第一次播放特別明顯）
-// ===============================
-function __ensureFiniteDuration(v, timeoutMs = 2500) {
-  return new Promise((resolve) => {
-    if (!v) return resolve();
-
-    let done = false;
-    const finish = () => {
-      if (done) return;
-      done = true;
-      cleanup();
-      resolve();
-    };
-
-    const cleanup = () => {
-      v.removeEventListener("loadedmetadata", onMeta);
-      v.removeEventListener("durationchange", onDur);
-      v.removeEventListener("timeupdate", onTime);
-      v.removeEventListener("seeked", onSeeked);
-    };
-
-    const isOk = () => Number.isFinite(v.duration) && v.duration > 0;
-
-    const tryFix = () => {
-      if (isOk()) return finish();
-
-      // 部分 WebM（特別是 MediaRecorder 產出）第一次載入時 duration 可能是 Infinity
-      // 透過「seek 到很大的時間」逼瀏覽器解析結尾，拿到正確 duration
-      if (v.duration === Infinity || !Number.isFinite(v.duration) || v.duration === 0) {
-        const wasMuted = v.muted;
-        v.muted = true;
-
-        // 用 seeked/timeupdate 任一個事件都行；不同瀏覽器觸發行為不一致，所以兩個都掛
-        try {
-          v.addEventListener("timeupdate", onTime, { once: true });
-          v.addEventListener("seeked", onSeeked, { once: true });
-          v.currentTime = 1e101;
-        } catch (_) {
-          v.muted = wasMuted;
-          finish();
-          return;
-        }
-
-        // 若事件沒觸發，仍然要保底結束
-        setTimeout(() => {
-          try { v.muted = wasMuted; } catch (_) { }
-          if (isOk()) {
-            try { v.currentTime = 0; } catch (_) { }
-          }
-          finish();
-        }, Math.min(1200, timeoutMs));
-      }
-    };
-
-    const onMeta = () => tryFix();
-    const onDur = () => { if (isOk()) finish(); };
-    const onTime = () => { try { v.currentTime = 0; } catch (_) { } finish(); };
-    const onSeeked = () => { try { v.currentTime = 0; } catch (_) { } finish(); };
-
-    v.addEventListener("loadedmetadata", onMeta, { once: true });
-    v.addEventListener("durationchange", onDur);
-
-    // 可能已經有 metadata 了
-    setTimeout(() => {
-      tryFix();
-      setTimeout(finish, timeoutMs);
-    }, 0);
-  });
-}
-
-function __setVideoSrcAndPlay(v, url) {
-  if (!v) return;
-
-  // 用 token 避免切換媒體時舊的 async 回來把狀態蓋掉
-  const token = String(Date.now()) + "_" + Math.random().toString(16).slice(2);
-  v.dataset.__playToken = token;
-
-  try { v.pause(); } catch (_) { }
-  try {
-    v.removeAttribute("src");
-    v.load && v.load();
-  } catch (_) { }
-
-  v.preload = "metadata";
-  v.playsInline = true;
-  v.setAttribute("playsinline", "");
-  v.setAttribute("webkit-playsinline", "");
-
-  // 先暫時關掉 controls，避免 duration 修正時進度條閃跳
-  v.controls = false;
-
-  v.src = url;
-  try { v.load && v.load(); } catch (_) { }
-
-  __ensureFiniteDuration(v).then(() => {
-    if (v.dataset.__playToken !== token) return;
-    try { v.currentTime = 0; } catch (_) { }
-    v.controls = true;
-    try { v.play().catch(() => { }); } catch (_) { }
-  });
-}
-
-
 function __lockDialogScroll() {
   try { if (typeof lockScroll === "function") lockScroll(); } catch { }
 }
 
 function __unlockDialogScroll() {
   try { if (typeof unlockScroll === "function") unlockScroll(); } catch { }
+}
+
+
+
+// ===============================
+// 主影片播放：修正 iOS/Safari 首播「進度條不動/亂跳」
+// - 先等 loadedmetadata（拿到 duration）再 play
+// - 若 duration 仍是 0/Infinity/NaN（常見於「未 faststart」的 mp4 或某些串流回應）
+//   退而求其次：把影片整支抓成 Blob，再用 objectURL 播放（確保進度條正常）
+// ===============================
+const __videoBlobUrlCache = new Map(); // url -> objectURL（避免同支影片一直重抓）
+
+function __nextFrame() {
+  return new Promise((r) => requestAnimationFrame(() => r()));
+}
+
+function __waitOnce(el, ev, timeout = 1200) {
+  return new Promise((resolve, reject) => {
+    let done = false;
+    const on = () => {
+      if (done) return;
+      done = true;
+      cleanup();
+      resolve();
+    };
+    const to = setTimeout(() => {
+      if (done) return;
+      done = true;
+      cleanup();
+      reject(new Error("timeout"));
+    }, timeout);
+
+    function cleanup() {
+      clearTimeout(to);
+      try { el.removeEventListener(ev, on); } catch (_) { }
+    }
+
+    try { el.addEventListener(ev, on, { once: true }); } catch (_) { /* ignore */ }
+  });
+}
+
+const __videoTaskToken = new WeakMap();
+function __bumpToken(v) {
+  const t = (__videoTaskToken.get(v) || 0) + 1;
+  __videoTaskToken.set(v, t);
+  return t;
+}
+function __isLatest(v, t) { return (__videoTaskToken.get(v) || 0) === t; }
+
+async function __getVideoBlobUrl(url) {
+  if (__videoBlobUrlCache.has(url)) return __videoBlobUrlCache.get(url);
+
+  // 讓瀏覽器/HTTP cache 幫忙（第二次通常就很快）
+  const res = await fetch(url, { cache: "force-cache" });
+  const blob = await res.blob();
+  const obj = URL.createObjectURL(blob);
+  __videoBlobUrlCache.set(url, obj);
+  return obj;
+}
+
+function __stopVideoHard(v) {
+  if (!v) return;
+  __bumpToken(v); // 讓舊的 async 任務自動失效
+  try { v.pause(); } catch (_) { }
+  try { v.removeAttribute("src"); } catch (_) { }
+  try { v.load && v.load(); } catch (_) { }
+}
+
+async function __playVideoWithStableProgress(v, url) {
+  if (!v || !url) return;
+  const t = __bumpToken(v);
+
+  // 先硬重置（避免 src 切換時 Safari 狀態殘留）
+  try { v.pause(); } catch (_) { }
+  try { v.removeAttribute("src"); } catch (_) { }
+  try { v.load && v.load(); } catch (_) { }
+
+  v.preload = "metadata";
+  v.src = url;
+  try { v.load && v.load(); } catch (_) { }
+
+  // 等一點點讓元素真正出現在畫面上（dialog/lightbox 顯示時 Safari 比較挑）
+  await __nextFrame();
+  await __nextFrame();
+  if (!__isLatest(v, t)) return;
+
+  // 先等 metadata（拿到 duration）
+  try { await __waitOnce(v, "loadedmetadata", 1500); } catch (_) { }
+  if (!__isLatest(v, t)) return;
+
+  // 若 duration 還是不正常，改用 Blob 播放（會先把影片抓完整）
+  const dur = v.duration;
+  const durOk = Number.isFinite(dur) && dur > 0;
+  if (!durOk) {
+    try {
+      const blobUrl = await __getVideoBlobUrl(url);
+      if (!__isLatest(v, t)) return;
+      v.src = blobUrl;
+      try { v.load && v.load(); } catch (_) { }
+      try { await __waitOnce(v, "loadedmetadata", 2500); } catch (_) { }
+    } catch (_) { /* ignore */ }
+  }
+
+  if (!__isLatest(v, t)) return;
+
+  // 刷新一下 UI（有些 Safari 首播 controls 會卡住）
+  try { v.currentTime = 0; } catch (_) { }
+  await __nextFrame();
+  if (!__isLatest(v, t)) return;
+
+  // 開播（若被政策擋住就先靜音）
+  try {
+    await v.play();
+  } catch (_) {
+    try {
+      v.muted = true;
+      await v.play();
+    } catch (_) { }
+  }
 }
 
 // ===============================
@@ -326,7 +339,8 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
         video.requestVideoFrameCallback(cb);
       };
       video.requestVideoFrameCallback(cb);
-    } else {
+    
+      } else {
       const t = setInterval(() => {
         if (video.paused || video.ended) {
           clearInterval(t);
@@ -443,6 +457,7 @@ async function __decodeToBitmap(file) {
       // 等待畫面真正解碼（RVFC 最可靠）
       if (typeof v.requestVideoFrameCallback === "function") {
         await new Promise((res) => v.requestVideoFrameCallback(() => res()));
+      
       } else {
         // readyState >= 2 才有 current frame data
         if (v.readyState < 2) {
@@ -644,9 +659,7 @@ async function openDialog(id) {
       }
 
       if (dlgVideo) {
-        try { dlgVideo.pause(); } catch (_) { }
-        dlgVideo.removeAttribute("src");
-        try { dlgVideo.load && dlgVideo.load(); } catch (_) { }
+        __stopVideoHard(dlgVideo);
         dlgVideo.classList.add("hidden");
       }
 
@@ -680,13 +693,12 @@ async function openDialog(id) {
       if (isVid) {
         dlgImg.classList.add("hidden");
         dlgVideo.classList.remove("hidden");
-              __setVideoSrcAndPlay(dlgVideo, url);
-} else {
-        try {
-          dlgVideo.pause && dlgVideo.pause();
-        } catch (_) { }
-        dlgVideo.removeAttribute("src");
-        try { dlgVideo.load && dlgVideo.load(); } catch (_) { }
+        dlgVideo.playsInline = true;
+        dlgVideo.controls = true;
+        __playVideoWithStableProgress(dlgVideo, url);
+      
+      } else {
+        __stopVideoHard(dlgVideo);
         dlgVideo.classList.add("hidden");
         dlgImg.classList.remove("hidden");
         dlgImg.src = url;
@@ -701,6 +713,7 @@ async function openDialog(id) {
       if (!isVid) {
         // 主圖是照片：直接用當前這張照片做背景
         bgSrc = url;
+      
       } else {
         // 主圖是影片：優先用「這支影片自己的縮圖」
         try {
@@ -710,7 +723,8 @@ async function openDialog(id) {
 
           if (videoThumb) {
             bgSrc = videoThumb;
-          } else {
+          
+      } else {
             // 沒有縮圖時，再退而求其次：用第一張照片當背景
             const firstImage = media.find(u => !isVideoUrl(u));
             bgSrc = firstImage || "";
@@ -765,6 +779,7 @@ async function openDialog(id) {
         const img = document.createElement("img");
         img.src = videoThumb;
         wrapper.appendChild(img);
+      
       } else {
         const v = document.createElement("video");
         v.className = "thumb-video";
@@ -788,7 +803,8 @@ async function openDialog(id) {
       badge.className = "video-badge";
       badge.innerHTML = `<div class="video-badge-inner">${__PLAY_SVG}</div>`;
       wrapper.appendChild(badge);
-    } else {
+    
+      } else {
       const img = document.createElement("img");
       img.src = url;
       wrapper.appendChild(img);
@@ -857,7 +873,8 @@ async function openDialog(id) {
       btSel.value = "";
       resetEditBreedRight();       // 會塞入「請先選擇品種」並 disabled :contentReference[oaicite:8]{index=8}
       updateEditBreedLabel();
-    } else {
+    
+      } else {
       btSel.value = breedType;
       buildEditBreedOptions();     // 右邊會變成可選 + 第一個 option「請選擇」:contentReference[oaicite:9]{index=9}
       updateEditBreedLabel();
@@ -996,7 +1013,8 @@ async function saveEdit() {
     breed = "品種不詳";
   } else if (rawBreedType === "米克斯") {
     breed = rawBreed ? `米克斯/${rawBreed}` : "米克斯";
-  } else {
+  
+      } else {
     breed = rawBreed || "品種不詳";
   }
 
@@ -1294,14 +1312,16 @@ function __makeEditTile(it) {
         const thumbUrl = path && thumbMap[path];
         if (thumbUrl) {
           v.poster = thumbUrl;
-        } else {
+        
+      } else {
           // 沒有縮圖就用影片本身抓第一幀，避免黑畫面
           __primeThumbVideoFrame(v);
         }
       } catch (_) {
         __primeThumbVideoFrame(v);
       }
-    } else {
+    
+      } else {
       v.src = getEditVideoObjURL(it.file);
 
       // 先抓一幀，確保一開始就有畫面
@@ -1350,6 +1370,7 @@ function __makeEditTile(it) {
 
       if (v.paused || v.ended) {
         await __safePlayVideo(v);
+      
       } else {
         try { v.pause(); } catch (_) { }
       }
@@ -1361,7 +1382,8 @@ function __makeEditTile(it) {
     wrap.appendChild(v);
     wrap.appendChild(overlay);
     mediaEl = v;
-  } else {
+  
+      } else {
     const img = document.createElement("img");
     img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
     img.alt = "預覽";
@@ -1374,7 +1396,8 @@ function __makeEditTile(it) {
 
     if (it.kind === "url") {
       img.src = it.url;
-    } else {
+    
+      } else {
       img.src = PREVIEW_EMPTY_GIF;
       ensurePreviewThumbURL(it.file)
         .then((u) => { img.src = u; })
