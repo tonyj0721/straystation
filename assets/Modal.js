@@ -24,70 +24,56 @@ function thumbPathFromMediaPath(mediaPath) {
   }
 }
 
-// ===============================
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
-// ===============================
 function __primeThumbVideoFrame(v) {
   if (!v || v.dataset.__primed === "1") return;
   v.dataset.__primed = "1";
 
-  // 找一個適合當縮圖的時間點
-  const seekToThumbTime = () => {
+  const seekTo = (t) => {
     try {
       const dur = Number.isFinite(v.duration) ? v.duration : 0;
-      let t = 0.05;
-      if (dur && dur > 0.2) {
-        t = Math.min(0.2, dur / 2);
+      if (dur) {
         t = Math.max(0.05, Math.min(t, dur - 0.05));
       }
       v.currentTime = t;
-    } catch (_) { /* ignore */ }
+    } catch (_) { }
   };
 
-  // 真的跑一次「靜音播放 → 暫停」來逼 Safari 解碼畫面
-  const ensurePaint = () => {
-    if (v.dataset.__painted === "1") return;
-    v.dataset.__painted = "1";
-
+  const playOnce = () => {
     try {
+      v.muted = true;
+      v.playsInline = true;
+      v.setAttribute("playsinline", "");
+      v.setAttribute("webkit-playsinline", "");
+
       const p = v.play();
       if (p && typeof p.then === "function") {
         p.then(() => {
-          if (typeof v.requestVideoFrameCallback === "function") {
-            v.requestVideoFrameCallback(() => {
-              try { v.pause(); } catch (_) { }
-            });
-          } else {
-            setTimeout(() => {
-              try { v.pause(); } catch (_) { }
-            }, 60);
-          }
-        }).catch(() => {
-          try { v.pause(); } catch (_) { }
-        });
+          setTimeout(() => { try { v.pause(); } catch (_) { } }, 80);
+        }).catch(() => { });
       }
-    } catch (_) {
-      try { v.pause(); } catch (_) { }
-    }
+    } catch (_) { }
   };
 
-  v.addEventListener("loadedmetadata", () => {
-    seekToThumbTime();
-    ensurePaint();
-  }, { once: true });
+  const onMeta = () => {
+    seekTo(0.1);
+    playOnce();
+  };
 
-  v.addEventListener("seeked", () => {
-    ensurePaint();
-  }, { once: true });
+  v.addEventListener("loadedmetadata", onMeta, { once: true });
 
-  // 保險：metadata 很快就好了 / 我們太晚掛 listener 的情況
+  if (v.readyState >= 1) {
+    onMeta();
+  }
+
   setTimeout(() => {
     try {
-      if (v.readyState < 2) return;
-      if (v.currentTime === 0) seekToThumbTime();
-      ensurePaint();
+      if (v.readyState >= 2 && v.currentTime === 0) {
+        seekTo(0.1);
+        playOnce();
+      }
     } catch (_) { }
-  }, 200);
+  }, 300);
 }
 
 function __lockDialogScroll() {
