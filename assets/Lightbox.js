@@ -25,16 +25,7 @@ function __primeThumbVideoFrameLightbox(v) {
   if (!v || v.dataset.__primed === "1") return;
   v.dataset.__primed = "1";
 
-  try {
-    v.muted = true;
-    v.playsInline = true;
-    v.setAttribute("playsinline", "");
-    v.setAttribute("webkit-playsinline", "");
-    if (!v.preload) v.preload = "metadata";
-    v.disablePictureInPicture = true;
-  } catch (_) { }
-
-  const seekToFrame = () => {
+  const onMeta = () => {
     try {
       const dur = Number.isFinite(v.duration) ? v.duration : 0;
       let t = 0.05;
@@ -42,45 +33,22 @@ function __primeThumbVideoFrameLightbox(v) {
         t = Math.min(0.2, dur / 2);
         t = Math.max(0.05, Math.min(t, dur - 0.05));
       }
-      if (!Number.isFinite(v.currentTime) || v.currentTime === 0) {
-        v.currentTime = t;
-      }
+      v.currentTime = t;
     } catch (_) { }
   };
 
-  const tryPlayPause = () => {
-    try {
-      const p = v.play();
-      if (p && typeof p.then === "function") {
-        p.then(() => {
-          setTimeout(() => {
-            try { v.pause(); } catch (_) { }
-          }, 80);
-        }).catch(() => { });
-      }
-    } catch (_) { }
-  };
-
-  const onMeta = () => {
-    seekToFrame();
-    tryPlayPause();
-  };
-
-  const onSeeked = () => {
-    tryPlayPause();
-  };
+  const onSeeked = () => { try { v.pause(); } catch (_) { } };
 
   v.addEventListener("loadedmetadata", onMeta, { once: true });
   v.addEventListener("seeked", onSeeked, { once: true });
-
   setTimeout(() => {
     try {
       if (v.readyState < 2) return;
-      if (!v.currentTime) seekToFrame();
-      tryPlayPause();
+      if (v.currentTime === 0) v.currentTime = 0.05;
     } catch (_) { }
-  }, 200);
+  }, 120);
 }
+
 
 history.scrollRestoration = "manual";
 window.scrollTo(0, 0);

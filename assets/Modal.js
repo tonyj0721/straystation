@@ -33,17 +33,8 @@ function __primeThumbVideoFrame(v) {
   if (!v || v.dataset.__primed === "1") return;
   v.dataset.__primed = "1";
 
-  // 保險：確保是靜音 + 行動裝置可 inline 播放
-  try {
-    v.muted = true;
-    v.playsInline = true;
-    v.setAttribute("playsinline", "");
-    v.setAttribute("webkit-playsinline", "");
-    if (!v.preload) v.preload = "metadata";
-    v.disablePictureInPicture = true;
-  } catch (_) { }
-
-  const seekToFrame = () => {
+  // 只要能顯示某個 frame 就好：loadedmetadata 後 seek 一下
+  const onMeta = () => {
     try {
       const dur = Number.isFinite(v.duration) ? v.duration : 0;
       let t = 0.05;
@@ -51,47 +42,29 @@ function __primeThumbVideoFrame(v) {
         t = Math.min(0.2, dur / 2);
         t = Math.max(0.05, Math.min(t, dur - 0.05));
       }
-      if (!Number.isFinite(v.currentTime) || v.currentTime === 0) {
-        v.currentTime = t;
-      }
-    } catch (_) { }
-  };
-
-  const tryPlayPause = () => {
-    try {
-      const p = v.play();
-      if (p && typeof p.then === "function") {
-        p.then(() => {
-          // 給瀏覽器一點時間真的畫出畫面
-          setTimeout(() => {
-            try { v.pause(); } catch (_) { }
-          }, 80);
-        }).catch(() => { /* iOS 拒絕也沒關係，只是當作保險 */ });
-      }
-    } catch (_) { }
-  };
-
-  const onMeta = () => {
-    seekToFrame();
-    tryPlayPause();
+      v.currentTime = t;
+    } catch (_) {
+      // ignore
+    }
   };
 
   const onSeeked = () => {
-    tryPlayPause();
+    try { v.pause(); } catch (_) { }
   };
 
   v.addEventListener("loadedmetadata", onMeta, { once: true });
   v.addEventListener("seeked", onSeeked, { once: true });
 
-  // 有些 Safari 事件順序很怪，補一個 timeout 當後援
+  // 有些 Safari 不會立刻解碼畫面：加個保險
   setTimeout(() => {
     try {
       if (v.readyState < 2) return;
-      if (!v.currentTime) seekToFrame();
-      tryPlayPause();
+      // 觸發一次 seek（若上面沒成功）
+      if (v.currentTime === 0) v.currentTime = 0.05;
     } catch (_) { }
-  }, 200);
+  }, 120);
 }
+
 
 function __lockDialogScroll() {
   try { if (typeof lockScroll === "function") lockScroll(); } catch { }
