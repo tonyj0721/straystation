@@ -24,8 +24,6 @@ function thumbPathFromMediaPath(mediaPath) {
   }
 }
 
-
-
 // ===============================
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
 // ===============================
@@ -33,17 +31,8 @@ function __primeThumbVideoFrame(v) {
   if (!v || v.dataset.__primed === "1") return;
   v.dataset.__primed = "1";
 
-  // 保險：確保是靜音 + 行動裝置可 inline 播放
-  try {
-    v.muted = true;
-    v.playsInline = true;
-    v.setAttribute("playsinline", "");
-    v.setAttribute("webkit-playsinline", "");
-    if (!v.preload) v.preload = "metadata";
-    v.disablePictureInPicture = true;
-  } catch (_) { }
-
-  const seekToFrame = () => {
+  // 找一個適合當縮圖的時間點
+  const seekToThumbTime = () => {
     try {
       const dur = Number.isFinite(v.duration) ? v.duration : 0;
       let t = 0.05;
@@ -51,44 +40,52 @@ function __primeThumbVideoFrame(v) {
         t = Math.min(0.2, dur / 2);
         t = Math.max(0.05, Math.min(t, dur - 0.05));
       }
-      if (!Number.isFinite(v.currentTime) || v.currentTime === 0) {
-        v.currentTime = t;
-      }
-    } catch (_) { }
+      v.currentTime = t;
+    } catch (_) { /* ignore */ }
   };
 
-  const tryPlayPause = () => {
+  // 真的跑一次「靜音播放 → 暫停」來逼 Safari 解碼畫面
+  const ensurePaint = () => {
+    if (v.dataset.__painted === "1") return;
+    v.dataset.__painted = "1";
+
     try {
       const p = v.play();
       if (p && typeof p.then === "function") {
         p.then(() => {
-          // 給瀏覽器一點時間真的畫出畫面
-          setTimeout(() => {
-            try { v.pause(); } catch (_) { }
-          }, 80);
-        }).catch(() => { /* iOS 拒絕也沒關係，只是當作保險 */ });
+          if (typeof v.requestVideoFrameCallback === "function") {
+            v.requestVideoFrameCallback(() => {
+              try { v.pause(); } catch (_) { }
+            });
+          } else {
+            setTimeout(() => {
+              try { v.pause(); } catch (_) { }
+            }, 60);
+          }
+        }).catch(() => {
+          try { v.pause(); } catch (_) { }
+        });
       }
-    } catch (_) { }
+    } catch (_) {
+      try { v.pause(); } catch (_) { }
+    }
   };
 
-  const onMeta = () => {
-    seekToFrame();
-    tryPlayPause();
-  };
+  v.addEventListener("loadedmetadata", () => {
+    seekToThumbTime();
+    ensurePaint();
+  }, { once: true });
 
-  const onSeeked = () => {
-    tryPlayPause();
-  };
+  v.addEventListener("seeked", () => {
+    ensurePaint();
+  }, { once: true });
 
-  v.addEventListener("loadedmetadata", onMeta, { once: true });
-  v.addEventListener("seeked", onSeeked, { once: true });
-
-  // 有些 Safari 事件順序很怪，補一個 timeout 當後援
+  // 保險：metadata 很快就好了 / 我們太晚掛 listener 的情況
   setTimeout(() => {
     try {
       if (v.readyState < 2) return;
-      if (!v.currentTime) seekToFrame();
-      tryPlayPause();
+      if (v.currentTime === 0) seekToThumbTime();
+      ensurePaint();
     } catch (_) { }
   }, 200);
 }
