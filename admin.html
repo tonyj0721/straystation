@@ -1070,6 +1070,13 @@
       return p;
     }
 
+    // 產生要上傳用的縮圖 Blob（沿用預覽縮圖流程）
+    async function makeThumbBlobFromFile(file) {
+      const url = await ensureThumbURL(file);
+      const res = await fetch(url);
+      return await res.blob();
+    }
+
     const __previewTileMap = new Map(); // File -> tile element（保留 DOM，避免重畫閃爍）
 
     function __makePreviewTile(file) {
@@ -1412,30 +1419,55 @@
         // 1) 新增基本文件
         const docRef = await addDoc(collection(db, "pets"), payload);
 
-        // 2) 逐張上傳圖片，取得 Storage URL
+        // 2) 逐張上傳圖片，取得 Storage URL + 影片縮圖
         const urls = [];
+        const thumbByPath = {};
         for (const f of selectedFiles) {
           const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
-          const type = wmBlob.type || '';
-          let ext = 'bin';
-          if (type.startsWith('image/')) {
-            ext = type === 'image/png' ? 'png' : 'jpg';
-          } else if (type.startsWith('video/')) {
-            if (type.includes('webm')) ext = 'webm';
-            else if (type.includes('ogg')) ext = 'ogg';
-            else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
-            else ext = 'mp4';
+          const type = wmBlob.type || "";
+          const isVid = type.startsWith("video/");
+          let ext = "bin";
+
+          if (type.startsWith("image/")) {
+            ext = type === "image/png" ? "png" : "jpg";
+          } else if (isVid) {
+            if (type.includes("webm")) ext = "webm";
+            else if (type.includes("ogg")) ext = "ogg";
+            else if (type.includes("mp4") || type.includes("mpeg")) ext = "mp4";
+            else ext = "mp4";
           }
-          const base = f.name.replace(/\.[^.]+$/, '');
-          const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
+
+          const base = f.name.replace(/\.[^.]+$/, "");
+          const stamp = Date.now();
+          const fileBase = `${stamp}_${base}`;
+          const path = `pets/${docRef.id}/${fileBase}.${ext}`;
           const r = sRef(storage, path);
+
           await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
-          urls.push(await getDownloadURL(r));
+          const url = await getDownloadURL(r);
+          urls.push(url);
+
+          // 影片：另外產生並上傳縮圖，寫入 thumbByPath
+          if (isVid) {
+            try {
+              const thumbBlob = await makeThumbBlobFromFile(f);
+              const thumbPath = `pets/${docRef.id}/${fileBase}_feThumb.jpg`;
+              const tRef = sRef(storage, thumbPath);
+              await uploadBytes(tRef, thumbBlob, { contentType: thumbBlob.type || "image/jpeg" });
+              const tUrl = await getDownloadURL(tRef);
+              thumbByPath[path] = tUrl;
+            } catch (e) {
+              console.error("upload thumb (create) failed:", e);
+            }
+          }
         }
 
-        // 3) 回寫 images 欄位
-        if (urls.length) {
-          await updateDoc(doc(db, "pets", docRef.id), { images: urls });
+        // 3) 回寫 images / thumbByPath 欄位
+        const updatePayload = {};
+        if (urls.length) updatePayload.images = urls;
+        if (Object.keys(thumbByPath).length) updatePayload.thumbByPath = thumbByPath;
+        if (Object.keys(updatePayload).length) {
+          await updateDoc(doc(db, "pets", docRef.id), updatePayload);
         }
 
         // UI 收尾

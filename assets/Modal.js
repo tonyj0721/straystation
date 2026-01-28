@@ -462,6 +462,13 @@ function ensurePreviewThumbURL(file) {
   return p;
 }
 
+// 產生要上傳用的縮圖 Blob（沿用預覽縮圖流程）
+async function makeThumbBlobFromFile(file) {
+  const url = await ensurePreviewThumbURL(file);
+  const res = await fetch(url);
+  return await res.blob();
+}
+
 // ===============================
 // 小工具：按鈕上的「…」跳動
 // ===============================
@@ -904,6 +911,9 @@ async function saveEdit() {
   const txt = document.getElementById("saveText");
   const dlg = document.getElementById("petDialog");
 
+  // 先複製一份目前的 thumbByPath（之後會增刪）
+  const thumbByPath = { ...((currentDoc && currentDoc.thumbByPath) || {}) };
+
   // 蒐集欄位
   const name = (document.getElementById("editName").value || "").trim() || "未取名";
 
@@ -975,29 +985,49 @@ async function saveEdit() {
 
       if (it.kind === "file") {
         const f = it.file;
-        const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
-        const type = wmBlob.type || '';
-        let ext = 'bin';
-        if (type.startsWith('image/')) {
-          ext = type === 'image/png' ? 'png' : 'jpg';
-        } else if (type.startsWith('video/')) {
-          if (type.includes('webm')) ext = 'webm';
-          else if (type.includes('ogg')) ext = 'ogg';
-          else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
-          else ext = 'mp4';
+        const wmBlob = await addWatermarkToFile(f);       // ← 先加浮水印
+        const type = wmBlob.type || "";
+        const isVid = type.startsWith("video/");
+        let ext = "bin";
+
+        if (type.startsWith("image/")) {
+          ext = type === "image/png" ? "png" : "jpg";
+        } else if (isVid) {
+          if (type.includes("webm")) ext = "webm";
+          else if (type.includes("ogg")) ext = "ogg";
+          else if (type.includes("mp4") || type.includes("mpeg")) ext = "mp4";
+          else ext = "mp4";
         }
-        const base = f.name.replace(/\.[^.]+$/, '');
-        const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
-        const r = sRef(storage, path);
-        await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
-        newUrls.push(await getDownloadURL(r));
+
+        const base = f.name.replace(/\.[^.]+$/, "");
+        const stamp = Date.now();
+        const fileBase = `${stamp}_${base}`;
+        const mediaPath = `pets/${currentDocId}/${fileBase}.${ext}`;
+        const mediaRef = sRef(storage, mediaPath);
+
+        await uploadBytes(mediaRef, wmBlob, { contentType: wmBlob.type });
+        const mediaUrl = await getDownloadURL(mediaRef);
+        newUrls.push(mediaUrl);
+
+        // 影片：另外產生並上傳縮圖，寫入 thumbByPath
+        if (isVid) {
+          try {
+            const thumbBlob = await makeThumbBlobFromFile(f);
+            const thumbPath = `pets/${currentDocId}/${fileBase}_feThumb.jpg`;
+            const thumbRef = sRef(storage, thumbPath);
+            await uploadBytes(thumbRef, thumbBlob, { contentType: thumbBlob.type || "image/jpeg" });
+            const thumbUrl = await getDownloadURL(thumbRef);
+            thumbByPath[mediaPath] = thumbUrl;
+          } catch (e) {
+            console.error("upload thumb (edit) failed:", e);
+          }
+        }
       }
     }
 
     // 刪除被移除的舊圖（忽略刪失敗）
     // 同步刪掉後端產生的縮圖：thumbs/<原路徑去副檔名>.jpg
-    // 並清理 Firestore 的 thumbByPath 對應 key（避免越積越多）
-    const __thumbFieldDeletes = {};
+    // 以及前端自己產生的縮圖（thumbByPath 指到的那張）
     for (const url of (removeUrls || [])) {
       try {
         const enc = String(url).split("/o/")[1].split("?")[0];
@@ -1008,11 +1038,21 @@ async function saveEdit() {
 
         // 2) 若是影片：刪縮圖 + 刪欄位 key
         if (isVideoUrl(url)) {
+          // 2a) 刪掉前端上傳的縮圖（存在 thumbByPath 裡）
+          const feThumbUrl = thumbByPath[mediaPath];
+          if (feThumbUrl) {
+            const feThumbPath = storagePathFromDownloadUrl(feThumbUrl);
+            if (feThumbPath) {
+              try { await deleteObject(sRef(storage, feThumbPath)); } catch (_) { /* ignore */ }
+            }
+          }
+          delete thumbByPath[mediaPath];
+
+          // 2b) 刪掉後端產生的縮圖（若有）
           const tPath = thumbPathFromMediaPath(mediaPath);
           if (tPath) {
             try { await deleteObject(sRef(storage, tPath)); } catch (_) { /* ignore */ }
           }
-          __thumbFieldDeletes[`thumbByPath.${mediaPath}`] = deleteField();
         }
       } catch (e) {
         // 靜默忽略
@@ -1020,10 +1060,10 @@ async function saveEdit() {
     }
 
     newData.images = newUrls;
-    const __updatePayload = { ...newData, ...__thumbFieldDeletes };
+    newData.thumbByPath = thumbByPath;
 
     // ③ 寫回 Firestore
-    await updateDoc(doc(db, "pets", currentDocId), __updatePayload);
+    await updateDoc(doc(db, "pets", currentDocId), newData);
 
     // ④ 重載列表並同步當前物件
     await loadPets();
