@@ -1458,9 +1458,10 @@
         // 先啟動重新載入列表（避免等到提示結束才開始抓資料）
         const reloadPromise = loadPets();
 
-        // 只針對這次新登錄的這一筆，輪詢 thumbByPath
-        reloadPromise
-          .then(() => waitForThumbByPath(docRef.id))
+        // 登錄完後，針對這次新增的這一筆輪詢 thumbByPath
+        // 10 次、每 1 秒問一次，大概最多等 10 秒，夠 Cloud Function 寫入了
+        const thumbReadyPromise = reloadPromise
+          .then(() => waitForThumbByPath(docRef.id, 10, 1000))
           .catch((e) => {
             console.warn("waitForThumbByPath chain error:", e);
           });
@@ -1478,14 +1479,16 @@
           returnFocus: false, // 避免關閉後把焦點還給原 input 而導致捲動回彈
         }).then(async () => {
           try {
+            // 1) 等列表抓完
             await reloadPromise;
+            // 2) 再多等這筆資料的 thumbByPath 出來（或是 timeout）
+            await thumbReadyPromise;
           } catch (e) {
-            console.error("loadPets error:", e);
+            console.error("loadPets / thumbReady error:", e);
           }
           forceScrollTop(); // ✅ 保證捲到最上面（不會卡在一半）
-          openDialog(docRef.id);
+          openDialog(docRef.id); // 此時 pets 裡這筆已經有 thumbByPath，Modal / Lightbox 會直接用後端縮圖
         });
-
       } catch (err) {
         stopDots();
         submitBtn.disabled = false;
