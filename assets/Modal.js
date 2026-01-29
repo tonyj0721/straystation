@@ -527,7 +527,17 @@ async function openDialog(id) {
   currentDoc = p;
   currentDocId = p.id;
   window.currentPetId = p.id;
-  window.currentPetThumbByPath = p.thumbByPath || {};
+
+  // 後端有 thumbByPath 就用後端的；還沒有的話，就保留前端暫存的那一份
+  const backendThumbMap = p.thumbByPath || {};
+  const hasBackendThumb = backendThumbMap && Object.keys(backendThumbMap).length > 0;
+  if (hasBackendThumb) {
+    window.currentPetThumbByPath = backendThumbMap;
+  } else {
+    const existingThumbMap = window.currentPetThumbByPath || {};
+    window.currentPetThumbByPath = existingThumbMap;
+  }
+
   history.replaceState(null, '', `?pet=${encodeURIComponent(p.id)}`);
 
   // 3. 健康標籤（第二排）
@@ -598,30 +608,18 @@ async function openDialog(id) {
         dlgImg.classList.add("hidden");
         dlgVideo.classList.remove("hidden");
 
-        // 先塞一張縮圖到 poster，避免剛載入時整塊黑畫面
+        // 盡量先塞一張縮圖到 poster，避免剛載入影片時整塊黑畫面
         try {
-          // 後端 thumb（currentPetThumbByPath）優先，其次是這筆資料上帶的 thumbByPath
-          const map = (window.currentPetThumbByPath || p.thumbByPath || {});
+          const map = (window.currentPetThumbByPath || {});
           const videoPath = storagePathFromDownloadUrl(url);
-          let poster = "";
-
-          if (videoPath && map) {
-            poster = map[videoPath] || "";
-          }
-
-          // 如果沒有對應影片縮圖，就退回用第一張照片當 poster
-          if (!poster) {
-            const firstImage = media.find(u => !isVideoUrl(u));
-            poster = firstImage || "";
-          }
-
+          const poster = (videoPath && map) ? (map[videoPath] || "") : "";
           if (poster) {
             dlgVideo.poster = poster;
           } else {
             dlgVideo.removeAttribute("poster");
           }
         } catch (_) {
-          dlgVideo.removeAttribute("poster");
+          try { dlgVideo.removeAttribute("poster"); } catch (_) { }
         }
 
         dlgVideo.src = url;
@@ -635,8 +633,7 @@ async function openDialog(id) {
         dlgVideo.classList.add("hidden");
         dlgImg.classList.remove("hidden");
         dlgImg.src = url;
-        // 切回圖片的時候把 poster 清掉，避免之後狀態亂掉
-        dlgVideo.removeAttribute("poster");
+        try { dlgVideo.removeAttribute("poster"); } catch (_) { }
       }
     } else if (dlgImg) {
       dlgImg.src = url;

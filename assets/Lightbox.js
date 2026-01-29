@@ -121,29 +121,18 @@ function renderLightboxMedia() {
       lbImg.classList.add("hidden");
       lbVideo.classList.remove("hidden");
 
-      // 一樣先把縮圖塞進 poster，避免一打開就是黑畫面
+      // 一樣先塞縮圖到 poster，避免剛進 Lightbox 看到一整塊黑的影片框
       try {
         const map = (window.currentPetThumbByPath || {});
         const videoPath = storagePathFromDownloadUrl(url);
-        let poster = "";
-
-        if (videoPath && map) {
-          poster = map[videoPath] || "";
-        }
-
-        // 沒有影片自己的縮圖，就用第一張照片頂一下
-        if (!poster) {
-          const firstImage = lbImages.find(u => !isVideoUrl(u));
-          poster = firstImage || "";
-        }
-
+        const poster = (videoPath && map) ? (map[videoPath] || "") : "";
         if (poster) {
           lbVideo.poster = poster;
         } else {
           lbVideo.removeAttribute("poster");
         }
       } catch (_) {
-        lbVideo.removeAttribute("poster");
+        try { lbVideo.removeAttribute("poster"); } catch (_) { }
       }
 
       lbVideo.src = url;
@@ -155,7 +144,7 @@ function renderLightboxMedia() {
       lbVideo.classList.add("hidden");
       lbImg.classList.remove("hidden");
       lbImg.src = url;
-      lbVideo.removeAttribute("poster");
+      try { lbVideo.removeAttribute("poster"); } catch (_) { }
     }
   } else if (lbImg) {
     lbImg.src = url;

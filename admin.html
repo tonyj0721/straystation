@@ -1414,14 +1414,16 @@
 
         // 2) 逐張上傳圖片，取得 Storage URL
         const urls = [];
-        const videoUrls = [];
+        const videoFilesForThumb = [];
+        const videoPathsForThumb = [];
         for (const f of selectedFiles) {
           const wmBlob = await addWatermarkToFile(f);       // ← 先加浮水印
           const type = wmBlob.type || '';
+          const isVideo = type.startsWith('video/');
           let ext = 'bin';
           if (type.startsWith('image/')) {
             ext = type === 'image/png' ? 'png' : 'jpg';
-          } else if (type.startsWith('video/')) {
+          } else if (isVideo) {
             if (type.includes('webm')) ext = 'webm';
             else if (type.includes('ogg')) ext = 'ogg';
             else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
@@ -1431,17 +1433,41 @@
           const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
           const r = sRef(storage, path);
           await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
+          const downloadUrl = await getDownloadURL(r);
+          urls.push(downloadUrl);
 
-          const url = await getDownloadURL(r);
-          urls.push(url);
-          if (type.startsWith('video/')) {
-            videoUrls.push(url);
+          // 記下「這支影片」的 Storage path + 對應的 File
+          if (isVideo) {
+            videoFilesForThumb.push(f);
+            videoPathsForThumb.push(path);
           }
         }
 
         // 3) 回寫 images 欄位
         if (urls.length) {
           await updateDoc(doc(db, "pets", docRef.id), { images: urls });
+        }
+
+        // 3.5) 本地先算一次影片縮圖，給等一下自動打開的 Modal / Lightbox 當 poster，
+        // 避免剛打開時先看到整塊黑畫面
+        if (videoFilesForThumb.length) {
+          const localThumbByPath = {};
+          for (let i = 0; i < videoFilesForThumb.length; i++) {
+            const file = videoFilesForThumb[i];
+            const path = videoPathsForThumb[i];
+            try {
+              const u = await ensureThumbURL(file);  // 用你原本的縮圖邏輯抓一張圖
+              if (u) {
+                localThumbByPath[path] = u;
+              }
+            } catch (err) {
+              console.warn("ensureThumbURL(video) failed:", err);
+            }
+          }
+          if (Object.keys(localThumbByPath).length) {
+            window.currentPetThumbByPath = localThumbByPath;
+            window.currentPetId = docRef.id;
+          }
         }
 
         // 4) 順手幫這次上傳的影片預載 metadata，減少第一次打開時的黑幕
