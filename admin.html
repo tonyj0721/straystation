@@ -923,48 +923,36 @@
       renderMediaPreviews();
     });
 
-    // === 修正版拖曳：支援左右拖曳 + 降低閃白 ===
+    // === 回歸原本穩定拖曳邏輯（只改容器與變數）===
     let dragFrom = null;
     let dragOver = null;
     let dragEl = null;
-    let dragStartX = 0;
-    let dragStartY = 0;
-    const DRAG_THRESHOLD = 10;
 
     function clearDragUI() {
-      mediaPreview.querySelectorAll("[data-idx]").forEach(el => {
+      mediaPreview.querySelectorAll("[data-idx]").forEach((el) => {
         el.classList.remove("ring-2", "ring-brand-500", "ring-brand-300", "opacity-80");
       });
     }
 
-    mediaPreview.style.touchAction = "none";
-
     mediaPreview.addEventListener("pointerdown", (e) => {
-      if (e.target.closest("button")) return;
+      if (e.target.closest?.("button")) return;
 
-      const tile = e.target.closest("[data-idx]");
+      const tile = e.target.closest?.("[data-idx]");
       if (!tile) return;
 
       dragEl = tile;
       dragFrom = +tile.dataset.idx;
       dragOver = dragFrom;
-      dragStartX = e.clientX;
-      dragStartY = e.clientY;
 
-      tile.setPointerCapture(e.pointerId);
+      tile.setPointerCapture?.(e.pointerId);
       clearDragUI();
       tile.classList.add("ring-2", "ring-brand-500", "opacity-80");
 
-      e.stopPropagation();
       e.preventDefault();
     });
 
     mediaPreview.addEventListener("pointermove", (e) => {
-      if (dragFrom === null) return;
-
-      const dx = Math.abs(e.clientX - dragStartX);
-      const dy = Math.abs(e.clientY - dragStartY);
-      if (dx < DRAG_THRESHOLD && dy < DRAG_THRESHOLD) return;
+      if (dragFrom == null) return;
 
       const el = document.elementFromPoint(e.clientX, e.clientY);
       const tile = el?.closest?.("[data-idx]");
@@ -977,12 +965,10 @@
       clearDragUI();
       if (dragEl) dragEl.classList.add("ring-2", "ring-brand-500", "opacity-80");
       tile.classList.add("ring-2", "ring-brand-300");
-
-      e.preventDefault();
     });
 
     function finishDrag() {
-      if (dragFrom === null) return;
+      if (dragFrom == null) return;
 
       const from = dragFrom;
       const to = dragOver;
@@ -991,12 +977,13 @@
       dragFrom = dragOver = null;
       dragEl = null;
 
-      if (to !== null && to !== from) {
-        const tmp = selectedMedia[from];
-        selectedMedia[from] = selectedMedia[to];
-        selectedMedia[to] = tmp;
-        renderMediaPreviews();
-      }
+      if (to == null || to === from) return;
+
+      const tmp = selectedMedia[from];
+      selectedMedia[from] = selectedMedia[to];
+      selectedMedia[to] = tmp;
+
+      renderMediaPreviews();
     }
 
     mediaPreview.addEventListener("pointerup", finishDrag);
