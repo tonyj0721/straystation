@@ -1414,8 +1414,9 @@
 
         // 2) 逐張上傳圖片，取得 Storage URL
         const urls = [];
+        const videoUrls = [];
         for (const f of selectedFiles) {
-          const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+          const wmBlob = await addWatermarkToFile(f);       // ← 先加浮水印
           const type = wmBlob.type || '';
           let ext = 'bin';
           if (type.startsWith('image/')) {
@@ -1430,12 +1431,22 @@
           const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
           const r = sRef(storage, path);
           await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
-          urls.push(await getDownloadURL(r));
+
+          const url = await getDownloadURL(r);
+          urls.push(url);
+          if (type.startsWith('video/')) {
+            videoUrls.push(url);
+          }
         }
 
         // 3) 回寫 images 欄位
         if (urls.length) {
           await updateDoc(doc(db, "pets", docRef.id), { images: urls });
+        }
+
+        // 4) 順手幫這次上傳的影片預載 metadata，減少第一次打開時的黑幕
+        if (videoUrls.length) {
+          preloadVideoMetadata(videoUrls);
         }
 
         // UI 收尾
@@ -1489,6 +1500,42 @@
         Swal.fire({ icon: "error", title: "登錄失敗", text: err.message });
       }
     });
+
+    // ===============================
+    // 上傳後，預先載入影片的 metadata，減少第一次打開時的黑幕
+    // ===============================
+    function preloadVideoMetadata(urls) {
+      if (!Array.isArray(urls) || !urls.length) return;
+      try {
+        urls.forEach((url) => {
+          if (!url) return;
+          const v = document.createElement("video");
+          v.preload = "metadata";
+          v.muted = true;
+          v.playsInline = true;
+          v.setAttribute("playsinline", "");
+          v.setAttribute("webkit-playsinline", "");
+          v.controls = false;
+          v.disablePictureInPicture = true;
+          v.src = url;
+
+          // 丟到畫面外面，讓它自己載
+          v.style.position = "fixed";
+          v.style.left = "-9999px";
+          v.style.bottom = "0";
+          v.style.width = "1px";
+          v.style.height = "1px";
+          v.style.opacity = "0";
+          v.setAttribute("data-preload-video", "1");
+          document.body.appendChild(v);
+
+          // 幾秒後自動清掉，避免 DOM 累積太多隱藏元素
+          setTimeout(() => {
+            try { v.remove(); } catch (_) { }
+          }, 15000);
+        });
+      } catch (_) { }
+    }
 
     // ===============================
     // 列表載入 + 搜尋 + 渲染（桌機/手機）
