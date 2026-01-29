@@ -24,6 +24,8 @@ function thumbPathFromMediaPath(mediaPath) {
   }
 }
 
+
+
 // ===============================
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
 // ===============================
@@ -31,8 +33,8 @@ function __primeThumbVideoFrame(v) {
   if (!v || v.dataset.__primed === "1") return;
   v.dataset.__primed = "1";
 
-  // 找一個適合當縮圖的時間點
-  const seekToThumbTime = () => {
+  // 只要能顯示某個 frame 就好：loadedmetadata 後 seek 一下
+  const onMeta = () => {
     try {
       const dur = Number.isFinite(v.duration) ? v.duration : 0;
       let t = 0.05;
@@ -41,54 +43,28 @@ function __primeThumbVideoFrame(v) {
         t = Math.max(0.05, Math.min(t, dur - 0.05));
       }
       v.currentTime = t;
-    } catch (_) { /* ignore */ }
-  };
-
-  // 真的跑一次「靜音播放 → 暫停」來逼 Safari 解碼畫面
-  const ensurePaint = () => {
-    if (v.dataset.__painted === "1") return;
-    v.dataset.__painted = "1";
-
-    try {
-      const p = v.play();
-      if (p && typeof p.then === "function") {
-        p.then(() => {
-          if (typeof v.requestVideoFrameCallback === "function") {
-            v.requestVideoFrameCallback(() => {
-              try { v.pause(); } catch (_) { }
-            });
-          } else {
-            setTimeout(() => {
-              try { v.pause(); } catch (_) { }
-            }, 60);
-          }
-        }).catch(() => {
-          try { v.pause(); } catch (_) { }
-        });
-      }
     } catch (_) {
-      try { v.pause(); } catch (_) { }
+      // ignore
     }
   };
 
-  v.addEventListener("loadedmetadata", () => {
-    seekToThumbTime();
-    ensurePaint();
-  }, { once: true });
+  const onSeeked = () => {
+    try { v.pause(); } catch (_) { }
+  };
 
-  v.addEventListener("seeked", () => {
-    ensurePaint();
-  }, { once: true });
+  v.addEventListener("loadedmetadata", onMeta, { once: true });
+  v.addEventListener("seeked", onSeeked, { once: true });
 
-  // 保險：metadata 很快就好了 / 我們太晚掛 listener 的情況
+  // 有些 Safari 不會立刻解碼畫面：加個保險
   setTimeout(() => {
     try {
       if (v.readyState < 2) return;
-      if (v.currentTime === 0) seekToThumbTime();
-      ensurePaint();
+      // 觸發一次 seek（若上面沒成功）
+      if (v.currentTime === 0) v.currentTime = 0.05;
     } catch (_) { }
-  }, 200);
+  }, 120);
 }
+
 
 function __lockDialogScroll() {
   try { if (typeof lockScroll === "function") lockScroll(); } catch { }
@@ -528,14 +504,12 @@ async function openDialog(id) {
   currentDocId = p.id;
   window.currentPetId = p.id;
 
-  // 後端有 thumbByPath 就用後端的；還沒有的話，就保留前端暫存的那一份
+  // 後端有 thumbByPath 就用後端的；沒有的話，保留這次上傳時暫存的那份（如果有）
   const backendThumbMap = p.thumbByPath || {};
-  const hasBackendThumb = backendThumbMap && Object.keys(backendThumbMap).length > 0;
-  if (hasBackendThumb) {
+  if (backendThumbMap && Object.keys(backendThumbMap).length) {
     window.currentPetThumbByPath = backendThumbMap;
   } else {
-    const existingThumbMap = window.currentPetThumbByPath || {};
-    window.currentPetThumbByPath = existingThumbMap;
+    window.currentPetThumbByPath = window.currentPetThumbByPath || {};
   }
 
   history.replaceState(null, '', `?pet=${encodeURIComponent(p.id)}`);
@@ -608,9 +582,9 @@ async function openDialog(id) {
         dlgImg.classList.add("hidden");
         dlgVideo.classList.remove("hidden");
 
-        // 盡量先塞一張縮圖到 poster，避免剛載入影片時整塊黑畫面
+        // 優先用這支影片自己的縮圖當 poster，避免一開始看到黑畫面
         try {
-          const map = (window.currentPetThumbByPath || {});
+          const map = (window.currentPetThumbByPath || p.thumbByPath || {});
           const videoPath = storagePathFromDownloadUrl(url);
           const poster = (videoPath && map) ? (map[videoPath] || "") : "";
           if (poster) {
@@ -625,7 +599,8 @@ async function openDialog(id) {
         dlgVideo.src = url;
         dlgVideo.playsInline = true;
         dlgVideo.controls = true;
-        try { dlgVideo.play().catch(() => { }); } catch (_) { }
+        // 不自動播放，讓使用者自己按下播放鍵，避免解碼時的黑幕
+        try { dlgVideo.pause && dlgVideo.pause(); } catch (_) { }
       } else {
         try {
           dlgVideo.pause && dlgVideo.pause();

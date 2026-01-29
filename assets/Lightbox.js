@@ -15,6 +15,8 @@ function storagePathFromDownloadUrl(url) {
   }
 }
 
+
+
 // Lightbox 縮圖播放 icon（避免與 Modal.js 的 __PLAY_SVG 命名衝突）
 const __THUMB_PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
 
@@ -23,7 +25,7 @@ function __primeThumbVideoFrameLightbox(v) {
   if (!v || v.dataset.__primed === "1") return;
   v.dataset.__primed = "1";
 
-  const seekToThumbTime = () => {
+  const onMeta = () => {
     try {
       const dur = Number.isFinite(v.duration) ? v.duration : 0;
       let t = 0.05;
@@ -35,49 +37,18 @@ function __primeThumbVideoFrameLightbox(v) {
     } catch (_) { }
   };
 
-  const ensurePaint = () => {
-    if (v.dataset.__painted === "1") return;
-    v.dataset.__painted = "1";
+  const onSeeked = () => { try { v.pause(); } catch (_) { } };
 
-    try {
-      const p = v.play();
-      if (p && typeof p.then === "function") {
-        p.then(() => {
-          if (typeof v.requestVideoFrameCallback === "function") {
-            v.requestVideoFrameCallback(() => {
-              try { v.pause(); } catch (_) { }
-            });
-          } else {
-            setTimeout(() => {
-              try { v.pause(); } catch (_) { }
-            }, 60);
-          }
-        }).catch(() => {
-          try { v.pause(); } catch (_) { }
-        });
-      }
-    } catch (_) {
-      try { v.pause(); } catch (_) { }
-    }
-  };
-
-  v.addEventListener("loadedmetadata", () => {
-    seekToThumbTime();
-    ensurePaint();
-  }, { once: true });
-
-  v.addEventListener("seeked", () => {
-    ensurePaint();
-  }, { once: true });
-
+  v.addEventListener("loadedmetadata", onMeta, { once: true });
+  v.addEventListener("seeked", onSeeked, { once: true });
   setTimeout(() => {
     try {
       if (v.readyState < 2) return;
-      if (v.currentTime === 0) seekToThumbTime();
-      ensurePaint();
+      if (v.currentTime === 0) v.currentTime = 0.05;
     } catch (_) { }
-  }, 200);
+  }, 120);
 }
+
 
 history.scrollRestoration = "manual";
 window.scrollTo(0, 0);
@@ -121,7 +92,7 @@ function renderLightboxMedia() {
       lbImg.classList.add("hidden");
       lbVideo.classList.remove("hidden");
 
-      // 一樣先塞縮圖到 poster，避免剛進 Lightbox 看到一整塊黑的影片框
+      // 優先用這支影片自己的縮圖當 poster，避免一開始看到黑畫面
       try {
         const map = (window.currentPetThumbByPath || {});
         const videoPath = storagePathFromDownloadUrl(url);
@@ -138,7 +109,8 @@ function renderLightboxMedia() {
       lbVideo.src = url;
       lbVideo.playsInline = true;
       lbVideo.controls = true;
-      try { lbVideo.play().catch(() => { }); } catch (_) { }
+      // 不自動播放，讓使用者自己按下播放鍵，避免解碼時的黑幕
+      try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
     } else {
       try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
       lbVideo.classList.add("hidden");

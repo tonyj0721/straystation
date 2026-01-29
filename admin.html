@@ -1414,8 +1414,7 @@
 
         // 2) 逐張上傳圖片，取得 Storage URL
         const urls = [];
-        const videoFilesForThumb = [];
-        const videoPathsForThumb = [];
+        const localThumbByPath = {};
         for (const f of selectedFiles) {
           const wmBlob = await addWatermarkToFile(f);       // ← 先加浮水印
           const type = wmBlob.type || '';
@@ -1423,7 +1422,7 @@
           let ext = 'bin';
           if (type.startsWith('image/')) {
             ext = type === 'image/png' ? 'png' : 'jpg';
-          } else if (isVideo) {
+          } else if (type.startsWith('video/')) {
             if (type.includes('webm')) ext = 'webm';
             else if (type.includes('ogg')) ext = 'ogg';
             else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
@@ -1436,10 +1435,16 @@
           const downloadUrl = await getDownloadURL(r);
           urls.push(downloadUrl);
 
-          // 記下「這支影片」的 Storage path + 對應的 File
+          // 如果是影片，順便把這支影片的本地縮圖記起來，給 Modal / Lightbox 當 poster
           if (isVideo) {
-            videoFilesForThumb.push(f);
-            videoPathsForThumb.push(path);
+            try {
+              const thumbUrl = await ensureThumbURL(f);
+              if (thumbUrl) {
+                localThumbByPath[path] = thumbUrl;
+              }
+            } catch (thumbErr) {
+              console.warn("ensureThumbURL(video) failed:", thumbErr);
+            }
           }
         }
 
@@ -1448,32 +1453,9 @@
           await updateDoc(doc(db, "pets", docRef.id), { images: urls });
         }
 
-        // 3.5) 本地先算一次影片縮圖，給等一下自動打開的 Modal / Lightbox 當 poster，
-        // 避免剛打開時先看到整塊黑畫面
-        if (videoFilesForThumb.length) {
-          const localThumbByPath = {};
-          for (let i = 0; i < videoFilesForThumb.length; i++) {
-            const file = videoFilesForThumb[i];
-            const path = videoPathsForThumb[i];
-            try {
-              const u = await ensureThumbURL(file);  // 用你原本的縮圖邏輯抓一張圖
-              if (u) {
-                localThumbByPath[path] = u;
-              }
-            } catch (err) {
-              console.warn("ensureThumbURL(video) failed:", err);
-            }
-          }
-          if (Object.keys(localThumbByPath).length) {
-            window.currentPetThumbByPath = localThumbByPath;
-            window.currentPetId = docRef.id;
-          }
-        }
-
-        // 4) 順手幫這次上傳的影片預載 metadata，減少第一次打開時的黑幕
-        if (videoUrls.length) {
-          preloadVideoMetadata(videoUrls);
-        }
+        // 把這次上傳產生的縮圖暫存在全域，Modal / Lightbox 可以立刻拿來用
+        window.currentPetId = docRef.id;
+        window.currentPetThumbByPath = localThumbByPath || {};
 
         // UI 收尾
         stopDots();
@@ -1495,19 +1477,11 @@
         // 先啟動重新載入列表（避免等到提示結束才開始抓資料）
         const reloadPromise = loadPets();
 
-        // 登錄完後，針對這次新增的這一筆輪詢 thumbByPath
-        // 10 次、每 1 秒問一次，大概最多等 10 秒，夠 Cloud Function 寫入了
-        const thumbReadyPromise = reloadPromise
-          .then(() => waitForThumbByPath(docRef.id, 10, 1000))
-          .catch((e) => {
-            console.warn("waitForThumbByPath chain error:", e);
-          });
-
         // ★ 登錄完成 → 捲到最上方（先 smooth，最後再硬捲補正）
         window.scrollTo({ top: 0, behavior: "smooth" });
         setTimeout(forceScrollTop, 250); // smooth 途中若被打斷，250ms 後硬捲補正
 
-        // 成功提示後直接打開詳情
+        // 成功提示後直接打開詳情（不用等 reloadPromise 完成，避免卡 1~2 秒）
         Swal.fire({
           icon: "success",
           title: "已成功登錄！",
@@ -1515,10 +1489,10 @@
           timer: 1500,
           returnFocus: false, // 避免關閉後把焦點還給原 input 而導致捲動回彈
         }).then(() => {
-          // 不再 await reloadPromise，列表背景自己更新就好
-          forceScrollTop();
+          forceScrollTop(); // ✅ 保證捲到最上面（不會卡在一半）
           openDialog(docRef.id);
         });
+
       } catch (err) {
         stopDots();
         submitBtn.disabled = false;
@@ -1526,42 +1500,6 @@
         Swal.fire({ icon: "error", title: "登錄失敗", text: err.message });
       }
     });
-
-    // ===============================
-    // 上傳後，預先載入影片的 metadata，減少第一次打開時的黑幕
-    // ===============================
-    function preloadVideoMetadata(urls) {
-      if (!Array.isArray(urls) || !urls.length) return;
-      try {
-        urls.forEach((url) => {
-          if (!url) return;
-          const v = document.createElement("video");
-          v.preload = "metadata";
-          v.muted = true;
-          v.playsInline = true;
-          v.setAttribute("playsinline", "");
-          v.setAttribute("webkit-playsinline", "");
-          v.controls = false;
-          v.disablePictureInPicture = true;
-          v.src = url;
-
-          // 丟到畫面外面，讓它自己載
-          v.style.position = "fixed";
-          v.style.left = "-9999px";
-          v.style.bottom = "0";
-          v.style.width = "1px";
-          v.style.height = "1px";
-          v.style.opacity = "0";
-          v.setAttribute("data-preload-video", "1");
-          document.body.appendChild(v);
-
-          // 幾秒後自動清掉，避免 DOM 累積太多隱藏元素
-          setTimeout(() => {
-            try { v.remove(); } catch (_) { }
-          }, 15000);
-        });
-      } catch (_) { }
-    }
 
     // ===============================
     // 列表載入 + 搜尋 + 渲染（桌機/手機）
@@ -1572,66 +1510,6 @@
       pets.length = 0;
       pets.push(...snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       applyFilterAndRender();
-    }
-
-    // ===============================
-    // 方案 B：只針對「這次新登錄的那一筆」輪詢 thumbByPath
-    // ===============================
-    async function waitForThumbByPath(petId, maxTries = 5, intervalMs = 1500) {
-      if (!petId) return;
-
-      const ref = doc(db, "pets", petId);
-
-      for (let i = 0; i < maxTries; i++) {
-        try {
-          const snap = await getDoc(ref);
-          if (!snap.exists()) break;
-
-          const data = snap.data() || {};
-          const thumbMap = data.thumbByPath;
-
-          // 有拿到 thumbByPath 才算成功
-          if (thumbMap && Object.keys(thumbMap).length) {
-            // 更新本地 pets 陣列
-            const idx = pets.findIndex((p) => p.id === petId);
-            const merged = { id: petId, ...data };
-
-            if (idx >= 0) {
-              pets[idx] = merged;
-            } else {
-              // 理論上不會走到這裡，保險一下
-              pets.unshift(merged);
-            }
-
-            // 用更新後的資料重算列表（會套用目前搜尋關鍵字）
-            applyFilterAndRender();
-
-            // 如果此時 dialog 正好開在這筆，就順便刷新一次內容，
-            // 讓 Modal / Lightbox 的縮圖可以換成後端縮圖
-            try {
-              const dlgEl = document.getElementById("petDialog");
-              if (dlgEl && dlgEl.open && window.currentPetId === petId && typeof openDialog === "function") {
-                await openDialog(petId);
-              }
-            } catch (err) {
-              console.warn("refresh dialog after thumb ready failed:", err);
-            }
-
-            return true;
-          }
-        } catch (err) {
-          console.warn("waitForThumbByPath getDoc error:", err);
-          // 直接跳出，不再重試
-          break;
-        }
-
-        // 還沒生好 → 過一段時間再問一次
-        if (i < maxTries - 1) {
-          await new Promise((r) => setTimeout(r, intervalMs));
-        }
-      }
-
-      return false;
     }
 
     const searchInput = $("#searchName");
@@ -1819,12 +1697,11 @@
 
     // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
     const __THUMB_PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
-
     function __primeThumbVideoFrameAdmin(v) {
       if (!v || v.dataset.__primed === "1") return;
       v.dataset.__primed = "1";
 
-      const seekToThumbTime = () => {
+      const onMeta = () => {
         try {
           const dur = Number.isFinite(v.duration) ? v.duration : 0;
           let t = 0.05;
@@ -1836,48 +1713,15 @@
         } catch (_) { }
       };
 
-      const ensurePaint = () => {
-        if (v.dataset.__painted === "1") return;
-        v.dataset.__painted = "1";
-
-        try {
-          const p = v.play();
-          if (p && typeof p.then === "function") {
-            p.then(() => {
-              if (typeof v.requestVideoFrameCallback === "function") {
-                v.requestVideoFrameCallback(() => {
-                  try { v.pause(); } catch (_) { }
-                });
-              } else {
-                setTimeout(() => {
-                  try { v.pause(); } catch (_) { }
-                }, 60);
-              }
-            }).catch(() => {
-              try { v.pause(); } catch (_) { }
-            });
-          }
-        } catch (_) {
-          try { v.pause(); } catch (_) { }
-        }
-      };
-
-      v.addEventListener("loadedmetadata", () => {
-        seekToThumbTime();
-        ensurePaint();
-      }, { once: true });
-
-      v.addEventListener("seeked", () => {
-        ensurePaint();
-      }, { once: true });
-
+      const onSeeked = () => { try { v.pause(); } catch (_) { } };
+      v.addEventListener("loadedmetadata", onMeta, { once: true });
+      v.addEventListener("seeked", onSeeked, { once: true });
       setTimeout(() => {
         try {
           if (v.readyState < 2) return;
-          if (v.currentTime === 0) seekToThumbTime();
-          ensurePaint();
+          if (v.currentTime === 0) v.currentTime = 0.05;
         } catch (_) { }
-      }, 200);
+      }, 120);
     }
 
     // downloadUrl → Storage path（用於 thumbByPath）
