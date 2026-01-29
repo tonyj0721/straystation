@@ -1419,16 +1419,13 @@
         // 1) 新增基本文件
         const docRef = await addDoc(collection(db, "pets"), payload);
 
-        // 2) 逐張上傳檔案：圖片加浮水印，影片也照你現在的 addWatermarkToFile 流程跑
+        // 2) 逐張上傳檔案：圖片加浮水印，影片直接原檔
         const urls = [];
-        const thumbByPath = {};   // 🔸 這就是剛剛沒宣告而報錯的變數
-
         for (const f of selectedFiles) {
-          // 先加浮水印（你原本就有）
-          const wmBlob = await addWatermarkToFile(f);
-          const type = wmBlob.type || f.type || "";
-          const isVideo = type.startsWith("video/");
+          const isVideo = (f.type || "").startsWith("video/");
+          const blobToUpload = isVideo ? f : await addWatermarkToFile(f);
 
+          const type = blobToUpload.type || f.type || "";
           let ext = "bin";
           if (type.startsWith("image/")) {
             ext = type === "image/png" ? "png" : "jpg";
@@ -1440,45 +1437,18 @@
           }
 
           const base = f.name.replace(/\.[^.]+$/, "");
-          const stamp = Date.now();
-          const fileBase = `${stamp}_${base}`;
-
-          // 原始檔路徑
-          const mediaPath = `pets/${docRef.id}/${fileBase}.${ext}`;
-          const mediaRef = sRef(storage, mediaPath);
-
-          await uploadBytes(mediaRef, wmBlob, {
-            contentType: wmBlob.type || f.type || undefined,
+          const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
+          const r = sRef(storage, path);
+          await uploadBytes(r, blobToUpload, {
+            contentType: blobToUpload.type || f.type || undefined,
           });
-          const mediaUrl = await getDownloadURL(mediaRef);
-          urls.push(mediaUrl);
-
-          // 針對影片：再多做一張縮圖，放在同一個 pets/{petId}/ 資料夾裡
-          if (isVideo) {
-            try {
-              const thumbBlob = await makeThumbBlobFromFile(f); // 用剛剛那個 helper
-              const thumbPath = `pets/${docRef.id}/${fileBase}_feThumb.jpg`;
-              const tRef = sRef(storage, thumbPath);
-              await uploadBytes(tRef, thumbBlob, {
-                contentType: thumbBlob.type || "image/jpeg",
-              });
-              const thumbUrl = await getDownloadURL(tRef);
-
-              // Firestore 的 thumbByPath： key = 原始檔 Storage path, value = 縮圖 URL
-              thumbByPath[mediaPath] = thumbUrl;
-            } catch (e) {
-              console.error("上傳縮圖失敗（前端）:", e);
-            }
-          }
+          const url = await getDownloadURL(r);
+          urls.push(url);
         }
 
-        // 3) 回寫 images / thumbByPath 欄位
-        const updatePayload = {};
-        if (urls.length) updatePayload.images = urls;
-        if (Object.keys(thumbByPath).length) updatePayload.thumbByPath = thumbByPath;
-
-        if (Object.keys(updatePayload).length) {
-          await updateDoc(doc(db, "pets", docRef.id), updatePayload);
+        // 3) 回寫 images 欄位
+        if (urls.length) {
+          await updateDoc(doc(db, "pets", docRef.id), { images: urls });
         }
 
         // UI 收尾
@@ -1486,26 +1456,44 @@
         submitBtn.disabled = false;
         submitText.textContent = "登錄";
 
-        // 清空欄位 & 預覽
-        $("#name").value = "";
-        $("#intro").value = "";
-        $("#fileInput").value = "";
-        selectedFiles = [];
-        imgPreview.innerHTML = "";
-        fileCount.textContent = "已選 0/5 張 最多 5 張";
+        // ★ 清空名字欄位 + 把「已被使用」提示/紅框移除
+        const nameInput = document.getElementById("name");
+        if (nameInput) nameInput.value = "";
+        if (window.resetNameCheck) resetNameCheck();
 
-        // 重新載入列表 + 打開剛新增那筆
-        forceScrollTop();
+        // 重置表單與選擇圖片（先做，避免 DOM 還在變動導致 smooth scroll 卡住）
+        e.target.reset();
+        imgPreview.innerHTML = "";
+        selectedFiles = [];
+        fileCount.textContent = "已選 0 / 5 張";
+        syncBreedSelectors();
+
+        // 先啟動重新載入列表（避免等到提示結束才開始抓資料）
         const reloadPromise = loadPets();
-        reloadPromise.then(() => {
+
+        // ★ 登錄完成 → 捲到最上方（先 smooth，最後再硬捲補正）
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        setTimeout(forceScrollTop, 250); // smooth 途中若被打斷，250ms 後硬捲補正
+
+
+        // 成功提示後直接打開詳情
+        Swal.fire({
+          icon: "success",
+          title: "已成功登錄！",
+          showConfirmButton: false,
+          timer: 1500,
+          returnFocus: false, // 避免關閉後把焦點還給原 input 而導致捲動回彈
+        }).then(async () => {
+          try {
+            await reloadPromise;
+          } catch (e) {
+            console.error("loadPets error:", e);
+          }
+          forceScrollTop(); // ✅ 保證捲到最上面（不會卡在一半）
           openDialog(docRef.id);
-        }).catch((e) => {
-          console.error("loadPets error:", e);
         });
 
       } catch (err) {
-        // 任何錯誤都會跑到這裡，被 Swal 顯示出來
-        console.error("create pet error:", err);
         stopDots();
         submitBtn.disabled = false;
         submitText.textContent = "登錄";
