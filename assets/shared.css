@@ -33,28 +33,14 @@ dialog::backdrop {
 .dlg-thumb {
   width: 70px;
   height: 70px;
+  object-fit: cover;
+  /* 🔥 填滿區域，被裁切也沒關係 */
   background-color: #f3f4f6;
   border-radius: 6px;
   /* 你想多圓都可調整 */
   cursor: pointer;
   opacity: 0.8;
   transition: 0.2s;
-  position: relative;
-  overflow: hidden;
-}
-
-/* 縮圖內容（圖片/影片）都填滿容器 */
-.dlg-thumb>img,
-.dlg-thumb>video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 6px;
-  display: block;
-}
-
-.dlg-thumb>video {
-  background: #000;
 }
 
 .dlg-thumb.active {
@@ -66,26 +52,9 @@ dialog::backdrop {
 #lightbox {
   position: fixed;
   inset: 0;
-
-  align-items: center;
-  justify-content: center;
-  padding-top: 36px;
-  padding-bottom: 86px;
-  box-sizing: border-box;
-
-  --stageW: 100vw;
-}
-
-/* 影片模式：只讓 #lbWrap 自己到底（不影響照片） */
-#lbWrap.lb-video-mode {
-  align-self: flex-end;
-  /* 影片：貼底 */
-}
-
-#lightbox #lbImg,
-#lightbox #lbVideo {
-  max-height: calc(100dvh - 122px);
-  max-width: calc(100vw - 72px);
+  width: 100vw;
+  min-height: 100dvh;
+  -webkit-backdrop-filter: none;
 }
 
 #lbThumbs {
@@ -93,123 +62,36 @@ dialog::backdrop {
   bottom: env(safe-area-inset-bottom);
 }
 
-/* 🔥 Lightbox 縮圖：改用 wrapper（支援影片） */
-.lb-thumb {
-  width: 70px;
-  height: 70px;
+#lbThumbs img {
+  width: 60px;
+  height: 60px;
+  object-fit: contain;
   border-radius: 6px;
   opacity: 0.5;
   cursor: pointer;
   background: #444;
-  position: relative;
-  overflow: hidden;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
 }
 
-.lb-thumb>img,
-.lb-thumb>video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.lb-thumb>video {
-  background: #000;
-}
-
-.lb-thumb.active {
+#lbThumbs img.active {
   opacity: 1;
   border: 2px solid white;
 }
 
-/* 一般列表（手機卡片）的媒體縮圖 wrapper */
-.media-thumb {
-  width: 70px;
-  height: 70px;
-  border-radius: 8px;
-  background: #f3f4f6;
-  position: relative;
-  overflow: hidden;
-  flex: 0 0 auto;
-}
-
-.media-thumb>img,
-.media-thumb>video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.media-thumb>video {
-  background: #000;
-}
-
-/* 影片縮圖：播放圖示（參考圖 4 的圓形播放鍵） */
-.video-badge {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-  z-index: 2;
-}
-
-.video-badge .video-badge-inner {
-  width: 40px;
-  height: 40px;
-  border-radius: 9999px;
-  /* 參考圖 4：偏灰的圓形播放鍵 */
-  background: rgba(156, 163, 175, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.video-badge svg {
-  width: 32px;
-  height: 32px;
-  fill: #fff;
-  margin-left: 2px;
-  display: block;
-}
-
-/* 縮圖影片：不顯示原生控制列 */
-video.thumb-video::-webkit-media-controls,
-video.thumb-video::-webkit-media-controls-panel,
-video.thumb-video::-webkit-media-controls-play-button,
-video.thumb-video::-webkit-media-controls-start-playback-button,
-video.thumb-video::-webkit-media-controls-enclosure {
-  display: none !important;
-  -webkit-appearance: none;
-}
-
-#lbPrev,
-#lbNext {
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 20;
-}
-
 #lbPrev {
-  left: calc(50% - (var(--stageW) / 2) + 9px);
+  left: 0rem;
 }
 
 #lbNext {
-  right: calc(50% - (var(--stageW) / 2) + 9px);
+  right: 0rem;
 }
 
 @media (min-width:768px) {
   #lbPrev {
-    left: calc(50% - (var(--stageW) / 4));
+    left: 2.5rem;
   }
 
   #lbNext {
-    right: calc(50% - (var(--stageW) / 4));
+    right: 2.5rem;
   }
 }
 
@@ -245,141 +127,4 @@ video.thumb-video::-webkit-media-controls-enclosure {
   font-size: 14px;
   font-weight: 600;
   border: none;
-}
-
-/* ===============================
-   新增/編輯模式：影片縮圖播放按鈕（取代原生控制列）
-   =============================== */
-
-/* 中央播放/暫停按鈕（樣式/位置跟截圖一致：圓角矩形 + 半透明底） */
-.media-play-overlay {
-  position: absolute;
-  left: 0px;
-  bottom: 0px;
-  z-index: 10;
-  pointer-events: none;
-  line-height: 0;
-}
-
-.media-play-btn {
-  width: 44px;
-  height: 28px;
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.55);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-  -webkit-tap-highlight-color: transparent;
-  pointer-events: auto;
-}
-
-.media-play-btn:active {
-  transform: scale(0.98);
-}
-
-.media-play-btn svg {
-  width: 21px;
-  height: 21px;
-  fill: #fff;
-  display: block;
-}
-
-/* 影片縮圖本體：不顯示原生控制列 */
-video.video-preview {
-  background: #000;
-}
-
-video.video-preview::-webkit-media-controls,
-video.video-preview::-webkit-media-controls-panel,
-video.video-preview::-webkit-media-controls-play-button,
-video.video-preview::-webkit-media-controls-start-playback-button,
-video.video-preview::-webkit-media-controls-enclosure {
-  display: none !important;
-  -webkit-appearance: none;
-}
-
-/* ===============================
-   iOS/桌機一致：縮圖刪除按鈕（避免 iOS text-size-adjust 影響 rem 尺寸）
-   =============================== */
-
-.preview-remove-btn {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 0;
-  line-height: 0;
-  /* 不走 baseline */
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
-}
-
-.preview-remove-btn svg {
-  width: 14px;
-  height: 14px;
-  display: block;
-}
-
-/* ===============================
-   iOS/桌機一致：Modal / Lightbox 關閉按鈕（使用 SVG，避免字型 ✕ 差異）
-   =============================== */
-
-.ui-close-btn {
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  border: 0;
-  border-radius: 9999px;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 0;
-  -webkit-tap-highlight-color: transparent;
-}
-
-@media (hover:hover) {
-  .ui-close-btn:hover {
-    background: rgba(0, 0, 0, 0.7);
-  }
-}
-
-.ui-close-btn:active {
-  transform: scale(0.98);
-}
-
-.ui-close-icon {
-  width: 18px;
-  height: 18px;
-  display: block;
-}
-
-/* ✅ 只有影片時：往上移，避開 iOS 原生控制列的右上角按鈕 */
-#dlgStageWrap.dlg-video-mode #dlgClose {
-  top: -36px;   /* 你可以調 -30 ~ -48 之間，看最順的距離 */
-  right: 4px;
-}
-
-/* 桌機可稍微少移一點（可選） */
-@media (min-width: 768px) {
-  #dlgStageWrap.dlg-video-mode #dlgClose {
-    top: -30px;
-    right: 0px;
-  }
-}
-
-/* Lightbox：影片時，把關閉按鈕移到影片右邊（紅圈位置附近） */
-#lbWrap.lb-video-mode #lbClose {
-  right: -30px;
-  top: -30px;
-  /* 可以依實際感覺微調 */
-}
-
-/* 桌機寬一點時可以再往右一些 */
-@media (min-width: 768px) {
-  #lbWrap.lb-video-mode #lbClose {
-    right: -36px;
-    top: -36px;
-  }
 }

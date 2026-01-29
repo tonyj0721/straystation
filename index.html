@@ -235,39 +235,28 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 lg:py-20 grid lg:grid-cols-2 items-center gap-10">
       <div>
         <h1 class="text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight">讓牠們回家 🐾<br>找到命中注定的家人</h1>
-        <p class="mt-4 text-lg text-gray-600 dark:text-gray-300">在台中簡媽媽狗園，我們致力於<br>為每一隻貓狗找到安全、穩定、充滿愛的家。</p>
+        <p class="mt-4 text-lg text-gray-600 dark:text-gray-300">在浪浪轉運站，我們與民間中途與收容所合作，為每一隻貓狗找到安全、穩定、充滿愛的家。</p>
         <dl class="mt-8 grid grid-cols-3 gap-4 text-center">
           <div class="p-4 rounded-xl bg-white/70 border border-gray-200">
+            <dt class="text-sm text-gray-500">已成功送養</dt>
+            <dd class="text-xl font-semibold" id="statAdopted">0</dd>
+          </div>
+          <div class="p-4 rounded-xl bg-white/70 border border-gray-200">
             <dt class="text-sm text-gray-500">待領養貓咪</dt>
-            <dd class="mt-1 text-xl font-semibold" id="statCats">0</dd>
-            <p class="mt-2 whitespace-nowrap text-xs text-gray-500">檔案陸續建置中</p>
+            <dd class="text-xl font-semibold" id="statCats">0</dd>
           </div>
           <div class="p-4 rounded-xl bg-white/70 border border-gray-200">
             <dt class="text-sm text-gray-500">待領養狗狗</dt>
-            <dd class="mt-1 text-xl font-semibold" id="statDogs">0</dd>
-            <p class="mt-2 whitespace-nowrap text-xs text-gray-500">檔案陸續建置中</p>
-          </div>
-          <div class="p-4 rounded-xl bg-white/70 border border-gray-200">
-            <dt class="text-sm text-gray-500">歷年以來<br>已成功送養</dt>
-            <dd class="mt-2 text-xl font-semibold" id="statAdopted">0</dd>
+            <dd class="text-xl font-semibold" id="statDogs">0</dd>
           </div>
         </dl>
-        <p class="mt-3 mx-auto max-w-3xl px-4 text-xs leading-relaxed text-gray-500 text-left"
-          style="display:flex; gap:.25rem; align-items:flex-start;">
-          <span style="white-space:nowrap;">註：</span>
-          <span style="min-width:0;">
-            以上數字為「已建檔的送養資料」統計，部分毛孩因年齡、疾病或安置評估暫不送養，實際照護數量超過以上數字。
-          </span>
-        </p>
-
       </div>
       <div class="relative">
         <div class="aspect-[4/3] rounded-3xl overflow-hidden shadow-soft ring-1 ring-gray-200">
           <img src="images/hero-bg.jpg" alt="台中簡媽媽狗園" class="w-full h-full object-cover" loading="lazy">
         </div>
         <div
-          class="absolute -bottom-6 bg-white rounded-2xl shadow-soft ring-1 ring-gray-200 p-4 flex items-center gap-3"
-          style="left: -0.7rem;">
+          class="absolute -bottom-6 -left-6 bg-white rounded-2xl shadow-soft ring-1 ring-gray-200 p-4 flex items-center gap-3">
           <span class="text-2xl">🎉</span>
           <div class="text-sm">
             <p class="font-semibold">這週 <span id="statWeeklyAdopted">0</span> 位毛孩找到新家</p>
@@ -335,28 +324,19 @@
     <div class="mt-6 grid md:grid-cols-2 gap-6">
       <details class="p-4 rounded-xl bg-white border border-gray-200">
         <summary class="font-medium cursor-pointer">認養流程需要多久？</summary>
-        <p class="mt-2 text-gray-600">通常 1 ～ 2 週內會完成基本訪談。<br><br>
-          我們會將您的認養資料提交給理事長和簡媽審閱，並由他們選出最適合的認養人喔。<br><br>
-          有意認養的朋友請耐心等候，我們非常感謝您的支持與愛心。</p>
+        <p class="mt-2 text-gray-600">通常 1–2 週，包含基本面談、家訪與試養期。我們會確保雙方都準備好。</p>
       </details>
       <details class="p-4 rounded-xl bg-white border border-gray-200">
-        <summary class="font-medium cursor-pointer">我可以先到園區看狗狗/貓咪再決定認養嗎？</summary>
-        <p class="mt-2 text-gray-600">若您都符合我們的認養條件也同意我們的認養要求，才會與您約時間和毛孩進行當面認養程序喔！<br><br>
-          我們會確保雙方都準備好，再將毛孩託付給您。<br><br>
-          互動當天若評估彼此不適合，可當場取消認養程序，雙方的契合度是我們最首要的考量。</p>
+        <summary class="font-medium cursor-pointer">可以跨縣市認養嗎？</summary>
+        <p class="mt-2 text-gray-600">可以，但需評估交通與後續回診等安排，並視中途/機構規定調整。</p>
       </details>
       <details class="p-4 rounded-xl bg-white border border-gray-200">
         <summary class="font-medium cursor-pointer">領養需要費用嗎？</summary>
-        <p class="mt-2 text-gray-600">園區認養費用說明</p><br>
-        <p class="bg-sky-50 text-sky-700">
-          10 公斤以下公犬 $4000<br>
-          10 公斤以下母犬 $5000<br>
-          皆包含：結紮手術、4合1快篩血檢、8合一疫苗、狂犬疫苗、體內外驅蟲、晶片移轉費<br>
-          （若體重超過 10 公斤之大型犬，因麻醉劑量需依體重調整，將酌收 1000 元之藥劑加價。）</p><br>
-        <p class="bg-emerald-50 text-emerald-700">
-          公貓 $4400<br>
-          母貓 $5000<br>
-          皆包含：結紮手術、白血愛滋快篩、預防針、狂犬疫苗、體內外驅蟲、晶片轉移費</p>
+        <p class="mt-2 text-gray-600">視每隻動物的結紮、健康狀況而定。</p>
+      </details>
+      <details class="p-4 rounded-xl bg-white border border-gray-200">
+        <summary class="font-medium cursor-pointer">是否提供晶片登記與結紮補助？</summary>
+        <p class="mt-2 text-gray-600">部分合作機構提供，依地區不同，請聯繫我們了解詳情。</p>
       </details>
     </div>
   </section>
@@ -380,26 +360,20 @@
     <div class="bg-white">
       <!-- 新增：與下方縮圖 p-3 對齊 -->
       <div class="px-3 pt-2">
-        <p id="dlgHint" class="text-center text-sm text-gray-500 mb-1">點主圖可放大</p>
-        <div id="dlgStageWrap" class="relative">
-          <div class="relative aspect-video bg-gray-100 overflow-hidden rounded-lg">
-            <!-- 只模糊這張背景圖 -->
-            <img id="dlgBg" aria-hidden="true" class="absolute inset-0 w-full h-full object-cover blur-md scale-110">
+        <p class="text-center text-xs text-gray-500 mb-1">點主圖可放大</p>
+        <div class="relative aspect-video bg-gray-100 overflow-hidden rounded-lg">
+          <!-- 只模糊這張背景圖 -->
+          <img id="dlgBg" aria-hidden="true" class="absolute inset-0 w-full h-full object-cover blur-md scale-110">
 
-            <!-- 可選：柔化一下背景，沒有加任何 blur -->
-            <div class="absolute inset-0 bg-white/20"></div>
+          <!-- 可選：柔化一下背景，沒有加任何 blur -->
+          <div class="absolute inset-0 bg-white/20"></div>
 
-            <!-- 主圖在最上層，沒有 blur -->
-            <img id="dlgImg" alt="毛孩照片"
-              class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg">
-            <video id="dlgVideo" playsinline controls
-              class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg hidden"></video>
-          </div>
+          <!-- 主圖在最上層，沒有 blur -->
+          <img id="dlgImg" alt="毛孩照片"
+            class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg">
 
-          <button id="dlgClose" class="ui-close-btn absolute top-1 right-1 z-20" aria-label="關閉"><svg
-              viewBox="0 0 24 24" aria-hidden="true" focusable="false" class="ui-close-icon">
-              <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
-            </svg></button>
+          <button id="dlgClose" class="absolute top-1 right-1 z-20 bg-black/60 text-white p-2 rounded-full leading-none"
+            aria-label="關閉">✕</button>
         </div>
       </div>
 
@@ -533,10 +507,10 @@
           </div>
 
           <div>
-            <input id="editFiles" type="file" accept="image/*,video/*" multiple class="sr-only" />
+            <input id="editFiles" type="file" accept="image/*" multiple class="sr-only" />
             <div class="flex items-center gap-3">
               <button id="btnPickEdit" type="button"
-                class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增照片／影片</button>
+                class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增照片</button>
               <span id="editCount" class="text-xs text-gray-500"></span>
               <span class="text-sm text-gray-400">最多 5 張</span>
             </div>
@@ -598,18 +572,15 @@
   <!-- Lightbox -->
   <div id="lightbox" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[9999]">
     <div id="lbWrap" class="relative inline-block">
-      <img id="lbImg" class="object-contain rounded-lg" />
-      <video id="lbVideo" playsinline controls class="object-contain rounded-lg hidden"></video>
-      <button id="lbClose" class="ui-close-btn absolute top-1 right-1 z-10" aria-label="關閉"><svg viewBox="0 0 24 24"
-          aria-hidden="true" focusable="false" class="ui-close-icon">
-          <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
-        </svg></button>
-      <button id="lbPrev" class="absolute text-white text-4xl select-none">❮</button>
-      <button id="lbNext" class="absolute text-white text-4xl select-none">❯</button>
+      <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg" />
+      <button id="lbClose" class="absolute top-1 right-1 z-10 bg-black/60 hover:bg-black/70 text-white rounded-full p-2
+           text-2xl leading-none select-none" aria-label="關閉">✕</button>
     </div>
     <div id="lbThumbs" class="absolute w-full flex justify-center px-4 py-2">
-      <div id="lbThumbsInner" class="flex gap-2"></div>
+      <div id="lbThumbsInner" class="flex gap-3"></div>
     </div>
+    <button id="lbPrev" class="absolute text-white text-4xl select-none">❮</button>
+    <button id="lbNext" class="absolute text-white text-4xl select-none">❯</button>
   </div>
 
   <script src="./assets/firebase-config.js"></script>
@@ -836,7 +807,7 @@
     });
 
     // 統計起始基數（已成功送養、待領養貓咪、待領養狗狗）
-    const STATS_BASE = { adopted: 200, cats: 0, dogs: 0 };
+    const STATS_BASE = { adopted: 1021, cats: 89, dogs: 743 };
     const pets = (window.pets ||= []);
     let currentPetId = null;
 
@@ -860,9 +831,9 @@
           const eladopted = document.getElementById('statAdopted');
           const elCats = document.getElementById('statCats');
           const elDogs = document.getElementById('statDogs');
-          if (eladopted) { eladopted.innerHTML = `${adopted.toLocaleString()} <span style="position:relative; top:-0.12em;">↑</span>`; }
-          if (elCats) elCats.textContent = cats.toLocaleString() + ' +';
-          if (elDogs) elDogs.textContent = dogs.toLocaleString() + ' +';
+          if (eladopted) eladopted.textContent = adopted.toLocaleString();
+          if (elCats) elCats.textContent = cats.toLocaleString();
+          if (elDogs) elDogs.textContent = dogs.toLocaleString();
         } catch (err) {
           console.error('applyStats error:', err);
         }
@@ -881,86 +852,14 @@
       if (hit) openDialog(hit.id);
     }
 
-    
-    // ===== Video thumbnail helpers (backend thumbs + play badge) =====
-    const __THUMB_PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
-
-    function isVideoUrl(url) {
-      if (!url) return false;
-      const u = String(url).split("?", 1)[0];
-      return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
-    }
-
-    // downloadUrl → Storage path（用於 thumbByPath）
-    function storagePathFromDownloadUrl(url) {
-      try {
-        const p = String(url || "").split("/o/")[1].split("?")[0];
-        return decodeURIComponent(p);
-      } catch (_) {
-        return "";
-      }
-    }
-
-    // 影片縮圖（後端縮圖還沒產出時的備援）：seek 到前面一點顯示第一幀
-    function __primeThumbVideoFrame(v) {
-      if (!v || v.dataset.__primed === "1") return;
-      v.dataset.__primed = "1";
-
-      const onMeta = () => {
-        try {
-          const dur = Number.isFinite(v.duration) ? v.duration : 0;
-          let t = 0.05;
-          if (dur && dur > 0.2) {
-            t = Math.min(0.2, dur / 2);
-            t = Math.max(0.05, Math.min(t, dur - 0.05));
-          }
-          v.currentTime = t;
-        } catch (_) { }
-      };
-
-      const onSeeked = () => { try { v.pause(); } catch (_) { } };
-      v.addEventListener("loadedmetadata", onMeta, { once: true });
-      v.addEventListener("seeked", onSeeked, { once: true });
-
-      setTimeout(() => {
-        try {
-          if (v.readyState < 2) return;
-          if (v.currentTime === 0) v.currentTime = 0.05;
-        } catch (_) { }
-      }, 120);
-    }
-
     function createCardHTML(p) {
       const imgs = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
       const img = imgs[0] || '';
-
-      const mediaUrl = img;
-      const isVid = isVideoUrl(mediaUrl);
-      const videoPath = isVid ? storagePathFromDownloadUrl(mediaUrl) : "";
-      const videoThumb = (isVid && p.thumbByPath && videoPath) ? (p.thumbByPath[videoPath] || "") : "";
-
-      const coverHTML = isVid
-        ? (videoThumb
-          ? `
-            <div class="blur-fit rounded-t-2xl aspect-[4/3]" style="--bg: url('${videoThumb}')">
-              <img src="${videoThumb}" alt="${p.name}">
-              <div class="video-badge"><div class="video-badge-inner">${__THUMB_PLAY_SVG}</div></div>
-            </div>
-          `
-          : `
-            <div class="relative rounded-t-2xl aspect-[4/3] overflow-hidden bg-gray-100">
-              <video class="thumb-video w-full h-full object-cover" preload="metadata" muted playsinline webkit-playsinline disablepictureinpicture src="${mediaUrl}"></video>
-              <div class="video-badge"><div class="video-badge-inner">${__THUMB_PLAY_SVG}</div></div>
-            </div>
-          `)
-        : `
-            <div class="blur-fit rounded-t-2xl aspect-[4/3]" style="--bg: url('${mediaUrl}')">
-              <img src="${mediaUrl}" alt="${p.name}">
-            </div>
-          `;
       return `
         <article class="group rounded-2xl overflow-hidden ring-1 ring-gray-200 bg-white hover:shadow-soft transition-shadow snap-start">
-          ${coverHTML}
+          <div class="blur-fit rounded-t-2xl aspect-[4/3]" style="--bg: url('${img}')">
+            <img src="${img}" alt="${p.name}">
+          </div>
           <div class="p-4 flex-1 flex flex-col">
             <!-- 第一行：左邊名字、右上角圓角標籤 -->
             <div class="flex items-start justify-between gap-2">
@@ -1052,7 +951,6 @@
       // 桌機版：3 排（每排 4 張）
       renderDesktopRows(cats, dogs);
       renderMobileColumns(cats, dogs);
-      document.querySelectorAll("video.thumb-video").forEach((v) => __primeThumbVideoFrame(v));
       bindDetailButtons();
 
       openFromDeepLink();
@@ -1163,25 +1061,8 @@
       );
 
       const n = snap.data().count || 0;
-
       const el = document.getElementById("statWeeklyAdopted");
-      const titleP = el?.closest("p");                 // 第一行
-      const subtitleP = titleP?.nextElementSibling;    // 第二行（灰字那行）
-
-      if (!titleP || !subtitleP) return;
-
-      // 確保第二行是灰字（就算你之後改到 class 也能補回來）
-      subtitleP.classList.add("text-gray-500");
-
-      if (n === 0) {
-        // n = 0
-        titleP.textContent = "這週持續媒合中，謝謝您願意看看牠們";
-        subtitleP.textContent = "也謝謝每位辛苦的志工";
-      } else {
-        // n > 0
-        titleP.innerHTML = `這週 <span id="statWeeklyAdopted">${n.toLocaleString()}</span> 位毛孩找到新家`;
-        subtitleP.textContent = "感謝每位認養人與辛苦的志工";
-      }
+      if (el) el.textContent = n.toLocaleString();
     }
     window.loadPets = loadPets;
     loadPets();

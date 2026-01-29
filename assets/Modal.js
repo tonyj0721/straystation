@@ -1,182 +1,5 @@
 const q = (sel) => document.querySelector(sel);
 
-function isVideoUrl(url) {
-  if (!url) return false;
-  const u = String(url).split("?", 1)[0];
-  return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
-}
-
-function storagePathFromDownloadUrl(url) {
-  try {
-    const p = String(url).split("/o/")[1].split("?")[0];
-    return decodeURIComponent(p);
-  } catch (_) {
-    return "";
-  }
-}
-
-function thumbPathFromMediaPath(mediaPath) {
-  try {
-    const noExt = String(mediaPath).replace(/\.[^.]+$/i, "");
-    return `thumbs/${noExt}.jpg`;
-  } catch (_) {
-    return "";
-  }
-}
-
-// ===============================
-// 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
-// ===============================
-function __primeThumbVideoFrame(v) {
-  if (!v || v.dataset.__primed === "1") return;
-  v.dataset.__primed = "1";
-
-  // 找一個適合當縮圖的時間點
-  const seekToThumbTime = () => {
-    try {
-      const dur = Number.isFinite(v.duration) ? v.duration : 0;
-      let t = 0.05;
-      if (dur && dur > 0.2) {
-        t = Math.min(0.2, dur / 2);
-        t = Math.max(0.05, Math.min(t, dur - 0.05));
-      }
-      v.currentTime = t;
-    } catch (_) { /* ignore */ }
-  };
-
-  // 真的跑一次「靜音播放 → 暫停」來逼 Safari 解碼畫面
-  const ensurePaint = () => {
-    if (v.dataset.__painted === "1") return;
-    v.dataset.__painted = "1";
-
-    try {
-      const p = v.play();
-      if (p && typeof p.then === "function") {
-        p.then(() => {
-          if (typeof v.requestVideoFrameCallback === "function") {
-            v.requestVideoFrameCallback(() => {
-              try { v.pause(); } catch (_) { }
-            });
-          } else {
-            setTimeout(() => {
-              try { v.pause(); } catch (_) { }
-            }, 60);
-          }
-        }).catch(() => {
-          try { v.pause(); } catch (_) { }
-        });
-      }
-    } catch (_) {
-      try { v.pause(); } catch (_) { }
-    }
-  };
-
-  v.addEventListener("loadedmetadata", () => {
-    seekToThumbTime();
-    ensurePaint();
-  }, { once: true });
-
-  v.addEventListener("seeked", () => {
-    ensurePaint();
-  }, { once: true });
-
-  // 保險：metadata 很快就好了 / 我們太晚掛 listener 的情況
-  setTimeout(() => {
-    try {
-      if (v.readyState < 2) return;
-      if (v.currentTime === 0) seekToThumbTime();
-      ensurePaint();
-    } catch (_) { }
-  }, 200);
-}
-
-
-// ===============================
-// 自訂影片控制列：進度條 + 自動播放
-// ===============================
-function __attachCustomVideoControls(video, opts) {
-  if (!video || video.__hasCustomControls) return;
-  video.__hasCustomControls = true;
-
-  // 關掉原生控制列，避免原生進度條狀態不穩
-  video.controls = false;
-
-  // 建立簡單的進度條（使用 <input type="range">）
-  const parent = video.parentElement || video;
-  const wrap = document.createElement("div");
-  wrap.className = "custom-video-controls mt-2";
-  const range = document.createElement("input");
-  range.type = "range";
-  range.min = "0";
-  range.max = "1000";
-  range.step = "1";
-  range.value = "0";
-  range.className = "w-full";
-  wrap.appendChild(range);
-  parent.appendChild(wrap);
-
-  video.__progressEl = range;
-
-  let seeking = false;
-
-  // 影片播放時更新進度條
-  video.addEventListener("timeupdate", () => {
-    if (seeking) return;
-    if (!Number.isFinite(video.duration) || video.duration <= 0) return;
-    try {
-      const v = Math.max(0, Math.min(1000, Math.round(video.currentTime / video.duration * 1000)));
-      range.value = String(v);
-    } catch (_) {}
-  });
-
-  // metadata 準備好時，重設進度條
-  video.addEventListener("loadedmetadata", () => {
-    range.value = "0";
-  });
-
-  // 播放完就把進度條填滿
-  video.addEventListener("ended", () => {
-    range.value = "1000";
-  });
-
-  // 使用者拖曳/點擊進度條時，改變 currentTime
-  const onChange = () => {
-    if (!Number.isFinite(video.duration) || video.duration <= 0) return;
-    seeking = true;
-    try {
-      const ratio = Math.max(0, Math.min(1, Number(range.value) / 1000));
-      video.currentTime = ratio * video.duration;
-    } catch (_) {} finally {
-      seeking = false;
-    }
-  };
-  range.addEventListener("input", onChange);
-  range.addEventListener("change", onChange);
-
-  // 如果需要自動播放，等 metadata 好了再播（避免一開始進度錯亂）
-  if (opts && opts.autoPlayOnReady) {
-    const tryPlay = () => {
-      if (!video || video.paused === false) return;
-      try {
-        const p = video.play();
-        if (p && typeof p.then === "function") {
-          p.catch(() => {});
-        }
-      } catch (_) {}
-    };
-
-    if (video.readyState >= 1 && Number.isFinite(video.duration) && video.duration > 0) {
-      tryPlay();
-    } else {
-      const onMeta = () => {
-        video.removeEventListener("loadedmetadata", onMeta);
-        tryPlay();
-      };
-      video.addEventListener("loadedmetadata", onMeta);
-    }
-  }
-}
-
 function __lockDialogScroll() {
   try { if (typeof lockScroll === "function") lockScroll(); } catch { }
 }
@@ -208,36 +31,7 @@ const BREEDS = {
 };
 
 // 產生帶浮水印的 Blob（細字、無外框、疏一點）
-function __drawWatermarkPattern(g, W, H, text) {
-  const ANG = -33 * Math.PI / 180;   // 斜角
-  const FS = Math.round(Math.max(W, H) * 0.03);  // 字高 ≈ 長邊 3%
-  const OP = 0.25;                                  // 透明度
-  const STEP_X = Math.max(Math.round(FS * 12), 360); // 同斜線間距（倍數越大越疏）
-  const STEP_Y = Math.max(Math.round(FS * 8), 260);  // 斜線與斜線間距
-
-  const diag = Math.hypot(W, H);
-
-  g.save();
-  g.translate(W / 2, H / 2);
-  g.rotate(ANG);
-  g.font = `600 ${FS}px "Noto Sans TC","Microsoft JhengHei",sans-serif`;
-  g.textBaseline = "middle";
-  g.fillStyle = `rgba(255,255,255,${OP})`;
-
-  for (let x = -diag; x <= diag; x += STEP_X) {
-    for (let y = -diag; y <= diag; y += STEP_Y) {
-      g.fillText(text, x, y);
-    }
-  }
-  g.restore();
-}
-
 async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {}) {
-  const type = (file && file.type) || "";
-  if (type.startsWith("video/")) {
-    return await addWatermarkToVideo(file, { text });
-  }
-
   const url = URL.createObjectURL(file);
   try {
     // 讀圖 & 畫原圖
@@ -250,109 +44,36 @@ async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {})
     const g = c.getContext("2d");
     g.drawImage(img, 0, 0, W, H);
 
-    __drawWatermarkPattern(g, W, H, text);
+    // === 細字無外框樣式（可調參數） ===
+    const ANG = -33 * Math.PI / 180;   // 斜角
+    const FS = Math.round(Math.max(W, H) * 0.03);  // 字高 ≈ 長邊 6%
+    const OP = 0.25;                                  // 透明度
+    const STEP_X = Math.max(Math.round(FS * 12), 360); // 同斜線間距（倍數越大越疏）
+    const STEP_Y = Math.max(Math.round(FS * 8), 260);  // 斜線與斜線間距
+
+    const diag = Math.hypot(W, H);
+
+    g.save();
+    g.translate(W / 2, H / 2);
+    g.rotate(ANG);
+    g.font = `600 ${FS}px "Noto Sans TC","Microsoft JhengHei",sans-serif`;
+    g.textBaseline = "middle";
+    g.fillStyle = `rgba(255,255,255,${OP})`;
+    // 想更柔和可打開下一行：
+    // g.globalCompositeOperation = "overlay"; // 或 "soft-light"
+
+    // 只填色，不描邊（不要 strokeText/lineWidth/strokeStyle）
+    for (let x = -diag; x <= diag; x += STEP_X) {
+      for (let y = -diag; y <= diag; y += STEP_Y) {
+        g.fillText(text, x, y);
+      }
+    }
+    g.restore();
 
     const out = await new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
     return new File([out], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
   } finally {
     URL.revokeObjectURL(url);
-  }
-}
-
-async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}) {
-  const testCanvas = document.createElement("canvas");
-  if (!testCanvas.captureStream || typeof MediaRecorder === "undefined") {
-    throw new Error("目前瀏覽器不支援影片浮水印（缺少 MediaRecorder 或 captureStream）");
-  }
-
-  const src = URL.createObjectURL(file);
-  try {
-    const video = document.createElement("video");
-    video.src = src;
-    video.muted = true;
-    video.playsInline = true;
-    video.crossOrigin = "anonymous";
-
-    await new Promise((res, rej) => {
-      video.onloadedmetadata = () => res();
-      video.onerror = (e) => rej(e || new Error("載入影片失敗"));
-    });
-
-    const W = video.videoWidth || 1280;
-    const H = video.videoHeight || 720;
-
-    const canvas = document.createElement("canvas");
-    canvas.width = W;
-    canvas.height = H;
-    const g = canvas.getContext("2d");
-
-    const stream = canvas.captureStream();
-    try {
-      if (video.captureStream) {
-        const vStream = video.captureStream();
-        vStream.getAudioTracks().forEach((track) => stream.addTrack(track));
-      }
-    } catch (_) {
-      // audio 失敗可以忽略，至少保留畫面
-    }
-
-    const chunks = [];
-    const canUseVP9 = typeof MediaRecorder !== "undefined" &&
-      MediaRecorder.isTypeSupported("video/webm;codecs=vp9");
-    const canUseVP8 = typeof MediaRecorder !== "undefined" &&
-      MediaRecorder.isTypeSupported("video/webm;codecs=vp8");
-
-    const mime = canUseVP9
-      ? "video/webm;codecs=vp9"
-      : (canUseVP8 ? "video/webm;codecs=vp8" : "video/webm");
-
-    const recorder = new MediaRecorder(stream, { mimeType: mime });
-    recorder.ondataavailable = (e) => {
-      if (e.data && e.data.size > 0) chunks.push(e.data);
-    };
-    const finished = new Promise((resolve) => {
-      recorder.onstop = () => resolve();
-    });
-
-    recorder.start();
-
-    const useRVFC = typeof video.requestVideoFrameCallback === "function";
-
-    function drawFrame() {
-      g.clearRect(0, 0, W, H);
-      g.drawImage(video, 0, 0, W, H);
-      __drawWatermarkPattern(g, W, H, text);
-    }
-
-    if (useRVFC) {
-      const cb = () => {
-        if (video.paused || video.ended) return;
-        drawFrame();
-        video.requestVideoFrameCallback(cb);
-      };
-      video.requestVideoFrameCallback(cb);
-    } else {
-      const t = setInterval(() => {
-        if (video.paused || video.ended) {
-          clearInterval(t);
-          return;
-        }
-        drawFrame();
-      }, 40);
-    }
-
-    await video.play();
-    await new Promise((res) => { video.onended = () => res(); });
-
-    recorder.stop();
-    await finished;
-
-    const blob = new Blob(chunks, { type: mime });
-    const ext = ".webm";
-    const name = (file.name || "video").replace(/\.[^.]+$/, ext);
-    return new File([blob], name, { type: mime });
-  } finally {
-    URL.revokeObjectURL(src);
   }
 }
 
@@ -396,96 +117,8 @@ function revokePreviewThumb(file) {
 }
 
 async function __decodeToBitmap(file) {
-  const type = (file && file.type) || "";
-  const isVideo = type.startsWith("video/");
-  const isImage = type.startsWith("image/");
-  // 影片：抓一張影格當縮圖（iOS 需要用 loadedmetadata + seek / RVFC 才容易出現畫面）
-  if (isVideo) {
-    const vUrl = URL.createObjectURL(file);
-    try {
-      const v = document.createElement("video");
-      v.preload = "metadata";
-      v.src = vUrl;
-      v.muted = true;
-      v.playsInline = true;
-      v.setAttribute("playsinline", "");
-      v.setAttribute("webkit-playsinline", "");
-      v.disablePictureInPicture = true;
-
-      // iOS Safari 有時不會觸發 loadeddata（不播放就不解碼畫面），所以用 loadedmetadata + seek 逼出第一張影格
-      await new Promise((res, rej) => {
-        v.onloadedmetadata = () => res();
-        v.onerror = (e) => rej(e || new Error("載入影片失敗"));
-      });
-
-      // 目標抓取時間：盡量靠前，但不要是 0（iOS 有時 seek 到 0 會拿不到 frame）
-      let t = 0.05;
-      try {
-        if (Number.isFinite(v.duration) && v.duration > 0.2) {
-          t = Math.min(0.2, v.duration / 2);
-          t = Math.max(0.05, Math.min(t, v.duration - 0.05));
-        }
-      } catch (_) { /* ignore */ }
-
-      // 先嘗試 seek
-      try {
-        v.currentTime = t;
-        await new Promise((res) => {
-          const done = () => { v.removeEventListener("seeked", done); res(); };
-          v.addEventListener("seeked", done);
-        });
-      } catch (_) {
-        // 有些檔案/瀏覽器不給 seek，就用 0.01 退回
-        try {
-          v.currentTime = 0.01;
-          await new Promise((res) => {
-            const done = () => { v.removeEventListener("seeked", done); res(); };
-            v.addEventListener("seeked", done);
-          });
-        } catch (_) { /* ignore */ }
-      }
-
-      // 等待畫面真正解碼（RVFC 最可靠）
-      if (typeof v.requestVideoFrameCallback === "function") {
-        await new Promise((res) => v.requestVideoFrameCallback(() => res()));
-      } else {
-        // readyState >= 2 才有 current frame data
-        if (v.readyState < 2) {
-          await Promise.race([
-            new Promise((res) => { v.onloadeddata = () => res(); }),
-            new Promise((res) => setTimeout(res, 150))
-          ]);
-        }
-        await new Promise((res) => setTimeout(res, 30));
-      }
-
-      // iOS 有時仍然黑畫面：試著「靜音播放一下再暫停」逼出 frame
-      try {
-        await v.play();
-        v.pause();
-      } catch (_) { /* ignore */ }
-
-      const w = v.videoWidth || 640;
-      const h = v.videoHeight || 360;
-      const c = document.createElement("canvas");
-      c.width = w;
-      c.height = h;
-      const g = c.getContext("2d");
-      g.drawImage(v, 0, 0, w, h);
-      return c;
-    } finally {
-      URL.revokeObjectURL(vUrl);
-    }
-  }
-
-
-  // 圖片：優先用 createImageBitmap（非阻塞解碼）
-  if (window.createImageBitmap && isImage) {
+  if (window.createImageBitmap) {
     try { return await createImageBitmap(file); } catch (_) { /* fallback */ }
-  }
-
-  if (!isImage) {
-    throw new Error("不支援的檔案類型");
   }
 
   // fallback：用 <img> 解碼（比較可能卡，但至少可用）
@@ -507,6 +140,7 @@ async function __decodeToBitmap(file) {
     URL.revokeObjectURL(raw);
   }
 }
+
 async function __makePreviewThumbURL(file) {
   const bmp = await __decodeToBitmap(file);
   const W = bmp.width, H = bmp.height;
@@ -614,7 +248,6 @@ async function openDialog(id) {
   currentDoc = p;
   currentDocId = p.id;
   window.currentPetId = p.id;
-  window.currentPetThumbByPath = p.thumbByPath || {};
   history.replaceState(null, '', `?pet=${encodeURIComponent(p.id)}`);
 
   // 3. 健康標籤（第二排）
@@ -627,193 +260,39 @@ async function openDialog(id) {
     ? '已注射預防針' : '未注射預防針';
 
   // 4. 圖片 + Lightbox（搭配 shared.js）
-
   const dlgImg = document.getElementById("dlgImg");
-  const dlgVideo = document.getElementById("dlgVideo");
   const dlgBg = document.getElementById("dlgBg");
   const dlgThumbs = document.getElementById("dlgThumbs");
-  const dlgHint = document.getElementById("dlgHint");
-  const dlgStageWrap = document.getElementById("dlgStageWrap");
 
-  const media = Array.isArray(p.images) && p.images.length > 0
+  const imgs = Array.isArray(p.images) && p.images.length > 0
     ? p.images
     : (p.image ? [p.image] : []);
 
   let currentIndex = 0;
 
-  function showDialogMedia(index) {
-    if (!media.length) {
-      if (dlgImg) {
-        dlgImg.src = "";
-        dlgImg.classList.add("hidden");
-      }
-
-      if (dlgVideo) {
-        try { dlgVideo.pause(); } catch (_) { }
-        dlgVideo.src = "";
-        dlgVideo.classList.add("hidden");
-      }
-
-      if (dlgThumbs) dlgThumbs.innerHTML = "";
-
-      if (dlgHint) dlgHint.textContent = "";
-
-      if (dlgStageWrap) dlgStageWrap.classList.remove("dlg-video-mode");
-
-      return;
-    }
-
-    currentIndex = Math.max(0, Math.min(index, media.length - 1));
-    const url = media[currentIndex];
-    const isVid = isVideoUrl(url);
-
-    if (dlgStageWrap) dlgStageWrap.classList.toggle("dlg-video-mode", isVid);
-
-    if (dlgHint) {
-      dlgHint.textContent = isVid
-        ? "雙擊主圖可放大"
-        : "點主圖可放大";
-
-      // 影片：加 mt-2；圖片：移除 mt-2
-      dlgHint.classList.toggle("mt-2", isVid);
-      // （可選）確保圖片時沒有 mt-2 殘留
-      if (!isVid) dlgHint.classList.remove("mt-2");
-    }
-
-    if (dlgImg && dlgVideo) {
-      if (isVid) {
-        dlgImg.classList.add("hidden");
-        dlgVideo.classList.remove("hidden");
-
-        // 換片前先停掉上一支影片並重設 src
-        try { dlgVideo.pause(); } catch (_) {}
-        dlgVideo.removeAttribute("src");
-        try { dlgVideo.load && dlgVideo.load(); } catch (_) {}
-
-        dlgVideo.src = url;
-        dlgVideo.playsInline = true;
-        dlgVideo.controls = false; // 使用自訂控制列
-        // 自訂進度條 + 自動播放
-        __attachCustomVideoControls(dlgVideo, { autoPlayOnReady: true });
-      } else {
-        try {
-          dlgVideo.pause && dlgVideo.pause();
-        } catch (_) { }
-        dlgVideo.classList.add("hidden");
-        dlgImg.classList.remove("hidden");
-        dlgImg.src = url;
-      }
-    } else if (dlgImg) {
-      dlgImg.src = url;
-    }
-
-    if (dlgBg) {
-      let bgSrc = "";
-
-      if (!isVid) {
-        // 主圖是照片：直接用當前這張照片做背景
-        bgSrc = url;
-      } else {
-        // 主圖是影片：優先用「這支影片自己的縮圖」
-        try {
-          const videoPath = storagePathFromDownloadUrl(url);
-          const thumbMap = (p.thumbByPath) || {};
-          const videoThumb = videoPath ? (thumbMap[videoPath] || "") : "";
-
-          if (videoThumb) {
-            bgSrc = videoThumb;
-          } else {
-            // 沒有縮圖時，再退而求其次：用第一張照片當背景
-            const firstImage = media.find(u => !isVideoUrl(u));
-            bgSrc = firstImage || "";
-          }
-        } catch (_) {
-          // 萬一解析 path 出錯，就跟上面一樣退回用第一張照片
-          const firstImage = media.find(u => !isVideoUrl(u));
-          bgSrc = firstImage || "";
-        }
-      }
-
-      // 只有真的有圖才塞 src，避免誤把影片網址塞進 <img> 變成破圖
-      dlgBg.src = bgSrc;
-    }
-
-    if (dlgThumbs) {
-      dlgThumbs.querySelectorAll(".dlg-thumb").forEach((el, i) => {
-        el.classList.toggle("active", i === currentIndex);
-      });
-    }
-  }
-
-  if (dlgImg) {
-    dlgImg.onclick = () => openLightbox(media, currentIndex);
-  }
-
-  if (dlgVideo) {
-    // 影片：改成「點兩下」主圖才進 Lightbox，單擊留給播放/暫停用
-    let __dlgVideoLastTap = 0;
-    dlgVideo.onclick = (ev) => {
-      const now = Date.now();
-      if (now - __dlgVideoLastTap < 320) {
-        ev.preventDefault();
-        ev.stopPropagation();
-        openLightbox(media, currentIndex);
-      }
-      __dlgVideoLastTap = now;
-    };
-  }
+  dlgImg.src = imgs[currentIndex] || "";
+  if (dlgBg) dlgBg.src = dlgImg.src;
+  dlgImg.onclick = () => openLightbox(imgs, currentIndex);
 
   dlgThumbs.innerHTML = "";
-  media.forEach((url, i) => {
-    const isVid = isVideoUrl(url);
-    const wrapper = document.createElement("div");
-    wrapper.className = "dlg-thumb" + (i === 0 ? " active" : "");
+  imgs.forEach((url, i) => {
+    const thumb = document.createElement("img");
+    thumb.src = url;
+    thumb.className = "dlg-thumb" + (i === 0 ? " active" : "");
 
-    if (isVid) {
-      const videoPath = storagePathFromDownloadUrl(url);
-      const videoThumb = (p.thumbByPath && videoPath) ? (p.thumbByPath[videoPath] || "") : "";
+    thumb.addEventListener("click", () => {
+      currentIndex = i;
 
-      if (videoThumb) {
-        const img = document.createElement("img");
-        img.src = videoThumb;
-        wrapper.appendChild(img);
-      } else {
-        const v = document.createElement("video");
-        v.className = "thumb-video";
-        v.preload = "metadata";
-        v.muted = true;
-        v.playsInline = true;
-        v.setAttribute("playsinline", "");
-        v.setAttribute("webkit-playsinline", "");
-        v.controls = false;
-        v.disablePictureInPicture = true;
-        v.src = url;
+      dlgImg.src = url;
+      if (dlgBg) dlgBg.src = url;
 
-        // 後端縮圖還沒產出時才 fallback 用影片抓第一幀
-        __primeThumbVideoFrame(v);
-
-        wrapper.appendChild(v);
-      }
-
-      // 覆蓋播放 icon（圖 4 的樣式）
-      const badge = document.createElement("div");
-      badge.className = "video-badge";
-      badge.innerHTML = `<div class="video-badge-inner">${__PLAY_SVG}</div>`;
-      wrapper.appendChild(badge);
-    } else {
-      const img = document.createElement("img");
-      img.src = url;
-      wrapper.appendChild(img);
-    }
-
-    wrapper.addEventListener("click", () => {
-      showDialogMedia(i);
+      dlgThumbs.querySelectorAll(".dlg-thumb")
+        .forEach(el => el.classList.remove("active"));
+      thumb.classList.add("active");
     });
 
-    dlgThumbs.appendChild(wrapper);
+    dlgThumbs.appendChild(thumb);
   });
-
-  showDialogMedia(currentIndex);
 
   // 5. 顯示用文字
   document.getElementById('dlgName').textContent = p.name;
@@ -880,7 +359,7 @@ async function openDialog(id) {
     }
   }
 
-  renderEditImages(media);
+  renderEditImages(imgs);
 
   // 7. 模式 / 按鈕 / 已送養相關
   setEditMode(false);      // 一開始都是「瀏覽模式」
@@ -967,7 +446,6 @@ async function onDelete() {
     // 刪掉這筆的所有圖片與合照資料夾
     await deleteAllUnder(`pets/${currentDocId}`);
     await deleteAllUnder(`adopted/${currentDocId}`);
-    await deleteAllUnder(`thumbs/pets/${currentDocId}`);
     // 最後刪 Firestore 文件
     await deleteDoc(doc(db, "pets", currentDocId));
     await loadPets();
@@ -1070,16 +548,7 @@ async function saveEdit() {
       if (it.kind === "file") {
         const f = it.file;
         const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
-        const type = wmBlob.type || '';
-        let ext = 'bin';
-        if (type.startsWith('image/')) {
-          ext = type === 'image/png' ? 'png' : 'jpg';
-        } else if (type.startsWith('video/')) {
-          if (type.includes('webm')) ext = 'webm';
-          else if (type.includes('ogg')) ext = 'ogg';
-          else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
-          else ext = 'mp4';
-        }
+        const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
         const base = f.name.replace(/\.[^.]+$/, '');
         const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
         const r = sRef(storage, path);
@@ -1089,35 +558,19 @@ async function saveEdit() {
     }
 
     // 刪除被移除的舊圖（忽略刪失敗）
-    // 同步刪掉後端產生的縮圖：thumbs/<原路徑去副檔名>.jpg
-    // 並清理 Firestore 的 thumbByPath 對應 key（避免越積越多）
-    const __thumbFieldDeletes = {};
     for (const url of (removeUrls || [])) {
       try {
-        const enc = String(url).split("/o/")[1].split("?")[0];
-        const mediaPath = decodeURIComponent(enc);
-
-        // 1) 刪原檔
-        await deleteObject(sRef(storage, mediaPath));
-
-        // 2) 若是影片：刪縮圖 + 刪欄位 key
-        if (isVideoUrl(url)) {
-          const tPath = thumbPathFromMediaPath(mediaPath);
-          if (tPath) {
-            try { await deleteObject(sRef(storage, tPath)); } catch (_) { /* ignore */ }
-          }
-          __thumbFieldDeletes[`thumbByPath.${mediaPath}`] = deleteField();
-        }
+        const path = url.split("/o/")[1].split("?")[0];
+        await deleteObject(sRef(storage, decodeURIComponent(path)));
       } catch (e) {
         // 靜默忽略
       }
     }
 
     newData.images = newUrls;
-    const __updatePayload = { ...newData, ...__thumbFieldDeletes };
 
     // ③ 寫回 Firestore
-    await updateDoc(doc(db, "pets", currentDocId), __updatePayload);
+    await updateDoc(doc(db, "pets", currentDocId), newData);
 
     // ④ 重載列表並同步當前物件
     await loadPets();
@@ -1212,40 +665,6 @@ const editCount = q("#editCount");
 
 const MAX_EDIT_FILES = 5;
 
-// 影片按鈕 icon（play / pause）
-const __PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
-const __PAUSE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"></path></svg>';
-
-async function __safePlayVideo(v) {
-  try {
-    await v.play();
-    return;
-  } catch (_) { }
-  // iOS / 部分瀏覽器可能需要先靜音才允許播放（至少先讓預覽能播）
-  try {
-    v.muted = true;
-    await v.play();
-  } catch (e) {
-    console.warn('video play failed:', e);
-  }
-}
-
-// File(video) → objectURL（給 <video> 播放用；刪除/關閉編輯時釋放）
-const __editVideoObjUrlCache = new Map();
-function getEditVideoObjURL(file) {
-  if (__editVideoObjUrlCache.has(file)) return __editVideoObjUrlCache.get(file);
-  const u = URL.createObjectURL(file);
-  __editVideoObjUrlCache.set(file, u);
-  return u;
-}
-function revokeEditVideoObjURL(file) {
-  const u = __editVideoObjUrlCache.get(file);
-  if (u) {
-    try { URL.revokeObjectURL(u); } catch (_) { }
-    __editVideoObjUrlCache.delete(file);
-  }
-}
-
 // 狀態：依「目前畫面順序」維護（url=舊圖、file=新圖）
 let editImagesState = { items: [], removeUrls: [] };
 
@@ -1254,10 +673,7 @@ btnPickEdit?.addEventListener("click", () => editFiles?.click());
 // 初始化編輯圖片列表（把舊的檔案縮圖快取清掉，避免記憶體累積）
 function renderEditImages(urls) {
   for (const it of editImagesState.items) {
-    if (it?.kind === "file" && it.file) {
-      revokePreviewThumb(it.file);
-      revokeEditVideoObjURL(it.file);
-    }
+    if (it?.kind === "file" && it.file) revokePreviewThumb(it.file);
   }
   editImagesState.items = (urls || []).map((u) => ({ kind: "url", url: u }));
   editImagesState.removeUrls = [];
@@ -1273,156 +689,51 @@ function __editKey(it) {
 
 function __makeEditTile(it) {
   const wrap = document.createElement("div");
-  wrap.className = "relative select-none overflow-hidden";
+  wrap.className = "relative  select-none";
   wrap.style.touchAction = "none";
   wrap.style.setProperty("-webkit-touch-callout", "none");
   wrap.style.userSelect = "none";
   wrap.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  const isVid = it.kind === "url"
-    ? isVideoUrl(it.url)
-    : (((it.file && it.file.type) || "").startsWith("video/"));
+  const img = document.createElement("img");
+  img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+  img.alt = "預覽";
+  img.decoding = "async";
+  img.loading = "lazy";
+  img.draggable = false;
+  img.style.webkitUserDrag = "none";
+  img.style.webkitTouchCallout = "none";
+  img.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  let mediaEl = null;
-  let playBtn = null;
-
-  if (isVid) {
-    const v = document.createElement("video");
-    v.className = "w-full aspect-square object-cover rounded-lg bg-gray-100 video-preview";
-    v.preload = "metadata";
-    v.playsInline = true;
-    v.setAttribute("playsinline", "");
-    v.setAttribute("webkit-playsinline", "");
-    v.controls = false;
-    v.disablePictureInPicture = true;
-
-    if (it.kind === "url") {
-      v.src = it.url;
-
-      // 先嘗試用後端產出的縮圖（thumbByPath）
-      try {
-        const path = storagePathFromDownloadUrl(it.url);
-        const thumbMap = window.currentPetThumbByPath || {};
-        const thumbUrl = path && thumbMap[path];
-        if (thumbUrl) {
-          v.poster = thumbUrl;
-        } else {
-          // 沒有縮圖就用影片本身抓第一幀，避免黑畫面
-          __primeThumbVideoFrame(v);
-        }
-      } catch (_) {
-        __primeThumbVideoFrame(v);
-      }
-    } else {
-      v.src = getEditVideoObjURL(it.file);
-
-      // 先抓一幀，確保一開始就有畫面
-      __primeThumbVideoFrame(v);
-
-      // 若能產出高品質縮圖就覆蓋上去
-      ensurePreviewThumbURL(it.file)
-        .then((u) => { v.poster = u; })
-        .catch(() => { /* 失敗就維持第一幀 */ });
-    }
-
-    const overlay = document.createElement("div");
-    overlay.className = "media-play-overlay";
-
-    playBtn = document.createElement("button");
-    playBtn.type = "button";
-    playBtn.className = "media-play-btn";
-    playBtn.innerHTML = __PLAY_SVG;
-    playBtn.setAttribute("aria-label", "播放影片");
-
-    const syncBtn = () => {
-      const playing = !v.paused && !v.ended;
-      playBtn.innerHTML = playing ? __PAUSE_SVG : __PLAY_SVG;
-      playBtn.setAttribute("aria-label", playing ? "暫停影片" : "播放影片");
-    };
-
-    v.addEventListener("play", syncBtn);
-    v.addEventListener("pause", syncBtn);
-    v.addEventListener("ended", () => {
-      try { v.currentTime = 0; } catch (_) { }
-      syncBtn();
-    });
-
-    playBtn.addEventListener("click", async (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
-
-      // 同時只播一支（避免多支一起播）
-      try {
-        editPreview?.querySelectorAll?.("video.video-preview")?.forEach((vv) => {
-          if (vv !== v) {
-            try { vv.pause(); } catch (_) { }
-          }
-        });
-      } catch (_) { }
-
-      if (v.paused || v.ended) {
-        await __safePlayVideo(v);
-      } else {
-        try { v.pause(); } catch (_) { }
-      }
-      syncBtn();
-    });
-
-    overlay.appendChild(playBtn);
-
-    wrap.appendChild(v);
-    wrap.appendChild(overlay);
-    mediaEl = v;
+  if (it.kind === "url") {
+    img.src = it.url;
   } else {
-    const img = document.createElement("img");
-    img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
-    img.alt = "預覽";
-    img.decoding = "async";
-    img.loading = "lazy";
-    img.draggable = false;
-    img.style.webkitUserDrag = "none";
-    img.style.webkitTouchCallout = "none";
-    img.addEventListener("contextmenu", (e) => e.preventDefault());
-
-    if (it.kind === "url") {
-      img.src = it.url;
-    } else {
-      img.src = PREVIEW_EMPTY_GIF;
-      ensurePreviewThumbURL(it.file)
-        .then((u) => { img.src = u; })
-        .catch(() => {
-          try {
-            const raw = URL.createObjectURL(it.file);
-            img.src = raw;
-            setTimeout(() => URL.revokeObjectURL(raw), 2000);
-          } catch { }
-        });
-    }
-
-    wrap.appendChild(img);
-    mediaEl = img;
+    img.src = PREVIEW_EMPTY_GIF;
+    ensurePreviewThumbURL(it.file)
+      .then((u) => { img.src = u; })
+      .catch(() => {
+        try {
+          const raw = URL.createObjectURL(it.file);
+          img.src = raw;
+          setTimeout(() => URL.revokeObjectURL(raw), 2000);
+        } catch { }
+      });
   }
 
   const btn = document.createElement("button");
   btn.type = "button";
-  // iOS Safari 可能因「文字大小 / text-size-adjust」放大 rem，導致 Tailwind w-7/h-7 變大。
-  // 這裡改用固定 px 尺寸 + SVG，確保手機/桌機一致。
-  btn.className = "preview-remove-btn absolute top-1 right-1 z-20 bg-black/70 text-white rounded-full flex items-center justify-center";
-  btn.innerHTML = `
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path d="M18.3 5.7a1 1 0 0 0-1.4 0L12 10.6 7.1 5.7a1 1 0 1 0-1.4 1.4L10.6 12l-4.9 4.9a1 1 0 1 0 1.4 1.4L12 13.4l4.9 4.9a1 1 0 0 0 1.4-1.4L13.4 12l4.9-4.9a1 1 0 0 0 0-1.4z" fill="currentColor"/>
-    </svg>
-  `;
+  btn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
+  btn.textContent = "✕";
   btn.setAttribute("aria-label", "刪除這張");
-  btn.dataset.remove = "1";
 
+  wrap.appendChild(img);
   wrap.appendChild(btn);
   return wrap;
 }
 
 function __setEditIdx(tile, idx) {
   tile.dataset.idx = String(idx);
-  const btn = tile.querySelector('button[data-remove]');
+  const btn = tile.querySelector("button");
   if (btn) btn.dataset.idx = String(idx);
 }
 
@@ -1437,7 +748,6 @@ function paintEditPreview() {
       // 移除 tile 時順便釋放縮圖
       if (k && typeof k === "object") {
         try { revokePreviewThumb(k); } catch { }
-        try { revokeEditVideoObjURL(k); } catch { }
       }
       el.remove();
       __editTileMap.delete(k);
@@ -1458,7 +768,7 @@ function paintEditPreview() {
 
 // 刪除（事件代理）
 editPreview?.addEventListener("click", (e) => {
-  const btn = e.target.closest?.("button[data-remove][data-idx]");
+  const btn = e.target.closest?.("button[data-idx]");
   if (!btn) return;
 
   e.preventDefault();
@@ -1472,7 +782,6 @@ editPreview?.addEventListener("click", (e) => {
     editImagesState.removeUrls.push(it.url);
   } else if (it.kind === "file") {
     revokePreviewThumb(it.file);
-    revokeEditVideoObjURL(it.file);
   }
 
   editImagesState.items.splice(i, 1);
@@ -1639,14 +948,8 @@ function __makeAdoptedTile(file) {
 
   const btn = document.createElement("button");
   btn.type = "button";
-  // iOS Safari 可能因「文字大小 / text-size-adjust」放大 rem，導致 Tailwind w-7/h-7 變大。
-  // 這裡改用固定 px 尺寸 + SVG，確保手機/桌機一致。
-  btn.className = "preview-remove-btn absolute top-1 right-1 z-20 bg-black/60 text-white rounded-full flex items-center justify-center";
-  btn.innerHTML = `
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path d="M18.3 5.7a1 1 0 0 0-1.4 0L12 10.6 7.1 5.7a1 1 0 1 0-1.4 1.4L10.6 12l-4.9 4.9a1 1 0 1 0 1.4 1.4L12 13.4l4.9 4.9a1 1 0 0 0 1.4-1.4L13.4 12l4.9-4.9a1 1 0 0 0 0-1.4z" fill="currentColor"/>
-    </svg>
-  `;
+  btn.className = "absolute top-1 right-1 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center";
+  btn.textContent = "✕";
   btn.setAttribute("aria-label", "刪除這張");
 
   wrap.appendChild(img);
@@ -1823,16 +1126,7 @@ async function onConfirmAdopted() {
   try {
     for (const f of files) {
       const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
-      const type = wmBlob.type || '';
-      let ext = 'bin';
-      if (type.startsWith('image/')) {
-        ext = type === 'image/png' ? 'png' : 'jpg';
-      } else if (type.startsWith('video/')) {
-        if (type.includes('webm')) ext = 'webm';
-        else if (type.includes('ogg')) ext = 'ogg';
-        else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
-        else ext = 'mp4';
-      }
+      const ext = wmBlob.type === 'image/png' ? 'png' : 'jpg';
       const base = f.name.replace(/\.[^.]+$/, '');
       const path = `adopted/${currentDocId}/${Date.now()}_${base}.${ext}`;
       const r = sRef(storage, path);
