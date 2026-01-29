@@ -881,7 +881,13 @@
           el.src = URL.createObjectURL(item.file);
           el.preload = "metadata";
           el.muted = true;
+          el.playsInline = true;
           el.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+
+          // iOS 強制顯示第一幀
+          el.addEventListener("loadedmetadata", () => {
+            el.currentTime = 0;
+          }, { once: true });
         }
 
         const label = document.createElement("div");
@@ -907,35 +913,46 @@
       renderMediaPreviews();
     });
 
-    // 手機可用的拖曳交換（Pointer Events；適用於 mediaPreview）
+    // === 加強版拖曳（支援桌機 + iOS）===
     let dragFrom = null;
     let dragOver = null;
     let dragEl = null;
+    let dragStartY = 0;
+    const DRAG_THRESHOLD = 8; // 增加門檻，避免輕微移動就觸發
 
     function clearDragUI() {
-      mediaPreview.querySelectorAll("[data-idx]").forEach((el) => {
+      mediaPreview.querySelectorAll("[data-idx]").forEach(el => {
         el.classList.remove("ring-2", "ring-brand-500", "ring-brand-300", "opacity-80");
       });
     }
 
-    mediaPreview.addEventListener("pointerdown", (e) => {
-      if (e.target.closest?.("button")) return;   // 點到刪除鈕不拖曳
+    mediaPreview.style.touchAction = "none"; // 防止 iOS scroll 搶事件
 
-      const tile = e.target.closest?.("[data-idx]");
+    mediaPreview.addEventListener("pointerdown", (e) => {
+      if (e.target.closest("button")) return;
+
+      const tile = e.target.closest("[data-idx]");
       if (!tile) return;
 
       dragEl = tile;
       dragFrom = +tile.dataset.idx;
       dragOver = dragFrom;
+      dragStartY = e.clientY;
 
-      tile.setPointerCapture?.(e.pointerId);
+      tile.setPointerCapture(e.pointerId);
       clearDragUI();
       tile.classList.add("ring-2", "ring-brand-500", "opacity-80");
+
+      e.stopPropagation();
       e.preventDefault();
     });
 
     mediaPreview.addEventListener("pointermove", (e) => {
-      if (dragFrom == null) return;
+      if (dragFrom === null) return;
+
+      // 計算垂直移動距離
+      const dy = Math.abs(e.clientY - dragStartY);
+      if (dy < DRAG_THRESHOLD) return; // 門檻過低不觸發
 
       const el = document.elementFromPoint(e.clientX, e.clientY);
       const tile = el?.closest?.("[data-idx]");
@@ -948,10 +965,12 @@
       clearDragUI();
       if (dragEl) dragEl.classList.add("ring-2", "ring-brand-500", "opacity-80");
       tile.classList.add("ring-2", "ring-brand-300");
+
+      e.preventDefault();
     });
 
     function finishDrag() {
-      if (dragFrom == null) return;
+      if (dragFrom === null) return;
 
       const from = dragFrom;
       const to = dragOver;
@@ -960,14 +979,12 @@
       dragFrom = dragOver = null;
       dragEl = null;
 
-      if (to == null || to === from) return;
-
-      // 交換 selectedMedia 中的項目
-      const tmp = selectedMedia[from];
-      selectedMedia[from] = selectedMedia[to];
-      selectedMedia[to] = tmp;
-
-      renderMediaPreviews();
+      if (to !== null && to !== from) {
+        const tmp = selectedMedia[from];
+        selectedMedia[from] = selectedMedia[to];
+        selectedMedia[to] = tmp;
+        renderMediaPreviews();
+      }
     }
 
     mediaPreview.addEventListener("pointerup", finishDrag);
