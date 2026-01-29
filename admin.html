@@ -1070,13 +1070,6 @@
       return p;
     }
 
-    // 產生要上傳用的縮圖 Blob（沿用預覽縮圖流程）
-    async function makeThumbBlobFromFile(file) {
-      const url = await ensureThumbURL(file);
-      const res = await fetch(url);
-      return await res.blob();
-    }
-
     const __previewTileMap = new Map(); // File -> tile element（保留 DOM，避免重畫閃爍）
 
     function __makePreviewTile(file) {
@@ -1419,31 +1412,25 @@
         // 1) 新增基本文件
         const docRef = await addDoc(collection(db, "pets"), payload);
 
-        // 2) 逐張上傳檔案：圖片加浮水印，影片直接原檔
+        // 2) 逐張上傳圖片，取得 Storage URL
         const urls = [];
         for (const f of selectedFiles) {
-          const isVideo = (f.type || "").startsWith("video/");
-          const blobToUpload = isVideo ? f : await addWatermarkToFile(f);
-
-          const type = blobToUpload.type || f.type || "";
-          let ext = "bin";
-          if (type.startsWith("image/")) {
-            ext = type === "image/png" ? "png" : "jpg";
-          } else if (type.startsWith("video/")) {
-            if (type.includes("webm")) ext = "webm";
-            else if (type.includes("ogg")) ext = "ogg";
-            else if (type.includes("mp4") || type.includes("mpeg")) ext = "mp4";
-            else ext = "mp4";
+          const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+          const type = wmBlob.type || '';
+          let ext = 'bin';
+          if (type.startsWith('image/')) {
+            ext = type === 'image/png' ? 'png' : 'jpg';
+          } else if (type.startsWith('video/')) {
+            if (type.includes('webm')) ext = 'webm';
+            else if (type.includes('ogg')) ext = 'ogg';
+            else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
+            else ext = 'mp4';
           }
-
-          const base = f.name.replace(/\.[^.]+$/, "");
+          const base = f.name.replace(/\.[^.]+$/, '');
           const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
           const r = sRef(storage, path);
-          await uploadBytes(r, blobToUpload, {
-            contentType: blobToUpload.type || f.type || undefined,
-          });
-          const url = await getDownloadURL(r);
-          urls.push(url);
+          await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
+          urls.push(await getDownloadURL(r));
         }
 
         // 3) 回寫 images 欄位
@@ -1471,10 +1458,16 @@
         // 先啟動重新載入列表（避免等到提示結束才開始抓資料）
         const reloadPromise = loadPets();
 
+        // 只針對這次新登錄的這一筆，輪詢 thumbByPath
+        reloadPromise
+          .then(() => waitForThumbByPath(docRef.id))
+          .catch((e) => {
+            console.warn("waitForThumbByPath chain error:", e);
+          });
+
         // ★ 登錄完成 → 捲到最上方（先 smooth，最後再硬捲補正）
         window.scrollTo({ top: 0, behavior: "smooth" });
         setTimeout(forceScrollTop, 250); // smooth 途中若被打斷，250ms 後硬捲補正
-
 
         // 成功提示後直接打開詳情
         Swal.fire({
@@ -1510,6 +1503,66 @@
       pets.length = 0;
       pets.push(...snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       applyFilterAndRender();
+    }
+
+    // ===============================
+    // 方案 B：只針對「這次新登錄的那一筆」輪詢 thumbByPath
+    // ===============================
+    async function waitForThumbByPath(petId, maxTries = 5, intervalMs = 1500) {
+      if (!petId) return;
+
+      const ref = doc(db, "pets", petId);
+
+      for (let i = 0; i < maxTries; i++) {
+        try {
+          const snap = await getDoc(ref);
+          if (!snap.exists()) break;
+
+          const data = snap.data() || {};
+          const thumbMap = data.thumbByPath;
+
+          // 有拿到 thumbByPath 才算成功
+          if (thumbMap && Object.keys(thumbMap).length) {
+            // 更新本地 pets 陣列
+            const idx = pets.findIndex((p) => p.id === petId);
+            const merged = { id: petId, ...data };
+
+            if (idx >= 0) {
+              pets[idx] = merged;
+            } else {
+              // 理論上不會走到這裡，保險一下
+              pets.unshift(merged);
+            }
+
+            // 用更新後的資料重算列表（會套用目前搜尋關鍵字）
+            applyFilterAndRender();
+
+            // 如果此時 dialog 正好開在這筆，就順便刷新一次內容，
+            // 讓 Modal / Lightbox 的縮圖可以換成後端縮圖
+            try {
+              const dlgEl = document.getElementById("petDialog");
+              if (dlgEl && dlgEl.open && window.currentPetId === petId && typeof openDialog === "function") {
+                await openDialog(petId);
+              }
+            } catch (err) {
+              console.warn("refresh dialog after thumb ready failed:", err);
+            }
+
+            return true;
+          }
+        } catch (err) {
+          console.warn("waitForThumbByPath getDoc error:", err);
+          // 直接跳出，不再重試
+          break;
+        }
+
+        // 還沒生好 → 過一段時間再問一次
+        if (i < maxTries - 1) {
+          await new Promise((r) => setTimeout(r, intervalMs));
+        }
+      }
+
+      return false;
     }
 
     const searchInput = $("#searchName");
