@@ -15,8 +15,6 @@ function storagePathFromDownloadUrl(url) {
   }
 }
 
-
-
 // Lightbox 縮圖播放 icon（避免與 Modal.js 的 __PLAY_SVG 命名衝突）
 const __THUMB_PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
 
@@ -25,7 +23,7 @@ function __primeThumbVideoFrameLightbox(v) {
   if (!v || v.dataset.__primed === "1") return;
   v.dataset.__primed = "1";
 
-  const onMeta = () => {
+  const seekToThumbTime = () => {
     try {
       const dur = Number.isFinite(v.duration) ? v.duration : 0;
       let t = 0.05;
@@ -37,18 +35,129 @@ function __primeThumbVideoFrameLightbox(v) {
     } catch (_) { }
   };
 
-  const onSeeked = () => { try { v.pause(); } catch (_) { } };
+  const ensurePaint = () => {
+    if (v.dataset.__painted === "1") return;
+    v.dataset.__painted = "1";
 
-  v.addEventListener("loadedmetadata", onMeta, { once: true });
-  v.addEventListener("seeked", onSeeked, { once: true });
+    try {
+      const p = v.play();
+      if (p && typeof p.then === "function") {
+        p.then(() => {
+          if (typeof v.requestVideoFrameCallback === "function") {
+            v.requestVideoFrameCallback(() => {
+              try { v.pause(); } catch (_) { }
+            });
+          } else {
+            setTimeout(() => {
+              try { v.pause(); } catch (_) { }
+            }, 60);
+          }
+        }).catch(() => {
+          try { v.pause(); } catch (_) { }
+        });
+      }
+    } catch (_) {
+      try { v.pause(); } catch (_) { }
+    }
+  };
+
+  v.addEventListener("loadedmetadata", () => {
+    seekToThumbTime();
+    ensurePaint();
+  }, { once: true });
+
+  v.addEventListener("seeked", () => {
+    ensurePaint();
+  }, { once: true });
+
   setTimeout(() => {
     try {
       if (v.readyState < 2) return;
-      if (v.currentTime === 0) v.currentTime = 0.05;
+      if (v.currentTime === 0) seekToThumbTime();
+      ensurePaint();
     } catch (_) { }
-  }, 120);
+  }, 200);
 }
 
+
+// ===============================
+// Lightbox 自訂影片控制列：進度條 + 自動播放
+// ===============================
+function __attachCustomLightboxVideoControls(video, opts) {
+  if (!video || video.__hasCustomControls) return;
+  video.__hasCustomControls = true;
+
+  video.controls = false;
+
+  const parent = video.parentElement || video;
+  const wrap = document.createElement("div");
+  wrap.className = "custom-video-controls mt-2";
+  const range = document.createElement("input");
+  range.type = "range";
+  range.min = "0";
+  range.max = "1000";
+  range.step = "1";
+  range.value = "0";
+  range.className = "w-full";
+  wrap.appendChild(range);
+  parent.appendChild(wrap);
+
+  video.__progressEl = range;
+
+  let seeking = false;
+
+  video.addEventListener("timeupdate", () => {
+    if (seeking) return;
+    if (!Number.isFinite(video.duration) || video.duration <= 0) return;
+    try {
+      const v = Math.max(0, Math.min(1000, Math.round(video.currentTime / video.duration * 1000)));
+      range.value = String(v);
+    } catch (_) {}
+  });
+
+  video.addEventListener("loadedmetadata", () => {
+    range.value = "0";
+  });
+
+  video.addEventListener("ended", () => {
+    range.value = "1000";
+  });
+
+  const onChange = () => {
+    if (!Number.isFinite(video.duration) || video.duration <= 0) return;
+    seeking = true;
+    try {
+      const ratio = Math.max(0, Math.min(1, Number(range.value) / 1000));
+      video.currentTime = ratio * video.duration;
+    } catch (_) {} finally {
+      seeking = false;
+    }
+  };
+  range.addEventListener("input", onChange);
+  range.addEventListener("change", onChange);
+
+  if (opts && opts.autoPlayOnReady) {
+    const tryPlay = () => {
+      if (!video || video.paused === false) return;
+      try {
+        const p = video.play();
+        if (p && typeof p.then === "function") {
+          p.catch(() => {});
+        }
+      } catch (_) {}
+    };
+
+    if (video.readyState >= 1 && Number.isFinite(video.duration) && video.duration > 0) {
+      tryPlay();
+    } else {
+      const onMeta = () => {
+        video.removeEventListener("loadedmetadata", onMeta);
+        tryPlay();
+      };
+      video.addEventListener("loadedmetadata", onMeta);
+    }
+  }
+}
 
 history.scrollRestoration = "manual";
 window.scrollTo(0, 0);
@@ -92,31 +201,20 @@ function renderLightboxMedia() {
       lbImg.classList.add("hidden");
       lbVideo.classList.remove("hidden");
 
-      // 優先用這支影片自己的縮圖當 poster，避免一開始看到黑畫面
-      try {
-        const map = (window.currentPetThumbByPath || {});
-        const videoPath = storagePathFromDownloadUrl(url);
-        const poster = (videoPath && map) ? (map[videoPath] || "") : "";
-        if (poster) {
-          lbVideo.poster = poster;
-        } else {
-          lbVideo.removeAttribute("poster");
-        }
-      } catch (_) {
-        try { lbVideo.removeAttribute("poster"); } catch (_) { }
-      }
+      // 換片前先停掉上一支影片並重設 src
+      try { lbVideo.pause(); } catch (_) {}
+      lbVideo.removeAttribute("src");
+      try { lbVideo.load && lbVideo.load(); } catch (_) {}
 
       lbVideo.src = url;
       lbVideo.playsInline = true;
-      lbVideo.controls = true;
-      // 不自動播放，讓使用者自己按下播放鍵，避免解碼時的黑幕
-      try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
+      lbVideo.controls = false; // 使用自訂控制列
+      __attachCustomLightboxVideoControls(lbVideo, { autoPlayOnReady: true });
     } else {
       try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
       lbVideo.classList.add("hidden");
       lbImg.classList.remove("hidden");
       lbImg.src = url;
-      try { lbVideo.removeAttribute("poster"); } catch (_) { }
     }
   } else if (lbImg) {
     lbImg.src = url;

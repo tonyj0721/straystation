@@ -24,8 +24,6 @@ function thumbPathFromMediaPath(mediaPath) {
   }
 }
 
-
-
 // ===============================
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
 // ===============================
@@ -33,8 +31,8 @@ function __primeThumbVideoFrame(v) {
   if (!v || v.dataset.__primed === "1") return;
   v.dataset.__primed = "1";
 
-  // 只要能顯示某個 frame 就好：loadedmetadata 後 seek 一下
-  const onMeta = () => {
+  // 找一個適合當縮圖的時間點
+  const seekToThumbTime = () => {
     try {
       const dur = Number.isFinite(v.duration) ? v.duration : 0;
       let t = 0.05;
@@ -43,28 +41,141 @@ function __primeThumbVideoFrame(v) {
         t = Math.max(0.05, Math.min(t, dur - 0.05));
       }
       v.currentTime = t;
+    } catch (_) { /* ignore */ }
+  };
+
+  // 真的跑一次「靜音播放 → 暫停」來逼 Safari 解碼畫面
+  const ensurePaint = () => {
+    if (v.dataset.__painted === "1") return;
+    v.dataset.__painted = "1";
+
+    try {
+      const p = v.play();
+      if (p && typeof p.then === "function") {
+        p.then(() => {
+          if (typeof v.requestVideoFrameCallback === "function") {
+            v.requestVideoFrameCallback(() => {
+              try { v.pause(); } catch (_) { }
+            });
+          } else {
+            setTimeout(() => {
+              try { v.pause(); } catch (_) { }
+            }, 60);
+          }
+        }).catch(() => {
+          try { v.pause(); } catch (_) { }
+        });
+      }
     } catch (_) {
-      // ignore
+      try { v.pause(); } catch (_) { }
     }
   };
 
-  const onSeeked = () => {
-    try { v.pause(); } catch (_) { }
-  };
+  v.addEventListener("loadedmetadata", () => {
+    seekToThumbTime();
+    ensurePaint();
+  }, { once: true });
 
-  v.addEventListener("loadedmetadata", onMeta, { once: true });
-  v.addEventListener("seeked", onSeeked, { once: true });
+  v.addEventListener("seeked", () => {
+    ensurePaint();
+  }, { once: true });
 
-  // 有些 Safari 不會立刻解碼畫面：加個保險
+  // 保險：metadata 很快就好了 / 我們太晚掛 listener 的情況
   setTimeout(() => {
     try {
       if (v.readyState < 2) return;
-      // 觸發一次 seek（若上面沒成功）
-      if (v.currentTime === 0) v.currentTime = 0.05;
+      if (v.currentTime === 0) seekToThumbTime();
+      ensurePaint();
     } catch (_) { }
-  }, 120);
+  }, 200);
 }
 
+
+// ===============================
+// 自訂影片控制列：進度條 + 自動播放
+// ===============================
+function __attachCustomVideoControls(video, opts) {
+  if (!video || video.__hasCustomControls) return;
+  video.__hasCustomControls = true;
+
+  // 關掉原生控制列，避免原生進度條狀態不穩
+  video.controls = false;
+
+  // 建立簡單的進度條（使用 <input type="range">）
+  const parent = video.parentElement || video;
+  const wrap = document.createElement("div");
+  wrap.className = "custom-video-controls mt-2";
+  const range = document.createElement("input");
+  range.type = "range";
+  range.min = "0";
+  range.max = "1000";
+  range.step = "1";
+  range.value = "0";
+  range.className = "w-full";
+  wrap.appendChild(range);
+  parent.appendChild(wrap);
+
+  video.__progressEl = range;
+
+  let seeking = false;
+
+  // 影片播放時更新進度條
+  video.addEventListener("timeupdate", () => {
+    if (seeking) return;
+    if (!Number.isFinite(video.duration) || video.duration <= 0) return;
+    try {
+      const v = Math.max(0, Math.min(1000, Math.round(video.currentTime / video.duration * 1000)));
+      range.value = String(v);
+    } catch (_) {}
+  });
+
+  // metadata 準備好時，重設進度條
+  video.addEventListener("loadedmetadata", () => {
+    range.value = "0";
+  });
+
+  // 播放完就把進度條填滿
+  video.addEventListener("ended", () => {
+    range.value = "1000";
+  });
+
+  // 使用者拖曳/點擊進度條時，改變 currentTime
+  const onChange = () => {
+    if (!Number.isFinite(video.duration) || video.duration <= 0) return;
+    seeking = true;
+    try {
+      const ratio = Math.max(0, Math.min(1, Number(range.value) / 1000));
+      video.currentTime = ratio * video.duration;
+    } catch (_) {} finally {
+      seeking = false;
+    }
+  };
+  range.addEventListener("input", onChange);
+  range.addEventListener("change", onChange);
+
+  // 如果需要自動播放，等 metadata 好了再播（避免一開始進度錯亂）
+  if (opts && opts.autoPlayOnReady) {
+    const tryPlay = () => {
+      if (!video || video.paused === false) return;
+      try {
+        const p = video.play();
+        if (p && typeof p.then === "function") {
+          p.catch(() => {});
+        }
+      } catch (_) {}
+    };
+
+    if (video.readyState >= 1 && Number.isFinite(video.duration) && video.duration > 0) {
+      tryPlay();
+    } else {
+      const onMeta = () => {
+        video.removeEventListener("loadedmetadata", onMeta);
+        tryPlay();
+      };
+      video.addEventListener("loadedmetadata", onMeta);
+    }
+  }
+}
 
 function __lockDialogScroll() {
   try { if (typeof lockScroll === "function") lockScroll(); } catch { }
@@ -503,15 +614,7 @@ async function openDialog(id) {
   currentDoc = p;
   currentDocId = p.id;
   window.currentPetId = p.id;
-
-  // 後端有 thumbByPath 就用後端的；沒有的話，保留這次上傳時暫存的那份（如果有）
-  const backendThumbMap = p.thumbByPath || {};
-  if (backendThumbMap && Object.keys(backendThumbMap).length) {
-    window.currentPetThumbByPath = backendThumbMap;
-  } else {
-    window.currentPetThumbByPath = window.currentPetThumbByPath || {};
-  }
-
+  window.currentPetThumbByPath = p.thumbByPath || {};
   history.replaceState(null, '', `?pet=${encodeURIComponent(p.id)}`);
 
   // 3. 健康標籤（第二排）
@@ -582,25 +685,16 @@ async function openDialog(id) {
         dlgImg.classList.add("hidden");
         dlgVideo.classList.remove("hidden");
 
-        // 優先用這支影片自己的縮圖當 poster，避免一開始看到黑畫面
-        try {
-          const map = (window.currentPetThumbByPath || p.thumbByPath || {});
-          const videoPath = storagePathFromDownloadUrl(url);
-          const poster = (videoPath && map) ? (map[videoPath] || "") : "";
-          if (poster) {
-            dlgVideo.poster = poster;
-          } else {
-            dlgVideo.removeAttribute("poster");
-          }
-        } catch (_) {
-          try { dlgVideo.removeAttribute("poster"); } catch (_) { }
-        }
+        // 換片前先停掉上一支影片並重設 src
+        try { dlgVideo.pause(); } catch (_) {}
+        dlgVideo.removeAttribute("src");
+        try { dlgVideo.load && dlgVideo.load(); } catch (_) {}
 
         dlgVideo.src = url;
         dlgVideo.playsInline = true;
-        dlgVideo.controls = true;
-        // 不自動播放，讓使用者自己按下播放鍵，避免解碼時的黑幕
-        try { dlgVideo.pause && dlgVideo.pause(); } catch (_) { }
+        dlgVideo.controls = false; // 使用自訂控制列
+        // 自訂進度條 + 自動播放
+        __attachCustomVideoControls(dlgVideo, { autoPlayOnReady: true });
       } else {
         try {
           dlgVideo.pause && dlgVideo.pause();
@@ -608,7 +702,6 @@ async function openDialog(id) {
         dlgVideo.classList.add("hidden");
         dlgImg.classList.remove("hidden");
         dlgImg.src = url;
-        try { dlgVideo.removeAttribute("poster"); } catch (_) { }
       }
     } else if (dlgImg) {
       dlgImg.src = url;
@@ -624,7 +717,7 @@ async function openDialog(id) {
         // 主圖是影片：優先用「這支影片自己的縮圖」
         try {
           const videoPath = storagePathFromDownloadUrl(url);
-          const thumbMap = (window.currentPetThumbByPath || p.thumbByPath || {});
+          const thumbMap = (p.thumbByPath) || {};
           const videoThumb = videoPath ? (thumbMap[videoPath] || "") : "";
 
           if (videoThumb) {

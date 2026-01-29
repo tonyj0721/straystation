@@ -1414,11 +1414,9 @@
 
         // 2) 逐張上傳圖片，取得 Storage URL
         const urls = [];
-        const localThumbByPath = {};
         for (const f of selectedFiles) {
-          const wmBlob = await addWatermarkToFile(f);       // ← 先加浮水印
+          const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
           const type = wmBlob.type || '';
-          const isVideo = type.startsWith('video/');
           let ext = 'bin';
           if (type.startsWith('image/')) {
             ext = type === 'image/png' ? 'png' : 'jpg';
@@ -1432,30 +1430,13 @@
           const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
           const r = sRef(storage, path);
           await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
-          const downloadUrl = await getDownloadURL(r);
-          urls.push(downloadUrl);
-
-          // 如果是影片，順便把這支影片的本地縮圖記起來，給 Modal / Lightbox 當 poster
-          if (isVideo) {
-            try {
-              const thumbUrl = await ensureThumbURL(f);
-              if (thumbUrl) {
-                localThumbByPath[path] = thumbUrl;
-              }
-            } catch (thumbErr) {
-              console.warn("ensureThumbURL(video) failed:", thumbErr);
-            }
-          }
+          urls.push(await getDownloadURL(r));
         }
 
         // 3) 回寫 images 欄位
         if (urls.length) {
           await updateDoc(doc(db, "pets", docRef.id), { images: urls });
         }
-
-        // 把這次上傳產生的縮圖暫存在全域，Modal / Lightbox 可以立刻拿來用
-        window.currentPetId = docRef.id;
-        window.currentPetThumbByPath = localThumbByPath || {};
 
         // UI 收尾
         stopDots();
@@ -1481,14 +1462,20 @@
         window.scrollTo({ top: 0, behavior: "smooth" });
         setTimeout(forceScrollTop, 250); // smooth 途中若被打斷，250ms 後硬捲補正
 
-        // 成功提示後直接打開詳情（不用等 reloadPromise 完成，避免卡 1~2 秒）
+
+        // 成功提示後直接打開詳情
         Swal.fire({
           icon: "success",
           title: "已成功登錄！",
           showConfirmButton: false,
           timer: 1500,
           returnFocus: false, // 避免關閉後把焦點還給原 input 而導致捲動回彈
-        }).then(() => {
+        }).then(async () => {
+          try {
+            await reloadPromise;
+          } catch (e) {
+            console.error("loadPets error:", e);
+          }
           forceScrollTop(); // ✅ 保證捲到最上面（不會卡在一半）
           openDialog(docRef.id);
         });
@@ -1697,11 +1684,12 @@
 
     // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
     const __THUMB_PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
+
     function __primeThumbVideoFrameAdmin(v) {
       if (!v || v.dataset.__primed === "1") return;
       v.dataset.__primed = "1";
 
-      const onMeta = () => {
+      const seekToThumbTime = () => {
         try {
           const dur = Number.isFinite(v.duration) ? v.duration : 0;
           let t = 0.05;
@@ -1713,15 +1701,48 @@
         } catch (_) { }
       };
 
-      const onSeeked = () => { try { v.pause(); } catch (_) { } };
-      v.addEventListener("loadedmetadata", onMeta, { once: true });
-      v.addEventListener("seeked", onSeeked, { once: true });
+      const ensurePaint = () => {
+        if (v.dataset.__painted === "1") return;
+        v.dataset.__painted = "1";
+
+        try {
+          const p = v.play();
+          if (p && typeof p.then === "function") {
+            p.then(() => {
+              if (typeof v.requestVideoFrameCallback === "function") {
+                v.requestVideoFrameCallback(() => {
+                  try { v.pause(); } catch (_) { }
+                });
+              } else {
+                setTimeout(() => {
+                  try { v.pause(); } catch (_) { }
+                }, 60);
+              }
+            }).catch(() => {
+              try { v.pause(); } catch (_) { }
+            });
+          }
+        } catch (_) {
+          try { v.pause(); } catch (_) { }
+        }
+      };
+
+      v.addEventListener("loadedmetadata", () => {
+        seekToThumbTime();
+        ensurePaint();
+      }, { once: true });
+
+      v.addEventListener("seeked", () => {
+        ensurePaint();
+      }, { once: true });
+
       setTimeout(() => {
         try {
           if (v.readyState < 2) return;
-          if (v.currentTime === 0) v.currentTime = 0.05;
+          if (v.currentTime === 0) seekToThumbTime();
+          ensurePaint();
         } catch (_) { }
-      }, 120);
+      }, 200);
     }
 
     // downloadUrl → Storage path（用於 thumbByPath）
