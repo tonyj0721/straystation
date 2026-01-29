@@ -1419,24 +1419,30 @@
         // 1) 新增基本文件
         const docRef = await addDoc(collection(db, "pets"), payload);
 
-        // 2) 逐張上傳圖片，取得 Storage URL
+                // 2) 逐張上傳檔案，圖片加浮水印，影片直接上傳
         const urls = [];
         for (const f of selectedFiles) {
-          const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
-          const type = wmBlob.type || '';
-          let ext = 'bin';
-          if (type.startsWith('image/')) {
-            ext = type === 'image/png' ? 'png' : 'jpg';
-          } else if (type.startsWith('video/')) {
-            if (type.includes('webm')) ext = 'webm';
-            else if (type.includes('ogg')) ext = 'ogg';
-            else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
-            else ext = 'mp4';
+          const isVideo = (f.type || "").startsWith("video/");
+          // 只有圖片加浮水印，影片直接用原始檔
+          const blobToUpload = isVideo ? f : await addWatermarkToFile(f);
+
+          const type = blobToUpload.type || f.type || "";
+          let ext = "bin";
+          if (type.startsWith("image/")) {
+            ext = type === "image/png" ? "png" : "jpg";
+          } else if (type.startsWith("video/")) {
+            if (type.includes("webm")) ext = "webm";
+            else if (type.includes("ogg")) ext = "ogg";
+            else if (type.includes("mp4") || type.includes("mpeg")) ext = "mp4";
+            else ext = "mp4";
           }
-          const base = f.name.replace(/\.[^.]+$/, '');
+
+          const base = f.name.replace(/\.[^.]+$/, "");
           const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
           const r = sRef(storage, path);
-          await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
+          await uploadBytes(r, blobToUpload, {
+            contentType: blobToUpload.type || f.type || undefined,
+          });
           urls.push(await getDownloadURL(r));
         }
 
