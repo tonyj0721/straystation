@@ -864,43 +864,53 @@
     function renderMediaPreviews() {
       mediaCount.textContent = `已選 ${selectedMedia.length} / ${MAX_MEDIA} 個`;
 
-      mediaPreview.innerHTML = "";  // 簡單重建（數量少，不易卡）
+      // 避免全清 innerHTML 造成閃白 → 使用 DOM 搬移 + 只更新必要部分
+      const existingTiles = Array.from(mediaPreview.children);
+      const newKeys = selectedMedia.map((item, i) => `${item.type}-${i}`);
+
+      // 移除多餘的
+      existingTiles.forEach((tile, index) => {
+        if (!newKeys.includes(tile.dataset.key)) tile.remove();
+      });
 
       selectedMedia.forEach((item, i) => {
-        const wrap = document.createElement("div");
-        wrap.className = "relative";
-        wrap.dataset.idx = i;
+        let tile = mediaPreview.querySelector(`[data-key="${item.type}-${i}"]`);
+        if (!tile) {
+          tile = document.createElement("div");
+          tile.className = "relative";
+          tile.dataset.key = `${item.type}-${i}`;
 
-        let el;
-        if (item.type === "image") {
-          el = document.createElement("img");
-          el.src = URL.createObjectURL(item.file);
-          el.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
-        } else {
-          el = document.createElement("video");
-          el.src = URL.createObjectURL(item.file);
-          el.preload = "metadata";
-          el.muted = true;
-          el.playsInline = true;
-          el.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+          let el;
+          if (item.type === "image") {
+            el = document.createElement("img");
+            el.src = URL.createObjectURL(item.file);
+            el.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+          } else {
+            el = document.createElement("video");
+            el.src = URL.createObjectURL(item.file);
+            el.preload = "metadata";
+            el.muted = true;
+            el.playsInline = true;
+            el.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
+            el.addEventListener("loadedmetadata", () => el.currentTime = 0, { once: true });
+          }
 
-          // iOS 強制顯示第一幀
-          el.addEventListener("loadedmetadata", () => {
-            el.currentTime = 0;
-          }, { once: true });
+          const label = document.createElement("div");
+          label.className = "absolute top-1 left-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded";
+          label.textContent = item.type === "image" ? "照片" : "影片";
+
+          const delBtn = document.createElement("button");
+          delBtn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
+          delBtn.textContent = "✕";
+          delBtn.dataset.idx = i;
+
+          tile.append(el, label, delBtn);
+          mediaPreview.appendChild(tile);
         }
 
-        const label = document.createElement("div");
-        label.className = "absolute top-1 left-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded";
-        label.textContent = item.type === "image" ? "照片" : "影片";
-
-        const delBtn = document.createElement("button");
-        delBtn.className = "absolute top-1 right-1 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center";
-        delBtn.textContent = "✕";
-        delBtn.dataset.idx = i;
-
-        wrap.append(el, label, delBtn);
-        mediaPreview.appendChild(wrap);
+        tile.dataset.idx = i;
+        const delBtn = tile.querySelector("button");
+        if (delBtn) delBtn.dataset.idx = i;
       });
     }
 
@@ -913,12 +923,13 @@
       renderMediaPreviews();
     });
 
-    // === 加強版拖曳（支援桌機 + iOS）===
+    // === 修正版拖曳：支援左右拖曳 + 降低閃白 ===
     let dragFrom = null;
     let dragOver = null;
     let dragEl = null;
+    let dragStartX = 0;
     let dragStartY = 0;
-    const DRAG_THRESHOLD = 8; // 增加門檻，避免輕微移動就觸發
+    const DRAG_THRESHOLD = 10;
 
     function clearDragUI() {
       mediaPreview.querySelectorAll("[data-idx]").forEach(el => {
@@ -926,7 +937,7 @@
       });
     }
 
-    mediaPreview.style.touchAction = "none"; // 防止 iOS scroll 搶事件
+    mediaPreview.style.touchAction = "none";
 
     mediaPreview.addEventListener("pointerdown", (e) => {
       if (e.target.closest("button")) return;
@@ -937,6 +948,7 @@
       dragEl = tile;
       dragFrom = +tile.dataset.idx;
       dragOver = dragFrom;
+      dragStartX = e.clientX;
       dragStartY = e.clientY;
 
       tile.setPointerCapture(e.pointerId);
@@ -950,9 +962,9 @@
     mediaPreview.addEventListener("pointermove", (e) => {
       if (dragFrom === null) return;
 
-      // 計算垂直移動距離
+      const dx = Math.abs(e.clientX - dragStartX);
       const dy = Math.abs(e.clientY - dragStartY);
-      if (dy < DRAG_THRESHOLD) return; // 門檻過低不觸發
+      if (dx < DRAG_THRESHOLD && dy < DRAG_THRESHOLD) return;
 
       const el = document.elementFromPoint(e.clientX, e.clientY);
       const tile = el?.closest?.("[data-idx]");
