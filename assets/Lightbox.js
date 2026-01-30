@@ -18,10 +18,6 @@ function storagePathFromDownloadUrl(url) {
 // Lightbox 縮圖播放 icon（避免與 Modal.js 的 __PLAY_SVG 命名衝突）
 const __THUMB_PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
 
-// 新增：播放 / 暫停圖示
-const PLAY_ICON = `<svg class="w-12 h-12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
-const PAUSE_ICON = `<svg class="w-12 h-12" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>`;
-
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
 function __primeThumbVideoFrameLightbox(v) {
   if (!v || v.dataset.__primed === "1") return;
@@ -100,6 +96,157 @@ let lbImages = [];
 let lbIndex = 0;
 let lbReturnToDialog = false;
 
+
+// ===============================
+// Custom video controls (Lightbox 主影片用)：播放/暫停、進度條、靜音
+// （避免與 Modal.js 的同名 const/function 衝突，這裡全部加 LB 前綴）
+// ===============================
+const __LBVC_PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
+const __LBVC_PAUSE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"></path></svg>';
+const __LBVC_MUTE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9v6h4l5 4V5L9 9H5zM19 9v6" /></svg>';
+const __LBVC_UNMUTE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9v6h4l5 4V5L9 9H5z"/><path d="M16 9l6 6M22 9l-6 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
+
+function __LBVC_ensureStyles() {
+  // 如果 Modal.js 已經注入過樣式，就直接用
+  if (document.getElementById("custom-video-controls-style")) return;
+  const s = document.createElement("style");
+  s.id = "custom-video-controls-style";
+  s.textContent = `
+  .vc-wrap{position:relative;}
+  .vc-bar{
+    position:absolute;left:0;right:0;bottom:0;
+    display:flex;align-items:center;gap:10px;
+    padding:10px 10px 12px;
+    background:linear-gradient(to top, rgba(0,0,0,.65), rgba(0,0,0,0));
+    z-index:30;
+  }
+  .vc-btn{
+    width:36px;height:36px;border-radius:9999px;
+    background:rgba(0,0,0,.55);color:#fff;
+    display:flex;align-items:center;justify-content:center;
+    border:0;outline:0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .vc-btn svg{width:20px;height:20px;fill:currentColor;}
+  .vc-progress{flex:1;min-width:0;}
+  .vc-progress{accent-color:#fff;}
+  .vc-progress:focus{outline:none;}
+  `;
+  document.head.appendChild(s);
+}
+
+async function __LBVC_safePlay(v) {
+  try { await v.play(); return; } catch (_) { }
+  try { v.muted = true; await v.play(); } catch (_) { }
+}
+
+function __LBVC_setVisible(v, on) {
+  const bar = v?.__lbvc?.bar;
+  if (!bar) return;
+  bar.classList.toggle("hidden", !on);
+}
+
+function __LBVC_attach(video, wrapEl, { barClass = "lb-vc-bar" } = {}) {
+  if (!video) return;
+  __LBVC_ensureStyles();
+
+  const wrap = wrapEl || video.parentElement;
+  if (!wrap) return;
+
+  wrap.classList.add("vc-wrap");
+
+  if (video.__lbvc?.bar && video.__lbvc.bar.isConnected) {
+    video.__lbvc.bar.classList.add(barClass);
+    __LBVC_setVisible(video, true);
+    __LBVC_sync(video);
+    return;
+  }
+
+  const bar = document.createElement("div");
+  bar.className = `${barClass} vc-bar`;
+  bar.innerHTML = `
+    <button type="button" class="vc-btn vc-play" aria-label="播放/暫停">${__LBVC_PLAY_SVG}</button>
+    <input type="range" class="vc-progress" min="0" max="0" step="0.1" value="0" aria-label="進度條"/>
+    <button type="button" class="vc-btn vc-mute" aria-label="靜音/取消靜音">${__LBVC_UNMUTE_SVG}</button>
+  `;
+
+  // 控制列的事件不要冒泡到 Lightbox（避免被當成 swipe / 點背景）
+  ["click","pointerdown","pointerup","touchstart","touchmove","touchend"].forEach((evt) => {
+    bar.addEventListener(evt, (e) => { e.stopPropagation(); }, { passive: evt.startsWith("touch") });
+  });
+
+  wrap.appendChild(bar);
+
+  const playBtn = bar.querySelector(".vc-play");
+  const muteBtn = bar.querySelector(".vc-mute");
+  const progress = bar.querySelector(".vc-progress");
+
+  let seeking = false;
+  const setSeeking = (v) => { seeking = v; };
+  progress.addEventListener("pointerdown", () => setSeeking(true));
+  progress.addEventListener("pointerup", () => setSeeking(false));
+  progress.addEventListener("touchstart", () => setSeeking(true), { passive: true });
+  progress.addEventListener("touchend", () => setSeeking(false), { passive: true });
+
+  progress.addEventListener("input", () => {
+    const t = Number(progress.value);
+    if (Number.isFinite(t)) {
+      try { video.currentTime = t; } catch (_) { }
+    }
+  });
+
+  playBtn.addEventListener("click", async () => {
+    if (video.paused || video.ended) await __LBVC_safePlay(video);
+    else { try { video.pause(); } catch (_) { } }
+    __LBVC_sync(video);
+  });
+
+  muteBtn.addEventListener("click", () => {
+    video.muted = !video.muted;
+    __LBVC_sync(video);
+  });
+
+  video.addEventListener("loadedmetadata", () => __LBVC_sync(video));
+  video.addEventListener("durationchange", () => __LBVC_sync(video));
+  video.addEventListener("timeupdate", () => { if (!seeking) __LBVC_sync(video); });
+  video.addEventListener("play", () => __LBVC_sync(video));
+  video.addEventListener("pause", () => __LBVC_sync(video));
+  video.addEventListener("ended", () => __LBVC_sync(video));
+  video.addEventListener("volumechange", () => __LBVC_sync(video));
+
+  // 點影片本身：播放 / 暫停（不影響底層的背景點擊關閉）
+  if (!video.dataset.__lbvcTapBound) {
+    video.dataset.__lbvcTapBound = "1";
+    video.addEventListener("click", async (ev) => {
+      if (ev.target && ev.target.closest && ev.target.closest(".vc-bar")) return;
+      if (video.paused || video.ended) await __LBVC_safePlay(video);
+      else { try { video.pause(); } catch (_) { } }
+      __LBVC_sync(video);
+    });
+  }
+
+  video.__lbvc = { bar, playBtn, muteBtn, progress, get seeking() { return seeking; } };
+
+  __LBVC_setVisible(video, true);
+  __LBVC_sync(video);
+}
+
+function __LBVC_sync(video) {
+  const ui = video?.__lbvc;
+  if (!ui) return;
+
+  const dur = Number.isFinite(video.duration) ? video.duration : 0;
+  ui.progress.max = String(dur || 0);
+  if (!ui.seeking) ui.progress.value = String(Number.isFinite(video.currentTime) ? video.currentTime : 0);
+
+  const playing = !video.paused && !video.ended;
+  ui.playBtn.innerHTML = playing ? __LBVC_PAUSE_SVG : __LBVC_PLAY_SVG;
+  ui.playBtn.setAttribute("aria-label", playing ? "暫停" : "播放");
+
+  const muted = !!video.muted || video.volume === 0;
+  ui.muteBtn.innerHTML = muted ? __LBVC_MUTE_SVG : __LBVC_UNMUTE_SVG;
+  ui.muteBtn.setAttribute("aria-label", muted ? "取消靜音" : "靜音");
+}
 function renderLightboxMedia() {
   if (!lbImages.length) {
     if (lbImg) lbImg.src = "";
@@ -107,137 +254,44 @@ function renderLightboxMedia() {
       try { lbVideo.pause(); } catch (_) { }
       lbVideo.src = "";
       lbVideo.classList.add("hidden");
-    }
-    if (lbWrap) lbWrap.classList.remove("lb-video-mode");
+        __LBVC_setVisible(lbVideo, false);
+  }
+    if (lbWrap) lbWrap.classList.remove("lb-video-mode"); // ← 新增
     return;
   }
 
   const url = lbImages[lbIndex] || "";
   const isVid = isVideoUrl(url);
 
+  // 根據是否為影片切換 class
   if (lbWrap) {
-    lbWrap.classList.toggle("lb-video-mode", !!isVid);
+    lbWrap.classList.toggle("lb-video-mode", !!isVid);   // ← 新增
   }
 
-  let controls = lbWrap.querySelector('.lb-custom-controls');
-
-  if (isVid) {
-    lbImg.classList.add("hidden");
-    lbVideo.classList.remove("hidden");
-    lbVideo.src = url;
-    lbVideo.playsInline = true;
-    lbVideo.controls = false;  // 移除原生控制列
-    lbVideo.load();
-    lbVideo.play().catch(() => { });
-
-    // 建立自訂控制列（只建立一次）
-    if (!controls) {
-      controls = document.createElement("div");
-      controls.className = "lb-custom-controls absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-6 flex items-center gap-6 text-white pointer-events-auto opacity-0 transition-opacity duration-300";
-
-      // 播放按鈕
-      const playBtn = document.createElement("button");
-      playBtn.className = "focus:outline-none";
-      playBtn.innerHTML = PLAY_ICON;
-      controls.appendChild(playBtn);
-
-      // 進度條容器
-      const progressContainer = document.createElement("div");
-      progressContainer.className = "flex-1 h-2 bg-white/30 rounded-full overflow-hidden cursor-pointer";
-      const progressFilled = document.createElement("div");
-      progressFilled.className = "h-full bg-white transition-all duration-100";
-      progressFilled.style.width = "0%";
-      progressContainer.appendChild(progressFilled);
-      controls.appendChild(progressContainer);
-
-      // 時間顯示
-      const timeDisplay = document.createElement("span");
-      timeDisplay.className = "text-lg font-medium tabular-nums";
-      timeDisplay.textContent = "0:00 / 0:00";
-      controls.appendChild(timeDisplay);
-
-      lbWrap.appendChild(controls);
-
-      // 事件綁定
-      const togglePlay = () => {
-        if (lbVideo.paused) lbVideo.play();
-        else lbVideo.pause();
-      };
-
-      const updatePlayIcon = () => {
-        playBtn.innerHTML = lbVideo.paused ? PLAY_ICON : PAUSE_ICON;
-      };
-
-      const updateProgress = () => {
-        const percent = lbVideo.duration ? (lbVideo.currentTime / lbVideo.duration) * 100 : 0;
-        progressFilled.style.width = percent + "%";
-      };
-
-      const formatTime = (sec) => {
-        if (!isFinite(sec)) return "0:00";
-        const m = Math.floor(sec / 60);
-        const s = Math.floor(sec % 60);
-        return `${m}:${s.toString().padStart(2, "0")}`;
-      };
-
-      const updateTime = () => {
-        timeDisplay.textContent = `${formatTime(lbVideo.currentTime)} / ${formatTime(lbVideo.duration)}`;
-      };
-
-      playBtn.onclick = togglePlay;
-      lbVideo.onclick = togglePlay;
-      progressContainer.onclick = (e) => {
-        const rect = progressContainer.getBoundingClientRect();
-        const pos = (e.clientX - rect.left) / rect.width;
-        lbVideo.currentTime = lbVideo.duration * Math.max(0, Math.min(1, pos));
-      };
-
-      lbVideo.addEventListener("play", updatePlayIcon);
-      lbVideo.addEventListener("pause", updatePlayIcon);
-      lbVideo.addEventListener("ended", updatePlayIcon);
-      lbVideo.addEventListener("timeupdate", updateProgress);
-      lbVideo.addEventListener("timeupdate", updateTime);
-      lbVideo.addEventListener("loadedmetadata", updateTime);
-      lbVideo.addEventListener("durationchange", updateTime);
-
-      // 自動隱藏控制列
-      let hideTimeout;
-      const showControls = () => {
-        controls.classList.remove("opacity-0");
-        clearTimeout(hideTimeout);
-        hideTimeout = setTimeout(() => controls.classList.add("opacity-0"), 3000);
-      };
-      lbWrap.addEventListener("mousemove", showControls);
-      lbWrap.addEventListener("touchstart", showControls, { passive: true });
-      lbVideo.addEventListener("click", showControls);
-
-      // 初始顯示
-      showControls();
-      updatePlayIcon();
-      updateTime();
-      updateProgress();
+  if (lbImg && lbVideo) {
+    if (isVid) {
+      lbImg.classList.add("hidden");
+      lbVideo.classList.remove("hidden");
+      lbVideo.src = url;
+      lbVideo.playsInline = true;
+      lbVideo.controls = false;
+      lbVideo.removeAttribute("controls");
+      __LBVC_attach(lbVideo, lbWrap, { barClass: "lb-vc-bar" });
+try { lbVideo.play().catch(() => { }); } catch (_) { }
     } else {
-      // 已存在控制列，僅更新 src 並播放
-      lbVideo.load();
-      lbVideo.play().catch(() => { });
-      controls.classList.remove("opacity-0");
+      try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
+      lbVideo.classList.add("hidden");
+      __LBVC_setVisible(lbVideo, false);
+      lbImg.classList.remove("hidden");
+      lbImg.src = url;
     }
-  } else {
-    // 圖片模式
-    try { lbVideo.pause(); } catch (_) { }
-    lbVideo.src = "";
-    lbVideo.classList.add("hidden");
-    lbImg.classList.remove("hidden");
+  } else if (lbImg) {
     lbImg.src = url;
-
-    // 隱藏控制列
-    if (controls) controls.classList.add("opacity-0");
   }
 
-  // 更新縮圖 active 狀態
   const lbThumbsInner = document.getElementById("lbThumbsInner");
   if (lbThumbsInner) {
-    Array.from(lbThumbsInner.children).forEach((el, i) => {
+    Array.prototype.forEach.call(lbThumbsInner.children, (el, i) => {
       el.classList.toggle("active", i === lbIndex);
     });
   }
@@ -407,10 +461,8 @@ function closeLightbox() {
   if (lbVideo) {
     try { lbVideo.pause(); } catch (_) { }
     lbVideo.removeAttribute("src");
-    try { lbVideo.load(); } catch (_) { }
+    try { lbVideo.load && lbVideo.load(); } catch (_) { }
   }
-  const controls = lbWrap.querySelector('.lb-custom-controls');
-  if (controls) controls.remove();
 
   if (lb) {
     lb.classList.add("hidden");
@@ -475,8 +527,9 @@ lb?.addEventListener("touchstart", (e) => {
   const h = window.innerHeight || document.documentElement.clientHeight || 0;
 
   if (isCurrentLightboxVideo()) {
-    // 影片時：上面 80% 可以左右滑，下面 20% 留給進度條
-    isSwipeZone = touchStartY < h * 0.8;
+    // 影片時：上面區域可以左右滑；控制列上操作不要觸發 swipe
+    const inControls = !!(e.target && e.target.closest && e.target.closest('.vc-bar'));
+    isSwipeZone = inControls ? false : (touchStartY < h * 0.8);
   } else {
     // 圖片時：整個畫面都可以左右滑
     isSwipeZone = true;

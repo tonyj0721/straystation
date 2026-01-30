@@ -99,6 +99,145 @@ function __unlockDialogScroll() {
 }
 
 // ===============================
+// Custom video controls (Dialog 主影片用)：播放/暫停、進度條、靜音
+// ===============================
+const __VC_PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
+const __VC_PAUSE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"></path></svg>';
+const __VC_MUTE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9v6h4l5 4V5L9 9H5zM19 9v6" /></svg>';
+const __VC_UNMUTE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9v6h4l5 4V5L9 9H5z"/><path d="M16 9l6 6M22 9l-6 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
+
+function __ensureVCStyles() {
+  if (document.getElementById("custom-video-controls-style")) return;
+  const s = document.createElement("style");
+  s.id = "custom-video-controls-style";
+  s.textContent = `
+  .vc-wrap{position:relative;}
+  .vc-bar{
+    position:absolute;left:0;right:0;bottom:0;
+    display:flex;align-items:center;gap:10px;
+    padding:10px 10px 12px;
+    background:linear-gradient(to top, rgba(0,0,0,.65), rgba(0,0,0,0));
+    z-index:30;
+  }
+  .vc-btn{
+    width:36px;height:36px;border-radius:9999px;
+    background:rgba(0,0,0,.55);color:#fff;
+    display:flex;align-items:center;justify-content:center;
+    border:0;outline:0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .vc-btn svg{width:20px;height:20px;fill:currentColor;}
+  .vc-progress{flex:1;min-width:0;}
+  .vc-progress{accent-color:#fff;}
+  .vc-progress:focus{outline:none;}
+  `;
+  document.head.appendChild(s);
+}
+
+async function __vcSafePlay(v) {
+  try { await v.play(); return; } catch (_) { }
+  try { v.muted = true; await v.play(); } catch (_) { }
+}
+
+function __setVCVisible(v, on) {
+  const bar = v?.__vc?.bar;
+  if (!bar) return;
+  bar.classList.toggle("hidden", !on);
+}
+
+function __attachCustomVideoControls(video, wrapEl, { barClass = "vc-bar" } = {}) {
+  if (!video) return;
+  __ensureVCStyles();
+
+  const wrap = wrapEl || video.parentElement;
+  if (!wrap) return;
+
+  wrap.classList.add("vc-wrap");
+
+  // 已經綁過就只要顯示 + 同步
+  if (video.__vc?.bar && video.__vc.bar.isConnected) {
+    video.__vc.bar.classList.add(barClass);
+    __setVCVisible(video, true);
+    __syncVC(video);
+    return;
+  }
+
+  const bar = document.createElement("div");
+  bar.className = `${barClass} vc-bar`;
+  bar.innerHTML = `
+    <button type="button" class="vc-btn vc-play" aria-label="播放/暫停">${__VC_PLAY_SVG}</button>
+    <input type="range" class="vc-progress" min="0" max="0" step="0.1" value="0" aria-label="進度條"/>
+    <button type="button" class="vc-btn vc-mute" aria-label="靜音/取消靜音">${__VC_UNMUTE_SVG}</button>
+  `;
+
+  // 讓控制列的操作不會穿透到 video 的 click / double tap
+  ["click","pointerdown","pointerup","touchstart","touchmove","touchend"].forEach((evt) => {
+    bar.addEventListener(evt, (e) => { e.stopPropagation(); }, { passive: evt.startsWith("touch") });
+  });
+
+  wrap.appendChild(bar);
+
+  const playBtn = bar.querySelector(".vc-play");
+  const muteBtn = bar.querySelector(".vc-mute");
+  const progress = bar.querySelector(".vc-progress");
+
+  let seeking = false;
+
+  const setSeeking = (v) => { seeking = v; };
+  progress.addEventListener("pointerdown", () => setSeeking(true));
+  progress.addEventListener("pointerup", () => setSeeking(false));
+  progress.addEventListener("touchstart", () => setSeeking(true), { passive: true });
+  progress.addEventListener("touchend", () => setSeeking(false), { passive: true });
+
+  progress.addEventListener("input", () => {
+    const t = Number(progress.value);
+    if (Number.isFinite(t)) {
+      try { video.currentTime = t; } catch (_) { }
+    }
+  });
+
+  playBtn.addEventListener("click", async () => {
+    if (video.paused || video.ended) await __vcSafePlay(video);
+    else { try { video.pause(); } catch (_) { } }
+    __syncVC(video);
+  });
+
+  muteBtn.addEventListener("click", () => {
+    video.muted = !video.muted;
+    __syncVC(video);
+  });
+
+  video.addEventListener("loadedmetadata", () => __syncVC(video));
+  video.addEventListener("durationchange", () => __syncVC(video));
+  video.addEventListener("timeupdate", () => { if (!seeking) __syncVC(video); });
+  video.addEventListener("play", () => __syncVC(video));
+  video.addEventListener("pause", () => __syncVC(video));
+  video.addEventListener("ended", () => __syncVC(video));
+  video.addEventListener("volumechange", () => __syncVC(video));
+
+  video.__vc = { bar, playBtn, muteBtn, progress, get seeking() { return seeking; } };
+
+  __setVCVisible(video, true);
+  __syncVC(video);
+}
+
+function __syncVC(video) {
+  const ui = video?.__vc;
+  if (!ui) return;
+  const dur = Number.isFinite(video.duration) ? video.duration : 0;
+  ui.progress.max = String(dur || 0);
+  if (!ui.seeking) ui.progress.value = String(Number.isFinite(video.currentTime) ? video.currentTime : 0);
+
+  const playing = !video.paused && !video.ended;
+  ui.playBtn.innerHTML = playing ? __VC_PAUSE_SVG : __VC_PLAY_SVG;
+  ui.playBtn.setAttribute("aria-label", playing ? "暫停" : "播放");
+
+  const muted = !!video.muted || video.volume === 0;
+  ui.muteBtn.innerHTML = muted ? __VC_MUTE_SVG : __VC_UNMUTE_SVG;
+  ui.muteBtn.setAttribute("aria-label", muted ? "取消靜音" : "靜音");
+}
+
+// ===============================
 // 品種資料與「品種/毛色」連動邏輯
 // ===============================
 const BREEDS = {
@@ -565,6 +704,7 @@ async function openDialog(id) {
         try { dlgVideo.pause(); } catch (_) { }
         dlgVideo.src = "";
         dlgVideo.classList.add("hidden");
+              __setVCVisible(dlgVideo, false);
       }
 
       if (dlgThumbs) dlgThumbs.innerHTML = "";
@@ -599,38 +739,16 @@ async function openDialog(id) {
         dlgVideo.classList.remove("hidden");
         dlgVideo.src = url;
         dlgVideo.playsInline = true;
-        dlgVideo.controls = false;  // 移除原生控制列
-        try { dlgVideo.play().catch(() => { }); } catch (_) { }
-
-        // 單擊播放/暫停，雙擊進入 Lightbox
-        let tapCount = 0;
-        let tapTimer = null;
-        dlgVideo.onclick = (ev) => {
-          tapCount++;
-          if (tapCount === 1) {
-            tapTimer = setTimeout(() => {
-              // 單擊：切換播放狀態
-              if (dlgVideo.paused) {
-                dlgVideo.play().catch(() => { });
-              } else {
-                dlgVideo.pause();
-              }
-              tapCount = 0;
-            }, 300);
-          } else {
-            // 雙擊：進入 Lightbox
-            clearTimeout(tapTimer);
-            ev.preventDefault();
-            ev.stopPropagation();
-            openLightbox(media, currentIndex);
-            tapCount = 0;
-          }
-        };
+        dlgVideo.controls = false;
+        dlgVideo.removeAttribute("controls");
+        __attachCustomVideoControls(dlgVideo, dlgStageWrap, { barClass: "dlg-vc-bar" });
+try { dlgVideo.play().catch(() => { }); } catch (_) { }
       } else {
         try {
           dlgVideo.pause && dlgVideo.pause();
         } catch (_) { }
         dlgVideo.classList.add("hidden");
+        __setVCVisible(dlgVideo, false);
         dlgImg.classList.remove("hidden");
         dlgImg.src = url;
       }
@@ -683,14 +801,30 @@ async function openDialog(id) {
   if (dlgVideo) {
     // 影片：改成「點兩下」主圖才進 Lightbox，單擊留給播放/暫停用
     let __dlgVideoLastTap = 0;
-    dlgVideo.onclick = (ev) => {
+    dlgVideo.onclick = async (ev) => {
       const now = Date.now();
+
+      // 影片控制列點擊不處理（避免點按控制列也被當成單擊/雙擊）
+      if (ev.target && ev.target.closest && ev.target.closest(".vc-bar")) return;
+
+      // 雙擊：進 Lightbox
       if (now - __dlgVideoLastTap < 320) {
         ev.preventDefault();
         ev.stopPropagation();
         openLightbox(media, currentIndex);
+        __dlgVideoLastTap = 0;
+        return;
       }
+
       __dlgVideoLastTap = now;
+
+      // 單擊：播放 / 暫停
+      if (dlgVideo.paused || dlgVideo.ended) {
+        await __vcSafePlay(dlgVideo);
+      } else {
+        try { dlgVideo.pause(); } catch (_) { }
+      }
+      __syncVC(dlgVideo);
     };
   }
 
