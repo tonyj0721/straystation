@@ -24,6 +24,8 @@ function thumbPathFromMediaPath(mediaPath) {
   }
 }
 
+
+
 // ===============================
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
 // ===============================
@@ -31,8 +33,8 @@ function __primeThumbVideoFrame(v) {
   if (!v || v.dataset.__primed === "1") return;
   v.dataset.__primed = "1";
 
-  // 找一個適合當縮圖的時間點
-  const seekToThumbTime = () => {
+  // 只要能顯示某個 frame 就好：loadedmetadata 後 seek 一下
+  const onMeta = () => {
     try {
       const dur = Number.isFinite(v.duration) ? v.duration : 0;
       let t = 0.05;
@@ -41,54 +43,28 @@ function __primeThumbVideoFrame(v) {
         t = Math.max(0.05, Math.min(t, dur - 0.05));
       }
       v.currentTime = t;
-    } catch (_) { /* ignore */ }
-  };
-
-  // 真的跑一次「靜音播放 → 暫停」來逼 Safari 解碼畫面
-  const ensurePaint = () => {
-    if (v.dataset.__painted === "1") return;
-    v.dataset.__painted = "1";
-
-    try {
-      const p = v.play();
-      if (p && typeof p.then === "function") {
-        p.then(() => {
-          if (typeof v.requestVideoFrameCallback === "function") {
-            v.requestVideoFrameCallback(() => {
-              try { v.pause(); } catch (_) { }
-            });
-          } else {
-            setTimeout(() => {
-              try { v.pause(); } catch (_) { }
-            }, 60);
-          }
-        }).catch(() => {
-          try { v.pause(); } catch (_) { }
-        });
-      }
     } catch (_) {
-      try { v.pause(); } catch (_) { }
+      // ignore
     }
   };
 
-  v.addEventListener("loadedmetadata", () => {
-    seekToThumbTime();
-    ensurePaint();
-  }, { once: true });
+  const onSeeked = () => {
+    try { v.pause(); } catch (_) { }
+  };
 
-  v.addEventListener("seeked", () => {
-    ensurePaint();
-  }, { once: true });
+  v.addEventListener("loadedmetadata", onMeta, { once: true });
+  v.addEventListener("seeked", onSeeked, { once: true });
 
-  // 保險：metadata 很快就好了 / 我們太晚掛 listener 的情況
+  // 有些 Safari 不會立刻解碼畫面：加個保險
   setTimeout(() => {
     try {
       if (v.readyState < 2) return;
-      if (v.currentTime === 0) seekToThumbTime();
-      ensurePaint();
+      // 觸發一次 seek（若上面沒成功）
+      if (v.currentTime === 0) v.currentTime = 0.05;
     } catch (_) { }
-  }, 200);
+  }, 120);
 }
+
 
 function __lockDialogScroll() {
   try { if (typeof lockScroll === "function") lockScroll(); } catch { }
@@ -96,145 +72,6 @@ function __lockDialogScroll() {
 
 function __unlockDialogScroll() {
   try { if (typeof unlockScroll === "function") unlockScroll(); } catch { }
-}
-
-// ===============================
-// Custom video controls (Dialog 主影片用)：播放/暫停、進度條、靜音
-// ===============================
-const __VC_PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
-const __VC_PAUSE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"></path></svg>';
-const __VC_MUTE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9v6h4l5 4V5L9 9H5zM19 9v6" /></svg>';
-const __VC_UNMUTE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9v6h4l5 4V5L9 9H5z"/><path d="M16 9l6 6M22 9l-6 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
-
-function __ensureVCStyles() {
-  if (document.getElementById("custom-video-controls-style")) return;
-  const s = document.createElement("style");
-  s.id = "custom-video-controls-style";
-  s.textContent = `
-  .vc-wrap{position:relative;}
-  .vc-bar{
-    position:absolute;left:0;right:0;bottom:0;
-    display:flex;align-items:center;gap:10px;
-    padding:10px 10px 12px;
-    background:linear-gradient(to top, rgba(0,0,0,.65), rgba(0,0,0,0));
-    z-index:30;
-  }
-  .vc-btn{
-    width:36px;height:36px;border-radius:9999px;
-    background:rgba(0,0,0,.55);color:#fff;
-    display:flex;align-items:center;justify-content:center;
-    border:0;outline:0;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .vc-btn svg{width:20px;height:20px;fill:currentColor;}
-  .vc-progress{flex:1;min-width:0;}
-  .vc-progress{accent-color:#fff;}
-  .vc-progress:focus{outline:none;}
-  `;
-  document.head.appendChild(s);
-}
-
-async function __vcSafePlay(v) {
-  try { await v.play(); return; } catch (_) { }
-  try { v.muted = true; await v.play(); } catch (_) { }
-}
-
-function __setVCVisible(v, on) {
-  const bar = v?.__vc?.bar;
-  if (!bar) return;
-  bar.classList.toggle("hidden", !on);
-}
-
-function __attachCustomVideoControls(video, wrapEl, { barClass = "vc-bar" } = {}) {
-  if (!video) return;
-  __ensureVCStyles();
-
-  const wrap = wrapEl || video.parentElement;
-  if (!wrap) return;
-
-  wrap.classList.add("vc-wrap");
-
-  // 已經綁過就只要顯示 + 同步
-  if (video.__vc?.bar && video.__vc.bar.isConnected) {
-    video.__vc.bar.classList.add(barClass);
-    __setVCVisible(video, true);
-    __syncVC(video);
-    return;
-  }
-
-  const bar = document.createElement("div");
-  bar.className = `${barClass} vc-bar`;
-  bar.innerHTML = `
-    <button type="button" class="vc-btn vc-play" aria-label="播放/暫停">${__VC_PLAY_SVG}</button>
-    <input type="range" class="vc-progress" min="0" max="0" step="0.1" value="0" aria-label="進度條"/>
-    <button type="button" class="vc-btn vc-mute" aria-label="靜音/取消靜音">${__VC_UNMUTE_SVG}</button>
-  `;
-
-  // 讓控制列的操作不會穿透到 video 的 click / double tap
-  ["click","pointerdown","pointerup","touchstart","touchmove","touchend"].forEach((evt) => {
-    bar.addEventListener(evt, (e) => { e.stopPropagation(); }, { passive: evt.startsWith("touch") });
-  });
-
-  wrap.appendChild(bar);
-
-  const playBtn = bar.querySelector(".vc-play");
-  const muteBtn = bar.querySelector(".vc-mute");
-  const progress = bar.querySelector(".vc-progress");
-
-  let seeking = false;
-
-  const setSeeking = (v) => { seeking = v; };
-  progress.addEventListener("pointerdown", () => setSeeking(true));
-  progress.addEventListener("pointerup", () => setSeeking(false));
-  progress.addEventListener("touchstart", () => setSeeking(true), { passive: true });
-  progress.addEventListener("touchend", () => setSeeking(false), { passive: true });
-
-  progress.addEventListener("input", () => {
-    const t = Number(progress.value);
-    if (Number.isFinite(t)) {
-      try { video.currentTime = t; } catch (_) { }
-    }
-  });
-
-  playBtn.addEventListener("click", async () => {
-    if (video.paused || video.ended) await __vcSafePlay(video);
-    else { try { video.pause(); } catch (_) { } }
-    __syncVC(video);
-  });
-
-  muteBtn.addEventListener("click", () => {
-    video.muted = !video.muted;
-    __syncVC(video);
-  });
-
-  video.addEventListener("loadedmetadata", () => __syncVC(video));
-  video.addEventListener("durationchange", () => __syncVC(video));
-  video.addEventListener("timeupdate", () => { if (!seeking) __syncVC(video); });
-  video.addEventListener("play", () => __syncVC(video));
-  video.addEventListener("pause", () => __syncVC(video));
-  video.addEventListener("ended", () => __syncVC(video));
-  video.addEventListener("volumechange", () => __syncVC(video));
-
-  video.__vc = { bar, playBtn, muteBtn, progress, get seeking() { return seeking; } };
-
-  __setVCVisible(video, true);
-  __syncVC(video);
-}
-
-function __syncVC(video) {
-  const ui = video?.__vc;
-  if (!ui) return;
-  const dur = Number.isFinite(video.duration) ? video.duration : 0;
-  ui.progress.max = String(dur || 0);
-  if (!ui.seeking) ui.progress.value = String(Number.isFinite(video.currentTime) ? video.currentTime : 0);
-
-  const playing = !video.paused && !video.ended;
-  ui.playBtn.innerHTML = playing ? __VC_PAUSE_SVG : __VC_PLAY_SVG;
-  ui.playBtn.setAttribute("aria-label", playing ? "暫停" : "播放");
-
-  const muted = !!video.muted || video.volume === 0;
-  ui.muteBtn.innerHTML = muted ? __VC_MUTE_SVG : __VC_UNMUTE_SVG;
-  ui.muteBtn.setAttribute("aria-label", muted ? "取消靜音" : "靜音");
 }
 
 // ===============================
@@ -704,7 +541,6 @@ async function openDialog(id) {
         try { dlgVideo.pause(); } catch (_) { }
         dlgVideo.src = "";
         dlgVideo.classList.add("hidden");
-              __setVCVisible(dlgVideo, false);
       }
 
       if (dlgThumbs) dlgThumbs.innerHTML = "";
@@ -739,16 +575,13 @@ async function openDialog(id) {
         dlgVideo.classList.remove("hidden");
         dlgVideo.src = url;
         dlgVideo.playsInline = true;
-        dlgVideo.controls = false;
-        dlgVideo.removeAttribute("controls");
-        __attachCustomVideoControls(dlgVideo, dlgStageWrap, { barClass: "dlg-vc-bar" });
-try { dlgVideo.play().catch(() => { }); } catch (_) { }
+        dlgVideo.controls = true;
+        try { dlgVideo.play().catch(() => { }); } catch (_) { }
       } else {
         try {
           dlgVideo.pause && dlgVideo.pause();
         } catch (_) { }
         dlgVideo.classList.add("hidden");
-        __setVCVisible(dlgVideo, false);
         dlgImg.classList.remove("hidden");
         dlgImg.src = url;
       }
@@ -757,34 +590,9 @@ try { dlgVideo.play().catch(() => { }); } catch (_) { }
     }
 
     if (dlgBg) {
-      let bgSrc = "";
-
-      if (!isVid) {
-        // 主圖是照片：直接用當前這張照片做背景
-        bgSrc = url;
-      } else {
-        // 主圖是影片：優先用「這支影片自己的縮圖」
-        try {
-          const videoPath = storagePathFromDownloadUrl(url);
-          const thumbMap = (p.thumbByPath) || {};
-          const videoThumb = videoPath ? (thumbMap[videoPath] || "") : "";
-
-          if (videoThumb) {
-            bgSrc = videoThumb;
-          } else {
-            // 沒有縮圖時，再退而求其次：用第一張照片當背景
-            const firstImage = media.find(u => !isVideoUrl(u));
-            bgSrc = firstImage || "";
-          }
-        } catch (_) {
-          // 萬一解析 path 出錯，就跟上面一樣退回用第一張照片
-          const firstImage = media.find(u => !isVideoUrl(u));
-          bgSrc = firstImage || "";
-        }
-      }
-
-      // 只有真的有圖才塞 src，避免誤把影片網址塞進 <img> 變成破圖
-      dlgBg.src = bgSrc;
+      const firstImage = media.find(u => !isVideoUrl(u));
+      // 只有影片時不要把 <img> 的 src 設成影片網址（會出現破圖）
+      dlgBg.src = firstImage || (isVid ? "" : url);
     }
 
     if (dlgThumbs) {
@@ -801,30 +609,14 @@ try { dlgVideo.play().catch(() => { }); } catch (_) { }
   if (dlgVideo) {
     // 影片：改成「點兩下」主圖才進 Lightbox，單擊留給播放/暫停用
     let __dlgVideoLastTap = 0;
-    dlgVideo.onclick = async (ev) => {
+    dlgVideo.onclick = (ev) => {
       const now = Date.now();
-
-      // 影片控制列點擊不處理（避免點按控制列也被當成單擊/雙擊）
-      if (ev.target && ev.target.closest && ev.target.closest(".vc-bar")) return;
-
-      // 雙擊：進 Lightbox
       if (now - __dlgVideoLastTap < 320) {
         ev.preventDefault();
         ev.stopPropagation();
         openLightbox(media, currentIndex);
-        __dlgVideoLastTap = 0;
-        return;
       }
-
       __dlgVideoLastTap = now;
-
-      // 單擊：播放 / 暫停
-      if (dlgVideo.paused || dlgVideo.ended) {
-        await __vcSafePlay(dlgVideo);
-      } else {
-        try { dlgVideo.pause(); } catch (_) { }
-      }
-      __syncVC(dlgVideo);
     };
   }
 
@@ -1154,32 +946,32 @@ async function saveEdit() {
     }
 
     // 刪除被移除的舊圖（忽略刪失敗）
-    // 同步刪掉後端產生的縮圖：thumbs/<原路徑去副檔名>.jpg
-    // 並清理 Firestore 的 thumbByPath 對應 key（避免越積越多）
-    const __thumbFieldDeletes = {};
-    for (const url of (removeUrls || [])) {
-      try {
-        const enc = String(url).split("/o/")[1].split("?")[0];
-        const mediaPath = decodeURIComponent(enc);
+// 同步刪掉後端產生的縮圖：thumbs/<原路徑去副檔名>.jpg
+// 並清理 Firestore 的 thumbByPath 對應 key（避免越積越多）
+const __thumbFieldDeletes = {};
+for (const url of (removeUrls || [])) {
+  try {
+    const enc = String(url).split("/o/")[1].split("?")[0];
+    const mediaPath = decodeURIComponent(enc);
 
-        // 1) 刪原檔
-        await deleteObject(sRef(storage, mediaPath));
+    // 1) 刪原檔
+    await deleteObject(sRef(storage, mediaPath));
 
-        // 2) 若是影片：刪縮圖 + 刪欄位 key
-        if (isVideoUrl(url)) {
-          const tPath = thumbPathFromMediaPath(mediaPath);
-          if (tPath) {
-            try { await deleteObject(sRef(storage, tPath)); } catch (_) { /* ignore */ }
-          }
-          __thumbFieldDeletes[`thumbByPath.${mediaPath}`] = deleteField();
-        }
-      } catch (e) {
-        // 靜默忽略
+    // 2) 若是影片：刪縮圖 + 刪欄位 key
+    if (isVideoUrl(url)) {
+      const tPath = thumbPathFromMediaPath(mediaPath);
+      if (tPath) {
+        try { await deleteObject(sRef(storage, tPath)); } catch (_) { /* ignore */ }
       }
+      __thumbFieldDeletes[`thumbByPath.${mediaPath}`] = deleteField();
     }
+  } catch (e) {
+    // 靜默忽略
+  }
+}
 
-    newData.images = newUrls;
-    const __updatePayload = { ...newData, ...__thumbFieldDeletes };
+newData.images = newUrls;
+const __updatePayload = { ...newData, ...__thumbFieldDeletes };
 
     // ③ 寫回 Firestore
     await updateDoc(doc(db, "pets", currentDocId), __updatePayload);
@@ -1363,31 +1155,12 @@ function __makeEditTile(it) {
 
     if (it.kind === "url") {
       v.src = it.url;
-
-      // 先嘗試用後端產出的縮圖（thumbByPath）
-      try {
-        const path = storagePathFromDownloadUrl(it.url);
-        const thumbMap = window.currentPetThumbByPath || {};
-        const thumbUrl = path && thumbMap[path];
-        if (thumbUrl) {
-          v.poster = thumbUrl;
-        } else {
-          // 沒有縮圖就用影片本身抓第一幀，避免黑畫面
-          __primeThumbVideoFrame(v);
-        }
-      } catch (_) {
-        __primeThumbVideoFrame(v);
-      }
     } else {
       v.src = getEditVideoObjURL(it.file);
-
-      // 先抓一幀，確保一開始就有畫面
-      __primeThumbVideoFrame(v);
-
-      // 若能產出高品質縮圖就覆蓋上去
+      // 用縮圖當 poster，避免黑畫面
       ensurePreviewThumbURL(it.file)
         .then((u) => { v.poster = u; })
-        .catch(() => { /* 失敗就維持第一幀 */ });
+        .catch(() => { /* ignore */ });
     }
 
     const overlay = document.createElement("div");
