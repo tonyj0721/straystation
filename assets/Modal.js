@@ -6,6 +6,48 @@ function isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
 
+
+function __startInlineVideo(v) {
+  if (!v) return;
+
+  // iOS Safari：播完後按播放鍵偶爾不會重播（停在 duration），要先把播放頭拉回來
+  if (v.dataset.__replayFix !== "1") {
+    v.dataset.__replayFix = "1";
+
+    v.addEventListener("ended", () => {
+      try {
+        // iOS 有時 set 0 會怪怪的，保險用 0.01
+        v.currentTime = 0.01;
+      } catch (_) { }
+    });
+
+    // 保險：有些情況 ended 沒正確 reset，但其實已在尾端
+    v.addEventListener("pause", () => {
+      try {
+        const d = Number.isFinite(v.duration) ? v.duration : 0;
+        if (d && v.currentTime >= d - 0.05) v.currentTime = 0.01;
+      } catch (_) { }
+    });
+  }
+
+  // 盡快取得 duration / metadata（避免第一次顯示時 controls 進度條不刷新）
+  try { v.preload = "metadata"; } catch (_) { }
+  try { v.load?.(); } catch (_) { }
+
+  const go = () => {
+    // 兩個 RAF：等 element 可見且 layout 完成（iOS/Safari 特別需要）
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        try { v.play?.().catch(() => { }); } catch (_) { }
+      });
+    });
+  };
+
+  // readyState >= 1：metadata 已可用
+  if (v.readyState >= 1) go();
+  else v.addEventListener("loadedmetadata", go, { once: true });
+}
+
 function storagePathFromDownloadUrl(url) {
   try {
     const p = String(url).split("/o/")[1].split("?")[0];
@@ -597,37 +639,23 @@ async function openDialog(id) {
       if (isVid) {
         dlgImg.classList.add("hidden");
         dlgVideo.classList.remove("hidden");
-        dlgVideo.preload = "metadata";
         dlgVideo.src = url;
-
-        // iOS 需要這兩個屬性（保險）
-        dlgVideo.playsInline = true;
         dlgVideo.setAttribute("playsinline", "");
         dlgVideo.setAttribute("webkit-playsinline", "");
-
+        dlgVideo.playsInline = true;
         dlgVideo.controls = true;
-
-        // 先載入 metadata（拿到 duration）
-        try { dlgVideo.load && dlgVideo.load(); } catch (_) { }
-
-        // ✅ 等到知道 duration（loadedmetadata）再播：進度條就會正常
-        dlgVideo.addEventListener("loadedmetadata", () => {
-          try { dlgVideo.play().catch(() => { }); } catch (_) { }
-        }, { once: true });
-
-        // ✅ iPhone：播完停在最後一格時，按播放可能沒反應 → 播完自動把播放頭拉回開頭
-        if (dlgVideo.dataset.__endedFixBound !== "1") {
-          dlgVideo.dataset.__endedFixBound = "1";
-          dlgVideo.addEventListener("ended", () => {
-            try { dlgVideo.currentTime = 0; }
-            catch (_) { try { dlgVideo.currentTime = 0.01; } catch (_) { } }
-            try { dlgVideo.pause(); } catch (_) { }
-          });
+        try { dlgVideo.preload = "metadata"; } catch (_) { }
+        dlgVideo.dataset.__autoplay = "1";
+        const __dlg = document.getElementById("petDialog");
+        if (__dlg && __dlg.open) {
+          __startInlineVideo(dlgVideo);
+          dlgVideo.dataset.__autoplay = "0";
         }
       } else {
         try {
           dlgVideo.pause && dlgVideo.pause();
         } catch (_) { }
+        dlgVideo.dataset.__autoplay = "0";
         dlgVideo.classList.add("hidden");
         dlgImg.classList.remove("hidden");
         dlgImg.src = url;
@@ -829,6 +857,13 @@ async function openDialog(id) {
   if (!dlg.open) {
     __lockDialogScroll();
     dlg.showModal();
+
+    // dialog 已可見後再啟動影片（避免第一次進度條不刷新）
+    const __v = document.getElementById("dlgVideo");
+    if (__v && __v.dataset.__autoplay === "1" && !__v.classList.contains("hidden")) {
+      __startInlineVideo(__v);
+      __v.dataset.__autoplay = "0";
+    }
   }
 }
 

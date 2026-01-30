@@ -6,6 +6,46 @@ function isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
 
+
+// 讓影片在「已可見 + metadata 已就緒」後再 play，避免第一次 controls 進度條卡住（iOS/Safari 常見）
+function __startInlineVideo(v) {
+  if (!v) return;
+
+  // iOS Safari：播完後按播放鍵偶爾不會重播（停在 duration），要先把播放頭拉回來
+  if (v.dataset.__replayFix !== "1") {
+    v.dataset.__replayFix = "1";
+
+    v.addEventListener("ended", () => {
+      try {
+        // iOS 有時 set 0 會怪怪的，保險用 0.01
+        v.currentTime = 0.01;
+      } catch (_) { }
+    });
+
+    // 保險：有些情況 ended 沒正確 reset，但其實已在尾端
+    v.addEventListener("pause", () => {
+      try {
+        const d = Number.isFinite(v.duration) ? v.duration : 0;
+        if (d && v.currentTime >= d - 0.05) v.currentTime = 0.01;
+      } catch (_) { }
+    });
+  }
+
+  try { v.preload = "metadata"; } catch (_) { }
+  try { v.load?.(); } catch (_) { }
+
+  const go = () => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        try { v.play?.().catch(() => { }); } catch (_) { }
+      });
+    });
+  };
+
+  if (v.readyState >= 1) go();
+  else v.addEventListener("loadedmetadata", go, { once: true });
+}
+
 function storagePathFromDownloadUrl(url) {
   try {
     const p = String(url).split("/o/")[1].split("?")[0];
@@ -120,30 +160,12 @@ function renderLightboxMedia() {
     if (isVid) {
       lbImg.classList.add("hidden");
       lbVideo.classList.remove("hidden");
-      lbVideo.preload = "metadata";
       lbVideo.src = url;
-
-      lbVideo.playsInline = true;
       lbVideo.setAttribute("playsinline", "");
       lbVideo.setAttribute("webkit-playsinline", "");
-
+      lbVideo.playsInline = true;
       lbVideo.controls = true;
-
-      try { lbVideo.load && lbVideo.load(); } catch (_) { }
-
-      lbVideo.addEventListener("loadedmetadata", () => {
-        try { lbVideo.play().catch(() => { }); } catch (_) { }
-      }, { once: true });
-
-      // ✅ iPhone：播完後停在結尾，按播放可能沒反應 → 播完自動拉回開頭
-      if (lbVideo.dataset.__endedFixBound !== "1") {
-        lbVideo.dataset.__endedFixBound = "1";
-        lbVideo.addEventListener("ended", () => {
-          try { lbVideo.currentTime = 0; }
-          catch (_) { try { lbVideo.currentTime = 0.01; } catch (_) { } }
-          try { lbVideo.pause(); } catch (_) { }
-        });
-      }
+      __startInlineVideo(lbVideo);
     } else {
       try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
       lbVideo.classList.add("hidden");
@@ -305,15 +327,15 @@ function openLightbox(images, index = 0) {
     });
   }
 
+  // 顯示 Lightbox（先顯示，讓影片 controls 有 layout，避免第一次進度條不刷新）
   if (lb) {
     lb.classList.remove("hidden");
     lb.classList.add("flex");
   }
 
-  // 下一個 frame 再 render（讓 layout/controls 先出來）
-  requestAnimationFrame(() => {
-    renderLightboxMedia();
-  });
+  // 一開始顯示當前項目（Lightbox 已可見）
+  renderLightboxMedia();
+
 
   // 關掉 Modal（移除 backdrop）
   if (dlg?.open) dlg.close();
