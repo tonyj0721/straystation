@@ -6,6 +6,90 @@ function isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
 
+// ===============================
+// 影片播放初始化：避免剛換 src 時 duration 還沒正常（Infinity/NaN）導致控制列進度條「前段不動、後段爆衝」
+// ===============================
+function __hasFiniteDuration(v) {
+  const d = v && v.duration;
+  return Number.isFinite(d) && d > 0 && d !== Infinity;
+}
+
+function __forceResolveDuration(v, timeoutMs = 1200) {
+  return new Promise((resolve) => {
+    let done = false;
+
+    const finish = () => {
+      if (done) return;
+      done = true;
+      v.removeEventListener("durationchange", onDur);
+      v.removeEventListener("timeupdate", onTime);
+      resolve();
+    };
+
+    const onDur = () => {
+      if (__hasFiniteDuration(v)) finish();
+    };
+
+    const onTime = () => {
+      if (__hasFiniteDuration(v) && v.currentTime > 0) {
+        try { v.currentTime = 0; } catch (_) { }
+        finish();
+      }
+    };
+
+    v.addEventListener("durationchange", onDur);
+    v.addEventListener("timeupdate", onTime);
+
+    try { v.currentTime = 1e101; } catch (_) { }
+    setTimeout(finish, timeoutMs);
+  });
+}
+
+function __prepareAndPlayVideo(v, url) {
+  if (!v) return;
+
+  const token = (v.__playToken = (v.__playToken || 0) + 1);
+  const isActive = () => v.__playToken === token;
+
+  try { v.pause(); } catch (_) { }
+  try { v.currentTime = 0; } catch (_) { }
+
+  v.preload = "metadata";
+  v.playsInline = true;
+  v.controls = true;
+
+  try { v.removeAttribute("src"); v.load && v.load(); } catch (_) { }
+  v.src = url;
+  try { v.load && v.load(); } catch (_) { }
+
+  let readyFired = false;
+  const tryPlay = () => {
+    if (!isActive()) return;
+    try {
+      const p = v.play();
+      if (p && typeof p.catch === "function") p.catch(() => { });
+    } catch (_) { }
+  };
+
+  const onReady = async () => {
+    if (!isActive() || readyFired) return;
+    readyFired = true;
+
+    if (!__hasFiniteDuration(v)) {
+      await __forceResolveDuration(v);
+    }
+    if (!isActive()) return;
+
+    try { v.currentTime = 0; } catch (_) { }
+    tryPlay();
+  };
+
+  v.addEventListener("loadedmetadata", onReady, { once: true });
+  v.addEventListener("canplay", onReady, { once: true });
+
+  setTimeout(tryPlay, 250);
+}
+
 function storagePathFromDownloadUrl(url) {
   try {
     const p = String(url).split("/o/")[1].split("?")[0];
@@ -120,10 +204,7 @@ function renderLightboxMedia() {
     if (isVid) {
       lbImg.classList.add("hidden");
       lbVideo.classList.remove("hidden");
-      lbVideo.src = url;
-      lbVideo.playsInline = true;
-      lbVideo.controls = true;
-      try { lbVideo.play().catch(() => { }); } catch (_) { }
+      __prepareAndPlayVideo(lbVideo, url);
     } else {
       try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
       lbVideo.classList.add("hidden");
