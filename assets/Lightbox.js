@@ -6,6 +6,112 @@ function isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
 
+// ===============================
+// iOS/Safari：影片 controls 進度條/重播穩定化
+// - 等 metadata + element 可見後再 play（避免第一次進度條卡住）
+// - 影片播完後顯示「重播」遮罩（避免 iOS 內建播放鍵偶爾失效）
+// ===============================
+function __installVideoReplayFix(v) {
+  if (!v || v.dataset.__replayFix === "1") return;
+  v.dataset.__replayFix = "1";
+
+  // iOS 有時只認 attribute
+  try { v.setAttribute("playsinline", ""); } catch (_) { }
+  try { v.setAttribute("webkit-playsinline", ""); } catch (_) { }
+
+  // 建一個只在 ended 時才出現的遮罩，讓使用者點一下就能重播（不靠內建播放鍵）
+  let overlay = null;
+  try {
+    const parent = v.parentElement;
+    if (parent) {
+      const ov = document.createElement("button");
+      ov.type = "button";
+      ov.textContent = "重播";
+      ov.style.position = "absolute";
+      ov.style.inset = "0";
+      ov.style.display = "none";
+      ov.style.alignItems = "center";
+      ov.style.justifyContent = "center";
+      ov.style.background = "rgba(0,0,0,0.35)";
+      ov.style.color = "#fff";
+      ov.style.border = "0";
+      ov.style.fontSize = "16px";
+      ov.style.fontWeight = "600";
+      ov.style.cursor = "pointer";
+      ov.style.zIndex = "5";
+      ov.style.webkitTapHighlightColor = "transparent";
+
+      // 確保 parent 是定位容器（不要硬改已有定位）
+      const cs = window.getComputedStyle(parent);
+      if (cs && cs.position === "static") parent.style.position = "relative";
+
+      ov.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        try { v.currentTime = 0; } catch (_) { }
+        try { v.play?.().catch(() => { }); } catch (_) { }
+        ov.style.display = "none";
+      });
+
+      parent.appendChild(ov);
+      overlay = ov;
+    }
+  } catch (_) { /* ignore */ }
+
+  const hideOverlay = () => {
+    try { if (overlay) overlay.style.display = "none"; } catch (_) { }
+  };
+  const showOverlay = () => {
+    try { if (overlay) overlay.style.display = "flex"; } catch (_) { }
+  };
+
+  // iOS Safari：有時 ended 後內建播放鍵不會重播 → 我們在 ended 時先把播放頭拉離尾端，並顯示遮罩
+  const resetHead = () => {
+    try { v.pause?.(); } catch (_) { }
+    try { v.currentTime = 0; } catch (_) { }
+    // 保險：Safari 有時會覆寫一次 currentTime
+    setTimeout(() => { try { v.currentTime = 0; } catch (_) { } }, 60);
+  };
+
+  v.addEventListener("ended", () => {
+    resetHead();
+    showOverlay();
+  });
+
+  // 任何播放/拖拉都把遮罩收起
+  v.addEventListener("play", hideOverlay);
+  v.addEventListener("seeking", hideOverlay);
+  v.addEventListener("timeupdate", () => {
+    try {
+      const d = Number.isFinite(v.duration) ? v.duration : 0;
+      if (d && (d - v.currentTime) > 0.2) hideOverlay();
+    } catch (_) { }
+  });
+}
+
+function __startInlineVideo(v) {
+  if (!v) return;
+
+  __installVideoReplayFix(v);
+
+  try { v.preload = "metadata"; } catch (_) { }
+  try { v.load?.(); } catch (_) { }
+
+  const go = () => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        try { v.play?.().catch(() => { }); } catch (_) { }
+      });
+    });
+  };
+
+  // readyState >= 1：metadata 已有（duration 通常就正常）
+  if (v.readyState >= 1) go();
+  else v.addEventListener("loadedmetadata", go, { once: true });
+}
+
+
+
 function storagePathFromDownloadUrl(url) {
   try {
     const p = String(url).split("/o/")[1].split("?")[0];
@@ -102,6 +208,7 @@ function renderLightboxMedia() {
     if (lbVideo) {
       try { lbVideo.pause(); } catch (_) { }
       lbVideo.src = "";
+      try { lbVideo.__replayOverlay && (lbVideo.__replayOverlay.style.display = "none"); } catch (_) { }
       lbVideo.classList.add("hidden");
     }
     if (lbWrap) lbWrap.classList.remove("lb-video-mode"); // ← 新增
@@ -120,40 +227,16 @@ function renderLightboxMedia() {
     if (isVid) {
       lbImg.classList.add("hidden");
       lbVideo.classList.remove("hidden");
-      lbVideo.preload = "metadata";
       lbVideo.src = url;
-
       lbVideo.playsInline = true;
-      lbVideo.setAttribute("playsinline", "");
-      lbVideo.setAttribute("webkit-playsinline", "");
-
+      try { lbVideo.setAttribute("playsinline", ""); } catch (_) { }
+      try { lbVideo.setAttribute("webkit-playsinline", ""); } catch (_) { }
       lbVideo.controls = true;
-
-      try { lbVideo.load && lbVideo.load(); } catch (_) { }
-
-      lbVideo.addEventListener("loadedmetadata", () => {
-        try { lbVideo.play().catch(() => { }); } catch (_) { }
-      }, { once: true });
-
-      // ✅ iPhone：9 秒影片播完後按播放沒反應 → 用「重載 src」把 ended 狀態清掉
-      if (lbVideo.dataset.__iosReplayFixBound !== "1") {
-        lbVideo.dataset.__iosReplayFixBound = "1";
-
-        lbVideo.addEventListener("ended", () => {
-          const src = lbVideo.currentSrc || lbVideo.src;
-
-          try { lbVideo.pause(); } catch (_) { }
-
-          try { lbVideo.removeAttribute("src"); } catch (_) { }
-          try { lbVideo.load && lbVideo.load(); } catch (_) { }
-
-          lbVideo.src = src;
-          lbVideo.preload = "metadata";
-          try { lbVideo.load && lbVideo.load(); } catch (_) { }
-        });
-      }
+      try { lbVideo.__replayOverlay && (lbVideo.__replayOverlay.style.display = "none"); } catch (_) { }
+      __startInlineVideo(lbVideo);
     } else {
       try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
+      try { lbVideo.__replayOverlay && (lbVideo.__replayOverlay.style.display = "none"); } catch (_) { }
       lbVideo.classList.add("hidden");
       lbImg.classList.remove("hidden");
       lbImg.src = url;
@@ -313,27 +396,27 @@ function openLightbox(images, index = 0) {
     });
   }
 
+  // 顯示 Lightbox（先顯示，讓 dlg.close() 的 close handler 知道是要切到 Lightbox）
   if (lb) {
     lb.classList.remove("hidden");
     lb.classList.add("flex");
   }
-
-  // 下一個 frame 再 render（讓 layout/controls 先出來）
-  requestAnimationFrame(() => {
-    renderLightboxMedia();
-  });
 
   // 關掉 Modal（移除 backdrop）
   if (dlg?.open) dlg.close();
 
   // 鎖背景（避免底層頁面被捲動）
   lockScroll();
+
+  // Lightbox 已可見後再 render/播放（避免 iOS 第一次進度條卡住）
+  renderLightboxMedia();
 }
 // 🔥 關閉 Lightbox：回到 dialog 或直接解鎖
 function closeLightbox() {
   // 關閉前一定要把影片停掉
   if (lbVideo) {
     try { lbVideo.pause(); } catch (_) { }
+    try { lbVideo.__replayOverlay && (lbVideo.__replayOverlay.style.display = "none"); } catch (_) { }
     lbVideo.removeAttribute("src");
     try { lbVideo.load && lbVideo.load(); } catch (_) { }
   }

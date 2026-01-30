@@ -6,6 +6,113 @@ function isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
 
+// ===============================
+// iOS/Safari：影片 controls 進度條/重播穩定化
+// - 等 metadata + element 可見後再 play（避免第一次進度條卡住）
+// - 影片播完後顯示「重播」遮罩（避免 iOS 內建播放鍵偶爾失效）
+// ===============================
+function __installVideoReplayFix(v) {
+  if (!v || v.dataset.__replayFix === "1") return;
+  v.dataset.__replayFix = "1";
+
+  // iOS 有時只認 attribute
+  try { v.setAttribute("playsinline", ""); } catch (_) { }
+  try { v.setAttribute("webkit-playsinline", ""); } catch (_) { }
+
+  // 建一個只在 ended 時才出現的遮罩，讓使用者點一下就能重播（不靠內建播放鍵）
+  let overlay = null;
+  try {
+    const parent = v.parentElement;
+    if (parent) {
+      const ov = document.createElement("button");
+      ov.type = "button";
+      ov.textContent = "重播";
+      ov.style.position = "absolute";
+      ov.style.inset = "0";
+      ov.style.display = "none";
+      ov.style.alignItems = "center";
+      ov.style.justifyContent = "center";
+      ov.style.background = "rgba(0,0,0,0.35)";
+      ov.style.color = "#fff";
+      ov.style.border = "0";
+      ov.style.fontSize = "16px";
+      ov.style.fontWeight = "600";
+      ov.style.cursor = "pointer";
+      ov.style.zIndex = "5";
+      ov.style.webkitTapHighlightColor = "transparent";
+
+      // 確保 parent 是定位容器（不要硬改已有定位）
+      const cs = window.getComputedStyle(parent);
+      if (cs && cs.position === "static") parent.style.position = "relative";
+
+      ov.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        try { v.currentTime = 0; } catch (_) { }
+        try { v.play?.().catch(() => { }); } catch (_) { }
+        ov.style.display = "none";
+      });
+
+      parent.appendChild(ov);
+      v.__replayOverlay = ov;
+      overlay = ov;
+    }
+  } catch (_) { /* ignore */ }
+
+  const hideOverlay = () => {
+    try { if (overlay) overlay.style.display = "none"; } catch (_) { }
+  };
+  const showOverlay = () => {
+    try { if (overlay) overlay.style.display = "flex"; } catch (_) { }
+  };
+
+  // iOS Safari：有時 ended 後內建播放鍵不會重播 → 我們在 ended 時先把播放頭拉離尾端，並顯示遮罩
+  const resetHead = () => {
+    try { v.pause?.(); } catch (_) { }
+    try { v.currentTime = 0; } catch (_) { }
+    // 保險：Safari 有時會覆寫一次 currentTime
+    setTimeout(() => { try { v.currentTime = 0; } catch (_) { } }, 60);
+  };
+
+  v.addEventListener("ended", () => {
+    resetHead();
+    showOverlay();
+  });
+
+  // 任何播放/拖拉都把遮罩收起
+  v.addEventListener("play", hideOverlay);
+  v.addEventListener("seeking", hideOverlay);
+  v.addEventListener("timeupdate", () => {
+    try {
+      const d = Number.isFinite(v.duration) ? v.duration : 0;
+      if (d && (d - v.currentTime) > 0.2) hideOverlay();
+    } catch (_) { }
+  });
+}
+
+function __startInlineVideo(v) {
+  if (!v) return;
+
+  __installVideoReplayFix(v);
+
+  try { v.preload = "metadata"; } catch (_) { }
+  try { v.load?.(); } catch (_) { }
+
+  const go = () => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        try { v.play?.().catch(() => { }); } catch (_) { }
+      });
+    });
+  };
+
+  // readyState >= 1：metadata 已有（duration 通常就正常）
+  if (v.readyState >= 1) go();
+  else v.addEventListener("loadedmetadata", go, { once: true });
+}
+
+
+
 function storagePathFromDownloadUrl(url) {
   try {
     const p = String(url).split("/o/")[1].split("?")[0];
@@ -564,6 +671,7 @@ async function openDialog(id) {
       if (dlgVideo) {
         try { dlgVideo.pause(); } catch (_) { }
         dlgVideo.src = "";
+        try { dlgVideo.__replayOverlay && (dlgVideo.__replayOverlay.style.display = "none"); } catch (_) { }
         dlgVideo.classList.add("hidden");
       }
 
@@ -597,48 +705,23 @@ async function openDialog(id) {
       if (isVid) {
         dlgImg.classList.add("hidden");
         dlgVideo.classList.remove("hidden");
-        dlgVideo.preload = "metadata";
+        try { dlgVideo.__replayOverlay && (dlgVideo.__replayOverlay.style.display = "none"); } catch (_) { }
         dlgVideo.src = url;
-
-        // iOS 需要這兩個屬性（保險）
         dlgVideo.playsInline = true;
-        dlgVideo.setAttribute("playsinline", "");
-        dlgVideo.setAttribute("webkit-playsinline", "");
-
+        try { dlgVideo.setAttribute("playsinline", ""); } catch (_) { }
+        try { dlgVideo.setAttribute("webkit-playsinline", ""); } catch (_) { }
         dlgVideo.controls = true;
-
-        // 先載入 metadata（拿到 duration）
-        try { dlgVideo.load && dlgVideo.load(); } catch (_) { }
-
-        // ✅ 等到知道 duration（loadedmetadata）再播：進度條就會正常
-        dlgVideo.addEventListener("loadedmetadata", () => {
-          try { dlgVideo.play().catch(() => { }); } catch (_) { }
-        }, { once: true });
-
-        // ✅ iPhone：9 秒影片播完後按播放沒反應 → 用「重載 src」把 ended 狀態清掉
-        if (dlgVideo.dataset.__iosReplayFixBound !== "1") {
-          dlgVideo.dataset.__iosReplayFixBound = "1";
-
-          dlgVideo.addEventListener("ended", () => {
-            const src = dlgVideo.currentSrc || dlgVideo.src;
-
-            // 1) 先停
-            try { dlgVideo.pause(); } catch (_) { }
-
-            // 2) 強制清掉 src + load（iOS 會把 ended 狀態清乾淨）
-            try { dlgVideo.removeAttribute("src"); } catch (_) { }
-            try { dlgVideo.load && dlgVideo.load(); } catch (_) { }
-
-            // 3) 塞回原本 src，再 load 一次（回到起點）
-            dlgVideo.src = src;
-            dlgVideo.preload = "metadata";
-            try { dlgVideo.load && dlgVideo.load(); } catch (_) { }
-          });
+        dlgVideo.dataset.__autoplay = "1";
+        // dialog 已經開著的話，立刻啟動；否則等 showModal() 之後再啟動
+        if (dlg && dlg.open) {
+          __startInlineVideo(dlgVideo);
+          dlgVideo.dataset.__autoplay = "0";
         }
       } else {
         try {
           dlgVideo.pause && dlgVideo.pause();
         } catch (_) { }
+        try { dlgVideo.__replayOverlay && (dlgVideo.__replayOverlay.style.display = "none"); } catch (_) { }
         dlgVideo.classList.add("hidden");
         dlgImg.classList.remove("hidden");
         dlgImg.src = url;
@@ -840,6 +923,12 @@ async function openDialog(id) {
   if (!dlg.open) {
     __lockDialogScroll();
     dlg.showModal();
+    // iOS/Safari：等 dialog 可見後再啟動影片（避免第一次進度條卡住）
+    const __v = document.getElementById("dlgVideo");
+    if (__v && __v.dataset.__autoplay === "1" && !__v.classList.contains("hidden")) {
+      __startInlineVideo(__v);
+      __v.dataset.__autoplay = "0";
+    }
   }
 }
 
