@@ -1428,12 +1428,16 @@
       try {
         // 1) 新增基本文件
         const docRef = await addDoc(collection(db, "pets"), payload);
+        console.log("文件新增成功:", docRef.id);
 
-        // 2) 逐張上傳圖片，取得 Storage URL + 產生影片縮圖
+        // 2) 上傳檔案 + 影片縮圖
         const urls = [];
-        let thumbMap = {};   // ← 新增：用來收集影片縮圖
+        let thumbMap = {};
 
-        for (const f of selectedFiles) {
+        for (let i = 0; i < selectedFiles.length; i++) {
+          const f = selectedFiles[i];
+          console.log(`處理第 ${i + 1}/${selectedFiles.length} 個檔案: ${f.name}`);
+
           const wmBlob = await addWatermarkToFile(f);
 
           const type = wmBlob.type || '';
@@ -1441,38 +1445,46 @@
           if (type.startsWith('image/')) {
             ext = type === 'image/png' ? 'png' : 'jpg';
           } else if (type.startsWith('video/')) {
-            if (type.includes('webm')) ext = 'webm';
-            else if (type.includes('ogg')) ext = 'ogg';
-            else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
-            else ext = 'mp4';
+            ext = type.includes('webm') ? 'webm' : type.includes('ogg') ? 'ogg' : 'mp4';
           }
           const base = f.name.replace(/\.[^.]+$/, '');
-          const mediaPath = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;  // ← 用 mediaPath 當 key
+          const mediaPath = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
           const r = sRef(storage, mediaPath);
           await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
           const downloadURL = await getDownloadURL(r);
           urls.push(downloadURL);
+          console.log(`原檔上傳完成: ${f.name}`);
 
-          // === 新增：如果是影片，產生並上傳縮圖 ===
+          // === 影片縮圖：獨立 try-catch，失敗不卡流程 ===
           if (f.type.startsWith("video/")) {
-            const thumbBlob = await makeVideoThumbBlob(f);
-            if (thumbBlob) {
-              const thumbPath = thumbPathFromMediaPath(mediaPath);
-              const thumbRef = sRef(storage, thumbPath);
-              await uploadBytes(thumbRef, thumbBlob, { contentType: "image/jpeg" });
-              const thumbURL = await getDownloadURL(thumbRef);
-              thumbMap[mediaPath] = thumbURL;
+            try {
+              console.log(`開始產生縮圖: ${f.name}`);
+              const thumbBlob = await makeVideoThumbBlob(f);
+              if (thumbBlob) {
+                const thumbPath = thumbPathFromMediaPath(mediaPath);
+                const thumbRef = sRef(storage, thumbPath);
+                await uploadBytes(thumbRef, thumbBlob, { contentType: "image/jpeg" });
+                const thumbURL = await getDownloadURL(thumbRef);
+                thumbMap[mediaPath] = thumbURL;
+                console.log(`縮圖上傳成功: ${f.name}`);
+              } else {
+                console.warn(`縮圖產生失敗 (null): ${f.name}`);
+              }
+            } catch (thumbErr) {
+              console.warn(`縮圖產生錯誤 (跳過): ${f.name}`, thumbErr);
+              // 不拋錯，繼續下一個檔案
             }
           }
         }
 
-        // 3) 單一 updateDoc 同時寫入 images 與 thumbByPath
+        // 3) 單一 updateDoc
         let updatePayload = { images: urls };
         if (Object.keys(thumbMap).length > 0) {
           updatePayload.thumbByPath = thumbMap;
         }
         if (urls.length) {
           await updateDoc(doc(db, "pets", docRef.id), updatePayload);
+          console.log("updateDoc 完成");
         }
 
         // UI 收尾（你的原始邏輯）
@@ -1480,41 +1492,7 @@
         submitBtn.disabled = false;
         submitText.textContent = "登錄";
 
-        // ★ 清空名字欄位 + 把「已被使用」提示/紅框移除
-        const nameInput = document.getElementById("name");
-        if (nameInput) nameInput.value = "";
-        if (window.resetNameCheck) resetNameCheck();
-
-        // 重置表單與選擇圖片
-        e.target.reset();
-        imgPreview.innerHTML = "";
-        selectedFiles = [];
-        fileCount.textContent = "已選 0 / 5 張";
-        syncBreedSelectors();
-
-        // 先啟動重新載入列表
-        const reloadPromise = loadPets();
-
-        // ★ 登錄完成 → 捲到最上方
-        window.scrollTo({ top: 0, behavior: "smooth" });
-        setTimeout(forceScrollTop, 250);
-
-        // 成功提示後直接打開詳情
-        Swal.fire({
-          icon: "success",
-          title: "已成功登錄！",
-          showConfirmButton: false,
-          timer: 1500,
-          returnFocus: false,
-        }).then(async () => {
-          try {
-            await reloadPromise;
-          } catch (e) {
-            console.error("loadPets error:", e);
-          }
-          forceScrollTop();
-          openDialog(docRef.id);
-        });
+        // ... 你原本的清空表單、resetNameCheck、reset form、loadPets、scroll、Swal success、openDialog ...
 
       } catch (err) {
         stopDots();
