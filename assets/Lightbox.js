@@ -6,18 +6,6 @@ function isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
 
-function __isIOS() {
-  try {
-    const ua = navigator.userAgent || "";
-    const isI = /iP(hone|od|ad)/.test(ua);
-    const isIpadOS = (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-    return isI || isIpadOS;
-  } catch (_) {
-    return false;
-  }
-}
-
-
 function storagePathFromDownloadUrl(url) {
   try {
     const p = String(url).split("/o/")[1].split("?")[0];
@@ -27,21 +15,17 @@ function storagePathFromDownloadUrl(url) {
   }
 }
 
+
+
 // Lightbox 縮圖播放 icon（避免與 Modal.js 的 __PLAY_SVG 命名衝突）
 const __THUMB_PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
 
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
 function __primeThumbVideoFrameLightbox(v) {
   if (!v || v.dataset.__primed === "1") return;
-
-  // iOS：不要為了縮圖去 play/pause 影片（多支影片時可能影響主影片播放）
-  if (__isIOS()) {
-    return;
-  }
-
   v.dataset.__primed = "1";
 
-  const seekToThumbTime = () => {
+  const onMeta = () => {
     try {
       const dur = Number.isFinite(v.duration) ? v.duration : 0;
       let t = 0.05;
@@ -53,49 +37,18 @@ function __primeThumbVideoFrameLightbox(v) {
     } catch (_) { }
   };
 
-  const ensurePaint = () => {
-    if (v.dataset.__painted === "1") return;
-    v.dataset.__painted = "1";
+  const onSeeked = () => { try { v.pause(); } catch (_) { } };
 
-    try {
-      const p = v.play();
-      if (p && typeof p.then === "function") {
-        p.then(() => {
-          if (typeof v.requestVideoFrameCallback === "function") {
-            v.requestVideoFrameCallback(() => {
-              try { v.pause(); } catch (_) { }
-            });
-          } else {
-            setTimeout(() => {
-              try { v.pause(); } catch (_) { }
-            }, 60);
-          }
-        }).catch(() => {
-          try { v.pause(); } catch (_) { }
-        });
-      }
-    } catch (_) {
-      try { v.pause(); } catch (_) { }
-    }
-  };
-
-  v.addEventListener("loadedmetadata", () => {
-    seekToThumbTime();
-    ensurePaint();
-  }, { once: true });
-
-  v.addEventListener("seeked", () => {
-    ensurePaint();
-  }, { once: true });
-
+  v.addEventListener("loadedmetadata", onMeta, { once: true });
+  v.addEventListener("seeked", onSeeked, { once: true });
   setTimeout(() => {
     try {
       if (v.readyState < 2) return;
-      if (v.currentTime === 0) seekToThumbTime();
-      ensurePaint();
+      if (v.currentTime === 0) v.currentTime = 0.05;
     } catch (_) { }
-  }, 200);
+  }, 120);
 }
+
 
 history.scrollRestoration = "manual";
 window.scrollTo(0, 0);
@@ -138,18 +91,8 @@ function renderLightboxMedia() {
     if (isVid) {
       lbImg.classList.add("hidden");
       lbVideo.classList.remove("hidden");
-      lbVideo.preload = "metadata";
-      lbVideo.playsInline = true;
-      lbVideo.setAttribute("playsinline", "");
-      lbVideo.setAttribute("webkit-playsinline", "");
-      lbVideo.controls = true;
-      try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
-      try { lbVideo.currentTime = 0; } catch (_) { }
       lbVideo.src = url;
-      try { lbVideo.load && lbVideo.load(); } catch (_) { }
-      if (!__isIOS()) {
-        try { lbVideo.play().catch(() => { }); } catch (_) { }
-      }
+      lbVideo.playsInline = true;
       lbVideo.controls = true;
       try { lbVideo.play().catch(() => { }); } catch (_) { }
     } else {
@@ -232,21 +175,16 @@ $('#dlgClose')?.addEventListener('click', () => {
 
 // 防止使用者按 ESC 或點 backdrop 關掉時，背景卡死
 dlg?.addEventListener('close', () => {
-  const switchingToLB = !!(lb && lb.classList.contains("flex"));
+  // 關掉 dialog 一律先把影片停掉
   const v = document.getElementById("dlgVideo");
-
-  // ✅ 切到 Lightbox：只暫停，不清 src（回來才不用點縮圖重設）
-  if (switchingToLB) {
-    try { v?.pause(); } catch (_) { }
-    return;
-  }
-
-  // ✅ 真正關掉 dialog：才清 src / load，釋放資源
   if (v) {
     try { v.pause(); } catch (_) { }
     v.removeAttribute("src");
     try { v.load && v.load(); } catch (_) { }
   }
+
+  // 如果是切到 Lightbox 才關掉 dialog：不要清 currentPetId、不要解鎖
+  if (lb && lb.classList.contains("flex")) return;
 
   window.currentPetId = null;
   window.currentPetThumbByPath = null;
@@ -265,8 +203,6 @@ function openLightbox(images, index = 0) {
   const lbThumbsInner = document.getElementById("lbThumbsInner");
   if (lbThumbsInner) {
     lbThumbsInner.innerHTML = "";
-    const __lbIsIOS = __isIOS();
-    const __lbFirstImage = lbImages.find(u => !isVideoUrl(u)) || "";
     lbImages.forEach((url, i) => {
       const isVid = isVideoUrl(url);
       const wrapper = document.createElement("div");
@@ -282,30 +218,18 @@ function openLightbox(images, index = 0) {
           img.src = videoThumb;
           wrapper.appendChild(img);
         } else {
-          if (__lbIsIOS) {
-            if (__lbFirstImage) {
-              const img = document.createElement("img");
-              img.src = __lbFirstImage;
-              wrapper.appendChild(img);
-            } else {
-              const ph = document.createElement("div");
-              ph.className = "thumb-fallback";
-              wrapper.appendChild(ph);
-            }
-          } else {
-            const v = document.createElement("video");
-            v.className = "thumb-video";
-            v.preload = "metadata";
-            v.muted = true;
-            v.playsInline = true;
-            v.setAttribute("playsinline", "");
-            v.setAttribute("webkit-playsinline", "");
-            v.controls = false;
-            v.disablePictureInPicture = true;
-            v.src = url;
-            __primeThumbVideoFrameLightbox(v);
-            wrapper.appendChild(v);
-          }
+          const v = document.createElement("video");
+          v.className = "thumb-video";
+          v.preload = "metadata";
+          v.muted = true;
+          v.playsInline = true;
+          v.setAttribute("playsinline", "");
+          v.setAttribute("webkit-playsinline", "");
+          v.controls = false;
+          v.disablePictureInPicture = true;
+          v.src = url;
+          __primeThumbVideoFrameLightbox(v);
+          wrapper.appendChild(v);
         }
 
         const badge = document.createElement("div");
