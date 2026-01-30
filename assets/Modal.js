@@ -6,99 +6,6 @@ function isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
 
-// ===============================
-// 影片播放初始化：避免剛換 src 時 duration 還沒正常（Infinity/NaN）導致控制列進度條「前段不動、後段爆衝」
-// ===============================
-function __hasFiniteDuration(v) {
-  const d = v && v.duration;
-  return Number.isFinite(d) && d > 0 && d !== Infinity;
-}
-
-function __forceResolveDuration(v, timeoutMs = 1200) {
-  // 常見情況：影片 metadata 在檔尾，第一次播放 duration 會是 Infinity/NaN。
-  // 透過「跳到極大時間點」逼瀏覽器解析 duration，成功後再跳回 0。
-  return new Promise((resolve) => {
-    let done = false;
-
-    const finish = () => {
-      if (done) return;
-      done = true;
-      v.removeEventListener("durationchange", onDur);
-      v.removeEventListener("timeupdate", onTime);
-      resolve();
-    };
-
-    const onDur = () => {
-      if (__hasFiniteDuration(v)) finish();
-    };
-
-    const onTime = () => {
-      if (__hasFiniteDuration(v) && v.currentTime > 0) {
-        try { v.currentTime = 0; } catch (_) { }
-        finish();
-      }
-    };
-
-    v.addEventListener("durationchange", onDur);
-    v.addEventListener("timeupdate", onTime);
-
-    try { v.currentTime = 1e101; } catch (_) { }
-    setTimeout(finish, timeoutMs);
-  });
-}
-
-function __prepareAndPlayVideo(v, url) {
-  if (!v) return;
-
-  // token：避免快速切換媒體時舊事件回來亂觸發
-  const token = (v.__playToken = (v.__playToken || 0) + 1);
-  const isActive = () => v.__playToken === token;
-
-  // 停掉舊的並重置
-  try { v.pause(); } catch (_) { }
-  try { v.currentTime = 0; } catch (_) { }
-
-  v.preload = "metadata";
-  v.playsInline = true;
-  v.controls = true;
-
-  // 重新載入（確保事件、duration 狀態乾淨）
-  try { v.removeAttribute("src"); v.load && v.load(); } catch (_) { }
-  v.src = url;
-  try { v.load && v.load(); } catch (_) { }
-
-  let readyFired = false;
-  const tryPlay = () => {
-    if (!isActive()) return;
-    try {
-      const p = v.play();
-      if (p && typeof p.catch === "function") p.catch(() => { });
-    } catch (_) { }
-  };
-
-  const onReady = async () => {
-    if (!isActive() || readyFired) return;
-    readyFired = true;
-
-    // duration 還不正常就先嘗試修正
-    if (!__hasFiniteDuration(v)) {
-      await __forceResolveDuration(v);
-    }
-    if (!isActive()) return;
-
-    // 保險：從 0 開始
-    try { v.currentTime = 0; } catch (_) { }
-
-    tryPlay();
-  };
-
-  v.addEventListener("loadedmetadata", onReady, { once: true });
-  v.addEventListener("canplay", onReady, { once: true });
-
-  // fallback：某些瀏覽器事件來很慢，先試播一次也無妨
-  setTimeout(tryPlay, 250);
-}
-
 function storagePathFromDownloadUrl(url) {
   try {
     const p = String(url).split("/o/")[1].split("?")[0];
@@ -690,7 +597,23 @@ async function openDialog(id) {
       if (isVid) {
         dlgImg.classList.add("hidden");
         dlgVideo.classList.remove("hidden");
-        __prepareAndPlayVideo(dlgVideo, url);
+        dlgVideo.preload = "metadata";
+        dlgVideo.src = url;
+
+        // iOS 需要這兩個屬性（保險）
+        dlgVideo.playsInline = true;
+        dlgVideo.setAttribute("playsinline", "");
+        dlgVideo.setAttribute("webkit-playsinline", "");
+
+        dlgVideo.controls = true;
+
+        // 先載入 metadata（拿到 duration）
+        try { dlgVideo.load && dlgVideo.load(); } catch (_) { }
+
+        // ✅ 等到知道 duration（loadedmetadata）再播：進度條就會正常
+        dlgVideo.addEventListener("loadedmetadata", () => {
+          try { dlgVideo.play().catch(() => { }); } catch (_) { }
+        }, { once: true });
       } else {
         try {
           dlgVideo.pause && dlgVideo.pause();
