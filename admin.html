@@ -1431,55 +1431,51 @@
         console.log("文件新增成功:", docRef.id);
 
         // 2) 上傳檔案 + 影片縮圖
-        const urls = [];
-        let thumbMap = {};
+          const urls = [];
+  let thumbMap = {};
 
-        for (let i = 0; i < selectedFiles.length; i++) {
-          const f = selectedFiles[i];
-          console.log(`處理第 ${i + 1}/${selectedFiles.length} 個檔案: ${f.name}`);
+  for (const f of selectedFiles) {
+    const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+    const type = wmBlob.type || '';
+    let ext = 'bin';
+    if (type.startsWith('image/')) {
+      ext = type === 'image/png' ? 'png' : 'jpg';
+    } else if (type.startsWith('video/')) {
+      if (type.includes('webm')) ext = 'webm';
+      else if (type.includes('ogg')) ext = 'ogg';
+      else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
+      else ext = 'mp4';
+    }
+    const base = f.name.replace(/\.[^.]+$/, '');
+    const mediaPath = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
+    const r = sRef(storage, mediaPath);
+    await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
+    const downloadURL = await getDownloadURL(r);
+    urls.push(downloadURL);
 
-          const wmBlob = await addWatermarkToFile(f);
+    // === 影片縮圖：加 timeout + catch 防卡 ===
+    if (f.type.startsWith("video/")) {
+      try {
+        console.log(`開始產生縮圖: ${f.name}`);
 
-          const type = wmBlob.type || '';
-          let ext = 'bin';
-          if (type.startsWith('image/')) {
-            ext = type === 'image/png' ? 'png' : 'jpg';
-          } else if (type.startsWith('video/')) {
-            ext = type.includes('webm') ? 'webm' : type.includes('ogg') ? 'ogg' : 'mp4';
-          }
-          const base = f.name.replace(/\.[^.]+$/, '');
-          const mediaPath = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
-          const r = sRef(storage, mediaPath);
-          await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
-          const downloadURL = await getDownloadURL(r);
-          urls.push(downloadURL);
-          console.log(`原檔上傳完成: ${f.name}`);
+        const thumbBlob = await Promise.race([
+          makeVideoThumbBlob(f),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("縮圖超時")), 15000))
+        ]);
 
-          // === 影片縮圖：獨立 try-catch，失敗不卡流程 ===
-          if (f.type.startsWith("video/")) {
-            try {
-              console.log(`開始產生縮圖: ${f.name}`);
-
-              // 加 timeout：最多等 15 秒
-              const thumbBlob = await Promise.race([
-                makeVideoThumbBlob(f),
-                new Promise((_, reject) => setTimeout(() => reject(new Error("縮圖產生超時")), 15000))
-              ]);
-
-              if (thumbBlob) {
-                const thumbPath = thumbPathFromMediaPath(mediaPath);
-                const thumbRef = sRef(storage, thumbPath);
-                await uploadBytes(thumbRef, thumbBlob, { contentType: "image/jpeg" });
-                const thumbURL = await getDownloadURL(thumbRef);
-                thumbMap[mediaPath] = thumbURL;
-                console.log(`縮圖上傳成功: ${f.name}`);
-              }
-            } catch (thumbErr) {
-              console.warn(`縮圖失敗或超時 (跳過): ${f.name}`, thumbErr.message || thumbErr);
-              // 完全不拋錯，繼續下一個檔案或結束
-            }
-          }
+        if (thumbBlob) {
+          const thumbPath = thumbPathFromMediaPath(mediaPath);
+          const thumbRef = sRef(storage, thumbPath);
+          await uploadBytes(thumbRef, thumbBlob, { contentType: "image/jpeg" });
+          const thumbURL = await getDownloadURL(thumbRef);
+          thumbMap[mediaPath] = thumbURL;
+          console.log(`縮圖成功: ${f.name}`);
         }
+      } catch (thumbErr) {
+        console.warn(`縮圖失敗或超時 (跳過): ${f.name}`, thumbErr.message || thumbErr);
+      }
+    }
+  }
 
         // 3) 單一 updateDoc
         let updatePayload = { images: urls };
