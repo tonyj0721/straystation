@@ -6,6 +6,18 @@ function isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
 
+function __isIOS() {
+  try {
+    const ua = navigator.userAgent || "";
+    const isI = /iP(hone|od|ad)/.test(ua);
+    const isIpadOS = (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    return isI || isIpadOS;
+  } catch (_) {
+    return false;
+  }
+}
+
+
 function storagePathFromDownloadUrl(url) {
   try {
     const p = String(url).split("/o/")[1].split("?")[0];
@@ -21,6 +33,12 @@ const __THUMB_PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
 function __primeThumbVideoFrameLightbox(v) {
   if (!v || v.dataset.__primed === "1") return;
+
+  // iOS：不要為了縮圖去 play/pause 影片（多支影片時可能影響主影片播放）
+  if (__isIOS()) {
+    return;
+  }
+
   v.dataset.__primed = "1";
 
   const seekToThumbTime = () => {
@@ -120,8 +138,18 @@ function renderLightboxMedia() {
     if (isVid) {
       lbImg.classList.add("hidden");
       lbVideo.classList.remove("hidden");
-      lbVideo.src = url;
+      lbVideo.preload = "metadata";
       lbVideo.playsInline = true;
+      lbVideo.setAttribute("playsinline", "");
+      lbVideo.setAttribute("webkit-playsinline", "");
+      lbVideo.controls = true;
+      try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
+      try { lbVideo.currentTime = 0; } catch (_) { }
+      lbVideo.src = url;
+      try { lbVideo.load && lbVideo.load(); } catch (_) { }
+      if (!__isIOS()) {
+        try { lbVideo.play().catch(() => { }); } catch (_) { }
+      }
       lbVideo.controls = true;
       try { lbVideo.play().catch(() => { }); } catch (_) { }
     } else {
@@ -237,6 +265,8 @@ function openLightbox(images, index = 0) {
   const lbThumbsInner = document.getElementById("lbThumbsInner");
   if (lbThumbsInner) {
     lbThumbsInner.innerHTML = "";
+    const __lbIsIOS = __isIOS();
+    const __lbFirstImage = lbImages.find(u => !isVideoUrl(u)) || "";
     lbImages.forEach((url, i) => {
       const isVid = isVideoUrl(url);
       const wrapper = document.createElement("div");
@@ -252,18 +282,30 @@ function openLightbox(images, index = 0) {
           img.src = videoThumb;
           wrapper.appendChild(img);
         } else {
-          const v = document.createElement("video");
-          v.className = "thumb-video";
-          v.preload = "metadata";
-          v.muted = true;
-          v.playsInline = true;
-          v.setAttribute("playsinline", "");
-          v.setAttribute("webkit-playsinline", "");
-          v.controls = false;
-          v.disablePictureInPicture = true;
-          v.src = url;
-          __primeThumbVideoFrameLightbox(v);
-          wrapper.appendChild(v);
+          if (__lbIsIOS) {
+            if (__lbFirstImage) {
+              const img = document.createElement("img");
+              img.src = __lbFirstImage;
+              wrapper.appendChild(img);
+            } else {
+              const ph = document.createElement("div");
+              ph.className = "thumb-fallback";
+              wrapper.appendChild(ph);
+            }
+          } else {
+            const v = document.createElement("video");
+            v.className = "thumb-video";
+            v.preload = "metadata";
+            v.muted = true;
+            v.playsInline = true;
+            v.setAttribute("playsinline", "");
+            v.setAttribute("webkit-playsinline", "");
+            v.controls = false;
+            v.disablePictureInPicture = true;
+            v.src = url;
+            __primeThumbVideoFrameLightbox(v);
+            wrapper.appendChild(v);
+          }
         }
 
         const badge = document.createElement("div");

@@ -6,6 +6,18 @@ function isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
 
+function __isIOS() {
+  try {
+    const ua = navigator.userAgent || "";
+    const isI = /iP(hone|od|ad)/.test(ua);
+    const isIpadOS = (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    return isI || isIpadOS;
+  } catch (_) {
+    return false;
+  }
+}
+
+
 function storagePathFromDownloadUrl(url) {
   try {
     const p = String(url).split("/o/")[1].split("?")[0];
@@ -29,6 +41,12 @@ function thumbPathFromMediaPath(mediaPath) {
 // ===============================
 function __primeThumbVideoFrame(v) {
   if (!v || v.dataset.__primed === "1") return;
+
+  // iOS：不要為了縮圖去 play/pause 影片（多支影片時可能影響主影片播放）
+  if (__isIOS()) {
+    return;
+  }
+
   v.dataset.__primed = "1";
 
   // 找一個適合當縮圖的時間點
@@ -597,8 +615,19 @@ async function openDialog(id) {
       if (isVid) {
         dlgImg.classList.add("hidden");
         dlgVideo.classList.remove("hidden");
-        dlgVideo.src = url;
+        dlgVideo.preload = "metadata";
         dlgVideo.playsInline = true;
+        dlgVideo.setAttribute("playsinline", "");
+        dlgVideo.setAttribute("webkit-playsinline", "");
+        dlgVideo.controls = true;
+        try { dlgVideo.pause && dlgVideo.pause(); } catch (_) { }
+        try { dlgVideo.currentTime = 0; } catch (_) { }
+        dlgVideo.src = url;
+        try { dlgVideo.load && dlgVideo.load(); } catch (_) { }
+        // iOS：避免自動 play；讓使用者按控制列播放（比較穩）
+        if (!__isIOS()) {
+          try { dlgVideo.play().catch(() => { }); } catch (_) { }
+        }
         dlgVideo.controls = true;
         try { dlgVideo.play().catch(() => { }); } catch (_) { }
       } else {
@@ -684,21 +713,33 @@ async function openDialog(id) {
         img.src = videoThumb;
         wrapper.appendChild(img);
       } else {
-        const v = document.createElement("video");
-        v.className = "thumb-video";
-        v.preload = "metadata";
-        v.muted = true;
-        v.playsInline = true;
-        v.setAttribute("playsinline", "");
-        v.setAttribute("webkit-playsinline", "");
-        v.controls = false;
-        v.disablePictureInPicture = true;
-        v.src = url;
+        if (__dlgIsIOS) {
+          if (__dlgFirstImage) {
+            const img = document.createElement("img");
+            img.src = __dlgFirstImage;
+            wrapper.appendChild(img);
+          } else {
+            const ph = document.createElement("div");
+            ph.className = "thumb-fallback";
+            wrapper.appendChild(ph);
+          }
+        } else {
+          const v = document.createElement("video");
+          v.className = "thumb-video";
+          v.preload = "metadata";
+          v.muted = true;
+          v.playsInline = true;
+          v.setAttribute("playsinline", "");
+          v.setAttribute("webkit-playsinline", "");
+          v.controls = false;
+          v.disablePictureInPicture = true;
+          v.src = url;
 
-        // 後端縮圖還沒產出時才 fallback 用影片抓第一幀
-        __primeThumbVideoFrame(v);
+          // 後端縮圖還沒產出時才 fallback 用影片抓第一幀
+          __primeThumbVideoFrame(v);
 
-        wrapper.appendChild(v);
+          wrapper.appendChild(v);
+        }
       }
 
       // 覆蓋播放 icon（圖 4 的樣式）
