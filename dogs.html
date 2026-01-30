@@ -332,20 +332,26 @@
     <div class="bg-white">
       <!-- 新增：與下方縮圖 p-3 對齊 -->
       <div class="px-3 pt-2">
-        <p class="text-center text-xs text-gray-500 mb-1">點主圖可放大</p>
-        <div class="relative aspect-video bg-gray-100 overflow-hidden rounded-lg">
-          <!-- 只模糊這張背景圖 -->
-          <img id="dlgBg" aria-hidden="true" class="absolute inset-0 w-full h-full object-cover blur-md scale-110">
+        <p id="dlgHint" class="text-center text-sm text-gray-500 mb-1">點主圖可放大</p>
+        <div id="dlgStageWrap" class="relative">
+          <div class="relative aspect-video bg-gray-100 overflow-hidden rounded-lg">
+            <!-- 只模糊這張背景圖 -->
+            <img id="dlgBg" aria-hidden="true" class="absolute inset-0 w-full h-full object-cover blur-md scale-110">
 
-          <!-- 可選：柔化一下背景，沒有加任何 blur -->
-          <div class="absolute inset-0 bg-white/20"></div>
+            <!-- 可選：柔化一下背景，沒有加任何 blur -->
+            <div class="absolute inset-0 bg-white/20"></div>
 
-          <!-- 主圖在最上層，沒有 blur -->
-          <img id="dlgImg" alt="毛孩照片"
-            class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg">
+            <!-- 主圖在最上層，沒有 blur -->
+            <img id="dlgImg" alt="毛孩照片"
+              class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg">
+            <video id="dlgVideo" playsinline controls
+              class="relative z-10 block w-full h-full object-contain cursor-pointer rounded-lg hidden"></video>
+          </div>
 
-          <button id="dlgClose" class="absolute top-1 right-1 z-20 bg-black/60 text-white p-2 rounded-full leading-none"
-            aria-label="關閉">✕</button>
+          <button id="dlgClose" class="ui-close-btn absolute top-1 right-1 z-20" aria-label="關閉"><svg
+              viewBox="0 0 24 24" aria-hidden="true" focusable="false" class="ui-close-icon">
+              <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
+            </svg></button>
         </div>
       </div>
 
@@ -479,10 +485,10 @@
           </div>
 
           <div>
-            <input id="editFiles" type="file" accept="image/*" multiple class="sr-only" />
+            <input id="editFiles" type="file" accept="image/*,video/*" multiple class="sr-only" />
             <div class="flex items-center gap-3">
               <button id="btnPickEdit" type="button"
-                class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增照片</button>
+                class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增照片／影片</button>
               <span id="editCount" class="text-xs text-gray-500"></span>
               <span class="text-sm text-gray-400">最多 5 張</span>
             </div>
@@ -544,15 +550,18 @@
   <!-- Lightbox -->
   <div id="lightbox" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[9999]">
     <div id="lbWrap" class="relative inline-block">
-      <img id="lbImg" class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg" />
-      <button id="lbClose" class="absolute top-1 right-1 z-10 bg-black/60 hover:bg-black/70 text-white rounded-full p-2
-           text-2xl leading-none select-none" aria-label="關閉">✕</button>
+      <img id="lbImg" class="object-contain rounded-lg" />
+      <video id="lbVideo" playsinline controls class="object-contain rounded-lg hidden"></video>
+      <button id="lbClose" class="ui-close-btn absolute top-1 right-1 z-10" aria-label="關閉"><svg viewBox="0 0 24 24"
+          aria-hidden="true" focusable="false" class="ui-close-icon">
+          <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
+        </svg></button>
+      <button id="lbPrev" class="absolute text-white text-4xl select-none">❮</button>
+      <button id="lbNext" class="absolute text-white text-4xl select-none">❯</button>
     </div>
     <div id="lbThumbs" class="absolute w-full flex justify-center px-4 py-2">
-      <div id="lbThumbsInner" class="flex gap-3"></div>
+      <div id="lbThumbsInner" class="flex gap-2"></div>
     </div>
-    <button id="lbPrev" class="absolute text-white text-4xl select-none">❮</button>
-    <button id="lbNext" class="absolute text-white text-4xl select-none">❯</button>
   </div>
 
   <script src="./assets/firebase-config.js"></script>
@@ -788,6 +797,54 @@
 
     const $ = (q) => document.querySelector(q);
     const $$ = (q) => document.querySelectorAll(q);
+    // ===== Video thumbnail helpers (backend thumbs + play badge) =====
+    const __THUMB_PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
+
+    function isVideoUrl(url) {
+      if (!url) return false;
+      const u = String(url).split("?", 1)[0];
+      return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
+    }
+
+    // downloadUrl → Storage path（用於 thumbByPath）
+    function storagePathFromDownloadUrl(url) {
+      try {
+        const p = String(url || "").split("/o/")[1].split("?")[0];
+        return decodeURIComponent(p);
+      } catch (_) {
+        return "";
+      }
+    }
+
+    // 影片縮圖（後端縮圖還沒產出時的備援）：seek 到前面一點顯示第一幀
+    function __primeThumbVideoFrame(v) {
+      if (!v || v.dataset.__primed === "1") return;
+      v.dataset.__primed = "1";
+
+      const onMeta = () => {
+        try {
+          const dur = Number.isFinite(v.duration) ? v.duration : 0;
+          let t = 0.05;
+          if (dur && dur > 0.2) {
+            t = Math.min(0.2, dur / 2);
+            t = Math.max(0.05, Math.min(t, dur - 0.05));
+          }
+          v.currentTime = t;
+        } catch (_) { }
+      };
+
+      const onSeeked = () => { try { v.pause(); } catch (_) { } };
+      v.addEventListener("loadedmetadata", onMeta, { once: true });
+      v.addEventListener("seeked", onSeeked, { once: true });
+
+      setTimeout(() => {
+        try {
+          if (v.readyState < 2) return;
+          if (v.currentTime === 0) v.currentTime = 0.05;
+        } catch (_) { }
+      }, 120);
+    }
+
 
     const BREED_DICT = {
       "品種犬": [
@@ -871,10 +928,33 @@
         const imgs = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
         const img = imgs[0] || '';
 
+        const mediaUrl = img;
+        const isVid = isVideoUrl(mediaUrl);
+        const videoPath = isVid ? storagePathFromDownloadUrl(mediaUrl) : "";
+        const videoThumb = (isVid && p.thumbByPath && videoPath) ? (p.thumbByPath[videoPath] || "") : "";
+
+        const coverHTML = isVid
+          ? (videoThumb
+            ? `
+              <div class="blur-fit rounded-t-2xl aspect-[4/3]" style="--bg: url('${videoThumb}')">
+                <img src="${videoThumb}" alt="${p.name}">
+                <div class="video-badge"><div class="video-badge-inner">${__THUMB_PLAY_SVG}</div></div>
+              </div>
+            `
+            : `
+              <div class="relative rounded-t-2xl aspect-[4/3] overflow-hidden bg-gray-100">
+                <video class="thumb-video w-full h-full object-cover" preload="metadata" muted playsinline webkit-playsinline disablepictureinpicture src="${mediaUrl}"></video>
+                <div class="video-badge"><div class="video-badge-inner">${__THUMB_PLAY_SVG}</div></div>
+              </div>
+            `)
+          : `
+              <div class="blur-fit rounded-t-2xl aspect-[4/3]" style="--bg: url('${mediaUrl}')">
+                <img src="${mediaUrl}" alt="${p.name}">
+              </div>
+            `;
+
         card.innerHTML = `
-          <div class="blur-fit rounded-t-2xl aspect-[4/3]" style="--bg: url('${img}')">
-            <img src="${img}" alt="${p.name}">
-          </div>
+          ${coverHTML}
           <div class="p-4 flex-1 flex flex-col">
             <!-- 第一行：左邊名字、右上角圓角標籤 -->
             <div class="flex items-start justify-between gap-2">
@@ -908,6 +988,8 @@
 
         grid.appendChild(card);
       });
+
+      grid.querySelectorAll("video.thumb-video").forEach((v) => __primeThumbVideoFrame(v));
 
       // 綁定「查看」按鈕
       $$('.btn-detail').forEach(btn =>
