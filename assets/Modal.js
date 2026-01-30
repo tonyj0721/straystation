@@ -7,111 +7,139 @@ function isVideoUrl(url) {
 }
 
 // ===============================
-// iOS/Safari：影片 controls 進度條/重播穩定化
-// - 等 metadata + element 可見後再 play（避免第一次進度條卡住）
-// - 影片播完後顯示「重播」遮罩（避免 iOS 內建播放鍵偶爾失效）
+// 影片播放初始化：避免剛換 src 時 duration 還沒正常（Infinity/NaN）導致控制列進度條「前段不動、後段爆衝」
 // ===============================
-function __installVideoReplayFix(v) {
-  if (!v || v.dataset.__replayFix === "1") return;
-  v.dataset.__replayFix = "1";
+function __hasFiniteDuration(v) {
+  const d = v && v.duration;
+  return Number.isFinite(d) && d > 0 && d !== Infinity;
+}
 
-  // iOS 有時只認 attribute
-  try { v.setAttribute("playsinline", ""); } catch (_) { }
-  try { v.setAttribute("webkit-playsinline", ""); } catch (_) { }
+function __forceResolveDuration(v, timeoutMs = 1200) {
+  // 常見情況：影片 metadata 在檔尾，第一次播放 duration 會是 Infinity/NaN。
+  // 透過「跳到極大時間點」逼瀏覽器解析 duration，成功後再跳回 0。
+  return new Promise((resolve) => {
+    let done = false;
 
-  // 建一個只在 ended 時才出現的遮罩，讓使用者點一下就能重播（不靠內建播放鍵）
-  let overlay = null;
-  try {
-    const parent = v.parentElement;
-    if (parent) {
-      const ov = document.createElement("button");
-      ov.type = "button";
-      ov.textContent = "重播";
-      ov.style.position = "absolute";
-      ov.style.inset = "0";
-      ov.style.display = "none";
-      ov.style.alignItems = "center";
-      ov.style.justifyContent = "center";
-      ov.style.background = "rgba(0,0,0,0.35)";
-      ov.style.color = "#fff";
-      ov.style.border = "0";
-      ov.style.fontSize = "16px";
-      ov.style.fontWeight = "600";
-      ov.style.cursor = "pointer";
-      ov.style.zIndex = "5";
-      ov.style.webkitTapHighlightColor = "transparent";
+    const finish = () => {
+      if (done) return;
+      done = true;
+      v.removeEventListener("durationchange", onDur);
+      v.removeEventListener("timeupdate", onTime);
+      resolve();
+    };
 
-      // 確保 parent 是定位容器（不要硬改已有定位）
-      const cs = window.getComputedStyle(parent);
-      if (cs && cs.position === "static") parent.style.position = "relative";
+    const onDur = () => {
+      if (__hasFiniteDuration(v)) finish();
+    };
 
-      ov.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+    const onTime = () => {
+      if (__hasFiniteDuration(v) && v.currentTime > 0) {
         try { v.currentTime = 0; } catch (_) { }
-        try { v.play?.().catch(() => { }); } catch (_) { }
-        ov.style.display = "none";
-      });
+        finish();
+      }
+    };
 
-      parent.appendChild(ov);
-      v.__replayOverlay = ov;
-      overlay = ov;
-    }
-  } catch (_) { /* ignore */ }
+    v.addEventListener("durationchange", onDur);
+    v.addEventListener("timeupdate", onTime);
 
-  const hideOverlay = () => {
-    try { if (overlay) overlay.style.display = "none"; } catch (_) { }
-  };
-  const showOverlay = () => {
-    try { if (overlay) overlay.style.display = "flex"; } catch (_) { }
-  };
-
-  // iOS Safari：有時 ended 後內建播放鍵不會重播 → 我們在 ended 時先把播放頭拉離尾端，並顯示遮罩
-  const resetHead = () => {
-    try { v.pause?.(); } catch (_) { }
-    try { v.currentTime = 0; } catch (_) { }
-    // 保險：Safari 有時會覆寫一次 currentTime
-    setTimeout(() => { try { v.currentTime = 0; } catch (_) { } }, 60);
-  };
-
-  v.addEventListener("ended", () => {
-    resetHead();
-    showOverlay();
-  });
-
-  // 任何播放/拖拉都把遮罩收起
-  v.addEventListener("play", hideOverlay);
-  v.addEventListener("seeking", hideOverlay);
-  v.addEventListener("timeupdate", () => {
-    try {
-      const d = Number.isFinite(v.duration) ? v.duration : 0;
-      if (d && (d - v.currentTime) > 0.2) hideOverlay();
-    } catch (_) { }
+    try { v.currentTime = 1e101; } catch (_) { }
+    setTimeout(finish, timeoutMs);
   });
 }
 
-function __startInlineVideo(v) {
+function __prepareAndPlayVideo(v, url) {
   if (!v) return;
 
-  __installVideoReplayFix(v);
+  // token：避免快速切換媒體時舊事件回來亂觸發
+  const token = (v.__playToken = (v.__playToken || 0) + 1);
+  const isActive = () => v.__playToken === token;
 
-  try { v.preload = "metadata"; } catch (_) { }
-  try { v.load?.(); } catch (_) { }
+  // 停掉舊的並重置
+  try { v.pause(); } catch (_) { }
+  try { v.currentTime = 0; } catch (_) { }
 
-  const go = () => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        try { v.play?.().catch(() => { }); } catch (_) { }
-      });
-    });
+  v.preload = "metadata";
+  v.playsInline = true;
+  v.controls = true;
+
+  // 重新載入（確保事件、duration 狀態乾淨）
+  try { v.removeAttribute("src"); v.load && v.load(); } catch (_) { }
+  v.src = url;
+  try { v.load && v.load(); } catch (_) { }
+
+  let readyFired = false;
+  const tryPlay = () => {
+    if (!isActive()) return;
+    try {
+      const p = v.play();
+      if (p && typeof p.catch === "function") p.catch(() => { });
+    } catch (_) { }
   };
 
-  // readyState >= 1：metadata 已有（duration 通常就正常）
-  if (v.readyState >= 1) go();
-  else v.addEventListener("loadedmetadata", go, { once: true });
+  const onReady = async () => {
+    if (!isActive() || readyFired) return;
+    readyFired = true;
+
+    // duration 還不正常就先嘗試修正
+    if (!__hasFiniteDuration(v)) {
+      await __forceResolveDuration(v);
+    }
+    if (!isActive()) return;
+
+    // 保險：從 0 開始
+    try { v.currentTime = 0; } catch (_) { }
+
+    tryPlay();
+  };
+
+  v.addEventListener("loadedmetadata", onReady, { once: true });
+  v.addEventListener("canplay", onReady, { once: true });
+
+
+  // === Replay fix ===
+  // 有些瀏覽器/特定影片在 ended 狀態按「播放」不會自動從 0 開始。
+  // 做兩道保險：
+  // 1) ended 時先把 currentTime 歸零並 load()，清掉 ended 狀態
+  // 2) 使用者在影片上點一下（包含控制列區域的點擊）時，如果偵測到在尾端，就強制回到 0 再 play()
+  try {
+    if (v.__endedHandler) v.removeEventListener("ended", v.__endedHandler);
+  } catch (_) { }
+  v.__endedHandler = () => {
+    if (!isActive()) return;
+    try { v.pause(); } catch (_) { }
+    try { v.currentTime = 0; } catch (_) { }
+    try { v.load && v.load(); } catch (_) { }
+  };
+  v.addEventListener("ended", v.__endedHandler);
+
+  const nearEnd = () => {
+    try {
+      if (v.ended) return true;
+      if (!__hasFiniteDuration(v)) return false;
+      return v.currentTime >= (v.duration - 0.05);
+    } catch (_) { return false; }
+  };
+
+  try {
+    if (v.__replayTapHandler) {
+      v.removeEventListener("pointerup", v.__replayTapHandler, true);
+      v.removeEventListener("click", v.__replayTapHandler, true);
+    }
+  } catch (_) { }
+  v.__replayTapHandler = (e) => {
+    if (!isActive()) return;
+    if (!nearEnd()) return;
+    // 這裡是使用者手勢事件（pointerup/click），可安全呼叫 play()
+    try { v.currentTime = 0; } catch (_) { }
+    try { v.load && v.load(); } catch (_) { }
+    tryPlay();
+  };
+  // capture=true：盡量讓控制列上的點擊也能被攔到（不同瀏覽器行為不一）
+  v.addEventListener("pointerup", v.__replayTapHandler, true);
+  v.addEventListener("click", v.__replayTapHandler, true);
+  // fallback：某些瀏覽器事件來很慢，先試播一次也無妨
+  setTimeout(tryPlay, 250);
 }
-
-
 
 function storagePathFromDownloadUrl(url) {
   try {
@@ -671,7 +699,6 @@ async function openDialog(id) {
       if (dlgVideo) {
         try { dlgVideo.pause(); } catch (_) { }
         dlgVideo.src = "";
-        try { dlgVideo.__replayOverlay && (dlgVideo.__replayOverlay.style.display = "none"); } catch (_) { }
         dlgVideo.classList.add("hidden");
       }
 
@@ -705,23 +732,11 @@ async function openDialog(id) {
       if (isVid) {
         dlgImg.classList.add("hidden");
         dlgVideo.classList.remove("hidden");
-        try { dlgVideo.__replayOverlay && (dlgVideo.__replayOverlay.style.display = "none"); } catch (_) { }
-        dlgVideo.src = url;
-        dlgVideo.playsInline = true;
-        try { dlgVideo.setAttribute("playsinline", ""); } catch (_) { }
-        try { dlgVideo.setAttribute("webkit-playsinline", ""); } catch (_) { }
-        dlgVideo.controls = true;
-        dlgVideo.dataset.__autoplay = "1";
-        // dialog 已經開著的話，立刻啟動；否則等 showModal() 之後再啟動
-        if (dlg && dlg.open) {
-          __startInlineVideo(dlgVideo);
-          dlgVideo.dataset.__autoplay = "0";
-        }
+        __prepareAndPlayVideo(dlgVideo, url);
       } else {
         try {
           dlgVideo.pause && dlgVideo.pause();
         } catch (_) { }
-        try { dlgVideo.__replayOverlay && (dlgVideo.__replayOverlay.style.display = "none"); } catch (_) { }
         dlgVideo.classList.add("hidden");
         dlgImg.classList.remove("hidden");
         dlgImg.src = url;
@@ -923,12 +938,6 @@ async function openDialog(id) {
   if (!dlg.open) {
     __lockDialogScroll();
     dlg.showModal();
-    // iOS/Safari：等 dialog 可見後再啟動影片（避免第一次進度條卡住）
-    const __v = document.getElementById("dlgVideo");
-    if (__v && __v.dataset.__autoplay === "1" && !__v.classList.contains("hidden")) {
-      __startInlineVideo(__v);
-      __v.dataset.__autoplay = "0";
-    }
   }
 }
 
