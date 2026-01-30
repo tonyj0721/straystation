@@ -1,5 +1,28 @@
 const q = (sel) => document.querySelector(sel);
 
+async function makeVideoThumbBlob(file) {
+  try {
+    const bmp = await __decodeToBitmap(file);        // Modal.js 已有的函式
+    // admin.html 版請改成 decodeToBitmap(file)
+
+    const w = Math.min(bmp.width || 640, 640);
+    const h = Math.min(bmp.height || 360, 360);
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    const g = c.getContext("2d");
+    g.drawImage(bmp, 0, 0, w, h);
+    bmp.close?.();
+
+    return await new Promise((resolve) => {
+      c.toBlob(resolve, "image/jpeg", 0.82);
+    });
+  } catch (err) {
+    console.warn("makeVideoThumbBlob 失敗", err);
+    return null;
+  }
+}
+
 function isVideoUrl(url) {
   if (!url) return false;
   const u = String(url).split("?", 1)[0];
@@ -904,6 +927,8 @@ async function saveEdit() {
   const txt = document.getElementById("saveText");
   const dlg = document.getElementById("petDialog");
 
+  let thumbMap = null;   // 只有新增影片時才建立
+
   // 蒐集欄位
   const name = (document.getElementById("editName").value || "").trim() || "未取名";
 
@@ -975,22 +1000,34 @@ async function saveEdit() {
 
       if (it.kind === "file") {
         const f = it.file;
-        const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+        const wmBlob = await addWatermarkToFile(f);
+
         const type = wmBlob.type || '';
-        let ext = 'bin';
-        if (type.startsWith('image/')) {
-          ext = type === 'image/png' ? 'png' : 'jpg';
-        } else if (type.startsWith('video/')) {
-          if (type.includes('webm')) ext = 'webm';
-          else if (type.includes('ogg')) ext = 'ogg';
-          else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
-          else ext = 'mp4';
+        let ext = 'jpg';
+        if (type.startsWith('video/')) {
+          ext = type.includes('webm') ? 'webm' : type.includes('ogg') ? 'ogg' : 'mp4';
         }
+
         const base = f.name.replace(/\.[^.]+$/, '');
-        const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
-        const r = sRef(storage, path);
+        const mediaPath = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
+        const r = sRef(storage, mediaPath);
         await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
-        newUrls.push(await getDownloadURL(r));
+        const downloadURL = await getDownloadURL(r);
+        newUrls.push(downloadURL);
+
+        // === 新增：產生影片縮圖 ===
+        if (f.type.startsWith("video/")) {
+          const thumbBlob = await makeVideoThumbBlob(f);
+          if (thumbBlob) {
+            const thumbPath = thumbPathFromMediaPath(mediaPath);
+            const thumbRef = sRef(storage, thumbPath);
+            await uploadBytes(thumbRef, thumbBlob, { contentType: "image/jpeg" });
+            const thumbURL = await getDownloadURL(thumbRef);
+
+            if (!thumbMap) thumbMap = { ...(currentDoc.thumbByPath || {}) };
+            thumbMap[mediaPath] = thumbURL;
+          }
+        }
       }
     }
 
@@ -1020,7 +1057,12 @@ async function saveEdit() {
     }
 
     newData.images = newUrls;
-    const __updatePayload = { ...newData, ...__thumbFieldDeletes };
+    const __updatePayload = {
+      ...newData,
+      images: newUrls,
+      ...(thumbMap && { thumbByPath: thumbMap }),
+      ...__thumbFieldDeletes
+    };
 
     // ③ 寫回 Firestore
     await updateDoc(doc(db, "pets", currentDocId), __updatePayload);

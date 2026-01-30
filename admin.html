@@ -1028,6 +1028,23 @@
         URL.revokeObjectURL(raw);
       }
     }
+
+    async function makeVideoThumbBlob(file) {
+      try {
+        const bmp = await decodeToBitmap(file);   // admin.html 的 decodeToBitmap
+        const w = Math.min(bmp.width || 640, 640);
+        const h = Math.min(bmp.height || 360, 360);
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        c.getContext("2d").drawImage(bmp, 0, 0, w, h);
+        bmp.close?.();
+        return await new Promise(r => c.toBlob(r, "image/jpeg", 0.82));
+      } catch (err) {
+        console.warn("makeVideoThumbBlob failed", err);
+        return null;
+      }
+    }
+
     async function makeThumbURL(file) {
       const bmp = await decodeToBitmap(file);
       const W = bmp.width, H = bmp.height;
@@ -1412,25 +1429,46 @@
         // 1) 新增基本文件
         const docRef = await addDoc(collection(db, "pets"), payload);
 
+        let thumbMap = {};
+
         // 2) 逐張上傳圖片，取得 Storage URL
         const urls = [];
         for (const f of selectedFiles) {
-          const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+          const wmBlob = await addWatermarkToFile(f);
+
           const type = wmBlob.type || '';
-          let ext = 'bin';
-          if (type.startsWith('image/')) {
-            ext = type === 'image/png' ? 'png' : 'jpg';
-          } else if (type.startsWith('video/')) {
-            if (type.includes('webm')) ext = 'webm';
-            else if (type.includes('ogg')) ext = 'ogg';
-            else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
-            else ext = 'mp4';
-          }
+          let ext = type.startsWith('video/') ? 'mp4' : 'jpg';
+          if (type.includes('webm')) ext = 'webm';
+          else if (type.includes('ogg')) ext = 'ogg';
+
           const base = f.name.replace(/\.[^.]+$/, '');
-          const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
-          const r = sRef(storage, path);
+          const mediaPath = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
+          const r = sRef(storage, mediaPath);
           await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
-          urls.push(await getDownloadURL(r));
+          const downloadURL = await getDownloadURL(r);
+          urls.push(downloadURL);
+
+          // === 新增：影片縮圖 ===
+          if (f.type.startsWith("video/")) {
+            const thumbBlob = await makeVideoThumbBlob(f);
+            if (thumbBlob) {
+              const thumbPath = thumbPathFromMediaPath(mediaPath);
+              const thumbRef = sRef(storage, thumbPath);
+              await uploadBytes(thumbRef, thumbBlob, { contentType: "image/jpeg" });
+              const thumbURL = await getDownloadURL(thumbRef);
+              thumbMap[mediaPath] = thumbURL;   // mediaPath = storage full path
+            }
+          }
+        }
+
+        // 迴圈外
+        let updatePayload = { images: urls };
+        if (Object.keys(thumbMap).length > 0) {
+          updatePayload.thumbByPath = thumbMap;
+        }
+
+        if (urls.length) {
+          await updateDoc(doc(db, "pets", docRef.id), updatePayload);
         }
 
         // 3) 回寫 images 欄位
