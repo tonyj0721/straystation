@@ -1459,7 +1459,13 @@
           if (f.type.startsWith("video/")) {
             try {
               console.log(`開始產生縮圖: ${f.name}`);
-              const thumbBlob = await makeVideoThumbBlob(f);
+
+              // 加 timeout：最多等 15 秒
+              const thumbBlob = await Promise.race([
+                makeVideoThumbBlob(f),
+                new Promise((_, reject) => setTimeout(() => reject(new Error("縮圖產生超時")), 15000))
+              ]);
+
               if (thumbBlob) {
                 const thumbPath = thumbPathFromMediaPath(mediaPath);
                 const thumbRef = sRef(storage, thumbPath);
@@ -1467,12 +1473,10 @@
                 const thumbURL = await getDownloadURL(thumbRef);
                 thumbMap[mediaPath] = thumbURL;
                 console.log(`縮圖上傳成功: ${f.name}`);
-              } else {
-                console.warn(`縮圖產生失敗 (null): ${f.name}`);
               }
             } catch (thumbErr) {
-              console.warn(`縮圖產生錯誤 (跳過): ${f.name}`, thumbErr);
-              // 不拋錯，繼續下一個檔案
+              console.warn(`縮圖失敗或超時 (跳過): ${f.name}`, thumbErr.message || thumbErr);
+              // 完全不拋錯，繼續下一個檔案或結束
             }
           }
         }
