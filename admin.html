@@ -1093,10 +1093,8 @@
         v.disablePictureInPicture = true;
         v.src = getVideoObjURL(file);
 
-        // 先顯示縮圖當 poster（更像截圖的效果），避免黑畫面
-        ensureThumbURL(file)
-          .then((url) => { v.poster = url; })
-          .catch(() => { /* poster 失敗就算了 */ });
+        // ✅ 直接用影片本身抓一個 frame，避免黑畫面（特別是 iOS / Safari）
+        __primeThumbVideoFrameAdmin(v);
 
         // 中央播放/暫停按鈕（取代原生控制列）
         const overlay = document.createElement("div");
@@ -1417,17 +1415,13 @@
         // 2) 逐張上傳圖片，取得 Storage URL
         const urls = [];
         for (const f of selectedFiles) {
-          const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+          const wmBlob = f; // 後端處理浮水印/轉檔/縮圖（前端直接上傳原檔）
+          // ← 新增：先加浮水印
           const type = wmBlob.type || '';
           let ext = 'bin';
-          if (type.startsWith('image/')) {
-            ext = type === 'image/png' ? 'png' : 'jpg';
-          } else if (type.startsWith('video/')) {
-            if (type.includes('webm')) ext = 'webm';
-            else if (type.includes('ogg')) ext = 'ogg';
-            else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
-            else ext = 'mp4';
-          }
+          // ✅ 後端會統一：圖片 -> JPG、影片 -> MP4（避免 iPhone/WebM 問題與進度條爆衝）
+          if (type.startsWith('image/')) ext = 'jpg';
+          else if (type.startsWith('video/')) ext = 'mp4';
           const base = f.name.replace(/\.[^.]+$/, '');
           const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
           const r = sRef(storage, path);
@@ -1686,11 +1680,12 @@
 
     // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
     const __THUMB_PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
+
     function __primeThumbVideoFrameAdmin(v) {
       if (!v || v.dataset.__primed === "1") return;
       v.dataset.__primed = "1";
 
-      const onMeta = () => {
+      const seekToThumbTime = () => {
         try {
           const dur = Number.isFinite(v.duration) ? v.duration : 0;
           let t = 0.05;
@@ -1702,15 +1697,48 @@
         } catch (_) { }
       };
 
-      const onSeeked = () => { try { v.pause(); } catch (_) { } };
-      v.addEventListener("loadedmetadata", onMeta, { once: true });
-      v.addEventListener("seeked", onSeeked, { once: true });
+      const ensurePaint = () => {
+        if (v.dataset.__painted === "1") return;
+        v.dataset.__painted = "1";
+
+        try {
+          const p = v.play();
+          if (p && typeof p.then === "function") {
+            p.then(() => {
+              if (typeof v.requestVideoFrameCallback === "function") {
+                v.requestVideoFrameCallback(() => {
+                  try { v.pause(); } catch (_) { }
+                });
+              } else {
+                setTimeout(() => {
+                  try { v.pause(); } catch (_) { }
+                }, 60);
+              }
+            }).catch(() => {
+              try { v.pause(); } catch (_) { }
+            });
+          }
+        } catch (_) {
+          try { v.pause(); } catch (_) { }
+        }
+      };
+
+      v.addEventListener("loadedmetadata", () => {
+        seekToThumbTime();
+        ensurePaint();
+      }, { once: true });
+
+      v.addEventListener("seeked", () => {
+        ensurePaint();
+      }, { once: true });
+
       setTimeout(() => {
         try {
           if (v.readyState < 2) return;
-          if (v.currentTime === 0) v.currentTime = 0.05;
+          if (v.currentTime === 0) seekToThumbTime();
+          ensurePaint();
         } catch (_) { }
-      }, 120);
+      }, 200);
     }
 
     // downloadUrl → Storage path（用於 thumbByPath）
@@ -1755,7 +1783,7 @@
                </div>
               `;
 
-return `
+          return `
         <div class="rounded-xl ring-1 ring-gray-200 p-3 flex gap-3 items-center cursor-pointer"
              data-id="${p.id}">
           ${thumb}
