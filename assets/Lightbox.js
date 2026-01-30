@@ -6,132 +6,6 @@ function isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
 
-// ===============================
-// 影片播放初始化：避免剛換 src 時 duration 還沒正常（Infinity/NaN）導致控制列進度條「前段不動、後段爆衝」
-// ===============================
-function __hasFiniteDuration(v) {
-  const d = v && v.duration;
-  return Number.isFinite(d) && d > 0 && d !== Infinity;
-}
-
-function __forceResolveDuration(v, timeoutMs = 1200) {
-  return new Promise((resolve) => {
-    let done = false;
-
-    const finish = () => {
-      if (done) return;
-      done = true;
-      v.removeEventListener("durationchange", onDur);
-      v.removeEventListener("timeupdate", onTime);
-      resolve();
-    };
-
-    const onDur = () => {
-      if (__hasFiniteDuration(v)) finish();
-    };
-
-    const onTime = () => {
-      if (__hasFiniteDuration(v) && v.currentTime > 0) {
-        try { v.currentTime = 0; } catch (_) { }
-        finish();
-      }
-    };
-
-    v.addEventListener("durationchange", onDur);
-    v.addEventListener("timeupdate", onTime);
-
-    try { v.currentTime = 1e101; } catch (_) { }
-    setTimeout(finish, timeoutMs);
-  });
-}
-
-function __prepareAndPlayVideo(v, url) {
-  if (!v) return;
-
-  const token = (v.__playToken = (v.__playToken || 0) + 1);
-  const isActive = () => v.__playToken === token;
-
-  try { v.pause(); } catch (_) { }
-  try { v.currentTime = 0; } catch (_) { }
-
-  v.preload = "metadata";
-  v.playsInline = true;
-  v.controls = true;
-
-  try { v.removeAttribute("src"); v.load && v.load(); } catch (_) { }
-  v.src = url;
-  try { v.load && v.load(); } catch (_) { }
-
-  let readyFired = false;
-  const tryPlay = () => {
-    if (!isActive()) return;
-    try {
-      const p = v.play();
-      if (p && typeof p.catch === "function") p.catch(() => { });
-    } catch (_) { }
-  };
-
-  const onReady = async () => {
-    if (!isActive() || readyFired) return;
-    readyFired = true;
-
-    if (!__hasFiniteDuration(v)) {
-      await __forceResolveDuration(v);
-    }
-    if (!isActive()) return;
-
-    try { v.currentTime = 0; } catch (_) { }
-    tryPlay();
-  };
-
-  v.addEventListener("loadedmetadata", onReady, { once: true });
-  v.addEventListener("canplay", onReady, { once: true });
-
-
-  // === Replay fix ===
-  // 有些瀏覽器/特定影片在 ended 狀態按「播放」不會自動從 0 開始。
-  // 做兩道保險：
-  // 1) ended 時先把 currentTime 歸零並 load()，清掉 ended 狀態
-  // 2) 使用者在影片上點一下（包含控制列區域的點擊）時，如果偵測到在尾端，就強制回到 0 再 play()
-  try {
-    if (v.__endedHandler) v.removeEventListener("ended", v.__endedHandler);
-  } catch (_) { }
-  v.__endedHandler = () => {
-    if (!isActive()) return;
-    try { v.pause(); } catch (_) { }
-    try { v.currentTime = 0; } catch (_) { }
-    try { v.load && v.load(); } catch (_) { }
-  };
-  v.addEventListener("ended", v.__endedHandler);
-
-  const nearEnd = () => {
-    try {
-      if (v.ended) return true;
-      if (!__hasFiniteDuration(v)) return false;
-      return v.currentTime >= (v.duration - 0.05);
-    } catch (_) { return false; }
-  };
-
-  try {
-    if (v.__replayTapHandler) {
-      v.removeEventListener("pointerup", v.__replayTapHandler, true);
-      v.removeEventListener("click", v.__replayTapHandler, true);
-    }
-  } catch (_) { }
-  v.__replayTapHandler = (e) => {
-    if (!isActive()) return;
-    if (!nearEnd()) return;
-    // 這裡是使用者手勢事件（pointerup/click），可安全呼叫 play()
-    try { v.currentTime = 0; } catch (_) { }
-    try { v.load && v.load(); } catch (_) { }
-    tryPlay();
-  };
-  // capture=true：盡量讓控制列上的點擊也能被攔到（不同瀏覽器行為不一）
-  v.addEventListener("pointerup", v.__replayTapHandler, true);
-  v.addEventListener("click", v.__replayTapHandler, true);
-  setTimeout(tryPlay, 250);
-}
-
 function storagePathFromDownloadUrl(url) {
   try {
     const p = String(url).split("/o/")[1].split("?")[0];
@@ -246,7 +120,38 @@ function renderLightboxMedia() {
     if (isVid) {
       lbImg.classList.add("hidden");
       lbVideo.classList.remove("hidden");
-      __prepareAndPlayVideo(lbVideo, url);
+      lbVideo.preload = "metadata";
+      lbVideo.src = url;
+
+      lbVideo.playsInline = true;
+      lbVideo.setAttribute("playsinline", "");
+      lbVideo.setAttribute("webkit-playsinline", "");
+
+      lbVideo.controls = true;
+
+      try { lbVideo.load && lbVideo.load(); } catch (_) { }
+
+      lbVideo.addEventListener("loadedmetadata", () => {
+        try { lbVideo.play().catch(() => { }); } catch (_) { }
+      }, { once: true });
+
+      // ✅ iPhone：9 秒影片播完後按播放沒反應 → 用「重載 src」把 ended 狀態清掉
+      if (lbVideo.dataset.__iosReplayFixBound !== "1") {
+        lbVideo.dataset.__iosReplayFixBound = "1";
+
+        lbVideo.addEventListener("ended", () => {
+          const src = lbVideo.currentSrc || lbVideo.src;
+
+          try { lbVideo.pause(); } catch (_) { }
+
+          try { lbVideo.removeAttribute("src"); } catch (_) { }
+          try { lbVideo.load && lbVideo.load(); } catch (_) { }
+
+          lbVideo.src = src;
+          lbVideo.preload = "metadata";
+          try { lbVideo.load && lbVideo.load(); } catch (_) { }
+        });
+      }
     } else {
       try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
       lbVideo.classList.add("hidden");
@@ -408,14 +313,15 @@ function openLightbox(images, index = 0) {
     });
   }
 
-  // 一開始顯示當前項目
-  renderLightboxMedia();
-
-  // 顯示 Lightbox（先顯示，讓 dlg.close() 的 close handler 知道是要切到 Lightbox）
   if (lb) {
     lb.classList.remove("hidden");
     lb.classList.add("flex");
   }
+
+  // 下一個 frame 再 render（讓 layout/controls 先出來）
+  requestAnimationFrame(() => {
+    renderLightboxMedia();
+  });
 
   // 關掉 Modal（移除 backdrop）
   if (dlg?.open) dlg.close();
