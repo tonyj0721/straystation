@@ -1,28 +1,5 @@
 const q = (sel) => document.querySelector(sel);
 
-async function makeVideoThumbBlob(file) {
-  try {
-    const bmp = await __decodeToBitmap(file);        // Modal.js 已有的函式
-    // admin.html 版請改成 decodeToBitmap(file)
-
-    const w = Math.min(bmp.width || 640, 640);
-    const h = Math.min(bmp.height || 360, 360);
-    const c = document.createElement("canvas");
-    c.width = w;
-    c.height = h;
-    const g = c.getContext("2d");
-    g.drawImage(bmp, 0, 0, w, h);
-    bmp.close?.();
-
-    return await new Promise((resolve) => {
-      c.toBlob(resolve, "image/jpeg", 0.82);
-    });
-  } catch (err) {
-    console.warn("makeVideoThumbBlob 失敗", err);
-    return null;
-  }
-}
-
 function isVideoUrl(url) {
   if (!url) return false;
   const u = String(url).split("?", 1)[0];
@@ -622,8 +599,33 @@ async function openDialog(id) {
         dlgVideo.classList.remove("hidden");
         dlgVideo.src = url;
         dlgVideo.playsInline = true;
-        dlgVideo.controls = true;
+        dlgVideo.controls = false;  // 移除原生控制列
         try { dlgVideo.play().catch(() => { }); } catch (_) { }
+
+        // 單擊播放/暫停，雙擊進入 Lightbox
+        let tapCount = 0;
+        let tapTimer = null;
+        dlgVideo.onclick = (ev) => {
+          tapCount++;
+          if (tapCount === 1) {
+            tapTimer = setTimeout(() => {
+              // 單擊：切換播放狀態
+              if (dlgVideo.paused) {
+                dlgVideo.play().catch(() => { });
+              } else {
+                dlgVideo.pause();
+              }
+              tapCount = 0;
+            }, 300);
+          } else {
+            // 雙擊：進入 Lightbox
+            clearTimeout(tapTimer);
+            ev.preventDefault();
+            ev.stopPropagation();
+            openLightbox(media, currentIndex);
+            tapCount = 0;
+          }
+        };
       } else {
         try {
           dlgVideo.pause && dlgVideo.pause();
@@ -927,8 +929,6 @@ async function saveEdit() {
   const txt = document.getElementById("saveText");
   const dlg = document.getElementById("petDialog");
 
-  let thumbMap = null;   // 只有新增影片時才建立
-
   // 蒐集欄位
   const name = (document.getElementById("editName").value || "").trim() || "未取名";
 
@@ -1000,34 +1000,22 @@ async function saveEdit() {
 
       if (it.kind === "file") {
         const f = it.file;
-        const wmBlob = await addWatermarkToFile(f);
-
+        const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
         const type = wmBlob.type || '';
-        let ext = 'jpg';
-        if (type.startsWith('video/')) {
-          ext = type.includes('webm') ? 'webm' : type.includes('ogg') ? 'ogg' : 'mp4';
+        let ext = 'bin';
+        if (type.startsWith('image/')) {
+          ext = type === 'image/png' ? 'png' : 'jpg';
+        } else if (type.startsWith('video/')) {
+          if (type.includes('webm')) ext = 'webm';
+          else if (type.includes('ogg')) ext = 'ogg';
+          else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
+          else ext = 'mp4';
         }
-
         const base = f.name.replace(/\.[^.]+$/, '');
-        const mediaPath = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
-        const r = sRef(storage, mediaPath);
+        const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
+        const r = sRef(storage, path);
         await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
-        const downloadURL = await getDownloadURL(r);
-        newUrls.push(downloadURL);
-
-        // === 新增：產生影片縮圖 ===
-        if (f.type.startsWith("video/")) {
-          const thumbBlob = await makeVideoThumbBlob(f);
-          if (thumbBlob) {
-            const thumbPath = thumbPathFromMediaPath(mediaPath);
-            const thumbRef = sRef(storage, thumbPath);
-            await uploadBytes(thumbRef, thumbBlob, { contentType: "image/jpeg" });
-            const thumbURL = await getDownloadURL(thumbRef);
-
-            if (!thumbMap) thumbMap = { ...(currentDoc.thumbByPath || {}) };
-            thumbMap[mediaPath] = thumbURL;
-          }
-        }
+        newUrls.push(await getDownloadURL(r));
       }
     }
 
@@ -1057,12 +1045,7 @@ async function saveEdit() {
     }
 
     newData.images = newUrls;
-    const __updatePayload = {
-      ...newData,
-      images: newUrls,
-      ...(thumbMap && { thumbByPath: thumbMap }),
-      ...__thumbFieldDeletes
-    };
+    const __updatePayload = { ...newData, ...__thumbFieldDeletes };
 
     // ③ 寫回 Firestore
     await updateDoc(doc(db, "pets", currentDocId), __updatePayload);

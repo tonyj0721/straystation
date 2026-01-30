@@ -18,6 +18,10 @@ function storagePathFromDownloadUrl(url) {
 // Lightbox 縮圖播放 icon（避免與 Modal.js 的 __PLAY_SVG 命名衝突）
 const __THUMB_PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
 
+// 新增：播放 / 暫停圖示
+const PLAY_ICON = `<svg class="w-12 h-12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
+const PAUSE_ICON = `<svg class="w-12 h-12" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>`;
+
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
 function __primeThumbVideoFrameLightbox(v) {
   if (!v || v.dataset.__primed === "1") return;
@@ -104,39 +108,136 @@ function renderLightboxMedia() {
       lbVideo.src = "";
       lbVideo.classList.add("hidden");
     }
-    if (lbWrap) lbWrap.classList.remove("lb-video-mode"); // ← 新增
+    if (lbWrap) lbWrap.classList.remove("lb-video-mode");
     return;
   }
 
   const url = lbImages[lbIndex] || "";
   const isVid = isVideoUrl(url);
 
-  // 根據是否為影片切換 class
   if (lbWrap) {
-    lbWrap.classList.toggle("lb-video-mode", !!isVid);   // ← 新增
+    lbWrap.classList.toggle("lb-video-mode", !!isVid);
   }
 
-  if (lbImg && lbVideo) {
-    if (isVid) {
-      lbImg.classList.add("hidden");
-      lbVideo.classList.remove("hidden");
-      lbVideo.src = url;
-      lbVideo.playsInline = true;
-      lbVideo.controls = true;
-      try { lbVideo.play().catch(() => { }); } catch (_) { }
+  let controls = lbWrap.querySelector('.lb-custom-controls');
+
+  if (isVid) {
+    lbImg.classList.add("hidden");
+    lbVideo.classList.remove("hidden");
+    lbVideo.src = url;
+    lbVideo.playsInline = true;
+    lbVideo.controls = false;  // 移除原生控制列
+    lbVideo.load();
+    lbVideo.play().catch(() => { });
+
+    // 建立自訂控制列（只建立一次）
+    if (!controls) {
+      controls = document.createElement("div");
+      controls.className = "lb-custom-controls absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-6 flex items-center gap-6 text-white pointer-events-auto opacity-0 transition-opacity duration-300";
+
+      // 播放按鈕
+      const playBtn = document.createElement("button");
+      playBtn.className = "focus:outline-none";
+      playBtn.innerHTML = PLAY_ICON;
+      controls.appendChild(playBtn);
+
+      // 進度條容器
+      const progressContainer = document.createElement("div");
+      progressContainer.className = "flex-1 h-2 bg-white/30 rounded-full overflow-hidden cursor-pointer";
+      const progressFilled = document.createElement("div");
+      progressFilled.className = "h-full bg-white transition-all duration-100";
+      progressFilled.style.width = "0%";
+      progressContainer.appendChild(progressFilled);
+      controls.appendChild(progressContainer);
+
+      // 時間顯示
+      const timeDisplay = document.createElement("span");
+      timeDisplay.className = "text-lg font-medium tabular-nums";
+      timeDisplay.textContent = "0:00 / 0:00";
+      controls.appendChild(timeDisplay);
+
+      lbWrap.appendChild(controls);
+
+      // 事件綁定
+      const togglePlay = () => {
+        if (lbVideo.paused) lbVideo.play();
+        else lbVideo.pause();
+      };
+
+      const updatePlayIcon = () => {
+        playBtn.innerHTML = lbVideo.paused ? PLAY_ICON : PAUSE_ICON;
+      };
+
+      const updateProgress = () => {
+        const percent = lbVideo.duration ? (lbVideo.currentTime / lbVideo.duration) * 100 : 0;
+        progressFilled.style.width = percent + "%";
+      };
+
+      const formatTime = (sec) => {
+        if (!isFinite(sec)) return "0:00";
+        const m = Math.floor(sec / 60);
+        const s = Math.floor(sec % 60);
+        return `${m}:${s.toString().padStart(2, "0")}`;
+      };
+
+      const updateTime = () => {
+        timeDisplay.textContent = `${formatTime(lbVideo.currentTime)} / ${formatTime(lbVideo.duration)}`;
+      };
+
+      playBtn.onclick = togglePlay;
+      lbVideo.onclick = togglePlay;
+      progressContainer.onclick = (e) => {
+        const rect = progressContainer.getBoundingClientRect();
+        const pos = (e.clientX - rect.left) / rect.width;
+        lbVideo.currentTime = lbVideo.duration * Math.max(0, Math.min(1, pos));
+      };
+
+      lbVideo.addEventListener("play", updatePlayIcon);
+      lbVideo.addEventListener("pause", updatePlayIcon);
+      lbVideo.addEventListener("ended", updatePlayIcon);
+      lbVideo.addEventListener("timeupdate", updateProgress);
+      lbVideo.addEventListener("timeupdate", updateTime);
+      lbVideo.addEventListener("loadedmetadata", updateTime);
+      lbVideo.addEventListener("durationchange", updateTime);
+
+      // 自動隱藏控制列
+      let hideTimeout;
+      const showControls = () => {
+        controls.classList.remove("opacity-0");
+        clearTimeout(hideTimeout);
+        hideTimeout = setTimeout(() => controls.classList.add("opacity-0"), 3000);
+      };
+      lbWrap.addEventListener("mousemove", showControls);
+      lbWrap.addEventListener("touchstart", showControls, { passive: true });
+      lbVideo.addEventListener("click", showControls);
+
+      // 初始顯示
+      showControls();
+      updatePlayIcon();
+      updateTime();
+      updateProgress();
     } else {
-      try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
-      lbVideo.classList.add("hidden");
-      lbImg.classList.remove("hidden");
-      lbImg.src = url;
+      // 已存在控制列，僅更新 src 並播放
+      lbVideo.load();
+      lbVideo.play().catch(() => { });
+      controls.classList.remove("opacity-0");
     }
-  } else if (lbImg) {
+  } else {
+    // 圖片模式
+    try { lbVideo.pause(); } catch (_) { }
+    lbVideo.src = "";
+    lbVideo.classList.add("hidden");
+    lbImg.classList.remove("hidden");
     lbImg.src = url;
+
+    // 隱藏控制列
+    if (controls) controls.classList.add("opacity-0");
   }
 
+  // 更新縮圖 active 狀態
   const lbThumbsInner = document.getElementById("lbThumbsInner");
   if (lbThumbsInner) {
-    Array.prototype.forEach.call(lbThumbsInner.children, (el, i) => {
+    Array.from(lbThumbsInner.children).forEach((el, i) => {
       el.classList.toggle("active", i === lbIndex);
     });
   }
@@ -306,8 +407,10 @@ function closeLightbox() {
   if (lbVideo) {
     try { lbVideo.pause(); } catch (_) { }
     lbVideo.removeAttribute("src");
-    try { lbVideo.load && lbVideo.load(); } catch (_) { }
+    try { lbVideo.load(); } catch (_) { }
   }
+  const controls = lbWrap.querySelector('.lb-custom-controls');
+  if (controls) controls.remove();
 
   if (lb) {
     lb.classList.add("hidden");
