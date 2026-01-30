@@ -1045,24 +1045,6 @@
       }
     }
 
-    function storagePathFromDownloadUrl(url) {
-      try {
-        const p = String(url || "").split("/o/")[1].split("?")[0];
-        return decodeURIComponent(p);
-      } catch (_) {
-        return "";
-      }
-    }
-
-    function thumbPathFromMediaPath(mediaPath) {
-      try {
-        const noExt = String(mediaPath).replace(/\.[^.]+$/i, "");
-        return `thumbs/${noExt}.jpg`;
-      } catch (_) {
-        return "";
-      }
-    }
-
     async function makeThumbURL(file) {
       const bmp = await decodeToBitmap(file);
       const W = bmp.width, H = bmp.height;
