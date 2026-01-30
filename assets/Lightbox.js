@@ -120,38 +120,10 @@ function renderLightboxMedia() {
     if (isVid) {
       lbImg.classList.add("hidden");
       lbVideo.classList.remove("hidden");
-      lbVideo.preload = "metadata";
       lbVideo.src = url;
-
       lbVideo.playsInline = true;
-      lbVideo.setAttribute("playsinline", "");
-      lbVideo.setAttribute("webkit-playsinline", "");
-
       lbVideo.controls = true;
-
-      try { lbVideo.load && lbVideo.load(); } catch (_) { }
-
-      lbVideo.addEventListener("loadedmetadata", () => {
-        try { lbVideo.play().catch(() => { }); } catch (_) { }
-      }, { once: true });
-
-      // ✅ iPhone：9 秒影片播完後按播放沒反應 → 用「重載 src」把 ended 狀態清掉
-      if (lbVideo.dataset.__iosReplayFixBound !== "1") {
-        lbVideo.dataset.__iosReplayFixBound = "1";
-
-        lbVideo.addEventListener("ended", () => {
-          const src = lbVideo.currentSrc || lbVideo.src;
-
-          try { lbVideo.pause(); } catch (_) { }
-
-          try { lbVideo.removeAttribute("src"); } catch (_) { }
-          try { lbVideo.load && lbVideo.load(); } catch (_) { }
-
-          lbVideo.src = src;
-          lbVideo.preload = "metadata";
-          try { lbVideo.load && lbVideo.load(); } catch (_) { }
-        });
-      }
+      try { lbVideo.play().catch(() => { }); } catch (_) { }
     } else {
       try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
       lbVideo.classList.add("hidden");
@@ -313,15 +285,14 @@ function openLightbox(images, index = 0) {
     });
   }
 
+  // 一開始顯示當前項目
+  renderLightboxMedia();
+
+  // 顯示 Lightbox（先顯示，讓 dlg.close() 的 close handler 知道是要切到 Lightbox）
   if (lb) {
     lb.classList.remove("hidden");
     lb.classList.add("flex");
   }
-
-  // 下一個 frame 再 render（讓 layout/controls 先出來）
-  requestAnimationFrame(() => {
-    renderLightboxMedia();
-  });
 
   // 關掉 Modal（移除 backdrop）
   if (dlg?.open) dlg.close();

@@ -597,44 +597,10 @@ async function openDialog(id) {
       if (isVid) {
         dlgImg.classList.add("hidden");
         dlgVideo.classList.remove("hidden");
-        dlgVideo.preload = "metadata";
         dlgVideo.src = url;
-
-        // iOS 需要這兩個屬性（保險）
         dlgVideo.playsInline = true;
-        dlgVideo.setAttribute("playsinline", "");
-        dlgVideo.setAttribute("webkit-playsinline", "");
-
         dlgVideo.controls = true;
-
-        // 先載入 metadata（拿到 duration）
-        try { dlgVideo.load && dlgVideo.load(); } catch (_) { }
-
-        // ✅ 等到知道 duration（loadedmetadata）再播：進度條就會正常
-        dlgVideo.addEventListener("loadedmetadata", () => {
-          try { dlgVideo.play().catch(() => { }); } catch (_) { }
-        }, { once: true });
-
-        // ✅ iPhone：9 秒影片播完後按播放沒反應 → 用「重載 src」把 ended 狀態清掉
-        if (dlgVideo.dataset.__iosReplayFixBound !== "1") {
-          dlgVideo.dataset.__iosReplayFixBound = "1";
-
-          dlgVideo.addEventListener("ended", () => {
-            const src = dlgVideo.currentSrc || dlgVideo.src;
-
-            // 1) 先停
-            try { dlgVideo.pause(); } catch (_) { }
-
-            // 2) 強制清掉 src + load（iOS 會把 ended 狀態清乾淨）
-            try { dlgVideo.removeAttribute("src"); } catch (_) { }
-            try { dlgVideo.load && dlgVideo.load(); } catch (_) { }
-
-            // 3) 塞回原本 src，再 load 一次（回到起點）
-            dlgVideo.src = src;
-            dlgVideo.preload = "metadata";
-            try { dlgVideo.load && dlgVideo.load(); } catch (_) { }
-          });
-        }
+        try { dlgVideo.play().catch(() => { }); } catch (_) { }
       } else {
         try {
           dlgVideo.pause && dlgVideo.pause();
