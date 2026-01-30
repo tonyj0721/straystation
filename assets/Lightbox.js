@@ -6,18 +6,6 @@ function isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
 
-function __isIOS() {
-  try {
-    const ua = navigator.userAgent || "";
-    const isI = /iP(hone|od|ad)/.test(ua);
-    const isIpadOS = (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-    return isI || isIpadOS;
-  } catch (_) {
-    return false;
-  }
-}
-
-
 function storagePathFromDownloadUrl(url) {
   try {
     const p = String(url).split("/o/")[1].split("?")[0];
@@ -33,12 +21,6 @@ const __THUMB_PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
 function __primeThumbVideoFrameLightbox(v) {
   if (!v || v.dataset.__primed === "1") return;
-
-  // iOS：不要為了縮圖去 play/pause 影片（多支影片時可能影響主影片播放）
-  if (__isIOS()) {
-    return;
-  }
-
   v.dataset.__primed = "1";
 
   const seekToThumbTime = () => {
@@ -139,19 +121,37 @@ function renderLightboxMedia() {
       lbImg.classList.add("hidden");
       lbVideo.classList.remove("hidden");
       lbVideo.preload = "metadata";
+      lbVideo.src = url;
+
       lbVideo.playsInline = true;
       lbVideo.setAttribute("playsinline", "");
       lbVideo.setAttribute("webkit-playsinline", "");
+
       lbVideo.controls = true;
-      try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
-      try { lbVideo.currentTime = 0; } catch (_) { }
-      lbVideo.src = url;
+
       try { lbVideo.load && lbVideo.load(); } catch (_) { }
-      if (!__isIOS()) {
+
+      lbVideo.addEventListener("loadedmetadata", () => {
         try { lbVideo.play().catch(() => { }); } catch (_) { }
+      }, { once: true });
+
+      // ✅ iPhone：9 秒影片播完後按播放沒反應 → 用「重載 src」把 ended 狀態清掉
+      if (lbVideo.dataset.__iosReplayFixBound !== "1") {
+        lbVideo.dataset.__iosReplayFixBound = "1";
+
+        lbVideo.addEventListener("ended", () => {
+          const src = lbVideo.currentSrc || lbVideo.src;
+
+          try { lbVideo.pause(); } catch (_) { }
+
+          try { lbVideo.removeAttribute("src"); } catch (_) { }
+          try { lbVideo.load && lbVideo.load(); } catch (_) { }
+
+          lbVideo.src = src;
+          lbVideo.preload = "metadata";
+          try { lbVideo.load && lbVideo.load(); } catch (_) { }
+        });
       }
-      lbVideo.controls = true;
-      try { lbVideo.play().catch(() => { }); } catch (_) { }
     } else {
       try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
       lbVideo.classList.add("hidden");
@@ -254,8 +254,11 @@ dlg?.addEventListener('close', () => {
   unlockScroll();
 });
 
-// 🔥 開啟 Lightbox：關掉 dialog + 維持背景鎖定
+const __IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const __EMPTY_GIF = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 
+// 🔥 開啟 Lightbox：關掉 dialog + 維持背景鎖定
 function openLightbox(images, index = 0) {
   lbImages = images || [];
   lbIndex = Math.max(0, Math.min(index, lbImages.length - 1));
@@ -265,8 +268,6 @@ function openLightbox(images, index = 0) {
   const lbThumbsInner = document.getElementById("lbThumbsInner");
   if (lbThumbsInner) {
     lbThumbsInner.innerHTML = "";
-    const __lbIsIOS = __isIOS();
-    const __lbFirstImage = lbImages.find(u => !isVideoUrl(u)) || "";
     lbImages.forEach((url, i) => {
       const isVid = isVideoUrl(url);
       const wrapper = document.createElement("div");
@@ -282,16 +283,12 @@ function openLightbox(images, index = 0) {
           img.src = videoThumb;
           wrapper.appendChild(img);
         } else {
-          if (__lbIsIOS) {
-            if (__lbFirstImage) {
-              const img = document.createElement("img");
-              img.src = __lbFirstImage;
-              wrapper.appendChild(img);
-            } else {
-              const ph = document.createElement("div");
-              ph.className = "thumb-fallback";
-              wrapper.appendChild(ph);
-            }
+          // ✅ iPhone：不要用 <video> 當縮圖 fallback（避免 thumb video play/pause 影響主影片進度條）
+          if (__IS_IOS) {
+            const img = document.createElement("img");
+            const firstImage = lbImages.find(u => !isVideoUrl(u));
+            img.src = firstImage || __EMPTY_GIF;
+            wrapper.appendChild(img);
           } else {
             const v = document.createElement("video");
             v.className = "thumb-video";
@@ -303,6 +300,7 @@ function openLightbox(images, index = 0) {
             v.controls = false;
             v.disablePictureInPicture = true;
             v.src = url;
+
             __primeThumbVideoFrameLightbox(v);
             wrapper.appendChild(v);
           }
@@ -327,14 +325,15 @@ function openLightbox(images, index = 0) {
     });
   }
 
-  // 一開始顯示當前項目
-  renderLightboxMedia();
-
-  // 顯示 Lightbox（先顯示，讓 dlg.close() 的 close handler 知道是要切到 Lightbox）
   if (lb) {
     lb.classList.remove("hidden");
     lb.classList.add("flex");
   }
+
+  // 下一個 frame 再 render（讓 layout/controls 先出來）
+  requestAnimationFrame(() => {
+    renderLightboxMedia();
+  });
 
   // 關掉 Modal（移除 backdrop）
   if (dlg?.open) dlg.close();

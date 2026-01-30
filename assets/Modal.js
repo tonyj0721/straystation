@@ -6,18 +6,6 @@ function isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
 
-function __isIOS() {
-  try {
-    const ua = navigator.userAgent || "";
-    const isI = /iP(hone|od|ad)/.test(ua);
-    const isIpadOS = (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-    return isI || isIpadOS;
-  } catch (_) {
-    return false;
-  }
-}
-
-
 function storagePathFromDownloadUrl(url) {
   try {
     const p = String(url).split("/o/")[1].split("?")[0];
@@ -41,12 +29,6 @@ function thumbPathFromMediaPath(mediaPath) {
 // ===============================
 function __primeThumbVideoFrame(v) {
   if (!v || v.dataset.__primed === "1") return;
-
-  // iOS：不要為了縮圖去 play/pause 影片（多支影片時可能影響主影片播放）
-  if (__isIOS()) {
-    return;
-  }
-
   v.dataset.__primed = "1";
 
   // 找一個適合當縮圖的時間點
@@ -616,20 +598,43 @@ async function openDialog(id) {
         dlgImg.classList.add("hidden");
         dlgVideo.classList.remove("hidden");
         dlgVideo.preload = "metadata";
+        dlgVideo.src = url;
+
+        // iOS 需要這兩個屬性（保險）
         dlgVideo.playsInline = true;
         dlgVideo.setAttribute("playsinline", "");
         dlgVideo.setAttribute("webkit-playsinline", "");
+
         dlgVideo.controls = true;
-        try { dlgVideo.pause && dlgVideo.pause(); } catch (_) { }
-        try { dlgVideo.currentTime = 0; } catch (_) { }
-        dlgVideo.src = url;
+
+        // 先載入 metadata（拿到 duration）
         try { dlgVideo.load && dlgVideo.load(); } catch (_) { }
-        // iOS：避免自動 play；讓使用者按控制列播放（比較穩）
-        if (!__isIOS()) {
+
+        // ✅ 等到知道 duration（loadedmetadata）再播：進度條就會正常
+        dlgVideo.addEventListener("loadedmetadata", () => {
           try { dlgVideo.play().catch(() => { }); } catch (_) { }
+        }, { once: true });
+
+        // ✅ iPhone：9 秒影片播完後按播放沒反應 → 用「重載 src」把 ended 狀態清掉
+        if (dlgVideo.dataset.__iosReplayFixBound !== "1") {
+          dlgVideo.dataset.__iosReplayFixBound = "1";
+
+          dlgVideo.addEventListener("ended", () => {
+            const src = dlgVideo.currentSrc || dlgVideo.src;
+
+            // 1) 先停
+            try { dlgVideo.pause(); } catch (_) { }
+
+            // 2) 強制清掉 src + load（iOS 會把 ended 狀態清乾淨）
+            try { dlgVideo.removeAttribute("src"); } catch (_) { }
+            try { dlgVideo.load && dlgVideo.load(); } catch (_) { }
+
+            // 3) 塞回原本 src，再 load 一次（回到起點）
+            dlgVideo.src = src;
+            dlgVideo.preload = "metadata";
+            try { dlgVideo.load && dlgVideo.load(); } catch (_) { }
+          });
         }
-        dlgVideo.controls = true;
-        try { dlgVideo.play().catch(() => { }); } catch (_) { }
       } else {
         try {
           dlgVideo.pause && dlgVideo.pause();
@@ -698,6 +703,10 @@ async function openDialog(id) {
     };
   }
 
+  const __IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const __EMPTY_GIF = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+
   dlgThumbs.innerHTML = "";
   media.forEach((url, i) => {
     const isVid = isVideoUrl(url);
@@ -713,16 +722,12 @@ async function openDialog(id) {
         img.src = videoThumb;
         wrapper.appendChild(img);
       } else {
-        if (__dlgIsIOS) {
-          if (__dlgFirstImage) {
-            const img = document.createElement("img");
-            img.src = __dlgFirstImage;
-            wrapper.appendChild(img);
-          } else {
-            const ph = document.createElement("div");
-            ph.className = "thumb-fallback";
-            wrapper.appendChild(ph);
-          }
+        // ✅ iPhone：不要用 <video> 當縮圖 fallback（避免 thumb video play/pause 影響主影片進度條）
+        if (__IS_IOS) {
+          const img = document.createElement("img");
+          const firstImage = media.find(u => !isVideoUrl(u));
+          img.src = firstImage || __EMPTY_GIF;
+          wrapper.appendChild(img);
         } else {
           const v = document.createElement("video");
           v.className = "thumb-video";
@@ -735,7 +740,7 @@ async function openDialog(id) {
           v.disablePictureInPicture = true;
           v.src = url;
 
-          // 後端縮圖還沒產出時才 fallback 用影片抓第一幀
+          // 後端縮圖還沒產出時才 fallback 用影片抓第一幀（非 iOS 才做）
           __primeThumbVideoFrame(v);
 
           wrapper.appendChild(v);
