@@ -6,6 +6,99 @@ function isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
 
+// ===============================
+// 影片播放初始化：避免剛換 src 時 duration 還沒正常（Infinity/NaN）導致控制列進度條「前段不動、後段爆衝」
+// ===============================
+function __hasFiniteDuration(v) {
+  const d = v && v.duration;
+  return Number.isFinite(d) && d > 0 && d !== Infinity;
+}
+
+function __forceResolveDuration(v, timeoutMs = 1200) {
+  // 常見情況：影片 metadata 在檔尾，第一次播放 duration 會是 Infinity/NaN。
+  // 透過「跳到極大時間點」逼瀏覽器解析 duration，成功後再跳回 0。
+  return new Promise((resolve) => {
+    let done = false;
+
+    const finish = () => {
+      if (done) return;
+      done = true;
+      v.removeEventListener("durationchange", onDur);
+      v.removeEventListener("timeupdate", onTime);
+      resolve();
+    };
+
+    const onDur = () => {
+      if (__hasFiniteDuration(v)) finish();
+    };
+
+    const onTime = () => {
+      if (__hasFiniteDuration(v) && v.currentTime > 0) {
+        try { v.currentTime = 0; } catch (_) { }
+        finish();
+      }
+    };
+
+    v.addEventListener("durationchange", onDur);
+    v.addEventListener("timeupdate", onTime);
+
+    try { v.currentTime = 1e101; } catch (_) { }
+    setTimeout(finish, timeoutMs);
+  });
+}
+
+function __prepareAndPlayVideo(v, url) {
+  if (!v) return;
+
+  // token：避免快速切換媒體時舊事件回來亂觸發
+  const token = (v.__playToken = (v.__playToken || 0) + 1);
+  const isActive = () => v.__playToken === token;
+
+  // 停掉舊的並重置
+  try { v.pause(); } catch (_) { }
+  try { v.currentTime = 0; } catch (_) { }
+
+  v.preload = "metadata";
+  v.playsInline = true;
+  v.controls = true;
+
+  // 重新載入（確保事件、duration 狀態乾淨）
+  try { v.removeAttribute("src"); v.load && v.load(); } catch (_) { }
+  v.src = url;
+  try { v.load && v.load(); } catch (_) { }
+
+  let readyFired = false;
+  const tryPlay = () => {
+    if (!isActive()) return;
+    try {
+      const p = v.play();
+      if (p && typeof p.catch === "function") p.catch(() => { });
+    } catch (_) { }
+  };
+
+  const onReady = async () => {
+    if (!isActive() || readyFired) return;
+    readyFired = true;
+
+    // duration 還不正常就先嘗試修正
+    if (!__hasFiniteDuration(v)) {
+      await __forceResolveDuration(v);
+    }
+    if (!isActive()) return;
+
+    // 保險：從 0 開始
+    try { v.currentTime = 0; } catch (_) { }
+
+    tryPlay();
+  };
+
+  v.addEventListener("loadedmetadata", onReady, { once: true });
+  v.addEventListener("canplay", onReady, { once: true });
+
+  // fallback：某些瀏覽器事件來很慢，先試播一次也無妨
+  setTimeout(tryPlay, 250);
+}
+
 function storagePathFromDownloadUrl(url) {
   try {
     const p = String(url).split("/o/")[1].split("?")[0];
@@ -597,44 +690,7 @@ async function openDialog(id) {
       if (isVid) {
         dlgImg.classList.add("hidden");
         dlgVideo.classList.remove("hidden");
-        dlgVideo.preload = "metadata";
-        dlgVideo.src = url;
-
-        // iOS 需要這兩個屬性（保險）
-        dlgVideo.playsInline = true;
-        dlgVideo.setAttribute("playsinline", "");
-        dlgVideo.setAttribute("webkit-playsinline", "");
-
-        dlgVideo.controls = true;
-
-        // 先載入 metadata（拿到 duration）
-        try { dlgVideo.load && dlgVideo.load(); } catch (_) { }
-
-        // ✅ 等到知道 duration（loadedmetadata）再播：進度條就會正常
-        dlgVideo.addEventListener("loadedmetadata", () => {
-          try { dlgVideo.play().catch(() => { }); } catch (_) { }
-        }, { once: true });
-
-        // ✅ iPhone：9 秒影片播完後按播放沒反應 → 用「重載 src」把 ended 狀態清掉
-        if (dlgVideo.dataset.__iosReplayFixBound !== "1") {
-          dlgVideo.dataset.__iosReplayFixBound = "1";
-
-          dlgVideo.addEventListener("ended", () => {
-            const src = dlgVideo.currentSrc || dlgVideo.src;
-
-            // 1) 先停
-            try { dlgVideo.pause(); } catch (_) { }
-
-            // 2) 強制清掉 src + load（iOS 會把 ended 狀態清乾淨）
-            try { dlgVideo.removeAttribute("src"); } catch (_) { }
-            try { dlgVideo.load && dlgVideo.load(); } catch (_) { }
-
-            // 3) 塞回原本 src，再 load 一次（回到起點）
-            dlgVideo.src = src;
-            dlgVideo.preload = "metadata";
-            try { dlgVideo.load && dlgVideo.load(); } catch (_) { }
-          });
-        }
+        __prepareAndPlayVideo(dlgVideo, url);
       } else {
         try {
           dlgVideo.pause && dlgVideo.pause();
@@ -703,10 +759,6 @@ async function openDialog(id) {
     };
   }
 
-  const __IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-  const __EMPTY_GIF = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
-
   dlgThumbs.innerHTML = "";
   media.forEach((url, i) => {
     const isVid = isVideoUrl(url);
@@ -722,29 +774,21 @@ async function openDialog(id) {
         img.src = videoThumb;
         wrapper.appendChild(img);
       } else {
-        // ✅ iPhone：不要用 <video> 當縮圖 fallback（避免 thumb video play/pause 影響主影片進度條）
-        if (__IS_IOS) {
-          const img = document.createElement("img");
-          const firstImage = media.find(u => !isVideoUrl(u));
-          img.src = firstImage || __EMPTY_GIF;
-          wrapper.appendChild(img);
-        } else {
-          const v = document.createElement("video");
-          v.className = "thumb-video";
-          v.preload = "metadata";
-          v.muted = true;
-          v.playsInline = true;
-          v.setAttribute("playsinline", "");
-          v.setAttribute("webkit-playsinline", "");
-          v.controls = false;
-          v.disablePictureInPicture = true;
-          v.src = url;
+        const v = document.createElement("video");
+        v.className = "thumb-video";
+        v.preload = "metadata";
+        v.muted = true;
+        v.playsInline = true;
+        v.setAttribute("playsinline", "");
+        v.setAttribute("webkit-playsinline", "");
+        v.controls = false;
+        v.disablePictureInPicture = true;
+        v.src = url;
 
-          // 後端縮圖還沒產出時才 fallback 用影片抓第一幀（非 iOS 才做）
-          __primeThumbVideoFrame(v);
+        // 後端縮圖還沒產出時才 fallback 用影片抓第一幀
+        __primeThumbVideoFrame(v);
 
-          wrapper.appendChild(v);
-        }
+        wrapper.appendChild(v);
       }
 
       // 覆蓋播放 icon（圖 4 的樣式）
@@ -1021,17 +1065,13 @@ async function saveEdit() {
 
       if (it.kind === "file") {
         const f = it.file;
-        const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+        const wmBlob = f; // 後端處理浮水印/轉檔/縮圖（前端直接上傳原檔）
+        // ← 新增：先加浮水印
         const type = wmBlob.type || '';
         let ext = 'bin';
-        if (type.startsWith('image/')) {
-          ext = type === 'image/png' ? 'png' : 'jpg';
-        } else if (type.startsWith('video/')) {
-          if (type.includes('webm')) ext = 'webm';
-          else if (type.includes('ogg')) ext = 'ogg';
-          else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
-          else ext = 'mp4';
-        }
+        // ✅ 後端會統一：圖片 -> JPG、影片 -> MP4（避免 iPhone/WebM 問題與進度條爆衝）
+        if (type.startsWith('image/')) ext = 'jpg';
+        else if (type.startsWith('video/')) ext = 'mp4';
         const base = f.name.replace(/\.[^.]+$/, '');
         const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
         const r = sRef(storage, path);
@@ -1774,17 +1814,13 @@ async function onConfirmAdopted() {
   const urls = [];
   try {
     for (const f of files) {
-      const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+      const wmBlob = f; // 後端處理浮水印/轉檔/縮圖（前端直接上傳原檔）
+      // ← 新增：先加浮水印
       const type = wmBlob.type || '';
       let ext = 'bin';
-      if (type.startsWith('image/')) {
-        ext = type === 'image/png' ? 'png' : 'jpg';
-      } else if (type.startsWith('video/')) {
-        if (type.includes('webm')) ext = 'webm';
-        else if (type.includes('ogg')) ext = 'ogg';
-        else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
-        else ext = 'mp4';
-      }
+      // ✅ 後端會統一：圖片 -> JPG、影片 -> MP4（避免 iPhone/WebM 問題與進度條爆衝）
+      if (type.startsWith('image/')) ext = 'jpg';
+      else if (type.startsWith('video/')) ext = 'mp4';
       const base = f.name.replace(/\.[^.]+$/, '');
       const path = `adopted/${currentDocId}/${Date.now()}_${base}.${ext}`;
       const r = sRef(storage, path);
