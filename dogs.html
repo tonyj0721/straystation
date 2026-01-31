@@ -924,16 +924,25 @@
         const card = document.createElement('article');
         card.className = 'group rounded-2xl overflow-hidden ring-1 ring-gray-200 bg-white hover:shadow-soft transition-shadow';
 
-        // 取封面圖（先用 p.images[0]，沒有的話退回 p.image）
-        const imgs = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
-        const img = imgs[0] || '';
+        
+// 取封面圖：若後端正在處理（pendingMediaPlan 或 mediaProcessing），就顯示「處理中」
+const pendingPlan = Array.isArray(p.pendingMediaPlan) && p.pendingMediaPlan.length ? p.pendingMediaPlan : [];
+const imgs = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
+const first = pendingPlan.length ? pendingPlan[0] : (imgs[0] || "");
+const isPending = (typeof first === "string" && first.startsWith("uploads/")) || !!p.mediaProcessing;
 
-        const mediaUrl = img;
-        const isVid = isVideoUrl(mediaUrl);
-        const videoPath = isVid ? storagePathFromDownloadUrl(mediaUrl) : "";
-        const videoThumb = (isVid && p.thumbByPath && videoPath) ? (p.thumbByPath[videoPath] || "") : "";
+const mediaUrl = first;
+const isVid = (!isPending) && isVideoUrl(mediaUrl);
+const videoPath = isVid ? storagePathFromDownloadUrl(mediaUrl) : "";
+const videoThumb = (isVid && p.thumbByPath && videoPath) ? (p.thumbByPath[videoPath] || "") : "";
 
-        const coverHTML = isVid
+const coverHTML = isPending || !mediaUrl
+  ? `
+    <div class="relative rounded-t-2xl aspect-[4/3] overflow-hidden bg-gray-200 flex items-center justify-center">
+      <div class="text-gray-700 font-bold text-sm">處理中</div>
+    </div>
+  `
+        : isVid
           ? (videoThumb
             ? `
               <div class="blur-fit rounded-t-2xl aspect-[4/3]" style="--bg: url('${videoThumb}')">
