@@ -1201,6 +1201,41 @@ const coverHTML = isPending || !mediaUrl
       });
     };
 
+    
+
+// ===== uploads/ 媒體處理：輪詢單筆文件，完成後自動更新卡片（不需要重新整理） =====
+const __processingPollers = new Map(); // id -> timer
+function __needsProcessing(p) {
+  return !!p?.mediaProcessing || (Array.isArray(p?.pendingMediaPlan) && p.pendingMediaPlan.some(u => typeof u === "string" && u.startsWith("uploads/")));
+}
+function __startPollIfNeeded(p) {
+  if (!p?.id) return;
+  if (!__needsProcessing(p)) return;
+  if (__processingPollers.has(p.id)) return;
+  const timer = setInterval(async () => {
+    try {
+      const snap = await getDoc(doc(db, "pets", p.id));
+      if (!snap.exists()) return;
+      const p2 = { id: snap.id, ...snap.data() };
+      if (!__needsProcessing(p2)) {
+        clearInterval(timer);
+        __processingPollers.delete(p.id);
+        // 更新快取並重畫
+        const idx = pets.findIndex(x => x.id === p.id);
+        if (idx >= 0) pets[idx] = p2;
+        applyFilterAndRender();
+      }
+    } catch (_) {}
+  }, 2000);
+  __processingPollers.set(p.id, timer);
+}
+// 在每次 render 後，幫正在處理的卡片啟動輪詢
+const __oldApply = applyFilterAndRender;
+applyFilterAndRender = function() {
+  __oldApply();
+  try { pets.forEach(__startPollIfNeeded); } catch(_) {}
+};
+
     window.loadPets = loadPets;
     loadPets();
   </script>

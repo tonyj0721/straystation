@@ -1442,12 +1442,6 @@ for (let i = 0; i < selectedFiles.length; i++) {
   await uploadBytes(r, f, { contentType: (f.type || "") });
 }
 
-
-        // 3) 回寫 images 欄位
-        if (urls.length) {
-          await updateDoc(doc(db, "pets", docRef.id), { images: urls });
-        }
-
         // UI 收尾
         stopDots();
         submitBtn.disabled = false;

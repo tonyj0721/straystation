@@ -507,6 +507,8 @@ let currentDoc = null;
 
 // 開啟 + 渲染 + 編輯預填，全部合併在這一支
 async function openDialog(id) {
+  // uploads/ 媒體處理期間：輪詢 Firestore，完成後自動刷新（避免前台短暫顯示無浮水印）
+  if (window.__dlgMediaPollTimer) { try { clearInterval(window.__dlgMediaPollTimer); } catch(_){} window.__dlgMediaPollTimer = null; }
   // 1. 先拿資料：先從 pets 找，沒有就去 Firestore 抓一次
   let p = pets.find((x) => x.id === id);
   if (!p) {
@@ -573,6 +575,29 @@ const __hideProcessing = () => { try { dlgProcessing?.classList.add("hidden"); d
     ? p.pendingMediaPlan
     : (Array.isArray(p.images) && p.images.length > 0 ? p.images : (p.image ? [p.image] : []));
 let currentIndex = 0;
+
+
+// 若資料仍在後端處理（pendingMediaPlan / mediaProcessing），啟動輪詢：處理完成後自動重畫 Modal/Lightbox
+const __needsPoll = !!p.mediaProcessing || (Array.isArray(p.pendingMediaPlan) && p.pendingMediaPlan.some(u => typeof u === "string" && u.startsWith("uploads/")));
+if (__needsPoll) {
+  window.__dlgMediaPollTimer = setInterval(async () => {
+    try {
+      const snap2 = await getDoc(doc(db, "pets", id));
+      if (!snap2.exists()) return;
+      const p2 = { id: snap2.id, ...snap2.data() };
+      const still = !!p2.mediaProcessing || (Array.isArray(p2.pendingMediaPlan) && p2.pendingMediaPlan.some(u => typeof u === "string" && u.startsWith("uploads/")));
+      if (!still) {
+        // 更新全域快取，讓下一次 openDialog 直接拿到新資料
+        const idx = pets.findIndex(x => x.id === id);
+        if (idx >= 0) pets[idx] = p2;
+        // 停止輪詢後，重新渲染一次（同一個 Modal 內刷新）
+        try { clearInterval(window.__dlgMediaPollTimer); } catch(_) {}
+        window.__dlgMediaPollTimer = null;
+        await openDialog(id);
+      }
+    } catch (_) { /* ignore */ }
+  }, 1500);
+}
 
   function showDialogMedia(index) {
     if (!media.length) {
@@ -1930,11 +1955,13 @@ function swalInDialog(opts) {
   // 1) 標準：dialog 關閉事件（按 X、點遮罩、呼叫 close() 都會觸發）
   dlg.addEventListener("close", () => {
     resetAdoptedSelection();
+    if (window.__dlgMediaPollTimer) { try { clearInterval(window.__dlgMediaPollTimer); } catch(_){} window.__dlgMediaPollTimer = null; }
   });
 
   // 2) 取消事件（按 Esc）
   dlg.addEventListener("cancel", () => {
     resetAdoptedSelection();
+    if (window.__dlgMediaPollTimer) { try { clearInterval(window.__dlgMediaPollTimer); } catch(_){} window.__dlgMediaPollTimer = null; }
     // 不阻止預設，讓它照常關閉
   });
 
@@ -1942,6 +1969,7 @@ function swalInDialog(opts) {
   const mo = new MutationObserver(() => {
     if (!dlg.open) {
       resetAdoptedSelection();
+      if (window.__dlgMediaPollTimer) { try { clearInterval(window.__dlgMediaPollTimer); } catch(_){} window.__dlgMediaPollTimer = null; }
     }
   });
   mo.observe(dlg, { attributes: true, attributeFilter: ["open", "aria-hidden"] });
