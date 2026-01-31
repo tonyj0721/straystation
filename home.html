@@ -405,6 +405,7 @@
       getFirestore, collection, getDocs, query, orderBy, where,
 
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+    import { getStorage, ref as sRef, getMetadata } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
     import {
       getAuth,
       GoogleAuthProvider,
@@ -431,6 +432,7 @@
     const app = initializeApp(__cfg);
     const db = getFirestore(app);
 
+    const storage = getStorage(app);
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
 
@@ -584,6 +586,117 @@
 
     const grid = document.getElementById('grid');
 
+    // downloadUrl → Storage path（用於浮水印完成判斷）
+    function storagePathFromDownloadUrl(url) {
+      try {
+        const p = String(url || "").split("/o/")[1].split("?")[0];
+        return decodeURIComponent(p);
+      } catch (_) {
+        return "";
+      }
+    }
+
+    // ===== Watermark gate (解法 A)：列表縮圖/封面也必須等後端浮水印完成 =====
+    const __BLANK_PIXEL = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+    const __wmCache = new Map(); // mediaPath -> Promise<string>
+
+    function __appendBust(url, v) {
+      try {
+        if (!url) return url;
+        const hasQ = String(url).includes("?");
+        return String(url) + (hasQ ? "&" : "?") + "v=" + encodeURIComponent(String(v));
+      } catch (_) {
+        return url;
+      }
+    }
+
+    async function waitForWatermarkUrl(url, { timeoutMs = 30000, intervalMs = 500 } = {}) {
+      try {
+        const mediaPath = storagePathFromDownloadUrl(url);
+        if (!mediaPath) return url;
+
+        if (__wmCache.has(mediaPath)) return await __wmCache.get(mediaPath);
+
+        const p = (async () => {
+          const start = Date.now();
+          while (true) {
+            try {
+              const md = await getMetadata(sRef(storage, mediaPath));
+              const cm = md?.customMetadata || md?.metadata || {};
+              if (cm.wmProcessed === "1") {
+                // 覆蓋同一路徑：用 generation 當 cache buster
+                return __appendBust(url, md?.generation || Date.now());
+              }
+            } catch (_) {
+              // ignore & retry
+            }
+            if (Date.now() - start > timeoutMs) return "";
+            await new Promise((r) => setTimeout(r, intervalMs));
+          }
+        })();
+        __wmCache.set(mediaPath, p);
+        return await p;
+      } catch (_) {
+        return url;
+      }
+    }
+
+    async function __hydrateCover(el) {
+      if (!el) return;
+      const url = el.dataset.url || "";
+      if (!url) return;
+
+      const kind = el.dataset.kind || "img";
+      const reqId = String((Number(el.dataset.__wmReqId || "0") + 1));
+      el.dataset.__wmReqId = reqId;
+
+      const overlay = el.querySelector(".wm-processing");
+      const gated = await waitForWatermarkUrl(url);
+
+
+      // 超時或失敗：維持遮罩，不顯示原檔（避免短暫無浮水印）
+      if (!gated) return;
+      // 若元素已被重繪/換頁，避免舊 async 回來覆蓋新畫面
+      if (el.dataset.__wmReqId !== reqId) return;
+
+      if (kind === "video") {
+        const v = el.querySelector("video");
+        if (!v) return;
+        try {
+          v.src = gated;
+          v.classList.remove("hidden");
+          v.addEventListener("loadedmetadata", () => {
+            try { if (overlay) overlay.style.display = "none"; } catch (_) {}
+          }, { once: true });
+          // 讓既有的 prime 邏輯可以在 src 設定後正常運作
+          try { v.load(); } catch (_) {}
+        } catch (_) {}
+      } else {
+        const img = el.querySelector("img");
+        if (!img) return;
+        try {
+          // blur-fit 的背景（若有）
+          try {
+            el.style.setProperty("--bg", `url('${gated}')`);
+          } catch (_) {}
+
+          img.addEventListener("load", () => {
+            try { if (overlay) overlay.style.display = "none"; } catch (_) {}
+          }, { once: true });
+          img.src = gated;
+        } catch (_) {}
+      }
+    }
+
+    function hydrateAllCovers(root = document) {
+      try {
+        root.querySelectorAll(".js-wm-cover[data-url]").forEach((el) => {
+          __hydrateCover(el);
+        });
+      } catch (_) {}
+    }
+
+
     function buildMosaic(imgs) {
       const box = document.getElementById('heroMosaic');
       if (!box) return;
@@ -602,8 +715,14 @@
       // 產生拼貼 HTML（第 1、5 格加高）
       box.innerHTML = imgs.map((src, i) => {
         const tall = (i === 0 || i === 4) ? ' style="grid-row: span 2 / span 2;"' : '';
-        return `<div class="itm"${tall}><img src="${src}" alt="adopted photo" loading="lazy"></div>`;
+        return `<div class=\"itm js-wm-cover\" data-kind=\"img\" data-url=\"${src}\"${tall}>
+          <img src=\"${__BLANK_PIXEL}\" alt=\"adopted photo\" loading=\"lazy\" decoding=\"async\">
+          <div class=\"wm-processing\" style=\"position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:12px; color:#4b5563; background:rgba(255,255,255,.7); backdrop-filter: blur(6px); z-index:2;\">處理中…</div>
+        </div>`;
       }).join('');
+
+      // ✅ 拼貼縮圖：等後端浮水印完成才真正載入
+      hydrateAllCovers(box);
     }
 
     // 簡單的可重現 PRNG

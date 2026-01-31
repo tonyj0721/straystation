@@ -676,7 +676,7 @@
       getFirestore, collection, getDocs, query, orderBy, where,
       doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp, limit as fbLimit, deleteField,
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
-    import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject, listAll, } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
+    import { getStorage, ref as sRef, uploadBytes, getDownloadURL, getMetadata, deleteObject, listAll, } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
     import {
       getAuth,
       signOut,
@@ -693,7 +693,7 @@
       collection, getDocs, query, orderBy, where,
       doc, getDoc, updateDoc, deleteDoc, serverTimestamp, fbLimit,
       deleteField,
-      sRef, uploadBytes, getDownloadURL, deleteObject, listAll,
+      sRef, uploadBytes, getDownloadURL, getMetadata, deleteObject, listAll,
     });
 
     const auth = getAuth(app);
@@ -1749,6 +1749,105 @@ urls.push(await getDownloadURL(r));
       } catch (_) {
         return "";
       }
+
+    // ===== Watermark gate (解法 A)：列表縮圖/封面也必須等後端浮水印完成 =====
+    const __BLANK_PIXEL = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+    const __wmCache = new Map(); // mediaPath -> Promise<string>
+
+    function __appendBust(url, v) {
+      try {
+        if (!url) return url;
+        const hasQ = String(url).includes("?");
+        return String(url) + (hasQ ? "&" : "?") + "v=" + encodeURIComponent(String(v));
+      } catch (_) {
+        return url;
+      }
+    }
+
+    async function waitForWatermarkUrl(url, { timeoutMs = 30000, intervalMs = 500 } = {}) {
+      try {
+        const mediaPath = storagePathFromDownloadUrl(url);
+        if (!mediaPath) return url;
+
+        if (__wmCache.has(mediaPath)) return await __wmCache.get(mediaPath);
+
+        const p = (async () => {
+          const start = Date.now();
+          while (true) {
+            try {
+              const md = await getMetadata(sRef(storage, mediaPath));
+              const cm = md?.customMetadata || md?.metadata || {};
+              if (cm.wmProcessed === "1") {
+                // 覆蓋同一路徑：用 generation 當 cache buster
+                return __appendBust(url, md?.generation || Date.now());
+              }
+            } catch (_) {
+              // ignore & retry
+            }
+            if (Date.now() - start > timeoutMs) return "";
+            await new Promise((r) => setTimeout(r, intervalMs));
+          }
+        })();
+        __wmCache.set(mediaPath, p);
+        return await p;
+      } catch (_) {
+        return url;
+      }
+    }
+
+    async function __hydrateCover(el) {
+      if (!el) return;
+      const url = el.dataset.url || "";
+      if (!url) return;
+
+      const kind = el.dataset.kind || "img";
+      const reqId = String((Number(el.dataset.__wmReqId || "0") + 1));
+      el.dataset.__wmReqId = reqId;
+
+      const overlay = el.querySelector(".wm-processing");
+      const gated = await waitForWatermarkUrl(url);
+
+
+      // 超時或失敗：維持遮罩，不顯示原檔（避免短暫無浮水印）
+      if (!gated) return;
+      // 若元素已被重繪/換頁，避免舊 async 回來覆蓋新畫面
+      if (el.dataset.__wmReqId !== reqId) return;
+
+      if (kind === "video") {
+        const v = el.querySelector("video");
+        if (!v) return;
+        try {
+          v.src = gated;
+          v.classList.remove("hidden");
+          v.addEventListener("loadedmetadata", () => {
+            try { if (overlay) overlay.style.display = "none"; } catch (_) {}
+          }, { once: true });
+          // 讓既有的 prime 邏輯可以在 src 設定後正常運作
+          try { v.load(); } catch (_) {}
+        } catch (_) {}
+      } else {
+        const img = el.querySelector("img");
+        if (!img) return;
+        try {
+          // blur-fit 的背景（若有）
+          try {
+            el.style.setProperty("--bg", `url('${gated}')`);
+          } catch (_) {}
+
+          img.addEventListener("load", () => {
+            try { if (overlay) overlay.style.display = "none"; } catch (_) {}
+          }, { once: true });
+          img.src = gated;
+        } catch (_) {}
+      }
+    }
+
+    function hydrateAllCovers(root = document) {
+      try {
+        root.querySelectorAll(".js-wm-cover[data-url]").forEach((el) => {
+          __hydrateCover(el);
+        });
+      } catch (_) {}
     }
 
     // 手機卡片
@@ -1772,14 +1871,16 @@ urls.push(await getDownloadURL(r));
                </div>
               `
               : `
-               <div class="media-thumb">
-                 <video class="thumb-video" preload="metadata" muted playsinline webkit-playsinline disablepictureinpicture src="${mediaUrl}"></video>
+               <div class=\"media-thumb js-wm-cover\" data-kind=\"video\" data-url=\"${mediaUrl}\" style=\"position:relative; overflow:hidden;\">
+                 <video class=\"thumb-video hidden\" preload=\"metadata\" muted playsinline webkit-playsinline disablepictureinpicture></video>
+                 <div class=\"wm-processing\" style=\"position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:12px; color:#4b5563; background:rgba(255,255,255,.7); backdrop-filter: blur(6px); z-index:2;\">處理中…</div>
                  <div class="video-badge"><div class="video-badge-inner">${__THUMB_PLAY_SVG}</div></div>
                </div>
               `)
             : `
-               <div class="media-thumb">
-                 <img src="${mediaUrl}" alt="" loading="lazy" decoding="async">
+               <div class=\"media-thumb js-wm-cover\" data-kind=\"img\" data-url=\"${mediaUrl}\" style=\"position:relative; overflow:hidden;\">
+                 <img src=\"${__BLANK_PIXEL}\" alt=\"\" loading=\"lazy\" decoding=\"async\">
+                 <div class=\"wm-processing\" style=\"position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:12px; color:#4b5563; background:rgba(255,255,255,.7); backdrop-filter: blur(6px); z-index:2;\">處理中…</div>
                </div>
               `;
 
@@ -1796,6 +1897,10 @@ urls.push(await getDownloadURL(r));
         </div>`;
         })
         .join("");
+      // ✅ 列表縮圖/封面：等後端浮水印完成才真正載入
+      hydrateAllCovers(wrap);
+
+      
 
       // 影片縮圖：seek 到前面一點，顯示第一幀
       wrap.querySelectorAll("video.thumb-video").forEach((v) => {

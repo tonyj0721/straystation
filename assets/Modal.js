@@ -24,6 +24,65 @@ function thumbPathFromMediaPath(mediaPath) {
   }
 }
 
+
+// ===============================
+// Watermark ready gate (解法 A)
+// - 前台永遠只顯示「已處理浮水印」的檔案
+// - 透過 Storage object customMetadata.wmProcessed === "1" 判斷
+// - 另外用 generation 當 cache-buster，避免覆蓋同一路徑時的快取殘留
+// ===============================
+const __wmWaitCache = window.__wmWaitCache || (window.__wmWaitCache = new Map());
+
+function __wmAppendBust(url, v) {
+  if (!url) return url;
+  const hasQ = String(url).includes("?");
+  return String(url) + (hasQ ? "&" : "?") + "v=" + encodeURIComponent(String(v));
+}
+
+function __wmIsThumbPath(p) {
+  return String(p || "").startsWith("thumbs/");
+}
+
+async function waitForWatermarkUrl(url, { timeoutMs = 60000, intervalMs = 500 } = {}) {
+  try {
+    const mediaPath = storagePathFromDownloadUrl(url);
+    if (!mediaPath) return url;
+
+    // thumbs/* 沒有 wmProcessed metadata；且影片縮圖是從「已浮水印影片」擷取，所以直接放行
+    if (__wmIsThumbPath(mediaPath)) return url;
+
+    // 若頁面沒把 getMetadata 暴露到 window（或尚未初始化 storage），就別阻擋
+    if (typeof window.getMetadata !== "function" || typeof window.sRef !== "function" || !window.storage) return url;
+
+    if (__wmWaitCache.has(mediaPath)) return await __wmWaitCache.get(mediaPath);
+
+    const p = (async () => {
+      const start = Date.now();
+      while (true) {
+        try {
+          const md = await window.getMetadata(window.sRef(window.storage, mediaPath));
+          const cm = md?.customMetadata || md?.metadata || {};
+          if (cm?.wmProcessed === "1") {
+            return __wmAppendBust(url, md?.generation || Date.now());
+          }
+        } catch (_) { /* ignore */ }
+
+        if (Date.now() - start > timeoutMs) return null;
+        await new Promise(r => setTimeout(r, intervalMs));
+      }
+    })();
+
+    __wmWaitCache.set(mediaPath, p);
+
+    const out = await p;
+    // 成功/失敗都移除，讓下次可以重新嘗試（避免永遠卡在 null）
+    __wmWaitCache.delete(mediaPath);
+    return out;
+  } catch (_) {
+    return url;
+  }
+}
+
 // ===============================
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
 // ===============================
@@ -553,8 +612,10 @@ async function openDialog(id) {
     : (p.image ? [p.image] : []);
 
   let currentIndex = 0;
+  let __dlgReqId = 0;
 
-  function showDialogMedia(index) {
+
+  async function showDialogMedia(index) {
     if (!media.length) {
       if (dlgImg) {
         dlgImg.src = "";
@@ -580,6 +641,31 @@ async function openDialog(id) {
     const url = media[currentIndex];
     const isVid = isVideoUrl(url);
 
+const __req = ++__dlgReqId;
+
+// 先清空/隱藏，避免短暫顯示未浮水印版本（或上一張殘影）
+if (dlgImg) { dlgImg.src = ""; dlgImg.classList.add("hidden"); }
+if (dlgVideo) {
+  try { dlgVideo.pause(); } catch (_) { }
+  dlgVideo.removeAttribute("src");
+  try { dlgVideo.load && dlgVideo.load(); } catch (_) { }
+  dlgVideo.classList.add("hidden");
+}
+if (dlgBg) dlgBg.src = "";
+
+if (dlgHint) {
+  dlgHint.textContent = "媒體處理中…";
+  dlgHint.classList.toggle("mt-2", isVid);
+}
+
+const safeUrl = await waitForWatermarkUrl(url);
+if (__req !== __dlgReqId) return; // 使用者切換太快：丟掉舊請求
+if (!safeUrl) {
+  if (dlgHint) dlgHint.textContent = "媒體處理中，請稍候再試";
+  return;
+}
+
+
     if (dlgStageWrap) dlgStageWrap.classList.toggle("dlg-video-mode", isVid);
 
     if (dlgHint) {
@@ -597,7 +683,7 @@ async function openDialog(id) {
       if (isVid) {
         dlgImg.classList.add("hidden");
         dlgVideo.classList.remove("hidden");
-        dlgVideo.src = url;
+        dlgVideo.src = safeUrl;
         dlgVideo.playsInline = true;
         dlgVideo.controls = true;
         try { dlgVideo.play().catch(() => { }); } catch (_) { }
@@ -607,10 +693,10 @@ async function openDialog(id) {
         } catch (_) { }
         dlgVideo.classList.add("hidden");
         dlgImg.classList.remove("hidden");
-        dlgImg.src = url;
+        dlgImg.src = safeUrl;
       }
     } else if (dlgImg) {
-      dlgImg.src = url;
+      dlgImg.src = safeUrl;
     }
 
     if (dlgBg) {
@@ -641,7 +727,13 @@ async function openDialog(id) {
       }
 
       // 只有真的有圖才塞 src，避免誤把影片網址塞進 <img> 變成破圖
-      dlgBg.src = bgSrc;
+if (!bgSrc) {
+  dlgBg.src = "";
+} else {
+  const safeBg = await waitForWatermarkUrl(bgSrc);
+  if (__req !== __dlgReqId) return;
+  dlgBg.src = safeBg || "";
+}
     }
 
     if (dlgThumbs) {
@@ -693,10 +785,11 @@ async function openDialog(id) {
         v.setAttribute("webkit-playsinline", "");
         v.controls = false;
         v.disablePictureInPicture = true;
-        v.src = url;
+        v.src = "";
 
-        // 後端縮圖還沒產出時才 fallback 用影片抓第一幀
+        // 後端縮圖還沒產出時才 fallback 用影片抓第一幀（但要等浮水印完成後才允許載入）
         __primeThumbVideoFrame(v);
+        waitForWatermarkUrl(url).then((u) => { if (u) v.src = u; }).catch(() => {});
 
         wrapper.appendChild(v);
       }
@@ -708,18 +801,19 @@ async function openDialog(id) {
       wrapper.appendChild(badge);
     } else {
       const img = document.createElement("img");
-      img.src = url;
+      img.src = "";
       wrapper.appendChild(img);
+      waitForWatermarkUrl(url).then((u) => { if (u) img.src = u; }).catch(() => {});
     }
 
     wrapper.addEventListener("click", () => {
-      showDialogMedia(i);
+      showDialogMedia(i).catch(() => {});
     });
 
     dlgThumbs.appendChild(wrapper);
   });
 
-  showDialogMedia(currentIndex);
+  showDialogMedia(currentIndex).catch(() => {});
 
   // 5. 顯示用文字
   document.getElementById('dlgName').textContent = p.name;
