@@ -548,11 +548,31 @@ async function openDialog(id) {
   const dlgHint = document.getElementById("dlgHint");
   const dlgStageWrap = document.getElementById("dlgStageWrap");
 
-  const media = Array.isArray(p.images) && p.images.length > 0
-    ? p.images
-    : (p.image ? [p.image] : []);
 
-  let currentIndex = 0;
+
+// 「處理中」遮罩：有 pendingMediaPlan 時，uploads/ 的項目一律顯示灰底文字，不顯示原檔
+let dlgProcessing = document.getElementById("dlgProcessing");
+if (!dlgProcessing && dlgStageWrap) {
+  dlgProcessing = document.createElement("div");
+  dlgProcessing.id = "dlgProcessing";
+  dlgProcessing.className = "absolute inset-0 hidden items-center justify-center text-center";
+  dlgProcessing.style.background = "rgba(0,0,0,0.45)";
+  dlgProcessing.style.color = "#fff";
+  dlgProcessing.style.fontSize = "16px";
+  dlgProcessing.style.fontWeight = "700";
+  dlgProcessing.style.padding = "16px";
+  dlgProcessing.style.whiteSpace = "pre-line";
+  dlgProcessing.textContent = "媒體處理中\n請稍候…";
+  dlgStageWrap.style.position = dlgStageWrap.style.position || "relative";
+  dlgStageWrap.appendChild(dlgProcessing);
+}
+const __isPendingMedia = (u) => (typeof u === "string" && u.startsWith("uploads/"));
+const __showProcessing = () => { try { dlgProcessing?.classList.remove("hidden"); dlgProcessing?.classList.add("flex"); } catch(_){} };
+const __hideProcessing = () => { try { dlgProcessing?.classList.add("hidden"); dlgProcessing?.classList.remove("flex"); } catch(_){} };
+  const media = (Array.isArray(p.pendingMediaPlan) && p.pendingMediaPlan.length > 0)
+    ? p.pendingMediaPlan
+    : (Array.isArray(p.images) && p.images.length > 0 ? p.images : (p.image ? [p.image] : []));
+let currentIndex = 0;
 
   function showDialogMedia(index) {
     if (!media.length) {
@@ -578,7 +598,17 @@ async function openDialog(id) {
 
     currentIndex = Math.max(0, Math.min(index, media.length - 1));
     const url = media[currentIndex];
-    const isVid = isVideoUrl(url);
+if (__isPendingMedia(url)) {
+  // uploads/ 的原檔不在前台顯示（避免無浮水印空窗）
+  if (dlgImg) { dlgImg.src = ""; dlgImg.classList.add("hidden"); }
+  if (dlgVideo) { try { dlgVideo.pause(); } catch (_) { } dlgVideo.src = ""; dlgVideo.classList.add("hidden"); }
+  __showProcessing();
+  if (dlgHint) dlgHint.textContent = "媒體處理中…";
+  if (dlgStageWrap) dlgStageWrap.classList.remove("dlg-video-mode");
+  return;
+}
+__hideProcessing();
+const isVid = isVideoUrl(url);
 
     if (dlgStageWrap) dlgStageWrap.classList.toggle("dlg-video-mode", isVid);
 
@@ -669,13 +699,23 @@ async function openDialog(id) {
     };
   }
 
-  dlgThumbs.innerHTML = "";
-  media.forEach((url, i) => {
-    const isVid = isVideoUrl(url);
-    const wrapper = document.createElement("div");
-    wrapper.className = "dlg-thumb" + (i === 0 ? " active" : "");
+dlgThumbs.innerHTML = "";
+media.forEach((url, i) => {
+  const wrapper = document.createElement("div");
+  wrapper.className = "dlg-thumb" + (i === 0 ? " active" : "");
 
-    if (isVid) {
+  if (__isPendingMedia(url)) {
+    // 處理中的項目：灰底 + 文字
+    wrapper.style.background = "#e5e7eb";
+    wrapper.style.display = "flex";
+    wrapper.style.alignItems = "center";
+    wrapper.style.justifyContent = "center";
+    wrapper.style.fontSize = "12px";
+    wrapper.style.fontWeight = "700";
+    wrapper.style.color = "#374151";
+    wrapper.textContent = "處理中";
+  } else if (isVideoUrl(url)) {
+
       const videoPath = storagePathFromDownloadUrl(url);
       const videoThumb = (p.thumbByPath && videoPath) ? (p.thumbByPath[videoPath] || "") : "";
 
@@ -963,38 +1003,45 @@ async function saveEdit() {
 
   try {
     // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
-    const { items, removeUrls } = editImagesState;
-    const newUrls = [];
+    
+const { items, removeUrls } = editImagesState;
 
-    // 依序處理（保持順序）
-    for (const it of items) {
-      if (it.kind === "url") {
-        newUrls.push(it.url);
-        continue;
-      }
+// 後端浮水印：此處不再做前端浮水印/轉檔
+// - existingUrls：目前已是「水印後」的 downloadURL（可以立刻顯示）
+// - pendingMediaPlan：最終順序（包含既有 URL 與 uploads/ 路徑）
+const existingUrls = [];
+const pendingMediaPlan = [];
+const uploads = [];
+const now = Date.now();
+let seq = 0;
 
-      if (it.kind === "file") {
-        const f = it.file;
-        const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
-        const type = wmBlob.type || '';
-        let ext = 'bin';
-        if (type.startsWith('image/')) {
-          ext = type === 'image/png' ? 'png' : 'jpg';
-        } else if (type.startsWith('video/')) {
-          if (type.includes('webm')) ext = 'webm';
-          else if (type.includes('ogg')) ext = 'ogg';
-          else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
-          else ext = 'mp4';
-        }
-        const base = f.name.replace(/\.[^.]+$/, '');
-        const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
-        const r = sRef(storage, path);
-        await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
-        newUrls.push(await getDownloadURL(r));
-      }
-    }
+for (const it of (items || [])) {
+  if (it.kind === "url") {
+    existingUrls.push(it.url);
+    pendingMediaPlan.push(it.url);
+    continue;
+  }
 
-    // 刪除被移除的舊圖（忽略刪失敗）
+  if (it.kind === "file") {
+    const f = it.file;
+    const isVid = (f && String(f.type || "").startsWith("video/"));
+    const ext = isVid ? "mp4" : "jpg";
+    const base = (f?.name || `media_${seq}`).replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9_\-\u4e00-\u9fa5]+/g, "_");
+    const s = String(seq).padStart(2, "0");
+    const upPath = `uploads/pets/${currentDocId}/${s}_${now}_${base}.${ext}`;
+    pendingMediaPlan.push(upPath);
+    uploads.push({ path: upPath, file: f });
+    seq++;
+  }
+}
+
+// 逐一上傳到 uploads/（前台不讀 uploads/；完成後由後端把成品寫回 pets/ 並更新 images）
+for (const u of uploads) {
+  const r = sRef(storage, u.path);
+  await uploadBytes(r, u.file, { contentType: (u.file?.type || "") });
+}
+
+// 刪除被移除的舊圖（忽略刪失敗）
     // 同步刪掉後端產生的縮圖：thumbs/<原路徑去副檔名>.jpg
     // 並清理 Firestore 的 thumbByPath 對應 key（避免越積越多）
     const __thumbFieldDeletes = {};
@@ -1019,8 +1066,15 @@ async function saveEdit() {
       }
     }
 
-    newData.images = newUrls;
-    const __updatePayload = { ...newData, ...__thumbFieldDeletes };
+    
+// 只先寫回「已存在」的水印檔 URL；新增的檔案會先存在 uploads/，等後端處理完成再補回 images
+newData.images = existingUrls;
+
+const __processingPayload = (uploads.length > 0)
+  ? { mediaProcessing: true, pendingMediaPlan }
+  : { mediaProcessing: false, pendingMediaPlan: deleteField(), processedByUploadPath: deleteField() };
+
+const __updatePayload = { ...newData, ...__thumbFieldDeletes, ...__processingPayload };
 
     // ③ 寫回 Firestore
     await updateDoc(doc(db, "pets", currentDocId), __updatePayload);
@@ -1725,31 +1779,34 @@ async function onConfirmAdopted() {
   const stopDots = startDots(btn, "儲存中");
 
   const files = adoptedSelected.slice(0, 5);
-  const urls = [];
+
   try {
-    for (const f of files) {
-      const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
-      const type = wmBlob.type || '';
-      let ext = 'bin';
-      if (type.startsWith('image/')) {
-        ext = type === 'image/png' ? 'png' : 'jpg';
-      } else if (type.startsWith('video/')) {
-        if (type.includes('webm')) ext = 'webm';
-        else if (type.includes('ogg')) ext = 'ogg';
-        else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
-        else ext = 'mp4';
-      }
-      const base = f.name.replace(/\.[^.]+$/, '');
-      const path = `adopted/${currentDocId}/${Date.now()}_${base}.${ext}`;
+    // 後端浮水印：前端只上傳原檔到 uploads/（前台不讀 uploads/），等待後端產出有水印的成品
+    const pendingAdoptedPhotosPlan = [];
+    const now = Date.now();
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      const isVid = (f && String(f.type || "").startsWith("video/"));
+      const ext = isVid ? "mp4" : "jpg";
+      const base = (f?.name || `adopted_${i}`).replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9_\-\u4e00-\u9fa5]+/g, "_");
+      const seq = String(i).padStart(2, "0");
+      const upPath = `uploads/adopted/${currentDocId}/${seq}_${now}_${base}.${ext}`;
+      pendingAdoptedPhotosPlan.push(upPath);
+    }
+
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      const path = pendingAdoptedPhotosPlan[i];
       const r = sRef(storage, path);
-      await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
-      urls.push(await getDownloadURL(r));
+      await uploadBytes(r, f, { contentType: (f.type || "") });
     }
 
     await updateDoc(doc(db, "pets", currentDocId), {
       status: "adopted",
       adoptedAt: serverTimestamp(),
-      adoptedPhotos: urls,
+      adoptedPhotos: [], // 等後端處理完成再補回
+      adoptedPhotosProcessing: true,
+      pendingAdoptedPhotosPlan,
       showOnHome: true,
       showOnCats: false,
       showOnDogs: false,
@@ -1782,7 +1839,6 @@ async function onConfirmAdopted() {
   }
 }
 
-// 退養 → 還原狀態與顯示頁面選項
 async function onUnadopt() {
   const wasOpen = dlg.open;
   if (wasOpen) dlg.close();
@@ -1802,7 +1858,8 @@ async function onUnadopt() {
   }
 
   try {
-    await deleteAllUnder(`adopted/${currentDocId}`); // 清掉合照
+    await deleteAllUnder(`adopted/${currentDocId}`); // 清掉合照（成品）
+    await deleteAllUnder(`uploads/adopted/${currentDocId}`); // 清掉處理中原檔
     await updateDoc(doc(db, "pets", currentDocId), {
       status: "available",
       adoptedAt: deleteField(),
