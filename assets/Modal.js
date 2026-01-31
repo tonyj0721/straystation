@@ -24,8 +24,6 @@ function thumbPathFromMediaPath(mediaPath) {
   }
 }
 
-
-
 // ===============================
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
 // ===============================
@@ -33,8 +31,8 @@ function __primeThumbVideoFrame(v) {
   if (!v || v.dataset.__primed === "1") return;
   v.dataset.__primed = "1";
 
-  // 只要能顯示某個 frame 就好：loadedmetadata 後 seek 一下
-  const onMeta = () => {
+  // 找一個適合當縮圖的時間點
+  const seekToThumbTime = () => {
     try {
       const dur = Number.isFinite(v.duration) ? v.duration : 0;
       let t = 0.05;
@@ -43,28 +41,54 @@ function __primeThumbVideoFrame(v) {
         t = Math.max(0.05, Math.min(t, dur - 0.05));
       }
       v.currentTime = t;
+    } catch (_) { /* ignore */ }
+  };
+
+  // 真的跑一次「靜音播放 → 暫停」來逼 Safari 解碼畫面
+  const ensurePaint = () => {
+    if (v.dataset.__painted === "1") return;
+    v.dataset.__painted = "1";
+
+    try {
+      const p = v.play();
+      if (p && typeof p.then === "function") {
+        p.then(() => {
+          if (typeof v.requestVideoFrameCallback === "function") {
+            v.requestVideoFrameCallback(() => {
+              try { v.pause(); } catch (_) { }
+            });
+          } else {
+            setTimeout(() => {
+              try { v.pause(); } catch (_) { }
+            }, 60);
+          }
+        }).catch(() => {
+          try { v.pause(); } catch (_) { }
+        });
+      }
     } catch (_) {
-      // ignore
+      try { v.pause(); } catch (_) { }
     }
   };
 
-  const onSeeked = () => {
-    try { v.pause(); } catch (_) { }
-  };
+  v.addEventListener("loadedmetadata", () => {
+    seekToThumbTime();
+    ensurePaint();
+  }, { once: true });
 
-  v.addEventListener("loadedmetadata", onMeta, { once: true });
-  v.addEventListener("seeked", onSeeked, { once: true });
+  v.addEventListener("seeked", () => {
+    ensurePaint();
+  }, { once: true });
 
-  // 有些 Safari 不會立刻解碼畫面：加個保險
+  // 保險：metadata 很快就好了 / 我們太晚掛 listener 的情況
   setTimeout(() => {
     try {
       if (v.readyState < 2) return;
-      // 觸發一次 seek（若上面沒成功）
-      if (v.currentTime === 0) v.currentTime = 0.05;
+      if (v.currentTime === 0) seekToThumbTime();
+      ensurePaint();
     } catch (_) { }
-  }, 120);
+  }, 200);
 }
-
 
 function __lockDialogScroll() {
   try { if (typeof lockScroll === "function") lockScroll(); } catch { }

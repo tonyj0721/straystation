@@ -15,8 +15,6 @@ function storagePathFromDownloadUrl(url) {
   }
 }
 
-
-
 // Lightbox 縮圖播放 icon（避免與 Modal.js 的 __PLAY_SVG 命名衝突）
 const __THUMB_PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
 
@@ -25,7 +23,7 @@ function __primeThumbVideoFrameLightbox(v) {
   if (!v || v.dataset.__primed === "1") return;
   v.dataset.__primed = "1";
 
-  const onMeta = () => {
+  const seekToThumbTime = () => {
     try {
       const dur = Number.isFinite(v.duration) ? v.duration : 0;
       let t = 0.05;
@@ -37,18 +35,49 @@ function __primeThumbVideoFrameLightbox(v) {
     } catch (_) { }
   };
 
-  const onSeeked = () => { try { v.pause(); } catch (_) { } };
+  const ensurePaint = () => {
+    if (v.dataset.__painted === "1") return;
+    v.dataset.__painted = "1";
 
-  v.addEventListener("loadedmetadata", onMeta, { once: true });
-  v.addEventListener("seeked", onSeeked, { once: true });
+    try {
+      const p = v.play();
+      if (p && typeof p.then === "function") {
+        p.then(() => {
+          if (typeof v.requestVideoFrameCallback === "function") {
+            v.requestVideoFrameCallback(() => {
+              try { v.pause(); } catch (_) { }
+            });
+          } else {
+            setTimeout(() => {
+              try { v.pause(); } catch (_) { }
+            }, 60);
+          }
+        }).catch(() => {
+          try { v.pause(); } catch (_) { }
+        });
+      }
+    } catch (_) {
+      try { v.pause(); } catch (_) { }
+    }
+  };
+
+  v.addEventListener("loadedmetadata", () => {
+    seekToThumbTime();
+    ensurePaint();
+  }, { once: true });
+
+  v.addEventListener("seeked", () => {
+    ensurePaint();
+  }, { once: true });
+
   setTimeout(() => {
     try {
       if (v.readyState < 2) return;
-      if (v.currentTime === 0) v.currentTime = 0.05;
+      if (v.currentTime === 0) seekToThumbTime();
+      ensurePaint();
     } catch (_) { }
-  }, 120);
+  }, 200);
 }
-
 
 history.scrollRestoration = "manual";
 window.scrollTo(0, 0);
