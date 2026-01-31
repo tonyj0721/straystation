@@ -86,6 +86,50 @@
       opacity: 1;
       /* 避免 iOS 用 opacity 影響觀感 */
     }
+  
+
+    /* Mobile list thumbnails (admin) */
+    .media-thumb {
+      width: 72px;
+      height: 72px;
+      border-radius: 12px;
+      overflow: hidden;
+      flex: 0 0 auto;
+      background: #f3f4f6;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .media-thumb img,
+    .media-thumb video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .media-thumb.processing {
+      background: #e5e7eb;
+      color: #374151;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .video-badge{
+      position:absolute;
+      right:6px;
+      bottom:6px;
+      width:26px;
+      height:26px;
+      border-radius:999px;
+      background:rgba(0,0,0,.55);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .video-badge-inner svg{
+      width:14px;height:14px;fill:#fff;
+    }
+
   </style>
 </head>
 
@@ -1767,11 +1811,16 @@ for (let i = 0; i < selectedFiles.length; i++) {
       wrap.innerHTML = list
         .map((p) => {
           const mediaUrl = (Array.isArray(p.images) && p.images[0]) || p.image || "";
+          const isProcessing = !!p.mediaProcessing || (Array.isArray(p.pendingMediaPlan) && p.pendingMediaPlan.length > 0);
           const isVid = typeof isVideoUrl === "function" && isVideoUrl(mediaUrl);
           const videoPath = isVid ? storagePathFromDownloadUrl(mediaUrl) : "";
           const videoThumb = (isVid && p.thumbByPath && videoPath) ? (p.thumbByPath[videoPath] || "") : "";
 
-          const thumb = isVid
+          const thumb = isProcessing
+            ? `
+               <div class="media-thumb processing"><div>處理中</div></div>
+              `
+            : isVid
             ? (videoThumb
               ? `
                <div class="media-thumb">
