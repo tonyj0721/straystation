@@ -1204,6 +1204,12 @@ const coverHTML = isPending || !mediaUrl
     
 
 // ===== uploads/ 媒體處理：輪詢單筆文件，完成後自動更新卡片（不需要重新整理） =====
+// compat: 原頁面是 applyFilters()，但輪詢 hook 用 applyFilterAndRender()
+if (typeof applyFilterAndRender !== "function" && typeof applyFilters === "function") {
+  // 用 var 宣告，確保 identifier 存在，避免 ReferenceError
+  var applyFilterAndRender = applyFilters;
+}
+
 const __processingPollers = new Map(); // id -> timer
 function __needsProcessing(p) {
   return !!p?.mediaProcessing || (Array.isArray(p?.pendingMediaPlan) && p.pendingMediaPlan.some(u => typeof u === "string" && u.startsWith("uploads/")));
