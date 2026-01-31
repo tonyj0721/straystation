@@ -86,11 +86,7 @@
       opacity: 1;
       /* 避免 iOS 用 opacity 影響觀感 */
     }
-  
-
-    /* Mobile list thumbnails (admin) */
-/* admin mobile list thumbnail (scoped, do not affect Modal/Lightbox styles) */
-</style>
+  </style>
 </head>
 
 <body class="text-gray-800 bg-gradient-to-br from-brand-50 to-white">
@@ -1417,34 +1413,26 @@
         const docRef = await addDoc(collection(db, "pets"), payload);
 
         // 2) 逐張上傳圖片，取得 Storage URL
-        
-// 後端浮水印：前端只上傳原檔到 uploads/，並寫入 pendingMediaPlan（前台會顯示「處理中」直到完成）
-const pendingMediaPlan = [];
-const now = Date.now();
-for (let i = 0; i < selectedFiles.length; i++) {
-  const f = selectedFiles[i];
-  const isVid = (f && String(f.type || "").startsWith("video/"));
-  const ext = isVid ? "mp4" : "jpg";
-  const base = (f?.name || `media_${i}`).replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9_\-\u4e00-\u9fa5]+/g, "_");
-  const seq = String(i).padStart(2, "0");
-  const upPath = `uploads/pets/${docRef.id}/${seq}_${now}_${base}.${ext}`;
-  pendingMediaPlan.push(upPath);
-}
+        const urls = [];
+        for (const f of selectedFiles) {
+          // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
+const type = (f && f.type) || '';
+// 路徑副檔名固定用 jpg/mp4，讓後端覆蓋後檔名/格式一致（避免 iPhone/WebM 問題）
+let ext = 'bin';
+if (type.startsWith('image/')) ext = 'jpg';
+else if (type.startsWith('video/')) ext = 'mp4';
 
-if (pendingMediaPlan.length) {
-  await updateDoc(doc(db, "pets", docRef.id), {
-    mediaProcessing: true,
-    pendingMediaPlan,
-  });
-}
+const base = f.name.replace(/\.[^.]+$/, '');
+const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
+const r = sRef(storage, path);
+await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
+urls.push(await getDownloadURL(r));
+        }
 
-// 逐一上傳（保持順序、避免併發造成時序混亂）
-for (let i = 0; i < selectedFiles.length; i++) {
-  const f = selectedFiles[i];
-  const path = pendingMediaPlan[i];
-  const r = sRef(storage, path);
-  await uploadBytes(r, f, { contentType: (f.type || "") });
-}
+        // 3) 回寫 images 欄位
+        if (urls.length) {
+          await updateDoc(doc(db, "pets", docRef.id), { images: urls });
+        }
 
         // UI 收尾
         stopDots();
@@ -1521,77 +1509,7 @@ for (let i = 0; i < selectedFiles.length; i++) {
       renderCurrentPage();
     }
 
-    
-// ===============================
-// 後端處理中（pendingMediaPlan）自動更新：Admin 列表輪詢
-// ===============================
-const __adminPollers = new Map();
-
-function __petNeedsProcessing(p) {
-  return !!(p && (p.mediaProcessing ||
-    (Array.isArray(p.pendingMediaPlan) && p.pendingMediaPlan.some(x => typeof x === "string" && x.startsWith("uploads/")))));
-}
-
-function __syncAdminPollersForPage(pageList) {
-  const idsOnPage = new Set((Array.isArray(pageList) ? pageList : []).map(p => p.id));
-
-  // stop unused pollers
-  for (const [id, t] of __adminPollers.entries()) {
-    const inPage = idsOnPage.has(id);
-    const cur = (Array.isArray(pageList) ? pageList : []).find(x => x.id === id) || pets.find(x => x.id === id);
-    const stillNeed = cur ? __petNeedsProcessing(cur) : false;
-    if (!inPage || !stillNeed) {
-      try { clearInterval(t); } catch(_) {}
-      __adminPollers.delete(id);
-    }
-  }
-
-  // start needed pollers
-  (Array.isArray(pageList) ? pageList : []).forEach((p) => {
-    if (!p || !p.id) return;
-    if (!__petNeedsProcessing(p)) return;
-    if (__adminPollers.has(p.id)) return;
-
-    const timer = setInterval(async () => {
-      try {
-        const snap = await getDoc(doc(db, "pets", p.id));
-        if (!snap.exists()) {
-          try { clearInterval(timer); } catch(_) {}
-          __adminPollers.delete(p.id);
-          return;
-        }
-        const d = { id: snap.id, ...snap.data() };
-
-        // 更新快取資料
-        const idx = pets.findIndex(x => x.id === p.id);
-        if (idx >= 0) pets[idx] = d;
-        const vidx = viewList.findIndex(x => x.id === p.id);
-        if (vidx >= 0) viewList[vidx] = d;
-
-        // 完成後停掉輪詢
-        if (!__petNeedsProcessing(d)) {
-          try { clearInterval(timer); } catch(_) {}
-          __adminPollers.delete(p.id);
-        }
-
-        // 重新渲染目前頁面
-        try { renderCurrentPage(); } catch(_) {}
-      } catch (_) {
-        // ignore
-      }
-    }, 2000);
-
-    __adminPollers.set(p.id, timer);
-  });
-}
-
-window.addEventListener("beforeunload", () => {
-  for (const t of __adminPollers.values()) {
-    try { clearInterval(t); } catch(_) {}
-  }
-  __adminPollers.clear();
-});
-function renderCurrentPage() {
+    function renderCurrentPage() {
       const totalItems = viewList.length;
       const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
 
@@ -1605,9 +1523,6 @@ function renderCurrentPage() {
         renderRows(pageList);
         renderRowsMobile(pageList);
       });
-
-      // ✅ 讓列表在後端處理完成後自動更新封面
-      __syncAdminPollersForPage(pageList);
 
       updatePager(totalItems, totalPages);
     }
@@ -1837,60 +1752,65 @@ function renderCurrentPage() {
     }
 
     // 手機卡片
-    
-function renderRowsMobile(list) {
-  const wrap = document.getElementById("rowsMobile");
-  if (!wrap) return;
+    function renderRowsMobile(list) {
+      const wrap = document.getElementById("rowsMobile");
+      if (!wrap) return;
 
-  const isHttpUrl = (u) => typeof u === "string" && /^https?:\/\//i.test(u);
-  const looksLikeStoragePath = (u) => typeof u === "string" && u.includes("/") && !isHttpUrl(u);
+      wrap.innerHTML = list
+        .map((p) => {
+          const mediaUrl = (Array.isArray(p.images) && p.images[0]) || p.image || "";
+          const isVid = typeof isVideoUrl === "function" && isVideoUrl(mediaUrl);
+          const videoPath = isVid ? storagePathFromDownloadUrl(mediaUrl) : "";
+          const videoThumb = (isVid && p.thumbByPath && videoPath) ? (p.thumbByPath[videoPath] || "") : "";
 
-  wrap.innerHTML = (Array.isArray(list) ? list : [])
-    .map((p) => {
-      const mediaUrl = (Array.isArray(p.images) && p.images[0]) || p.image || "";
-      const hasPending = !!p.mediaProcessing || (Array.isArray(p.pendingMediaPlan) && p.pendingMediaPlan.some(x => typeof x === "string" && x.startsWith("uploads/")));
-      const isProcessing = hasPending || (typeof mediaUrl === "string" && mediaUrl.startsWith("uploads/")) || looksLikeStoragePath(mediaUrl);
+          const thumb = isVid
+            ? (videoThumb
+              ? `
+               <div class="media-thumb">
+                 <img src="${videoThumb}" alt="" loading="lazy" decoding="async">
+                 <div class="video-badge"><div class="video-badge-inner">${__THUMB_PLAY_SVG}</div></div>
+               </div>
+              `
+              : `
+               <div class="media-thumb">
+                 <video class="thumb-video" preload="metadata" muted playsinline webkit-playsinline disablepictureinpicture src="${mediaUrl}"></video>
+                 <div class="video-badge"><div class="video-badge-inner">${__THUMB_PLAY_SVG}</div></div>
+               </div>
+              `)
+            : `
+               <div class="media-thumb">
+                 <img src="${mediaUrl}" alt="" loading="lazy" decoding="async">
+               </div>
+              `;
 
-      // 只在「真正的 http(s) URL」時才判定影片/縮圖，避免把 storage path 當成可載入網址而 404
-      const isVid = isHttpUrl(mediaUrl) && (typeof isVideoUrl === "function" && isVideoUrl(mediaUrl));
-      const videoPath = isVid ? storagePathFromDownloadUrl(mediaUrl) : "";
-      const videoThumb = (isVid && p.thumbByPath && videoPath) ? (p.thumbByPath[videoPath] || "") : "";
+          return `
+        <div class="rounded-xl ring-1 ring-gray-200 p-3 flex gap-3 items-center cursor-pointer"
+             data-id="${p.id}">
+          ${thumb}
+          <div class="min-w-0 flex-1">
+            <div class="font-semibold truncate">${p.name}</div>
+            <div class="text-xs text-gray-600 mt-1 truncate">
+              ${p.species}・${p.breed}・${p.gender}
+            </div>
+          </div>
+        </div>`;
+        })
+        .join("");
 
-      const thumb = isProcessing
-        ? `<div class="media-thumb flex items-center justify-center text-xs text-gray-600">處理中</div>`
-        : isVid
-          ? (videoThumb && isHttpUrl(videoThumb)
-              ? `<div class="media-thumb"><img src="${videoThumb}" alt="" loading="lazy" decoding="async"></div>`
-              : `<div class="media-thumb flex items-center justify-center text-xs text-gray-600">處理中</div>`
-            )
-          : (isHttpUrl(mediaUrl)
-              ? `<div class="media-thumb"><img src="${mediaUrl}" alt="" loading="lazy" decoding="async"></div>`
-              : `<div class="media-thumb flex items-center justify-center text-xs text-gray-600">—</div>`
-            );
+      // 影片縮圖：seek 到前面一點，顯示第一幀
+      wrap.querySelectorAll("video.thumb-video").forEach((v) => {
+        __primeThumbVideoFrameAdmin(v);
+      });
 
-      return `
-    <div class="rounded-xl ring-1 ring-gray-200 p-3 flex gap-3 items-center cursor-pointer"
-         data-id="${p.id}">
-      ${thumb}
-      <div class="min-w-0 flex-1">
-        <div class="font-semibold truncate">${p.name}</div>
-        <div class="text-xs text-gray-600 mt-1 truncate">
-          ${p.species}・${p.breed}・${p.gender}
-        </div>
-      </div>
-    </div>`;
-    })
-    .join("");
+      wrap.querySelectorAll("[data-id]").forEach((card) =>
+        card.addEventListener("click", () => {
+          const data = list.find((p) => p.id === card.dataset.id);
+          if (data) openDialog(data.id);
+        })
+      );
+    }
 
-  wrap.querySelectorAll("[data-id]").forEach((card) =>
-    card.addEventListener("click", () => {
-      const data = (Array.isArray(list) ? list : []).find((p) => p.id === card.dataset.id);
-      if (data) openDialog(data.id);
-    })
-  );
-}
-
-// === 名字輸入：即時重複檢查（建立時用） ===
+    // === 名字輸入：即時重複檢查（建立時用） ===
     (() => {
       const input = document.getElementById("name");
       if (!input) return;
