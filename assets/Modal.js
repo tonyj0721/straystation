@@ -975,18 +975,23 @@ async function saveEdit() {
 
       if (it.kind === "file") {
         const f = it.file;
-        // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
-const type = (f && f.type) || '';
-let ext = 'bin';
-if (type.startsWith('image/')) ext = 'jpg';
-else if (type.startsWith('video/')) ext = 'mp4';
-
-const base = f.name.replace(/\.[^.]+$/, '');
-const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
-const r = sRef(storage, path);
-await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
-newUrls.push(await getDownloadURL(r));
-}
+        const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+        const type = wmBlob.type || '';
+        let ext = 'bin';
+        if (type.startsWith('image/')) {
+          ext = type === 'image/png' ? 'png' : 'jpg';
+        } else if (type.startsWith('video/')) {
+          if (type.includes('webm')) ext = 'webm';
+          else if (type.includes('ogg')) ext = 'ogg';
+          else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
+          else ext = 'mp4';
+        }
+        const base = f.name.replace(/\.[^.]+$/, '');
+        const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
+        const r = sRef(storage, path);
+        await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
+        newUrls.push(await getDownloadURL(r));
+      }
     }
 
     // 刪除被移除的舊圖（忽略刪失敗）
@@ -1723,16 +1728,21 @@ async function onConfirmAdopted() {
   const urls = [];
   try {
     for (const f of files) {
-      // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
-      const type = (f && f.type) || '';
+      const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+      const type = wmBlob.type || '';
       let ext = 'bin';
-      if (type.startsWith('image/')) ext = 'jpg';
-      else if (type.startsWith('video/')) ext = 'mp4';
-
+      if (type.startsWith('image/')) {
+        ext = type === 'image/png' ? 'png' : 'jpg';
+      } else if (type.startsWith('video/')) {
+        if (type.includes('webm')) ext = 'webm';
+        else if (type.includes('ogg')) ext = 'ogg';
+        else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
+        else ext = 'mp4';
+      }
       const base = f.name.replace(/\.[^.]+$/, '');
       const path = `adopted/${currentDocId}/${Date.now()}_${base}.${ext}`;
       const r = sRef(storage, path);
-      await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
+      await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
       urls.push(await getDownloadURL(r));
     }
 
