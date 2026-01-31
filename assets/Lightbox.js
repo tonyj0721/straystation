@@ -1,5 +1,9 @@
 const $ = (sel) => document.querySelector(sel);
 
+function isPendingMedia(url) {
+  return typeof url === 'string' && url.startsWith('uploads/');
+}
+
 function isVideoUrl(url) {
   if (!url) return false;
   const u = String(url).split("?", 1)[0];
@@ -92,6 +96,26 @@ const lbNext = document.getElementById("lbNext");
 const lbClose = document.getElementById("lbClose");
 const lbWrap = document.getElementById("lbWrap");   // ← 新增
 
+
+// 「處理中」遮罩：pendingMediaPlan 內 uploads/ 項目不顯示原檔
+let lbProcessing = document.getElementById("lbProcessing");
+if (!lbProcessing && lbWrap) {
+  lbProcessing = document.createElement("div");
+  lbProcessing.id = "lbProcessing";
+  lbProcessing.className = "absolute inset-0 hidden items-center justify-center text-center";
+  lbProcessing.style.background = "rgba(0,0,0,0.45)";
+  lbProcessing.style.color = "#fff";
+  lbProcessing.style.fontSize = "16px";
+  lbProcessing.style.fontWeight = "700";
+  lbProcessing.style.padding = "16px";
+  lbProcessing.style.whiteSpace = "pre-line";
+  lbProcessing.textContent = "媒體處理中\n請稍候…";
+  lbWrap.style.position = lbWrap.style.position || "relative";
+  lbWrap.appendChild(lbProcessing);
+}
+const __lbShowProcessing = () => { try { lbProcessing?.classList.remove("hidden"); lbProcessing?.classList.add("flex"); } catch(_){} };
+const __lbHideProcessing = () => { try { lbProcessing?.classList.add("hidden"); lbProcessing?.classList.remove("flex"); } catch(_){} };
+
 let lbImages = [];
 let lbIndex = 0;
 let lbReturnToDialog = false;
@@ -109,7 +133,18 @@ function renderLightboxMedia() {
   }
 
   const url = lbImages[lbIndex] || "";
-  const isVid = isVideoUrl(url);
+  const isPending = isPendingMedia(url);
+  const isVid = (!isPending) && isVideoUrl(url);
+
+  if (isPending) {
+    // uploads/ 的原檔不在前台顯示（避免無浮水印空窗）
+    if (lbImg) { lbImg.src = ""; lbImg.classList.add("hidden"); }
+    if (lbVideo) { try { lbVideo.pause(); } catch (_) { } lbVideo.src = ""; lbVideo.classList.add("hidden"); }
+    __lbShowProcessing();
+    if (lbWrap) lbWrap.classList.remove("lb-video-mode");
+    return;
+  }
+  __lbHideProcessing();
 
   // 根據是否為影片切換 class
   if (lbWrap) {
@@ -238,11 +273,21 @@ function openLightbox(images, index = 0) {
   if (lbThumbsInner) {
     lbThumbsInner.innerHTML = "";
     lbImages.forEach((url, i) => {
-      const isVid = isVideoUrl(url);
+      const isPending = isPendingMedia(url);
+      const isVid = (!isPending) && isVideoUrl(url);
       const wrapper = document.createElement("div");
       wrapper.className = "lb-thumb" + (i === lbIndex ? " active" : "");
 
-      if (isVid) {
+      if (isPending) {
+        wrapper.style.background = "#e5e7eb";
+        wrapper.style.display = "flex";
+        wrapper.style.alignItems = "center";
+        wrapper.style.justifyContent = "center";
+        wrapper.style.fontSize = "12px";
+        wrapper.style.fontWeight = "700";
+        wrapper.style.color = "#374151";
+        wrapper.textContent = "處理中";
+      } else if (isVid) {
         const map = (window.currentPetThumbByPath || {});
         const videoPath = storagePathFromDownloadUrl(url);
         const videoThumb = (videoPath && map) ? (map[videoPath] || "") : "";
