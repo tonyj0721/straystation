@@ -1117,6 +1117,7 @@ const coverHTML = isPending || !mediaUrl
       pets.push(...all.filter(p => p.species === SPECIES));
       buildBreedOptionsByType(); // ← 新的
       render(pets);
+      try { pets.forEach(__startPollIfNeeded); } catch(_) {}
       openFromDeepLink();
 
       // 即時篩選：任一選單變更就篩
