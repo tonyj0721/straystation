@@ -925,7 +925,8 @@
         card.className = 'group rounded-2xl overflow-hidden ring-1 ring-gray-200 bg-white hover:shadow-soft transition-shadow';
 
         // 取封面圖（先用 p.images[0]，沒有的話退回 p.image）
-        const imgs = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
+        const _rawImgs = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
+        const imgs = (_rawImgs || []).filter((u) => typeof u === "string" && u);
         const img = imgs[0] || '';
 
         const mediaUrl = img;

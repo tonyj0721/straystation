@@ -632,7 +632,7 @@
       let allPhotos = [];
       for (const p of list) {
         if (Array.isArray(p.adoptedPhotos)) {
-          allPhotos.push(...p.adoptedPhotos);
+          allPhotos.push(...p.adoptedPhotos.filter((u) => typeof u === "string" && u));
         }
       }
       // 去重複

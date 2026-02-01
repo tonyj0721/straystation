@@ -548,9 +548,11 @@ async function openDialog(id) {
   const dlgHint = document.getElementById("dlgHint");
   const dlgStageWrap = document.getElementById("dlgStageWrap");
 
-  const media = Array.isArray(p.images) && p.images.length > 0
+  const rawMedia = Array.isArray(p.images) && p.images.length > 0
     ? p.images
     : (p.image ? [p.image] : []);
+  const hasPendingMedia = Array.isArray(rawMedia) && rawMedia.some((x) => x && typeof x === "object");
+  const media = (rawMedia || []).filter((u) => typeof u === "string" && u);
 
   let currentIndex = 0;
 
@@ -569,7 +571,7 @@ async function openDialog(id) {
 
       if (dlgThumbs) dlgThumbs.innerHTML = "";
 
-      if (dlgHint) dlgHint.textContent = "";
+      if (dlgHint) dlgHint.textContent = hasPendingMedia ? "正在加浮水印，請稍後再開啟（成品產出後會自動顯示）" : "";
 
       if (dlgStageWrap) dlgStageWrap.classList.remove("dlg-video-mode");
 
@@ -873,6 +875,8 @@ async function onDelete() {
     // 刪掉這筆的所有圖片與合照資料夾
     await deleteAllUnder(`pets/${currentDocId}`);
     await deleteAllUnder(`adopted/${currentDocId}`);
+    await deleteAllUnder(`uploads/pets/${currentDocId}`);
+    await deleteAllUnder(`uploads/adopted/${currentDocId}`);
     await deleteAllUnder(`thumbs/pets/${currentDocId}`);
     // 最後刪 Firestore 文件
     await deleteDoc(doc(db, "pets", currentDocId));
@@ -981,11 +985,21 @@ let ext = 'bin';
 if (type.startsWith('image/')) ext = 'jpg';
 else if (type.startsWith('video/')) ext = 'mp4';
 
-const base = f.name.replace(/\.[^.]+$/, '');
-const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
-const r = sRef(storage, path);
+const baseName = f.name.replace(/\.[^.]+$/, '');
+const safeBase = baseName.replace(/[^\w\u4e00-\u9fff\-]+/g, '_').slice(0, 40) || 'media';
+const ts = Date.now();
+const rand = Math.random().toString(36).slice(2, 8);
+const dstPath = `pets/${currentDocId}/${ts}_${rand}_${safeBase}.${ext}`;
+const uploadPath = `uploads/${dstPath}`;
+const r = sRef(storage, uploadPath);
 await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
-newUrls.push(await getDownloadURL(r));
+newUrls.push({
+  _pending: 1,
+  uploadPath,
+  dstPath,
+  kind: type.startsWith('video/') ? 'video' : 'image',
+  ts,
+});
 }
     }
 
@@ -1015,7 +1029,8 @@ newUrls.push(await getDownloadURL(r));
     }
 
     newData.images = newUrls;
-    const __updatePayload = { ...newData, ...__thumbFieldDeletes };
+    const __hasPending = Array.isArray(newData.images) && newData.images.some((x) => x && typeof x === "object");
+    const __updatePayload = { ...newData, processing: __hasPending, ...__thumbFieldDeletes };
 
     // ③ 寫回 Firestore
     await updateDoc(doc(db, "pets", currentDocId), __updatePayload);
@@ -1160,7 +1175,7 @@ function renderEditImages(urls) {
       revokeEditVideoObjURL(it.file);
     }
   }
-  editImagesState.items = (urls || []).map((u) => ({ kind: "url", url: u }));
+  editImagesState.items = (urls || []).filter((u) => typeof u === "string" && u).map((u) => ({ kind: "url", url: u }));
   editImagesState.removeUrls = [];
   paintEditPreview();
 }
@@ -1729,16 +1744,29 @@ async function onConfirmAdopted() {
       if (type.startsWith('image/')) ext = 'jpg';
       else if (type.startsWith('video/')) ext = 'mp4';
 
-      const base = f.name.replace(/\.[^.]+$/, '');
-      const path = `adopted/${currentDocId}/${Date.now()}_${base}.${ext}`;
-      const r = sRef(storage, path);
+      const baseName = f.name.replace(/\.[^.]+$/, '');
+      const safeBase = baseName.replace(/[^\w\u4e00-\u9fff\-]+/g, '_').slice(0, 40) || 'media';
+      const ts = Date.now();
+      const rand = Math.random().toString(36).slice(2, 8);
+      const dstPath = `adopted/${currentDocId}/${ts}_${rand}_${safeBase}.${ext}`;
+      const uploadPath = `uploads/${dstPath}`;
+
+      const r = sRef(storage, uploadPath);
       await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
-      urls.push(await getDownloadURL(r));
-    }
+
+      urls.push({
+        _pending: 1,
+        uploadPath,
+        dstPath,
+        kind: type.startsWith('video/') ? 'video' : 'image',
+        ts,
+      });
+}
 
     await updateDoc(doc(db, "pets", currentDocId), {
       status: "adopted",
       adoptedAt: serverTimestamp(),
+      processing: true,
       adoptedPhotos: urls,
       showOnHome: true,
       showOnCats: false,
@@ -1793,6 +1821,7 @@ async function onUnadopt() {
 
   try {
     await deleteAllUnder(`adopted/${currentDocId}`); // 清掉合照
+    await deleteAllUnder(`uploads/adopted/${currentDocId}`); // 清掉暫存區（避免遺留未處理檔）
     await updateDoc(doc(db, "pets", currentDocId), {
       status: "available",
       adoptedAt: deleteField(),
