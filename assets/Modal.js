@@ -1,10 +1,43 @@
 const q = (sel) => document.querySelector(sel);
 
+    // ---- media url normalizer (supports legacy object schema) ----
+    function mediaItemToUrl(it) {
+      if (!it) return "";
+      if (typeof it === "string") return it;
+      if (typeof it === "object") {
+        return it.url || it.downloadURL || it.downloadUrl || it.src || it.mediaUrl || it.link || "";
+      }
+      return "";
+    }
+
+    function normalizeMediaList(list) {
+      const arr = Array.isArray(list) ? list : [];
+      return arr.map(mediaItemToUrl).filter(Boolean);
+    }
+
+
 function isVideoUrl(url) {
   if (!url) return false;
   const u = String(url).split("?", 1)[0];
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
+
+// --- media URL normalization (backward-compatible) ---
+function __mediaItemToUrl(it) {
+  if (!it) return "";
+  if (typeof it === "string") return it;
+  if (typeof it === "object") {
+    return (
+      it.url || it.downloadURL || it.downloadUrl || it.src || it.mediaUrl || it.link || it.href || ""
+    );
+  }
+  return "";
+}
+function __normalizeMediaArray(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.map(__mediaItemToUrl).filter(Boolean);
+}
+
 
 function storagePathFromDownloadUrl(url) {
   try {
@@ -23,73 +56,6 @@ function thumbPathFromMediaPath(mediaPath) {
     return "";
   }
 }
-
-// ===============================
-// Watermark safe mode helpers
-// ===============================
-function isPendingTokenStr(u) {
-  return typeof u === "string" && u.startsWith("__PENDING__:");
-}
-function makePendingToken(uploadPath) {
-  return `__PENDING__:${uploadPath}`;
-}
-
-// 舊資料/不同 schema 的容錯：可能是 string URL，也可能是 {url, downloadURL, path...}
-function toMediaUrl(x) {
-  if (typeof x === "string") return x;
-  if (x && typeof x === "object") {
-    // 常見欄位名
-    const u =
-      x.url ||
-      x.downloadURL ||
-      x.downloadUrl ||
-      x.src ||
-      x.href ||
-      "";
-    if (typeof u === "string" && u) return u;
-
-    // 若只有 storage path（例如 pets/...），保留給後續需要時再 resolve
-    const p = x.path || x.storagePath || x.fullPath || "";
-    if (typeof p === "string" && p) return `__PATH__:${p}`;
-  }
-  return "";
-}
-
-function isPendingItem(x) {
-  // 新版 token
-  if (typeof x === "string") return isPendingTokenStr(x);
-
-  // 舊版/物件 schema：uploads/** 一律視為 pending
-  if (x && typeof x === "object") {
-    const p = x.path || x.storagePath || x.fullPath || "";
-    if (typeof p === "string" && p.startsWith("uploads/")) return true;
-
-    const u = toMediaUrl(x);
-    return isPendingTokenStr(u);
-  }
-  return false;
-}
-
-function isRealUrl(x) {
-  const u = toMediaUrl(x);
-  // 真正可顯示的 downloadURL 會是 http(s) 開頭；但也保留 data/blob 的可能
-  if (!u || typeof u !== "string") return false;
-  if (isPendingTokenStr(u)) return false;
-  if (u.startsWith("__PATH__:")) return false;
-  return true;
-}
-
-function genUUID() {
-  try { return (crypto && crypto.randomUUID) ? crypto.randomUUID() : null; } catch (_) { }
-  return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
-}
-
-function hasAnyPending(p) {
-  const a = (p && Array.isArray(p.images)) ? p.images : [];
-  const b = (p && Array.isArray(p.adoptedPhotos)) ? p.adoptedPhotos : [];
-  return a.some(isPendingItem) || b.some(isPendingItem) || !!(p && p.processing);
-}
-
 
 // ===============================
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
@@ -614,32 +580,14 @@ async function openDialog(id) {
   const dlgThumbs = document.getElementById("dlgThumbs");
   const dlgHint = document.getElementById("dlgHint");
   const dlgStageWrap = document.getElementById("dlgStageWrap");
-  const mediaRaw = Array.isArray(p.images) && p.images.length > 0
-    ? p.images
-    : (p.image ? [p.image] : []);
 
-  const mediaPending = mediaRaw.filter(isPendingItem);
-  const media = mediaRaw.map(toMediaUrl).filter(isRealUrl);
-  const __hasPending = (mediaPending.length > 0) || !!p.processing;
-
-  // Watermark processing overlay (created once)
-  let wmOverlay = document.getElementById("dlgWmOverlay");
-  if (!wmOverlay && dlgStageWrap) {
-    wmOverlay = document.createElement("div");
-    wmOverlay.id = "dlgWmOverlay";
-    wmOverlay.className = "hidden absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-black/50 text-white text-sm";
-    wmOverlay.textContent = "正在加浮水印，請稍候…";
-    dlgStageWrap.appendChild(wmOverlay);
-  }
-  if (wmOverlay) wmOverlay.classList.toggle("hidden", !__hasPending);
+  const mediaRaw = Array.isArray(p.images) && p.images.length > 0 ? p.images : (p.image ? [p.image] : []);
+  const media = __normalizeMediaArray(mediaRaw);
 
   let currentIndex = 0;
 
   function showDialogMedia(index) {
     if (!media.length) {
-      if (__hasPending && dlgHint) {
-        dlgHint.textContent = "正在加浮水印，完成後會自動顯示";
-      }
       if (dlgImg) {
         dlgImg.src = "";
         dlgImg.classList.add("hidden");
@@ -857,11 +805,11 @@ async function openDialog(id) {
     if (!breedType) {
       // 沒選左邊：右邊保持 disabled +「請先選擇品種」
       btSel.value = "";
-      resetEditBreedRight();       // 會塞入「請先選擇品種」並 disabled
+      resetEditBreedRight();       // 會塞入「請先選擇品種」並 disabled :contentReference[oaicite:8]{index=8}
       updateEditBreedLabel();
     } else {
       btSel.value = breedType;
-      buildEditBreedOptions();     // 右邊會變成可選 + 第一個 option「請選擇」
+      buildEditBreedOptions();     // 右邊會變成可選 + 第一個 option「請選擇」:contentReference[oaicite:9]{index=9}
       updateEditBreedLabel();
 
       // breedValue 不在選項裡就回到 placeholder，避免顯示空白
@@ -890,41 +838,6 @@ async function openDialog(id) {
   if (!dlg.open) {
     __lockDialogScroll();
     dlg.showModal();
-
-
-// 若有待處理媒體：每 1 秒輪詢一次，直到全部變成可顯示 URL（不會曝光原檔，因為原檔在 uploads 私有路徑）
-if (__hasPending) {
-  try { if (window.__wmPollTimer) clearInterval(window.__wmPollTimer); } catch (_) { }
-  window.__wmPollTimer = setInterval(async () => {
-    try {
-      const snap2 = await getDoc(doc(db, "pets", currentDocId));
-      if (!snap2.exists()) return;
-      const p2 = { id: snap2.id, ...snap2.data() };
-      const still = hasAnyPending(p2);
-      if (!still) {
-        clearInterval(window.__wmPollTimer);
-        window.__wmPollTimer = null;
-        // 更新全域清單，避免下一次開 dialog 還是舊資料
-        try {
-          const i = pets.findIndex(x => x.id === p2.id);
-          if (i >= 0) pets[i] = p2;
-        } catch (_) { }
-        if (document.getElementById("petDialog")?.open) {
-          await openDialog(currentDocId);
-        }
-      }
-    } catch (_) { }
-  }, 1000);
-
-  const stop = () => {
-    try { if (window.__wmPollTimer) clearInterval(window.__wmPollTimer); } catch (_) { }
-    window.__wmPollTimer = null;
-  };
-  const dlgEl = document.getElementById("petDialog");
-  dlgEl?.addEventListener("close", stop, { once: true });
-  dlgEl?.addEventListener("cancel", stop, { once: true });
-}
-
   }
 }
 
@@ -1100,12 +1013,11 @@ let ext = 'bin';
 if (type.startsWith('image/')) ext = 'jpg';
 else if (type.startsWith('video/')) ext = 'mp4';
 
-const base = f.name.replace(/\.[^.]+$/, "");
-const idx = String(newUrls.length).padStart(3, "0");
-const upPath = `uploads/pets/${currentDocId}/${idx}_${Date.now()}_${base}.${ext}`;
-const r = sRef(storage, upPath);
-await uploadBytes(r, f, { contentType: type || "application/octet-stream" });
-newUrls.push(makePendingToken(upPath));
+const base = f.name.replace(/\.[^.]+$/, '');
+const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
+const r = sRef(storage, path);
+await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
+newUrls.push(await getDownloadURL(r));
 }
     }
 
@@ -1135,7 +1047,7 @@ newUrls.push(makePendingToken(upPath));
     }
 
     newData.images = newUrls;
-    const __updatePayload = { ...newData, processing: newUrls.some(isPendingToken), ...__thumbFieldDeletes };
+    const __updatePayload = { ...newData, ...__thumbFieldDeletes };
 
     // ③ 寫回 Firestore
     await updateDoc(doc(db, "pets", currentDocId), __updatePayload);
@@ -1849,19 +1761,17 @@ async function onConfirmAdopted() {
       if (type.startsWith('image/')) ext = 'jpg';
       else if (type.startsWith('video/')) ext = 'mp4';
 
-      const base = f.name.replace(/\.[^.]+$/, "");
-      const idx = String(urls.length).padStart(3, "0");
-      const upPath = `uploads/adopted/${currentDocId}/${idx}_${Date.now()}_${base}.${ext}`;
-      const r = sRef(storage, upPath);
-      await uploadBytes(r, f, { contentType: type || "application/octet-stream" });
-      urls.push(makePendingToken(upPath));
+      const base = f.name.replace(/\.[^.]+$/, '');
+      const path = `adopted/${currentDocId}/${Date.now()}_${base}.${ext}`;
+      const r = sRef(storage, path);
+      await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
+      urls.push(await getDownloadURL(r));
     }
 
     await updateDoc(doc(db, "pets", currentDocId), {
       status: "adopted",
       adoptedAt: serverTimestamp(),
       adoptedPhotos: urls,
-      processing: urls.some(isPendingToken),
       showOnHome: true,
       showOnCats: false,
       showOnDogs: false,

@@ -400,6 +400,24 @@
 
   <script src="./assets/firebase-config.js"></script>
   <script type="module">
+
+
+// --- media URL normalization (backward-compatible) ---
+function __mediaItemToUrl(it) {
+  if (!it) return "";
+  if (typeof it === "string") return it;
+  if (typeof it === "object") {
+    return (
+      it.url || it.downloadURL || it.downloadUrl || it.src || it.mediaUrl || it.link || it.href || ""
+    );
+  }
+  return "";
+}
+function __normalizeMediaArray(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.map(__mediaItemToUrl).filter(Boolean);
+}
+
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
     import {
       getFirestore, collection, getDocs, query, orderBy, where,
@@ -616,40 +634,7 @@
       };
     }
 
-    function isPendingToken(u) { return typeof u === "string" && u.startsWith("__PENDING__:"); }
-
-    // 舊資料/不同 schema 容錯：可能是 string URL，也可能是 {url, downloadURL, path...}
-    function toMediaUrl(x) {
-      if (typeof x === "string") return x;
-      if (x && typeof x === "object") {
-        const u = x.url || x.downloadURL || x.downloadUrl || x.src || x.href || "";
-        if (typeof u === "string" && u) return u;
-        const p = x.path || x.storagePath || x.fullPath || "";
-        if (typeof p === "string" && p) return `__PATH__:${p}`;
-      }
-      return "";
-    }
-
-    function isPendingItem(x) {
-      if (typeof x === "string") return isPendingToken(x);
-      if (x && typeof x === "object") {
-        const p = x.path || x.storagePath || x.fullPath || "";
-        if (typeof p === "string" && p.startsWith("uploads/")) return true;
-        const u = toMediaUrl(x);
-        return isPendingToken(u);
-      }
-      return false;
-    }
-
-    function isRealUrl(x) {
-      const u = toMediaUrl(x);
-      if (!u || typeof u !== "string") return false;
-      if (isPendingToken(u)) return false;
-      if (u.startsWith("__PATH__:")) return false;
-      return true;
-    }
-
-async function loadPets() {
+    async function loadPets() {
       const qRef = query(collection(db, 'pets'), where('status', '==', 'adopted'), orderBy('createdAt', 'desc'));
       const snap = await getDocs(qRef);
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -665,7 +650,7 @@ async function loadPets() {
       let allPhotos = [];
       for (const p of list) {
         if (Array.isArray(p.adoptedPhotos)) {
-          allPhotos.push(...p.adoptedPhotos.filter(isRealUrl).map(toMediaUrl));
+          allPhotos.push(...normalizeMediaList(p.adoptedPhotos));
         }
       }
       // 去重複
