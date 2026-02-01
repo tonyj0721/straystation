@@ -27,23 +27,67 @@ function thumbPathFromMediaPath(mediaPath) {
 // ===============================
 // Watermark safe mode helpers
 // ===============================
-function isPendingToken(u) {
+function isPendingTokenStr(u) {
   return typeof u === "string" && u.startsWith("__PENDING__:");
 }
 function makePendingToken(uploadPath) {
   return `__PENDING__:${uploadPath}`;
 }
-function isRealUrl(u) {
-  return typeof u === "string" && !!u && !isPendingToken(u);
+
+// 舊資料/不同 schema 的容錯：可能是 string URL，也可能是 {url, downloadURL, path...}
+function toMediaUrl(x) {
+  if (typeof x === "string") return x;
+  if (x && typeof x === "object") {
+    // 常見欄位名
+    const u =
+      x.url ||
+      x.downloadURL ||
+      x.downloadUrl ||
+      x.src ||
+      x.href ||
+      "";
+    if (typeof u === "string" && u) return u;
+
+    // 若只有 storage path（例如 pets/...），保留給後續需要時再 resolve
+    const p = x.path || x.storagePath || x.fullPath || "";
+    if (typeof p === "string" && p) return `__PATH__:${p}`;
+  }
+  return "";
 }
+
+function isPendingItem(x) {
+  // 新版 token
+  if (typeof x === "string") return isPendingTokenStr(x);
+
+  // 舊版/物件 schema：uploads/** 一律視為 pending
+  if (x && typeof x === "object") {
+    const p = x.path || x.storagePath || x.fullPath || "";
+    if (typeof p === "string" && p.startsWith("uploads/")) return true;
+
+    const u = toMediaUrl(x);
+    return isPendingTokenStr(u);
+  }
+  return false;
+}
+
+function isRealUrl(x) {
+  const u = toMediaUrl(x);
+  // 真正可顯示的 downloadURL 會是 http(s) 開頭；但也保留 data/blob 的可能
+  if (!u || typeof u !== "string") return false;
+  if (isPendingTokenStr(u)) return false;
+  if (u.startsWith("__PATH__:")) return false;
+  return true;
+}
+
 function genUUID() {
   try { return (crypto && crypto.randomUUID) ? crypto.randomUUID() : null; } catch (_) { }
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
+
 function hasAnyPending(p) {
   const a = (p && Array.isArray(p.images)) ? p.images : [];
   const b = (p && Array.isArray(p.adoptedPhotos)) ? p.adoptedPhotos : [];
-  return a.some(isPendingToken) || b.some(isPendingToken) || !!(p && p.processing);
+  return a.some(isPendingItem) || b.some(isPendingItem) || !!(p && p.processing);
 }
 
 
@@ -570,6 +614,13 @@ async function openDialog(id) {
   const dlgThumbs = document.getElementById("dlgThumbs");
   const dlgHint = document.getElementById("dlgHint");
   const dlgStageWrap = document.getElementById("dlgStageWrap");
+  const mediaRaw = Array.isArray(p.images) && p.images.length > 0
+    ? p.images
+    : (p.image ? [p.image] : []);
+
+  const mediaPending = mediaRaw.filter(isPendingItem);
+  const media = mediaRaw.map(toMediaUrl).filter(isRealUrl);
+  const __hasPending = (mediaPending.length > 0) || !!p.processing;
 
   // Watermark processing overlay (created once)
   let wmOverlay = document.getElementById("dlgWmOverlay");
@@ -582,14 +633,7 @@ async function openDialog(id) {
   }
   if (wmOverlay) wmOverlay.classList.toggle("hidden", !__hasPending);
 
-  const mediaRaw = Array.isArray(p.images) && p.images.length > 0
-    ? p.images
-    : (p.image ? [p.image] : []);
-
-  const mediaPending = mediaRaw.filter(isPendingToken);
-  const media = mediaRaw.filter(isRealUrl);
-  const __hasPending = (mediaPending.length > 0) || !!p.processing;
-let currentIndex = 0;
+  let currentIndex = 0;
 
   function showDialogMedia(index) {
     if (!media.length) {
@@ -813,11 +857,11 @@ let currentIndex = 0;
     if (!breedType) {
       // 沒選左邊：右邊保持 disabled +「請先選擇品種」
       btSel.value = "";
-      resetEditBreedRight();       // 會塞入「請先選擇品種」並 disabled :contentReference[oaicite:8]{index=8}
+      resetEditBreedRight();       // 會塞入「請先選擇品種」並 disabled
       updateEditBreedLabel();
     } else {
       btSel.value = breedType;
-      buildEditBreedOptions();     // 右邊會變成可選 + 第一個 option「請選擇」:contentReference[oaicite:9]{index=9}
+      buildEditBreedOptions();     // 右邊會變成可選 + 第一個 option「請選擇」
       updateEditBreedLabel();
 
       // breedValue 不在選項裡就回到 placeholder，避免顯示空白

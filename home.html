@@ -617,7 +617,37 @@
     }
 
     function isPendingToken(u) { return typeof u === "string" && u.startsWith("__PENDING__:"); }
-function isRealUrl(u) { return typeof u === "string" && !!u && !isPendingToken(u); }
+
+    // 舊資料/不同 schema 容錯：可能是 string URL，也可能是 {url, downloadURL, path...}
+    function toMediaUrl(x) {
+      if (typeof x === "string") return x;
+      if (x && typeof x === "object") {
+        const u = x.url || x.downloadURL || x.downloadUrl || x.src || x.href || "";
+        if (typeof u === "string" && u) return u;
+        const p = x.path || x.storagePath || x.fullPath || "";
+        if (typeof p === "string" && p) return `__PATH__:${p}`;
+      }
+      return "";
+    }
+
+    function isPendingItem(x) {
+      if (typeof x === "string") return isPendingToken(x);
+      if (x && typeof x === "object") {
+        const p = x.path || x.storagePath || x.fullPath || "";
+        if (typeof p === "string" && p.startsWith("uploads/")) return true;
+        const u = toMediaUrl(x);
+        return isPendingToken(u);
+      }
+      return false;
+    }
+
+    function isRealUrl(x) {
+      const u = toMediaUrl(x);
+      if (!u || typeof u !== "string") return false;
+      if (isPendingToken(u)) return false;
+      if (u.startsWith("__PATH__:")) return false;
+      return true;
+    }
 
 async function loadPets() {
       const qRef = query(collection(db, 'pets'), where('status', '==', 'adopted'), orderBy('createdAt', 'desc'));
@@ -635,7 +665,7 @@ async function loadPets() {
       let allPhotos = [];
       for (const p of list) {
         if (Array.isArray(p.adoptedPhotos)) {
-          allPhotos.push(...p.adoptedPhotos.filter(isRealUrl));
+          allPhotos.push(...p.adoptedPhotos.filter(isRealUrl).map(toMediaUrl));
         }
       }
       // 去重複

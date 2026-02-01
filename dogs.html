@@ -931,17 +931,22 @@
         const card = document.createElement('article');
         card.className = 'group rounded-2xl overflow-hidden ring-1 ring-gray-200 bg-white hover:shadow-soft transition-shadow';
 
-        // 取封面圖（先用 p.images[0]，沒有的話退回 p.image）
-        const imgs = Array.isArray(p.images) && p.images.length ? p.images.filter(isRealUrl) : (p.image ? [p.image] : []);
-        const img = imgs[0] || '';
-
-        const mediaUrl = img;
+        // 取封面（永遠只用可顯示 URL；pending / object 都會被排除或轉成字串）
+        const mediaCandidates = (Array.isArray(p.images) && p.images.length)
+          ? p.images
+          : (p.image ? [p.image] : []);
+        const firstItem = mediaCandidates.find(isRealUrl) || "";
+        const mediaUrl = toMediaUrl(firstItem);
         const isVid = isVideoUrl(mediaUrl);
         const videoPath = isVid ? storagePathFromDownloadUrl(mediaUrl) : "";
         const videoThumb = (isVid && p.thumbByPath && videoPath) ? (p.thumbByPath[videoPath] || "") : "";
 
-        const coverHTML = isVid
-          ? (videoThumb
+        const coverHTML = (!mediaUrl)
+          ? `
+              <div class="rounded-t-2xl aspect-[4/3] bg-gray-100"></div>
+            `
+          : (isVid
+            ? (videoThumb
             ? `
               <div class="blur-fit rounded-t-2xl aspect-[4/3]" style="--bg: url('${videoThumb}')">
                 <img src="${videoThumb}" alt="${p.name}">
@@ -958,7 +963,7 @@
               <div class="blur-fit rounded-t-2xl aspect-[4/3]" style="--bg: url('${mediaUrl}')">
                 <img src="${mediaUrl}" alt="${p.name}">
               </div>
-            `;
+            `);
 
         card.innerHTML = `
           ${coverHTML}

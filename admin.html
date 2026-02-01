@@ -1763,12 +1763,16 @@ if (pending.length) {
 
       wrap.innerHTML = list
         .map((p) => {
-          const mediaUrl = (Array.isArray(p.images) && p.images[0]) || p.image || "";
+          const mediaCandidates = Array.isArray(p.images) ? p.images : (p.image ? [p.image] : []);
+          const firstItem = mediaCandidates.find((x) => (typeof isRealUrl === "function" ? isRealUrl(x) : (typeof x === "string" && x))) || "";
+          const mediaUrl = (typeof toMediaUrl === "function") ? toMediaUrl(firstItem) : (typeof firstItem === "string" ? firstItem : "");
           const isVid = typeof isVideoUrl === "function" && isVideoUrl(mediaUrl);
           const videoPath = isVid ? storagePathFromDownloadUrl(mediaUrl) : "";
           const videoThumb = (isVid && p.thumbByPath && videoPath) ? (p.thumbByPath[videoPath] || "") : "";
 
-          const thumb = isVid
+          const thumb = (!mediaUrl)
+            ? `<div class="media-thumb" style="background:#f3f4f6;"></div>`
+            : (isVid
             ? (videoThumb
               ? `
                <div class="media-thumb">
@@ -1786,7 +1790,7 @@ if (pending.length) {
                <div class="media-thumb">
                  <img src="${mediaUrl}" alt="" loading="lazy" decoding="async">
                </div>
-              `;
+              `));
 
           return `
         <div class="rounded-xl ring-1 ring-gray-200 p-3 flex gap-3 items-center cursor-pointer"
