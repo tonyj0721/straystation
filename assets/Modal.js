@@ -24,6 +24,24 @@ function thumbPathFromMediaPath(mediaPath) {
   }
 }
 
+async function waitForWmReady(petId, { timeoutMs = 180000, intervalMs = 1500 } = {}) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < timeoutMs) {
+    try {
+      const snap = await getDoc(doc(db, "pets", petId));
+      if (snap.exists()) {
+        const d = snap.data() || {};
+        if (d.status !== "processing") return { ok: true, data: d };
+      }
+    } catch (_) {
+      // ignore transient errors
+    }
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  return { ok: false };
+}
+
+
 // ===============================
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
 // ===============================
@@ -523,6 +541,13 @@ async function openDialog(id) {
     }
   }
 
+
+  // ✅ 若後端還在加浮水印：前台一律不開啟（避免短暫看到無浮水印檔）
+  if (p && p.status === "processing") {
+    await swalInDialog({ icon: "info", title: "照片/影片處理中", text: "浮水印尚未完成，請稍後再試。" });
+    return;
+  }
+
   // 2. 共用狀態 + URL
   currentDoc = p;
   currentDocId = p.id;
@@ -965,6 +990,7 @@ async function saveEdit() {
     // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
     const { items, removeUrls } = editImagesState;
     const newUrls = [];
+    const uploadedPaths = [];
 
     // 依序處理（保持順序）
     for (const it of items) {
@@ -983,6 +1009,7 @@ else if (type.startsWith('video/')) ext = 'mp4';
 
 const base = f.name.replace(/\.[^.]+$/, '');
 const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
+uploadedPaths.push(path);
 const r = sRef(storage, path);
 await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
 newUrls.push(await getDownloadURL(r));
@@ -1015,6 +1042,16 @@ newUrls.push(await getDownloadURL(r));
     }
 
     newData.images = newUrls;
+
+    // ✅ 有新增檔案才進入 processing（等後端浮水印寫回 Storage 完成後才回到原狀態）
+    if (uploadedPaths.length) {
+      const prevStatus = (currentDoc && (currentDoc.statusBeforeWm || currentDoc.status)) || "available";
+      newData.statusBeforeWm = prevStatus;
+      newData.status = "processing";
+      newData.wmExpected = uploadedPaths;
+      newData.wmDone = {};
+    }
+
     const __updatePayload = { ...newData, ...__thumbFieldDeletes };
 
     // ③ 寫回 Firestore
@@ -1035,6 +1072,20 @@ newUrls.push(await getDownloadURL(r));
     if (wasOpen) { __lockDialogScroll(); dlg.showModal(); }
 
     setEditMode(false);
+
+    if (uploadedPaths.length) {
+      const w = await waitForWmReady(currentDocId);
+      if (!w.ok) {
+        await Swal.fire({
+          icon: "info",
+          title: "照片/影片處理中",
+          text: "浮水印尚未完成，稍後再從列表點開即可。",
+        });
+        return;
+      }
+      try { await loadPets(); } catch (_) { }
+    }
+
     await openDialog(currentDocId);
 
   } catch (err) {

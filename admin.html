@@ -1332,6 +1332,24 @@
       }, 80);
     }
 
+async function waitForWmReady(petId, { timeoutMs = 180000, intervalMs = 1500 } = {}) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < timeoutMs) {
+    try {
+      const snap = await getDoc(doc(db, "pets", petId));
+      if (snap.exists()) {
+        const d = snap.data() || {};
+        if (d.status !== "processing") return { ok: true, data: d };
+      }
+    } catch (_) {
+      // ignore transient errors
+    }
+    await new Promise(r => setTimeout(r, intervalMs));
+  }
+  return { ok: false };
+}
+
+
     // ===============================
     // 表單送出：新增動物資料
     // ===============================
@@ -1370,12 +1388,22 @@
         vaccinated: document.getElementById('vaccinated')?.checked || false,
         images: [],
         status: "available",
+        // ✅ 有照片/影片才進入 processing；等後端浮水印寫回 Storage 完成後再公開
+        //    （沒有照片/影片就略過，維持原本可立即顯示）
         showOnHome: false,
         showOnCats: true,
         showOnDogs: true,
         showOnIndex: true,
         createdAt: serverTimestamp(), // Firestore 伺服器時間
       };
+
+      const __hasMedia = Array.isArray(selectedFiles) && selectedFiles.length > 0;
+      if (__hasMedia) {
+        payload.statusBeforeWm = payload.status;
+        payload.status = "processing";
+        payload.wmExpected = [];
+        payload.wmDone = {};
+      }
 
       // 先檢查是否有同名（可選擇仍然新增）
       if (name !== "未取名") {
@@ -1413,25 +1441,42 @@
         const docRef = await addDoc(collection(db, "pets"), payload);
 
         // 2) 逐張上傳圖片，取得 Storage URL
-        const urls = [];
-        for (const f of selectedFiles) {
-          // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
-const type = (f && f.type) || '';
-// 路徑副檔名固定用 jpg/mp4，讓後端覆蓋後檔名/格式一致（避免 iPhone/WebM 問題）
-let ext = 'bin';
-if (type.startsWith('image/')) ext = 'jpg';
-else if (type.startsWith('video/')) ext = 'mp4';
+const urls = [];
 
-const base = f.name.replace(/\.[^.]+$/, '');
-const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
-const r = sRef(storage, path);
-await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
-urls.push(await getDownloadURL(r));
+// ✅ 先把「這次要處理浮水印的檔案路徑」寫進 Firestore，避免 Cloud Function 太快跑完導致卡在 processing
+const __ts = Date.now();
+const uploadPlan = (selectedFiles || []).map((f, i) => {
+  const type = (f && f.type) || '';
+  // 路徑副檔名固定用 jpg/mp4，讓後端覆蓋後檔名/格式一致（避免 iPhone/WebM 問題）
+  let ext = 'bin';
+  if (type.startsWith('image/')) ext = 'jpg';
+  else if (type.startsWith('video/')) ext = 'mp4';
+
+  const base = f.name.replace(/\.[^.]+$/, '');
+  const pth = `pets/${docRef.id}/${__ts}_${i}_${base}.${ext}`;
+  return { file: f, path: pth, contentType: type || 'application/octet-stream' };
+});
+const uploadedPaths = uploadPlan.map(x => x.path);
+
+if (uploadedPaths.length) {
+  await updateDoc(doc(db, "pets", docRef.id), { wmExpected: uploadedPaths, wmDone: {} });
+}
+
+for (const u of uploadPlan) {
+  const r = sRef(storage, u.path);
+  await uploadBytes(r, u.file, { contentType: u.contentType });
+  urls.push(await getDownloadURL(r));
+}
+
+// 3) 回寫 images / watermark 等待清單
+        const __u = {};
+        if (urls.length) __u.images = urls;
+        if (uploadedPaths.length) {
+          __u.wmExpected = uploadedPaths;
+          __u.wmDone = {};
         }
-
-        // 3) 回寫 images 欄位
-        if (urls.length) {
-          await updateDoc(doc(db, "pets", docRef.id), { images: urls });
+        if (Object.keys(__u).length) {
+          await updateDoc(doc(db, "pets", docRef.id), __u);
         }
 
         // UI 收尾
@@ -1473,6 +1518,21 @@ urls.push(await getDownloadURL(r));
             console.error("loadPets error:", e);
           }
           forceScrollTop(); // ✅ 保證捲到最上面（不會卡在一半）
+
+          // 有照片/影片：等後端浮水印處理完成（status 從 processing 變回 available）再開啟明細
+          if (uploadedPaths.length) {
+            const w = await waitForWmReady(docRef.id);
+            if (!w.ok) {
+              await Swal.fire({
+                icon: "info",
+                title: "照片/影片處理中",
+                text: "浮水印尚未完成，稍後再從清單點「查看」即可。",
+              });
+              return;
+            }
+            try { await loadPets(); } catch (_) { }
+          }
+
           openDialog(docRef.id);
         });
 
