@@ -25,23 +25,6 @@ function thumbPathFromMediaPath(mediaPath) {
 }
 
 // ===============================
-// 後端浮水印完成才拿 downloadURL（避免前台短暫看到無浮水印原檔）
-// Cloud Function 會 overwrite 同一路徑，並在 customMetadata.wmProcessed 設為 '1'
-// ===============================
-const __sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-async function waitForWmProcessed(ref, { timeoutMs = 600000, intervalMs = 1200 } = {}) {
-  const t0 = Date.now();
-  while (true) {
-    const md = await getMetadata(ref);
-    if (md?.customMetadata?.wmProcessed === "1") return md;
-    if (Date.now() - t0 > timeoutMs) {
-      throw new Error("等待浮水印處理逾時，請稍後再試");
-    }
-    await __sleep(intervalMs);
-  }
-}
-
-// ===============================
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
 // ===============================
 function __primeThumbVideoFrame(v) {
@@ -1002,7 +985,6 @@ const base = f.name.replace(/\.[^.]+$/, '');
 const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
 const r = sRef(storage, path);
 await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
-await waitForWmProcessed(r);
 newUrls.push(await getDownloadURL(r));
 }
     }
@@ -1751,7 +1733,6 @@ async function onConfirmAdopted() {
       const path = `adopted/${currentDocId}/${Date.now()}_${base}.${ext}`;
       const r = sRef(storage, path);
       await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
-      await waitForWmProcessed(r);
       urls.push(await getDownloadURL(r));
     }
 
