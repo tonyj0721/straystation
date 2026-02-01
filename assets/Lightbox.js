@@ -15,56 +15,6 @@ function storagePathFromDownloadUrl(url) {
   }
 }
 
-// ===== Watermark gate (解法 A)：前台永遠只顯示浮水印版本 =====
-const __BLANK_PIXEL = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
-const __wmCache = new Map(); // mediaPath -> Promise<string>
-
-function __appendBust(url, v) {
-  try {
-    if (!url) return url;
-    const hasQ = String(url).includes("?");
-    return String(url) + (hasQ ? "&" : "?") + "v=" + encodeURIComponent(String(v));
-  } catch (_) {
-    return url;
-  }
-}
-
-async function waitForWatermarkUrl(url, { timeoutMs = 30000, intervalMs = 500 } = {}) {
-  try {
-    const getMetadata = window.getMetadata;
-    const sRef = window.sRef;
-    const storage = window.storage;
-    if (!getMetadata || !sRef || !storage) return url;
-
-    const mediaPath = storagePathFromDownloadUrl(url);
-    if (!mediaPath) return url;
-
-    if (__wmCache.has(mediaPath)) return await __wmCache.get(mediaPath);
-
-    const p = (async () => {
-      const start = Date.now();
-      while (true) {
-        try {
-          const md = await getMetadata(sRef(storage, mediaPath));
-          const cm = md?.customMetadata || md?.metadata || {};
-          if (cm.wmProcessed === "1") {
-            return __appendBust(url, md?.generation || Date.now());
-          }
-        } catch (_) {
-          // ignore & retry
-        }
-        if (Date.now() - start > timeoutMs) return "";
-        await new Promise((r) => setTimeout(r, intervalMs));
-      }
-    })();
-    __wmCache.set(mediaPath, p);
-    return await p;
-  } catch (_) {
-    return url;
-  }
-}
-
-
 // Lightbox 縮圖播放 icon（避免與 Modal.js 的 __PLAY_SVG 命名衝突）
 const __THUMB_PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
 
@@ -146,9 +96,7 @@ let lbImages = [];
 let lbIndex = 0;
 let lbReturnToDialog = false;
 
-let __lbReqId = 0;
-
-async function renderLightboxMedia() {
+function renderLightboxMedia() {
   if (!lbImages.length) {
     if (lbImg) lbImg.src = "";
     if (lbVideo) {
@@ -163,19 +111,6 @@ async function renderLightboxMedia() {
   const url = lbImages[lbIndex] || "";
   const isVid = isVideoUrl(url);
 
-  const myReq = ++__lbReqId;
-
-  // 先進入「處理中」狀態：不要顯示原檔
-  try {
-    if (lbImg) { lbImg.src = ""; lbImg.classList.add("hidden"); }
-    if (lbVideo) { try { lbVideo.pause(); } catch (_) {} lbVideo.removeAttribute("src"); lbVideo.classList.add("hidden"); }
-  } catch (_) {}
-
-  const gatedMain = await waitForWatermarkUrl(url);
-  if (myReq !== __lbReqId) return;
-  if (!gatedMain) return; // 超時：維持不顯示原檔
-
-
   // 根據是否為影片切換 class
   if (lbWrap) {
     lbWrap.classList.toggle("lb-video-mode", !!isVid);   // ← 新增
@@ -185,7 +120,7 @@ async function renderLightboxMedia() {
     if (isVid) {
       lbImg.classList.add("hidden");
       lbVideo.classList.remove("hidden");
-      lbVideo.src = gatedMain;
+      lbVideo.src = url;
       lbVideo.playsInline = true;
       lbVideo.controls = true;
       try { lbVideo.play().catch(() => { }); } catch (_) { }
@@ -193,10 +128,10 @@ async function renderLightboxMedia() {
       try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
       lbVideo.classList.add("hidden");
       lbImg.classList.remove("hidden");
-      lbImg.src = gatedMain;
+      lbImg.src = url;
     }
   } else if (lbImg) {
-    lbImg.src = gatedMain;
+    lbImg.src = url;
   }
 
   const lbThumbsInner = document.getElementById("lbThumbsInner");
@@ -314,8 +249,7 @@ function openLightbox(images, index = 0) {
 
         if (videoThumb) {
           const img = document.createElement("img");
-          img.src = __BLANK_PIXEL;
-          (async () => { const g = await waitForWatermarkUrl(url); if (!g) return; img.src = videoThumb || __BLANK_PIXEL; })();
+          img.src = videoThumb;
           wrapper.appendChild(img);
         } else {
           const v = document.createElement("video");
@@ -327,8 +261,7 @@ function openLightbox(images, index = 0) {
           v.setAttribute("webkit-playsinline", "");
           v.controls = false;
           v.disablePictureInPicture = true;
-          v.src = "";
-          (async () => { const g = await waitForWatermarkUrl(url); if (!g) return; v.src = g; try { v.load(); } catch (_) {} })();
+          v.src = url;
           __primeThumbVideoFrameLightbox(v);
           wrapper.appendChild(v);
         }
@@ -339,8 +272,7 @@ function openLightbox(images, index = 0) {
         wrapper.appendChild(badge);
       } else {
         const img = document.createElement("img");
-        img.src = __BLANK_PIXEL;
-        (async () => { const g = await waitForWatermarkUrl(url); if (!g) return; img.src = g; })();
+        img.src = url;
         wrapper.appendChild(img);
       }
 

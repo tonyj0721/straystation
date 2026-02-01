@@ -24,55 +24,22 @@ function thumbPathFromMediaPath(mediaPath) {
   }
 }
 
-// ===== Watermark gate (解法 A)：前台永遠只顯示浮水印版本 =====
-const __BLANK_PIXEL = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
-const __wmCache = new Map(); // mediaPath -> Promise<string>
-
-function __appendBust(url, v) {
-  try {
-    if (!url) return url;
-    const hasQ = String(url).includes("?");
-    return String(url) + (hasQ ? "&" : "?") + "v=" + encodeURIComponent(String(v));
-  } catch (_) {
-    return url;
+// ===============================
+// 後端浮水印完成才拿 downloadURL（避免前台短暫看到無浮水印原檔）
+// Cloud Function 會 overwrite 同一路徑，並在 customMetadata.wmProcessed 設為 '1'
+// ===============================
+const __sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function waitForWmProcessed(ref, { timeoutMs = 600000, intervalMs = 1200 } = {}) {
+  const t0 = Date.now();
+  while (true) {
+    const md = await getMetadata(ref);
+    if (md?.customMetadata?.wmProcessed === "1") return md;
+    if (Date.now() - t0 > timeoutMs) {
+      throw new Error("等待浮水印處理逾時，請稍後再試");
+    }
+    await __sleep(intervalMs);
   }
 }
-
-async function waitForWatermarkUrl(url, { timeoutMs = 30000, intervalMs = 500 } = {}) {
-  try {
-    const getMetadata = window.getMetadata;
-    const sRef = window.sRef;
-    const storage = window.storage;
-    if (!getMetadata || !sRef || !storage) return url;
-
-    const mediaPath = storagePathFromDownloadUrl(url);
-    if (!mediaPath) return url;
-
-    if (__wmCache.has(mediaPath)) return await __wmCache.get(mediaPath);
-
-    const p = (async () => {
-      const start = Date.now();
-      while (true) {
-        try {
-          const md = await getMetadata(sRef(storage, mediaPath));
-          const cm = md?.customMetadata || md?.metadata || {};
-          if (cm.wmProcessed === "1") {
-            return __appendBust(url, md?.generation || Date.now());
-          }
-        } catch (_) {
-          // ignore & retry
-        }
-        if (Date.now() - start > timeoutMs) return "";
-        await new Promise((r) => setTimeout(r, intervalMs));
-      }
-    })();
-    __wmCache.set(mediaPath, p);
-    return await p;
-  } catch (_) {
-    return url;
-  }
-}
-
 
 // ===============================
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
@@ -604,9 +571,7 @@ async function openDialog(id) {
 
   let currentIndex = 0;
 
-  let __dlgMediaReqId = 0;
-
-  async function showDialogMedia(index) {
+  function showDialogMedia(index) {
     if (!media.length) {
       if (dlgImg) {
         dlgImg.src = "";
@@ -632,28 +597,6 @@ async function openDialog(id) {
     const url = media[currentIndex];
     const isVid = isVideoUrl(url);
 
-    const myReq = ++__dlgMediaReqId;
-
-    // 先進入「處理中」狀態：不要顯示原檔
-    try {
-      if (dlgImg) { dlgImg.src = ""; dlgImg.classList.add("hidden"); }
-      if (dlgVideo) { try { dlgVideo.pause(); } catch (_) {} dlgVideo.removeAttribute("src"); dlgVideo.classList.add("hidden"); }
-      if (dlgBg) dlgBg.src = "";
-      if (dlgHint) dlgHint.textContent = "媒體處理中…";
-    } catch (_) {}
-
-    const gatedMain = await waitForWatermarkUrl(url);
-
-    // 若使用者已切到別張，忽略舊結果
-    if (myReq !== __dlgMediaReqId) return;
-
-    // 超時或失敗：維持不顯示原檔
-    if (!gatedMain) {
-      try { if (dlgHint) dlgHint.textContent = "媒體處理中…請稍後再試"; } catch (_) {}
-      return;
-    }
-
-
     if (dlgStageWrap) dlgStageWrap.classList.toggle("dlg-video-mode", isVid);
 
     if (dlgHint) {
@@ -671,7 +614,7 @@ async function openDialog(id) {
       if (isVid) {
         dlgImg.classList.add("hidden");
         dlgVideo.classList.remove("hidden");
-        dlgVideo.src = gatedMain;
+        dlgVideo.src = url;
         dlgVideo.playsInline = true;
         dlgVideo.controls = true;
         try { dlgVideo.play().catch(() => { }); } catch (_) { }
@@ -681,10 +624,10 @@ async function openDialog(id) {
         } catch (_) { }
         dlgVideo.classList.add("hidden");
         dlgImg.classList.remove("hidden");
-        dlgImg.src = gatedMain;
+        dlgImg.src = url;
       }
     } else if (dlgImg) {
-      dlgImg.src = gatedMain;
+      dlgImg.src = url;
     }
 
     if (dlgBg) {
@@ -692,7 +635,7 @@ async function openDialog(id) {
 
       if (!isVid) {
         // 主圖是照片：直接用當前這張照片做背景
-        bgSrc = gatedMain;
+        bgSrc = url;
       } else {
         // 主圖是影片：優先用「這支影片自己的縮圖」
         try {
@@ -705,12 +648,12 @@ async function openDialog(id) {
           } else {
             // 沒有縮圖時，再退而求其次：用第一張照片當背景
             const firstImage = media.find(u => !isVideoUrl(u));
-            bgSrc = firstImage ? (await waitForWatermarkUrl(firstImage)) : "";
+            bgSrc = firstImage || "";
           }
         } catch (_) {
           // 萬一解析 path 出錯，就跟上面一樣退回用第一張照片
           const firstImage = media.find(u => !isVideoUrl(u));
-          bgSrc = firstImage ? (await waitForWatermarkUrl(firstImage)) : "";
+          bgSrc = firstImage || "";
         }
       }
 
@@ -755,8 +698,7 @@ async function openDialog(id) {
 
       if (videoThumb) {
         const img = document.createElement("img");
-        img.src = __BLANK_PIXEL;
-        (async () => { const g = await waitForWatermarkUrl(url); if (!g) return; img.src = videoThumb || __BLANK_PIXEL; })();
+        img.src = videoThumb;
         wrapper.appendChild(img);
       } else {
         const v = document.createElement("video");
@@ -768,8 +710,7 @@ async function openDialog(id) {
         v.setAttribute("webkit-playsinline", "");
         v.controls = false;
         v.disablePictureInPicture = true;
-        v.src = "";
-        (async () => { const g = await waitForWatermarkUrl(url); if (!g) return; v.src = g; try { v.load(); } catch (_) {} })();
+        v.src = url;
 
         // 後端縮圖還沒產出時才 fallback 用影片抓第一幀
         __primeThumbVideoFrame(v);
@@ -784,8 +725,7 @@ async function openDialog(id) {
       wrapper.appendChild(badge);
     } else {
       const img = document.createElement("img");
-      img.src = __BLANK_PIXEL;
-      (async () => { const g = await waitForWatermarkUrl(url); if (!g) return; img.src = g; })();
+      img.src = url;
       wrapper.appendChild(img);
     }
 
@@ -1062,6 +1002,7 @@ const base = f.name.replace(/\.[^.]+$/, '');
 const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
 const r = sRef(storage, path);
 await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
+await waitForWmProcessed(r);
 newUrls.push(await getDownloadURL(r));
 }
     }
@@ -1810,6 +1751,7 @@ async function onConfirmAdopted() {
       const path = `adopted/${currentDocId}/${Date.now()}_${base}.${ext}`;
       const r = sRef(storage, path);
       await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
+      await waitForWmProcessed(r);
       urls.push(await getDownloadURL(r));
     }
 
