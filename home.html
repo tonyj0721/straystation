@@ -621,7 +621,10 @@
       const snap = await getDocs(qRef);
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      const list = all;
+      const list = all.filter(p => {
+        const needs = Array.isArray(p.needsWmPaths) ? p.needsWmPaths : [];
+        return needs.length === 0;
+      });
       if (grid) grid.innerHTML = list.map(cardHTML).join('');
 
       // 顯示已領養數量

@@ -523,6 +523,17 @@ async function openDialog(id) {
     }
   }
 
+  // 若還有檔案在等後端加浮水印，前台暫時不要顯示這筆資料
+  const needs = Array.isArray(p.needsWmPaths) ? p.needsWmPaths : [];
+  if (needs.length > 0) {
+    await swalInDialog({
+      icon: "info",
+      title: "照片處理中，請稍候",
+      text: "後端正在為這筆毛孩的照片／影片加上浮水印，處理完成後才會在前台顯示。",
+    });
+    return;
+  }
+
   // 2. 共用狀態 + URL
   currentDoc = p;
   currentDocId = p.id;
@@ -965,6 +976,7 @@ async function saveEdit() {
     // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
     const { items, removeUrls } = editImagesState;
     const newUrls = [];
+    const newPaths = []; // 這次新上傳的檔案路徑
 
     // 依序處理（保持順序）
     for (const it of items) {
@@ -976,17 +988,18 @@ async function saveEdit() {
       if (it.kind === "file") {
         const f = it.file;
         // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
-const type = (f && f.type) || '';
-let ext = 'bin';
-if (type.startsWith('image/')) ext = 'jpg';
-else if (type.startsWith('video/')) ext = 'mp4';
+        const type = (f && f.type) || '';
+        let ext = 'bin';
+        if (type.startswith('image/')) ext = 'jpg';
+        else if (type.startswith('video/')) ext = 'mp4';
 
-const base = f.name.replace(/\.[^.]+$/, '');
-const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
-const r = sRef(storage, path);
-await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
-newUrls.push(await getDownloadURL(r));
-}
+        const base = f.name.replace(/\.[^.]+$/, '');
+        const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
+        const r = sRef(storage, path);
+        await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
+        newUrls.push(await getDownloadURL(r));
+        newPaths.push(path);
+      }
     }
 
     // 刪除被移除的舊圖（忽略刪失敗）
@@ -1014,8 +1027,23 @@ newUrls.push(await getDownloadURL(r));
       }
     }
 
+    // === 浮水印狀態：維護 needsWmPaths ===
+    let needsWmPaths = Array.isArray(currentDoc.needsWmPaths)
+      ? [...currentDoc.needsWmPaths]
+      : [];
+
+    // 把被刪掉的舊檔從清單中移除
+    for (const url of (removeUrls || [])) {
+      const p = storagePathFromDownloadUrl(url);
+      if (!p) continue;
+      needsWmPaths = needsWmPaths.filter((x) => x !== p);
+    }
+
+    // 把這次新上傳的檔案加進待處理清單
+    needsWmPaths.push(...newPaths);
+
     newData.images = newUrls;
-    const __updatePayload = { ...newData, ...__thumbFieldDeletes };
+    const __updatePayload = { ...newData, ...__thumbFieldDeletes, needsWmPaths };
 
     // ③ 寫回 Firestore
     await updateDoc(doc(db, "pets", currentDocId), __updatePayload);

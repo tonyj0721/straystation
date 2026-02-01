@@ -1414,24 +1414,29 @@
 
         // 2) 逐張上傳圖片，取得 Storage URL
         const urls = [];
+        const paths = []; // 記錄 Storage 路徑，給後端清除等待清單用
         for (const f of selectedFiles) {
           // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
-const type = (f && f.type) || '';
-// 路徑副檔名固定用 jpg/mp4，讓後端覆蓋後檔名/格式一致（避免 iPhone/WebM 問題）
-let ext = 'bin';
-if (type.startsWith('image/')) ext = 'jpg';
-else if (type.startsWith('video/')) ext = 'mp4';
+          const type = (f && f.type) || '';
+          // 路徑副檔名固定用 jpg/mp4，讓後端覆蓋後檔名/格式一致（避免 iPhone/WebM 問題）
+          let ext = 'bin';
+          if (type.startsWith('image/')) ext = 'jpg';
+          else if (type.startsWith('video/')) ext = 'mp4';
 
-const base = f.name.replace(/\.[^.]+$/, '');
-const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
-const r = sRef(storage, path);
-await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
-urls.push(await getDownloadURL(r));
+          const base = f.name.replace(/\.[^.]+$/, '');
+          const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
+          const r = sRef(storage, path);
+          await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
+          urls.push(await getDownloadURL(r));
+          paths.push(path);
         }
 
-        // 3) 回寫 images 欄位
+        // 3) 回寫 images / needsWmPaths 欄位
         if (urls.length) {
-          await updateDoc(doc(db, "pets", docRef.id), { images: urls });
+          await updateDoc(doc(db, "pets", docRef.id), {
+            images: urls,
+            needsWmPaths: paths, // 有圖 / 影片時，先標記「正在等後端浮水印」
+          });
         }
 
         // UI 收尾
