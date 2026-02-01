@@ -1369,6 +1369,9 @@
         neutered: document.getElementById('neutered')?.checked || false,
         vaccinated: document.getElementById('vaccinated')?.checked || false,
         images: [],
+
+        // 浮水印：有上傳媒體就先標記為未完成，等後端處理完再讓前台顯示
+        mediaReady: (Array.isArray(selectedFiles) && selectedFiles.length === 0),
         status: "available",
         showOnHome: false,
         showOnCats: true,
@@ -1429,32 +1432,9 @@ await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
 urls.push(await getDownloadURL(r));
         }
 
-        // 3) 回寫 images 欄位 + 浮水印 Gate（避免前台短暫看到未浮水印）
-        //    - 有上傳媒體：mediaReady=false + wmPendingPaths=[storage paths]
-        //    - 沒有媒體：直接略過 gate（mediaReady=true）
-        const pending = urls
-          .map((u) => {
-            try {
-              const p = String(u).split("/o/")[1].split("?")[0];
-              return decodeURIComponent(p);
-            } catch (_) {
-              return "";
-            }
-          })
-          .filter(Boolean);
-
+        // 3) 回寫 images 欄位
         if (urls.length) {
-          await updateDoc(doc(db, "pets", docRef.id), {
-            images: urls,
-            mediaReady: pending.length ? false : true,
-            wmPendingPaths: pending.length ? pending : deleteField(),
-          });
-        } else {
-          // 沒媒體：確保可立即顯示（也避免舊 pending 殘留）
-          await updateDoc(doc(db, "pets", docRef.id), {
-            mediaReady: true,
-            wmPendingPaths: deleteField(),
-          }).catch(() => { });
+          await updateDoc(doc(db, "pets", docRef.id), { images: urls, mediaReady: false, mediaReadyAt: deleteField() });
         }
 
         // UI 收尾
@@ -1496,13 +1476,6 @@ urls.push(await getDownloadURL(r));
             console.error("loadPets error:", e);
           }
           forceScrollTop(); // ✅ 保證捲到最上面（不會卡在一半）
-
-          // 有新媒體：等後端浮水印完成後再打開（避免短暫看到未浮水印）
-          if (pending.length && typeof window.waitForMediaReady === "function") {
-            await window.waitForMediaReady(docRef.id);
-            await loadPets().catch(() => { });
-          }
-
           openDialog(docRef.id);
         });
 
