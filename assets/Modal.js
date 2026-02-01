@@ -25,6 +25,42 @@ function thumbPathFromMediaPath(mediaPath) {
 }
 
 // ===============================
+// 浮水印完成前：避免前台/Modal/Lightbox 看到「未浮水印」
+//
+// 規則：
+// - 前端（新增/編輯/上傳）會在寫入 images / adoptedPhotos 後，同步寫：
+//   mediaReady=false、wmPendingPaths=["pets/<id>/...", "adopted/<id>/..."]
+// - 後端 Cloud Function 寫完浮水印覆蓋回 Storage 後，會逐一把該 filePath 從 wmPendingPaths 移除。
+//   當清空時，將 mediaReady 設回 true。
+// ===============================
+
+async function waitForMediaReady(petId, { timeoutMs = 120000, pollMs = 1200 } = {}) {
+  const started = Date.now();
+  while (true) {
+    const snap = await getDoc(doc(db, "pets", petId));
+    if (!snap.exists()) return false;
+    const p = snap.data() || {};
+
+    const hasMedia =
+      (Array.isArray(p.images) && p.images.length > 0) ||
+      !!p.image ||
+      (Array.isArray(p.adoptedPhotos) && p.adoptedPhotos.length > 0);
+
+    // 沒媒體：直接視為 ready
+    if (!hasMedia) return true;
+
+    // 未設定 mediaReady 視為 ready（舊資料相容）
+    if (p.mediaReady !== false) return true;
+
+    if (Date.now() - started > timeoutMs) return false;
+    await new Promise((r) => setTimeout(r, pollMs));
+  }
+}
+
+// 讓 admin.html / 其他頁面也能直接用
+window.waitForMediaReady = waitForMediaReady;
+
+// ===============================
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
 // ===============================
 function __primeThumbVideoFrame(v) {
@@ -523,6 +559,22 @@ async function openDialog(id) {
     }
   }
 
+  // ✅ 若有照片/影片，且後端浮水印尚未完成：直接擋下（避免看到未浮水印版本）
+  //    - 舊資料可能沒有 mediaReady 欄位，視為 ready
+  const __hasMedia =
+    (Array.isArray(p.images) && p.images.length > 0) ||
+    !!p.image ||
+    (Array.isArray(p.adoptedPhotos) && p.adoptedPhotos.length > 0);
+
+  if (__hasMedia && p.mediaReady === false) {
+    await swalInDialog({
+      icon: "info",
+      title: "照片／影片處理中",
+      text: "後端正在加上浮水印，請稍後再開啟。",
+    });
+    return;
+  }
+
   // 2. 共用狀態 + URL
   currentDoc = p;
   currentDocId = p.id;
@@ -965,6 +1017,7 @@ async function saveEdit() {
     // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
     const { items, removeUrls } = editImagesState;
     const newUrls = [];
+    const uploadedPaths = []; // 本次新上傳的 storage path（用來等後端浮水印完成）
 
     // 依序處理（保持順序）
     for (const it of items) {
@@ -985,7 +1038,12 @@ const base = f.name.replace(/\.[^.]+$/, '');
 const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
 const r = sRef(storage, path);
 await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
-newUrls.push(await getDownloadURL(r));
+{
+  const u = await getDownloadURL(r);
+  newUrls.push(u);
+  const sp = storagePathFromDownloadUrl(u);
+  if (sp) uploadedPaths.push(sp);
+}
 }
     }
 
@@ -1017,6 +1075,21 @@ newUrls.push(await getDownloadURL(r));
     newData.images = newUrls;
     const __updatePayload = { ...newData, ...__thumbFieldDeletes };
 
+    // ✅ 浮水印 Gate：有新上傳的媒體 → 先標記處理中，等後端處理完才允許前台顯示
+    // - 沒有任何媒體：直接 ready
+    // - 沒新增檔案（純文字/排序/刪除）：維持 ready
+    if (!newUrls.length) {
+      __updatePayload.mediaReady = true;
+      __updatePayload.wmPendingPaths = deleteField();
+    } else if (uploadedPaths.length) {
+      __updatePayload.mediaReady = false;
+      __updatePayload.wmPendingPaths = uploadedPaths;
+    } else {
+      // 只有保留舊網址（或刪除一些）— 沒有新檔案需要後端處理
+      __updatePayload.mediaReady = true;
+      __updatePayload.wmPendingPaths = deleteField();
+    }
+
     // ③ 寫回 Firestore
     await updateDoc(doc(db, "pets", currentDocId), __updatePayload);
 
@@ -1033,6 +1106,22 @@ newUrls.push(await getDownloadURL(r));
     if (wasOpen) dlg.close();
     await Swal.fire({ icon: "success", title: "已儲存", showConfirmButton: false, timer: 1500 });
     if (wasOpen) { __lockDialogScroll(); dlg.showModal(); }
+
+    // 若本次有新媒體：等後端浮水印完成後再重新打開（避免短暫看到未浮水印）
+    if (uploadedPaths.length) {
+      const ok = await waitForMediaReady(currentDocId);
+      if (!ok) {
+        await swalInDialog({
+          icon: "warning",
+          title: "照片／影片仍在處理中",
+          text: "浮水印尚未完成，請稍後再開啟（或重新整理）。",
+        });
+        setEditMode(false);
+        return;
+      }
+      // 等到 ready 後再刷新一次（避免列表/縮圖還是舊狀態）
+      await loadPets();
+    }
 
     setEditMode(false);
     await openDialog(currentDocId);
@@ -1736,6 +1825,11 @@ async function onConfirmAdopted() {
       urls.push(await getDownloadURL(r));
     }
 
+    // ✅ 浮水印 Gate：上傳合照後也要等後端加浮水印完成，避免幸福牆出現未浮水印版本
+    const pending = urls
+      .map((u) => storagePathFromDownloadUrl(u))
+      .filter(Boolean);
+
     await updateDoc(doc(db, "pets", currentDocId), {
       status: "adopted",
       adoptedAt: serverTimestamp(),
@@ -1744,6 +1838,10 @@ async function onConfirmAdopted() {
       showOnCats: false,
       showOnDogs: false,
       showOnIndex: false,
+
+      // 有合照才 gate；沒有合照就略過（直接 ready）
+      mediaReady: pending.length ? false : true,
+      wmPendingPaths: pending.length ? pending : deleteField(),
     });
 
     await loadPets();

@@ -621,7 +621,8 @@
       const snap = await getDocs(qRef);
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      const list = all;
+      // 浮水印 Gate：mediaReady === false 的資料先不要顯示（避免幸福牆短暫看到未浮水印）
+      const list = all.filter(p => p.mediaReady !== false);
       if (grid) grid.innerHTML = list.map(cardHTML).join('');
 
       // 顯示已領養數量

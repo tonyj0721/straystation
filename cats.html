@@ -1105,7 +1105,8 @@
       const snap = await getDocs(qRef);
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       pets.length = 0;
-      pets.push(...all.filter(p => p.species === SPECIES));
+      // 浮水印 Gate：mediaReady === false 的資料先不要顯示（避免看到未浮水印）
+      pets.push(...all.filter(p => p.species === SPECIES && p.mediaReady !== false));
       buildBreedOptionsByType(); // ← 新的
       render(pets);
       openFromDeepLink();
