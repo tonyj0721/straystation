@@ -676,7 +676,7 @@
       getFirestore, collection, getDocs, query, orderBy, where,
       doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp, limit as fbLimit, deleteField,
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
-    import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject, listAll, } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
+    import { getStorage, ref as sRef, uploadBytes, getDownloadURL, getMetadata, deleteObject, listAll, } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
     import {
       getAuth,
       signOut,
@@ -693,7 +693,7 @@
       collection, getDocs, query, orderBy, where,
       doc, getDoc, updateDoc, deleteDoc, serverTimestamp, fbLimit,
       deleteField,
-      sRef, uploadBytes, getDownloadURL, deleteObject, listAll,
+      sRef, uploadBytes, getDownloadURL, getMetadata, deleteObject, listAll,
     });
 
     const auth = getAuth(app);
@@ -1412,6 +1412,20 @@
         // 1) 新增基本文件
         const docRef = await addDoc(collection(db, "pets"), payload);
 
+        // 等待後端浮水印處理完成（Storage object 的 customMetadata.wmProcessed 會變成 '1'）
+        const __sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+        async function waitForWmProcessed(ref, { timeoutMs = 600000, intervalMs = 1200 } = {}) {
+          const t0 = Date.now();
+          while (true) {
+            const md = await getMetadata(ref);
+            if (md?.customMetadata?.wmProcessed === "1") return;
+            if (Date.now() - t0 > timeoutMs) {
+              throw new Error("等待浮水印處理逾時，請稍後再試");
+            }
+            await __sleep(intervalMs);
+          }
+        }
+
         // 2) 逐張上傳圖片，取得 Storage URL
         const urls = [];
         for (const f of selectedFiles) {
@@ -1426,6 +1440,7 @@ const base = f.name.replace(/\.[^.]+$/, '');
 const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
 const r = sRef(storage, path);
 await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
+await waitForWmProcessed(r);
 urls.push(await getDownloadURL(r));
         }
 
