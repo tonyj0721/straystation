@@ -885,44 +885,11 @@
     // ===== Video thumbnail helpers (backend thumbs + play badge) =====
     const __THUMB_PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
 
-    // ---- media url normalizer (supports legacy object schema) ----
-    function mediaItemToUrl(it) {
-      if (!it) return "";
-      if (typeof it === "string") return it;
-      if (typeof it === "object") {
-        return it.url || it.downloadURL || it.downloadUrl || it.src || it.mediaUrl || it.link || "";
-      }
-      return "";
-    }
-
-    function normalizeMediaList(list) {
-      const arr = Array.isArray(list) ? list : [];
-      return arr.map(mediaItemToUrl).filter(Boolean);
-    }
-
-
     function isVideoUrl(url) {
       if (!url) return false;
       const u = String(url).split("?", 1)[0];
       return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
     }
-
-// --- media URL normalization (backward-compatible) ---
-function __mediaItemToUrl(it) {
-  if (!it) return "";
-  if (typeof it === "string") return it;
-  if (typeof it === "object") {
-    return (
-      it.url || it.downloadURL || it.downloadUrl || it.src || it.mediaUrl || it.link || it.href || ""
-    );
-  }
-  return "";
-}
-function __normalizeMediaArray(arr) {
-  if (!Array.isArray(arr)) return [];
-  return arr.map(__mediaItemToUrl).filter(Boolean);
-}
-
 
     // downloadUrl → Storage path（用於 thumbByPath）
     function storagePathFromDownloadUrl(url) {
@@ -964,8 +931,7 @@ function __normalizeMediaArray(arr) {
     }
 
     function createCardHTML(p) {
-      const imgsRaw = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
-      const imgs = __normalizeMediaArray(imgsRaw);
+      const imgs = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
       const img = imgs[0] || '';
 
       const mediaUrl = img;

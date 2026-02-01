@@ -1,43 +1,10 @@
 const q = (sel) => document.querySelector(sel);
 
-    // ---- media url normalizer (supports legacy object schema) ----
-    function mediaItemToUrl(it) {
-      if (!it) return "";
-      if (typeof it === "string") return it;
-      if (typeof it === "object") {
-        return it.url || it.downloadURL || it.downloadUrl || it.src || it.mediaUrl || it.link || "";
-      }
-      return "";
-    }
-
-    function normalizeMediaList(list) {
-      const arr = Array.isArray(list) ? list : [];
-      return arr.map(mediaItemToUrl).filter(Boolean);
-    }
-
-
 function isVideoUrl(url) {
   if (!url) return false;
   const u = String(url).split("?", 1)[0];
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
-
-// --- media URL normalization (backward-compatible) ---
-function __mediaItemToUrl(it) {
-  if (!it) return "";
-  if (typeof it === "string") return it;
-  if (typeof it === "object") {
-    return (
-      it.url || it.downloadURL || it.downloadUrl || it.src || it.mediaUrl || it.link || it.href || ""
-    );
-  }
-  return "";
-}
-function __normalizeMediaArray(arr) {
-  if (!Array.isArray(arr)) return [];
-  return arr.map(__mediaItemToUrl).filter(Boolean);
-}
-
 
 function storagePathFromDownloadUrl(url) {
   try {
@@ -581,8 +548,9 @@ async function openDialog(id) {
   const dlgHint = document.getElementById("dlgHint");
   const dlgStageWrap = document.getElementById("dlgStageWrap");
 
-  const mediaRaw = Array.isArray(p.images) && p.images.length > 0 ? p.images : (p.image ? [p.image] : []);
-  const media = __normalizeMediaArray(mediaRaw);
+  const media = Array.isArray(p.images) && p.images.length > 0
+    ? p.images
+    : (p.image ? [p.image] : []);
 
   let currentIndex = 0;
 

@@ -653,24 +653,6 @@
 
   <script src="./assets/firebase-config.js"></script>
   <script type="module">
-
-
-// --- media URL normalization (backward-compatible) ---
-function __mediaItemToUrl(it) {
-  if (!it) return "";
-  if (typeof it === "string") return it;
-  if (typeof it === "object") {
-    return (
-      it.url || it.downloadURL || it.downloadUrl || it.src || it.mediaUrl || it.link || it.href || ""
-    );
-  }
-  return "";
-}
-function __normalizeMediaArray(arr) {
-  if (!Array.isArray(arr)) return [];
-  return arr.map(__mediaItemToUrl).filter(Boolean);
-}
-
     // 如果 withStableSearchRender 沒定義，就退成「直接渲染」
     const renderStable = (typeof withStableSearchRender === 'function')
       ? withStableSearchRender
@@ -1776,9 +1758,7 @@ urls.push(await getDownloadURL(r));
 
       wrap.innerHTML = list
         .map((p) => {
-          const mediaRaw = (Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []));
-          const media = __normalizeMediaArray(mediaRaw);
-          const mediaUrl = media[0] || "";
+          const mediaUrl = (Array.isArray(p.images) && p.images[0]) || p.image || "";
           const isVid = typeof isVideoUrl === "function" && isVideoUrl(mediaUrl);
           const videoPath = isVid ? storagePathFromDownloadUrl(mediaUrl) : "";
           const videoThumb = (isVid && p.thumbByPath && videoPath) ? (p.thumbByPath[videoPath] || "") : "";
