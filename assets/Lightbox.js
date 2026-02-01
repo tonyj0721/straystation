@@ -15,6 +15,56 @@ function storagePathFromDownloadUrl(url) {
   }
 }
 
+// ===== Watermark gate (解法 A)：前台永遠只顯示浮水印版本 =====
+const __BLANK_PIXEL = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+const __wmCache = new Map(); // mediaPath -> Promise<string>
+
+function __appendBust(url, v) {
+  try {
+    if (!url) return url;
+    const hasQ = String(url).includes("?");
+    return String(url) + (hasQ ? "&" : "?") + "v=" + encodeURIComponent(String(v));
+  } catch (_) {
+    return url;
+  }
+}
+
+async function waitForWatermarkUrl(url, { timeoutMs = 30000, intervalMs = 500 } = {}) {
+  try {
+    const getMetadata = window.getMetadata;
+    const sRef = window.sRef;
+    const storage = window.storage;
+    if (!getMetadata || !sRef || !storage) return url;
+
+    const mediaPath = storagePathFromDownloadUrl(url);
+    if (!mediaPath) return url;
+
+    if (__wmCache.has(mediaPath)) return await __wmCache.get(mediaPath);
+
+    const p = (async () => {
+      const start = Date.now();
+      while (true) {
+        try {
+          const md = await getMetadata(sRef(storage, mediaPath));
+          const cm = md?.customMetadata || md?.metadata || {};
+          if (cm.wmProcessed === "1") {
+            return __appendBust(url, md?.generation || Date.now());
+          }
+        } catch (_) {
+          // ignore & retry
+        }
+        if (Date.now() - start > timeoutMs) return "";
+        await new Promise((r) => setTimeout(r, intervalMs));
+      }
+    })();
+    __wmCache.set(mediaPath, p);
+    return await p;
+  } catch (_) {
+    return url;
+  }
+}
+
+
 // Lightbox 縮圖播放 icon（避免與 Modal.js 的 __PLAY_SVG 命名衝突）
 const __THUMB_PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
 
@@ -95,36 +145,8 @@ const lbWrap = document.getElementById("lbWrap");   // ← 新增
 let lbImages = [];
 let lbIndex = 0;
 let lbReturnToDialog = false;
+
 let __lbReqId = 0;
-
-
-function __setLbLoading(on, text = "媒體處理中…") {
-  if (!lbWrap) return;
-  let el = document.getElementById("lbLoading");
-  if (on) {
-    if (!el) {
-      el = document.createElement("div");
-      el.id = "lbLoading";
-      el.style.position = "absolute";
-      el.style.inset = "0";
-      el.style.display = "flex";
-      el.style.alignItems = "center";
-      el.style.justifyContent = "center";
-      el.style.padding = "16px";
-      el.style.textAlign = "center";
-      el.style.color = "white";
-      el.style.fontSize = "16px";
-      el.style.textShadow = "0 1px 2px rgba(0,0,0,.55)";
-      el.style.background = "rgba(0,0,0,.25)";
-      el.style.backdropFilter = "blur(2px)";
-      el.style.borderRadius = "12px";
-      lbWrap.appendChild(el);
-    }
-    el.textContent = text;
-  } else {
-    if (el && el.parentNode) el.parentNode.removeChild(el);
-  }
-}
 
 async function renderLightboxMedia() {
   if (!lbImages.length) {
@@ -135,32 +157,23 @@ async function renderLightboxMedia() {
       lbVideo.classList.add("hidden");
     }
     if (lbWrap) lbWrap.classList.remove("lb-video-mode"); // ← 新增
-    __setLbLoading(false);
     return;
   }
 
   const url = lbImages[lbIndex] || "";
   const isVid = isVideoUrl(url);
 
-const __req = ++__lbReqId;
+  const myReq = ++__lbReqId;
 
-// 清空/隱藏，避免短暫顯示未浮水印版本（或上一張殘影）
-__setLbLoading(true);
-if (lbImg) { lbImg.src = ""; lbImg.classList.add("hidden"); }
-if (lbVideo) {
-  try { lbVideo.pause(); } catch (_) { }
-  lbVideo.removeAttribute("src");
-  try { lbVideo.load && lbVideo.load(); } catch (_) { }
-  lbVideo.classList.add("hidden");
-}
+  // 先進入「處理中」狀態：不要顯示原檔
+  try {
+    if (lbImg) { lbImg.src = ""; lbImg.classList.add("hidden"); }
+    if (lbVideo) { try { lbVideo.pause(); } catch (_) {} lbVideo.removeAttribute("src"); lbVideo.classList.add("hidden"); }
+  } catch (_) {}
 
-const safeUrl = (typeof waitForWatermarkUrl === "function") ? await waitForWatermarkUrl(url) : url;
-if (__req !== __lbReqId) return;
-if (!safeUrl) {
-  __setLbLoading(true, "媒體處理中，請稍候再試");
-  return;
-}
-__setLbLoading(false);
+  const gatedMain = await waitForWatermarkUrl(url);
+  if (myReq !== __lbReqId) return;
+  if (!gatedMain) return; // 超時：維持不顯示原檔
 
 
   // 根據是否為影片切換 class
@@ -172,7 +185,7 @@ __setLbLoading(false);
     if (isVid) {
       lbImg.classList.add("hidden");
       lbVideo.classList.remove("hidden");
-      lbVideo.src = safeUrl;
+      lbVideo.src = gatedMain;
       lbVideo.playsInline = true;
       lbVideo.controls = true;
       try { lbVideo.play().catch(() => { }); } catch (_) { }
@@ -180,10 +193,10 @@ __setLbLoading(false);
       try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
       lbVideo.classList.add("hidden");
       lbImg.classList.remove("hidden");
-      lbImg.src = safeUrl;
+      lbImg.src = gatedMain;
     }
   } else if (lbImg) {
-    lbImg.src = safeUrl;
+    lbImg.src = gatedMain;
   }
 
   const lbThumbsInner = document.getElementById("lbThumbsInner");
@@ -301,7 +314,8 @@ function openLightbox(images, index = 0) {
 
         if (videoThumb) {
           const img = document.createElement("img");
-          img.src = videoThumb;
+          img.src = __BLANK_PIXEL;
+          (async () => { const g = await waitForWatermarkUrl(url); if (!g) return; img.src = videoThumb || __BLANK_PIXEL; })();
           wrapper.appendChild(img);
         } else {
           const v = document.createElement("video");
@@ -314,12 +328,8 @@ function openLightbox(images, index = 0) {
           v.controls = false;
           v.disablePictureInPicture = true;
           v.src = "";
+          (async () => { const g = await waitForWatermarkUrl(url); if (!g) return; v.src = g; try { v.load(); } catch (_) {} })();
           __primeThumbVideoFrameLightbox(v);
-          if (typeof waitForWatermarkUrl === "function") {
-            waitForWatermarkUrl(url).then((u) => { if (u) v.src = u; }).catch(() => {});
-          } else {
-            v.src = url;
-          }
           wrapper.appendChild(v);
         }
 
@@ -329,18 +339,14 @@ function openLightbox(images, index = 0) {
         wrapper.appendChild(badge);
       } else {
         const img = document.createElement("img");
-        img.src = "";
+        img.src = __BLANK_PIXEL;
+        (async () => { const g = await waitForWatermarkUrl(url); if (!g) return; img.src = g; })();
         wrapper.appendChild(img);
-        if (typeof waitForWatermarkUrl === "function") {
-          waitForWatermarkUrl(url).then((u) => { if (u) img.src = u; }).catch(() => {});
-        } else {
-          img.src = url;
-        }
       }
 
       wrapper.addEventListener("click", () => {
         lbIndex = i;
-        renderLightboxMedia().catch(() => {});
+        renderLightboxMedia();
       });
 
       lbThumbsInner.appendChild(wrapper);
@@ -348,7 +354,7 @@ function openLightbox(images, index = 0) {
   }
 
   // 一開始顯示當前項目
-  renderLightboxMedia().catch(() => {});
+  renderLightboxMedia();
 
   // 顯示 Lightbox（先顯示，讓 dlg.close() 的 close handler 知道是要切到 Lightbox）
   if (lb) {
@@ -371,7 +377,6 @@ function closeLightbox() {
     try { lbVideo.load && lbVideo.load(); } catch (_) { }
   }
 
-  __setLbLoading(false);
   if (lb) {
     lb.classList.add("hidden");
     lb.classList.remove("flex");
@@ -390,7 +395,7 @@ function closeLightbox() {
 function lbShow(delta) {
   if (!lbImages.length) return;
   lbIndex = (lbIndex + delta + lbImages.length) % lbImages.length;
-  renderLightboxMedia().catch(() => {});
+  renderLightboxMedia();
 }
 
 

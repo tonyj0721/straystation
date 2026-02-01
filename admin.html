@@ -676,7 +676,7 @@
       getFirestore, collection, getDocs, query, orderBy, where,
       doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp, limit as fbLimit, deleteField,
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
-    import { getStorage, ref as sRef, uploadBytes, getDownloadURL, getMetadata, deleteObject, listAll, } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
+    import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject, listAll, getMetadata, } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
     import {
       getAuth,
       signOut,
@@ -1749,8 +1749,9 @@ urls.push(await getDownloadURL(r));
       } catch (_) {
         return "";
       }
+    }
 
-    // ===== Watermark gate (解法 A)：列表縮圖/封面也必須等後端浮水印完成 =====
+    // ===== Watermark gate (解法 A)：前台永遠只顯示浮水印版本 =====
     const __BLANK_PIXEL = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
     const __wmCache = new Map(); // mediaPath -> Promise<string>
 
@@ -1778,7 +1779,6 @@ urls.push(await getDownloadURL(r));
               const md = await getMetadata(sRef(storage, mediaPath));
               const cm = md?.customMetadata || md?.metadata || {};
               if (cm.wmProcessed === "1") {
-                // 覆蓋同一路徑：用 generation 當 cache buster
                 return __appendBust(url, md?.generation || Date.now());
               }
             } catch (_) {
@@ -1807,10 +1807,9 @@ urls.push(await getDownloadURL(r));
       const overlay = el.querySelector(".wm-processing");
       const gated = await waitForWatermarkUrl(url);
 
-
       // 超時或失敗：維持遮罩，不顯示原檔（避免短暫無浮水印）
       if (!gated) return;
-      // 若元素已被重繪/換頁，避免舊 async 回來覆蓋新畫面
+      // 避免舊 async 回來覆蓋新畫面
       if (el.dataset.__wmReqId !== reqId) return;
 
       if (kind === "video") {
@@ -1819,25 +1818,33 @@ urls.push(await getDownloadURL(r));
         try {
           v.src = gated;
           v.classList.remove("hidden");
+          // 影片縮圖第一幀（若頁面有提供 helper）
+          try {
+            if (typeof __primeThumbVideoFrame === "function") __primeThumbVideoFrame(v);
+            else if (typeof __primeThumbVideoFrameAdmin === "function") __primeThumbVideoFrameAdmin(v);
+          } catch (_) {}
+
           v.addEventListener("loadedmetadata", () => {
             try { if (overlay) overlay.style.display = "none"; } catch (_) {}
           }, { once: true });
-          // 讓既有的 prime 邏輯可以在 src 設定後正常運作
           try { v.load(); } catch (_) {}
         } catch (_) {}
       } else {
         const img = el.querySelector("img");
         if (!img) return;
+
+        // video card w/ backend thumb: show thumb after main video is processed
+        const target = el.dataset.thumb || gated;
+
         try {
-          // blur-fit 的背景（若有）
           try {
-            el.style.setProperty("--bg", `url('${gated}')`);
+            el.style.setProperty("--bg", `url('${target}')`);
           } catch (_) {}
 
           img.addEventListener("load", () => {
             try { if (overlay) overlay.style.display = "none"; } catch (_) {}
           }, { once: true });
-          img.src = gated;
+          img.src = target;
         } catch (_) {}
       }
     }
@@ -1849,6 +1856,8 @@ urls.push(await getDownloadURL(r));
         });
       } catch (_) {}
     }
+
+
 
     // 手機卡片
     function renderRowsMobile(list) {
@@ -1865,23 +1874,15 @@ urls.push(await getDownloadURL(r));
           const thumb = isVid
             ? (videoThumb
               ? `
-               <div class="media-thumb">
-                 <img src="${videoThumb}" alt="" loading="lazy" decoding="async">
-                 <div class="video-badge"><div class="video-badge-inner">${__THUMB_PLAY_SVG}</div></div>
+               <div class="media-thumb js-wm-cover" data-kind="img" data-url="${mediaUrl}" data-thumb="${videoThumb}" style="position:relative; overflow:hidden;"><img src="${__BLANK_PIXEL}" alt="" loading="lazy" decoding="async"><div class="wm-processing" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:12px; color:#4b5563; background:rgba(255,255,255,0.7); backdrop-filter:blur(4px); z-index:2;">處理中…</div><div class="video-badge"><div class="video-badge-inner">${__THUMB_PLAY_SVG}</div></div></div>
                </div>
               `
               : `
-               <div class=\"media-thumb js-wm-cover\" data-kind=\"video\" data-url=\"${mediaUrl}\" style=\"position:relative; overflow:hidden;\">
-                 <video class=\"thumb-video hidden\" preload=\"metadata\" muted playsinline webkit-playsinline disablepictureinpicture></video>
-                 <div class=\"wm-processing\" style=\"position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:12px; color:#4b5563; background:rgba(255,255,255,.7); backdrop-filter: blur(6px); z-index:2;\">處理中…</div>
-                 <div class="video-badge"><div class="video-badge-inner">${__THUMB_PLAY_SVG}</div></div>
+               <div class="media-thumb js-wm-cover" data-kind="video" data-url="${mediaUrl}" style="position:relative; overflow:hidden;"><video class="thumb-video hidden" preload="metadata" muted playsinline webkit-playsinline disablepictureinpicture></video><div class="wm-processing" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:12px; color:#4b5563; background:rgba(255,255,255,0.7); backdrop-filter:blur(4px); z-index:2;">處理中…</div><div class="video-badge"><div class="video-badge-inner">${__THUMB_PLAY_SVG}</div></div></div>
                </div>
               `)
             : `
-               <div class=\"media-thumb js-wm-cover\" data-kind=\"img\" data-url=\"${mediaUrl}\" style=\"position:relative; overflow:hidden;\">
-                 <img src=\"${__BLANK_PIXEL}\" alt=\"\" loading=\"lazy\" decoding=\"async\">
-                 <div class=\"wm-processing\" style=\"position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:12px; color:#4b5563; background:rgba(255,255,255,.7); backdrop-filter: blur(6px); z-index:2;\">處理中…</div>
-               </div>
+               <div class="media-thumb js-wm-cover" data-kind="img" data-url="${mediaUrl}" style="position:relative; overflow:hidden;"><img src="${__BLANK_PIXEL}" alt="" loading="lazy" decoding="async"><div class="wm-processing" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:12px; color:#4b5563; background:rgba(255,255,255,0.7); backdrop-filter:blur(4px); z-index:2;">處理中…</div></div>
               `;
 
           return `
@@ -1897,16 +1898,14 @@ urls.push(await getDownloadURL(r));
         </div>`;
         })
         .join("");
-      // ✅ 列表縮圖/封面：等後端浮水印完成才真正載入
-      hydrateAllCovers(wrap);
-
-      
 
       // 影片縮圖：seek 到前面一點，顯示第一幀
       wrap.querySelectorAll("video.thumb-video").forEach((v) => {
         __primeThumbVideoFrameAdmin(v);
       });
 
+
+      try { hydrateAllCovers(wrap); } catch (_) {}
       wrap.querySelectorAll("[data-id]").forEach((card) =>
         card.addEventListener("click", () => {
           const data = list.find((p) => p.id === card.dataset.id);
