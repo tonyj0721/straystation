@@ -25,6 +25,29 @@ function thumbPathFromMediaPath(mediaPath) {
 }
 
 // ===============================
+// Watermark safe mode helpers
+// ===============================
+function isPendingToken(u) {
+  return typeof u === "string" && u.startsWith("__PENDING__:");
+}
+function makePendingToken(uploadPath) {
+  return `__PENDING__:${uploadPath}`;
+}
+function isRealUrl(u) {
+  return typeof u === "string" && !!u && !isPendingToken(u);
+}
+function genUUID() {
+  try { return (crypto && crypto.randomUUID) ? crypto.randomUUID() : null; } catch (_) { }
+  return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+function hasAnyPending(p) {
+  const a = (p && Array.isArray(p.images)) ? p.images : [];
+  const b = (p && Array.isArray(p.adoptedPhotos)) ? p.adoptedPhotos : [];
+  return a.some(isPendingToken) || b.some(isPendingToken) || !!(p && p.processing);
+}
+
+
+// ===============================
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
 // ===============================
 function __primeThumbVideoFrame(v) {
@@ -548,16 +571,31 @@ async function openDialog(id) {
   const dlgHint = document.getElementById("dlgHint");
   const dlgStageWrap = document.getElementById("dlgStageWrap");
 
-  const rawMedia = Array.isArray(p.images) && p.images.length > 0
+  // Watermark processing overlay (created once)
+  let wmOverlay = document.getElementById("dlgWmOverlay");
+  if (!wmOverlay && dlgStageWrap) {
+    wmOverlay = document.createElement("div");
+    wmOverlay.id = "dlgWmOverlay";
+    wmOverlay.className = "hidden absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-black/50 text-white text-sm";
+    wmOverlay.textContent = "正在加浮水印，請稍候…";
+    dlgStageWrap.appendChild(wmOverlay);
+  }
+  if (wmOverlay) wmOverlay.classList.toggle("hidden", !__hasPending);
+
+  const mediaRaw = Array.isArray(p.images) && p.images.length > 0
     ? p.images
     : (p.image ? [p.image] : []);
-  const hasPendingMedia = Array.isArray(rawMedia) && rawMedia.some((x) => x && typeof x === "object");
-  const media = (rawMedia || []).filter((u) => typeof u === "string" && u);
 
-  let currentIndex = 0;
+  const mediaPending = mediaRaw.filter(isPendingToken);
+  const media = mediaRaw.filter(isRealUrl);
+  const __hasPending = (mediaPending.length > 0) || !!p.processing;
+let currentIndex = 0;
 
   function showDialogMedia(index) {
     if (!media.length) {
+      if (__hasPending && dlgHint) {
+        dlgHint.textContent = "正在加浮水印，完成後會自動顯示";
+      }
       if (dlgImg) {
         dlgImg.src = "";
         dlgImg.classList.add("hidden");
@@ -571,7 +609,7 @@ async function openDialog(id) {
 
       if (dlgThumbs) dlgThumbs.innerHTML = "";
 
-      if (dlgHint) dlgHint.textContent = hasPendingMedia ? "正在加浮水印，請稍後再開啟（成品產出後會自動顯示）" : "";
+      if (dlgHint) dlgHint.textContent = "";
 
       if (dlgStageWrap) dlgStageWrap.classList.remove("dlg-video-mode");
 
@@ -808,6 +846,41 @@ async function openDialog(id) {
   if (!dlg.open) {
     __lockDialogScroll();
     dlg.showModal();
+
+
+// 若有待處理媒體：每 1 秒輪詢一次，直到全部變成可顯示 URL（不會曝光原檔，因為原檔在 uploads 私有路徑）
+if (__hasPending) {
+  try { if (window.__wmPollTimer) clearInterval(window.__wmPollTimer); } catch (_) { }
+  window.__wmPollTimer = setInterval(async () => {
+    try {
+      const snap2 = await getDoc(doc(db, "pets", currentDocId));
+      if (!snap2.exists()) return;
+      const p2 = { id: snap2.id, ...snap2.data() };
+      const still = hasAnyPending(p2);
+      if (!still) {
+        clearInterval(window.__wmPollTimer);
+        window.__wmPollTimer = null;
+        // 更新全域清單，避免下一次開 dialog 還是舊資料
+        try {
+          const i = pets.findIndex(x => x.id === p2.id);
+          if (i >= 0) pets[i] = p2;
+        } catch (_) { }
+        if (document.getElementById("petDialog")?.open) {
+          await openDialog(currentDocId);
+        }
+      }
+    } catch (_) { }
+  }, 1000);
+
+  const stop = () => {
+    try { if (window.__wmPollTimer) clearInterval(window.__wmPollTimer); } catch (_) { }
+    window.__wmPollTimer = null;
+  };
+  const dlgEl = document.getElementById("petDialog");
+  dlgEl?.addEventListener("close", stop, { once: true });
+  dlgEl?.addEventListener("cancel", stop, { once: true });
+}
+
   }
 }
 
@@ -875,8 +948,6 @@ async function onDelete() {
     // 刪掉這筆的所有圖片與合照資料夾
     await deleteAllUnder(`pets/${currentDocId}`);
     await deleteAllUnder(`adopted/${currentDocId}`);
-    await deleteAllUnder(`uploads/pets/${currentDocId}`);
-    await deleteAllUnder(`uploads/adopted/${currentDocId}`);
     await deleteAllUnder(`thumbs/pets/${currentDocId}`);
     // 最後刪 Firestore 文件
     await deleteDoc(doc(db, "pets", currentDocId));
@@ -985,21 +1056,12 @@ let ext = 'bin';
 if (type.startsWith('image/')) ext = 'jpg';
 else if (type.startsWith('video/')) ext = 'mp4';
 
-const baseName = f.name.replace(/\.[^.]+$/, '');
-const safeBase = baseName.replace(/[^\w\u4e00-\u9fff\-]+/g, '_').slice(0, 40) || 'media';
-const ts = Date.now();
-const rand = Math.random().toString(36).slice(2, 8);
-const dstPath = `pets/${currentDocId}/${ts}_${rand}_${safeBase}.${ext}`;
-const uploadPath = `uploads/${dstPath}`;
-const r = sRef(storage, uploadPath);
-await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
-newUrls.push({
-  _pending: 1,
-  uploadPath,
-  dstPath,
-  kind: type.startsWith('video/') ? 'video' : 'image',
-  ts,
-});
+const base = f.name.replace(/\.[^.]+$/, "");
+const idx = String(newUrls.length).padStart(3, "0");
+const upPath = `uploads/pets/${currentDocId}/${idx}_${Date.now()}_${base}.${ext}`;
+const r = sRef(storage, upPath);
+await uploadBytes(r, f, { contentType: type || "application/octet-stream" });
+newUrls.push(makePendingToken(upPath));
 }
     }
 
@@ -1029,8 +1091,7 @@ newUrls.push({
     }
 
     newData.images = newUrls;
-    const __hasPending = Array.isArray(newData.images) && newData.images.some((x) => x && typeof x === "object");
-    const __updatePayload = { ...newData, processing: __hasPending, ...__thumbFieldDeletes };
+    const __updatePayload = { ...newData, processing: newUrls.some(isPendingToken), ...__thumbFieldDeletes };
 
     // ③ 寫回 Firestore
     await updateDoc(doc(db, "pets", currentDocId), __updatePayload);
@@ -1175,7 +1236,7 @@ function renderEditImages(urls) {
       revokeEditVideoObjURL(it.file);
     }
   }
-  editImagesState.items = (urls || []).filter((u) => typeof u === "string" && u).map((u) => ({ kind: "url", url: u }));
+  editImagesState.items = (urls || []).map((u) => ({ kind: "url", url: u }));
   editImagesState.removeUrls = [];
   paintEditPreview();
 }
@@ -1744,30 +1805,19 @@ async function onConfirmAdopted() {
       if (type.startsWith('image/')) ext = 'jpg';
       else if (type.startsWith('video/')) ext = 'mp4';
 
-      const baseName = f.name.replace(/\.[^.]+$/, '');
-      const safeBase = baseName.replace(/[^\w\u4e00-\u9fff\-]+/g, '_').slice(0, 40) || 'media';
-      const ts = Date.now();
-      const rand = Math.random().toString(36).slice(2, 8);
-      const dstPath = `adopted/${currentDocId}/${ts}_${rand}_${safeBase}.${ext}`;
-      const uploadPath = `uploads/${dstPath}`;
-
-      const r = sRef(storage, uploadPath);
-      await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
-
-      urls.push({
-        _pending: 1,
-        uploadPath,
-        dstPath,
-        kind: type.startsWith('video/') ? 'video' : 'image',
-        ts,
-      });
-}
+      const base = f.name.replace(/\.[^.]+$/, "");
+      const idx = String(urls.length).padStart(3, "0");
+      const upPath = `uploads/adopted/${currentDocId}/${idx}_${Date.now()}_${base}.${ext}`;
+      const r = sRef(storage, upPath);
+      await uploadBytes(r, f, { contentType: type || "application/octet-stream" });
+      urls.push(makePendingToken(upPath));
+    }
 
     await updateDoc(doc(db, "pets", currentDocId), {
       status: "adopted",
       adoptedAt: serverTimestamp(),
-      processing: true,
       adoptedPhotos: urls,
+      processing: urls.some(isPendingToken),
       showOnHome: true,
       showOnCats: false,
       showOnDogs: false,
@@ -1821,7 +1871,6 @@ async function onUnadopt() {
 
   try {
     await deleteAllUnder(`adopted/${currentDocId}`); // 清掉合照
-    await deleteAllUnder(`uploads/adopted/${currentDocId}`); // 清掉暫存區（避免遺留未處理檔）
     await updateDoc(doc(db, "pets", currentDocId), {
       status: "available",
       adoptedAt: deleteField(),

@@ -616,7 +616,10 @@
       };
     }
 
-    async function loadPets() {
+    function isPendingToken(u) { return typeof u === "string" && u.startsWith("__PENDING__:"); }
+function isRealUrl(u) { return typeof u === "string" && !!u && !isPendingToken(u); }
+
+async function loadPets() {
       const qRef = query(collection(db, 'pets'), where('status', '==', 'adopted'), orderBy('createdAt', 'desc'));
       const snap = await getDocs(qRef);
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -632,7 +635,7 @@
       let allPhotos = [];
       for (const p of list) {
         if (Array.isArray(p.adoptedPhotos)) {
-          allPhotos.push(...p.adoptedPhotos.filter((u) => typeof u === "string" && u));
+          allPhotos.push(...p.adoptedPhotos.filter(isRealUrl));
         }
       }
       // 去重複

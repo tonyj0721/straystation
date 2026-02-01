@@ -891,6 +891,13 @@
       return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
     }
 
+    function isPendingToken(u) {
+      return typeof u === "string" && u.startsWith("__PENDING__:");
+    }
+    function isRealUrl(u) {
+      return typeof u === "string" && !!u && !isPendingToken(u);
+    }
+
     // downloadUrl → Storage path（用於 thumbByPath）
     function storagePathFromDownloadUrl(url) {
       try {
@@ -931,8 +938,7 @@
     }
 
     function createCardHTML(p) {
-      const _rawImgs = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
-        const imgs = (_rawImgs || []).filter((u) => typeof u === "string" && u);
+      const imgs = Array.isArray(p.images) && p.images.length ? p.images.filter(isRealUrl) : (p.image ? [p.image] : []);
       const img = imgs[0] || '';
 
       const mediaUrl = img;

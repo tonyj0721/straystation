@@ -806,6 +806,13 @@
       return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
     }
 
+    function isPendingToken(u) {
+      return typeof u === "string" && u.startsWith("__PENDING__:");
+    }
+    function isRealUrl(u) {
+      return typeof u === "string" && !!u && !isPendingToken(u);
+    }
+
     // downloadUrl → Storage path（用於 thumbByPath）
     function storagePathFromDownloadUrl(url) {
       try {
@@ -925,8 +932,7 @@
         card.className = 'group rounded-2xl overflow-hidden ring-1 ring-gray-200 bg-white hover:shadow-soft transition-shadow';
 
         // 取封面圖（先用 p.images[0]，沒有的話退回 p.image）
-        const _rawImgs = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
-        const imgs = (_rawImgs || []).filter((u) => typeof u === "string" && u);
+        const imgs = Array.isArray(p.images) && p.images.length ? p.images.filter(isRealUrl) : (p.image ? [p.image] : []);
         const img = imgs[0] || '';
 
         const mediaUrl = img;
