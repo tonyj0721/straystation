@@ -1468,30 +1468,71 @@
         fileCount.textContent = "已選 0 / 5 張";
         syncBreedSelectors();
 
-        // 先啟動重新載入列表（避免等到提示結束才開始抓資料）
-        const reloadPromise = loadPets();
-
         // ★ 登錄完成 → 捲到最上方（先 smooth，最後再硬捲補正）
         window.scrollTo({ top: 0, behavior: "smooth" });
         setTimeout(forceScrollTop, 250); // smooth 途中若被打斷，250ms 後硬捲補正
 
+        // 若有媒體：等待後端完成浮水印後才「顯示登錄完成」並把資料放進列表（避免空窗被點開）
+        if (pendingPaths.length) {
+          Swal.fire({
+            icon: "info",
+            title: "浮水印處理中…",
+            text: "處理完成後才會顯示在列表，並自動開啟詳情。",
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            showConfirmButton: false,
+            didOpen: () => {
+              Swal.showLoading();
+            },
+            returnFocus: false,
+          });
 
-        // 成功提示後直接打開詳情
-        Swal.fire({
-          icon: "success",
-          title: "已成功登錄！",
-          showConfirmButton: false,
-          timer: 1500,
-          returnFocus: false, // 避免關閉後把焦點還給原 input 而導致捲動回彈
-        }).then(async () => {
           try {
-            await reloadPromise;
+            await __waitPetMediaReady(docRef.id);
+          } catch (e) {
+            console.error("waitPetMediaReady error:", e);
+          }
+
+          // 完成後才載入列表
+          try {
+            await loadPets();
           } catch (e) {
             console.error("loadPets error:", e);
           }
-          forceScrollTop(); // ✅ 保證捲到最上面（不會卡在一半）
-          openDialog(docRef.id);
-        });
+
+          Swal.close();
+          forceScrollTop();
+
+          Swal.fire({
+            icon: "success",
+            title: "已成功登錄！",
+            showConfirmButton: false,
+            timer: 1500,
+            returnFocus: false,
+          }).then(() => {
+            openDialog(docRef.id);
+          });
+
+        } else {
+          // 沒有媒體：直接更新列表與提示
+          const reloadPromise = loadPets();
+
+          Swal.fire({
+            icon: "success",
+            title: "已成功登錄！",
+            showConfirmButton: false,
+            timer: 1500,
+            returnFocus: false, // 避免關閉後把焦點還給原 input 而導致捲動回彈
+          }).then(async () => {
+            try {
+              await reloadPromise;
+            } catch (e) {
+              console.error("loadPets error:", e);
+            }
+            forceScrollTop(); // ✅ 保證捲到最上面（不會卡在一半）
+            openDialog(docRef.id);
+          });
+        }
 
       } catch (err) {
         stopDots();
@@ -1504,6 +1545,36 @@
     // ===============================
     // 列表載入 + 搜尋 + 渲染（桌機/手機）
     // ===============================
+
+    // ========= 浮水印 gating（管理後台列表）=========
+    function __hasMediaForWatermark(p) {
+      const media = (Array.isArray(p?.images) && p.images.length > 0)
+        ? p.images
+        : (p?.image ? [p.image] : []);
+      return media.length > 0;
+    }
+
+    function __shouldHidePending(p) {
+      // 只有「有媒體且後端仍在處理」才隱藏；沒有媒體就不影響
+      return __hasMediaForWatermark(p) && p.mediaReady === false;
+    }
+
+    async function __waitPetMediaReady(petId, { maxTries = 180, intervalMs = 800 } = {}) {
+      for (let i = 0; i < maxTries; i++) {
+        const snap = await getDoc(doc(db, "pets", petId));
+        if (!snap.exists()) return null;
+        const data = snap.data() || {};
+        const p = { id: snap.id, ...data };
+
+        if (!__hasMediaForWatermark(p)) return p;          // 沒有媒體：不用等
+        if (p.mediaReady !== false) return p;              // true/undefined：視為就緒
+
+        await new Promise(r => setTimeout(r, intervalMs));
+      }
+      const snap = await getDoc(doc(db, "pets", petId));
+      return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+    }
+
     async function loadPets() {
       const q = query(collection(db, "pets"), orderBy("createdAt", "desc"));
       const snap = await getDocs(q);
@@ -1592,12 +1663,13 @@
     }
 
     function applyFilterAndRender() {
-      const kw = searchInput.value.trim().toLowerCase();
-      const list = kw
-        ? pets.filter((p) => String(p.name || "").toLowerCase().includes(kw))
-        : pets;
-      setViewList(list, true);
-    }
+  const kw = searchInput.value.trim().toLowerCase();
+  const base = pets.filter((p) => !__shouldHidePending(p));
+  const list = kw
+    ? base.filter((p) => String(p.name || "").toLowerCase().includes(kw))
+    : base;
+  setViewList(list.filter((p) => !__shouldHidePending(p)), true);
+}
 
     // 後端依名字（前綴）查詢：有關鍵字→打 Firestore；空字串→回到預設清單
     async function onSearchByName() {
@@ -1661,12 +1733,12 @@
           return tb - ta;
         });
 
-        setViewList(list, true);
+        setViewList(list.filter((p) => !__shouldHidePending(p)), true);
       } catch (err) {
         console.error("search error", err);
         // 後備：用目前記憶中的清單做包含搜尋
         const list = pets.filter(p => String(p.name || "").toLowerCase().includes(kw));
-        setViewList(list, true);
+        setViewList(list.filter((p) => !__shouldHidePending(p)), true);
       }
     }
 

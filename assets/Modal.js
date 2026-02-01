@@ -518,7 +518,7 @@ function __hasMediaForWatermark(p) {
   return media.length > 0;
 }
 
-function __renderProcessingState() {
+function __renderProcessingState(p = null) {
   const dlgImg = document.getElementById("dlgImg");
   const dlgVideo = document.getElementById("dlgVideo");
   const dlgBg = document.getElementById("dlgBg");
@@ -526,6 +526,7 @@ function __renderProcessingState() {
   const dlgHint = document.getElementById("dlgHint");
   const dlgStageWrap = document.getElementById("dlgStageWrap");
 
+  // 媒體區先清空，避免看到未浮水印 / 也避免殘留上一筆
   if (dlgHint) dlgHint.textContent = "浮水印處理中，請稍候…";
   if (dlgThumbs) dlgThumbs.innerHTML = "";
 
@@ -543,6 +544,22 @@ function __renderProcessingState() {
   }
 
   if (dlgStageWrap) dlgStageWrap.classList.remove("dlg-video-mode");
+
+  // 文字區：先把這筆的基本資料填上（避免畫面看起來「怪/全空」）
+  try {
+    if (p) {
+      document.getElementById('dlgName').textContent = p.name ?? "—";
+      document.getElementById('dlgDesc').textContent = p.desc ?? "";
+      document.getElementById('dlgTagBreed').textContent = p.breed ?? "";
+      document.getElementById('dlgTagAge').textContent = p.age ?? "";
+      document.getElementById('dlgTagGender').textContent = p.gender ?? "";
+
+      const isNeutered = !!p.neutered;
+      const isVaccinated = !!p.vaccinated;
+      document.getElementById('dlgTagNeutered').textContent = isNeutered ? '已結紮' : '未結紮';
+      document.getElementById('dlgTagVaccinated').textContent = isVaccinated ? '已注射預防針' : '未注射預防針';
+    }
+  } catch (_) { /* ignore */ }
 }
 
 async function __waitPetMediaReady(petId, { maxTries = 120, intervalMs = 800 } = {}) {
@@ -592,7 +609,7 @@ async function openDialog(id) {
       __lockDialogScroll();
       dlg.showModal();
     }
-    __renderProcessingState();
+    __renderProcessingState(p);
     const latest = await __waitPetMediaReady(id);
     if (!latest) {
       await swalInDialog({ icon: "error", title: "找不到這筆資料" });
