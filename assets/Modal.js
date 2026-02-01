@@ -25,73 +25,6 @@ function thumbPathFromMediaPath(mediaPath) {
 }
 
 // ===============================
-// Watermark safe mode helpers
-// ===============================
-function isPendingTokenStr(u) {
-  return typeof u === "string" && u.startsWith("__PENDING__:");
-}
-function makePendingToken(uploadPath) {
-  return `__PENDING__:${uploadPath}`;
-}
-
-// 舊資料/不同 schema 的容錯：可能是 string URL，也可能是 {url, downloadURL, path...}
-function toMediaUrl(x) {
-  if (typeof x === "string") return x;
-  if (x && typeof x === "object") {
-    // 常見欄位名
-    const u =
-      x.url ||
-      x.downloadURL ||
-      x.downloadUrl ||
-      x.src ||
-      x.href ||
-      "";
-    if (typeof u === "string" && u) return u;
-
-    // 若只有 storage path（例如 pets/...），保留給後續需要時再 resolve
-    const p = x.path || x.storagePath || x.fullPath || "";
-    if (typeof p === "string" && p) return `__PATH__:${p}`;
-  }
-  return "";
-}
-
-function isPendingItem(x) {
-  // 新版 token
-  if (typeof x === "string") return isPendingTokenStr(x);
-
-  // 舊版/物件 schema：uploads/** 一律視為 pending
-  if (x && typeof x === "object") {
-    const p = x.path || x.storagePath || x.fullPath || "";
-    if (typeof p === "string" && p.startsWith("uploads/")) return true;
-
-    const u = toMediaUrl(x);
-    return isPendingTokenStr(u);
-  }
-  return false;
-}
-
-function isRealUrl(x) {
-  const u = toMediaUrl(x);
-  // 真正可顯示的 downloadURL 會是 http(s) 開頭；但也保留 data/blob 的可能
-  if (!u || typeof u !== "string") return false;
-  if (isPendingTokenStr(u)) return false;
-  if (u.startsWith("__PATH__:")) return false;
-  return true;
-}
-
-function genUUID() {
-  try { return (crypto && crypto.randomUUID) ? crypto.randomUUID() : null; } catch (_) { }
-  return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
-}
-
-function hasAnyPending(p) {
-  const a = (p && Array.isArray(p.images)) ? p.images : [];
-  const b = (p && Array.isArray(p.adoptedPhotos)) ? p.adoptedPhotos : [];
-  return a.some(isPendingItem) || b.some(isPendingItem) || !!(p && p.processing);
-}
-
-
-// ===============================
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
 // ===============================
 function __primeThumbVideoFrame(v) {
@@ -163,6 +96,52 @@ function __lockDialogScroll() {
 
 function __unlockDialogScroll() {
   try { if (typeof unlockScroll === "function") unlockScroll(); } catch { }
+}
+
+// ===============================
+// Modal：處理中遮罩（避免前台短暫看到無水印/空白）
+// ===============================
+function __ensureDlgProcessingUI() {
+  const wrap = document.getElementById("dlgStageWrap");
+  if (!wrap) return null;
+  // 確保 stage 是定位容器
+  if (getComputedStyle(wrap).position === 'static') {
+    wrap.style.position = 'relative';
+  }
+
+  // 注入一次樣式
+  if (!document.getElementById('dlgProcessingStyle')) {
+    const st = document.createElement('style');
+    st.id = 'dlgProcessingStyle';
+    st.textContent = `
+      #dlgProcessingMask{position:absolute;inset:0;display:none;align-items:center;justify-content:center;z-index:50;
+        background:rgba(0,0,0,.45);backdrop-filter:blur(6px);}
+      #dlgProcessingMask .box{display:flex;flex-direction:column;align-items:center;gap:10px;
+        padding:16px 18px;border-radius:16px;background:rgba(17,24,39,.75);color:#fff;
+        box-shadow:0 10px 20px rgba(0,0,0,.25);}
+      #dlgProcessingMask .spin{width:28px;height:28px;border-radius:9999px;border:3px solid rgba(255,255,255,.35);
+        border-top-color:#fff;animation:dlgSpin 0.9s linear infinite;}
+      @keyframes dlgSpin{to{transform:rotate(360deg)}}
+    `;
+    document.head.appendChild(st);
+  }
+
+  let mask = document.getElementById('dlgProcessingMask');
+  if (!mask) {
+    mask = document.createElement('div');
+    mask.id = 'dlgProcessingMask';
+    mask.innerHTML = `<div class="box"><div class="spin"></div><div id="dlgProcessingText" style="font-size:14px;line-height:1.4;text-align:center">正在加浮水印…</div></div>`;
+    wrap.appendChild(mask);
+  }
+  return mask;
+}
+
+function __setDlgProcessing(on, msg) {
+  const mask = __ensureDlgProcessingUI();
+  if (!mask) return;
+  const t = document.getElementById('dlgProcessingText');
+  if (t && msg) t.textContent = msg;
+  mask.style.display = on ? 'flex' : 'none';
 }
 
 // ===============================
@@ -614,32 +593,27 @@ async function openDialog(id) {
   const dlgThumbs = document.getElementById("dlgThumbs");
   const dlgHint = document.getElementById("dlgHint");
   const dlgStageWrap = document.getElementById("dlgStageWrap");
-  const mediaRaw = Array.isArray(p.images) && p.images.length > 0
+
+  const __isProcessing = !!p.processing || (Array.isArray(p.pendingImages) && p.pendingImages.length > 0);
+  // 沒有任何成品可顯示，但正在處理中：顯示遮罩（避免空白/誤點）
+  if (__isProcessing && !(Array.isArray(p.images) && p.images.length) && !p.image) {
+    __setDlgProcessing(true, '正在加浮水印，請稍候…');
+  } else if (__isProcessing) {
+    // 有舊成品可看，但仍有新檔處理中
+    __setDlgProcessing(false);
+    try { if (dlgHint) dlgHint.textContent = '（新增媒體加浮水印中…）'; } catch (_) { }
+  } else {
+    __setDlgProcessing(false);
+  }
+
+  const media = Array.isArray(p.images) && p.images.length > 0
     ? p.images
     : (p.image ? [p.image] : []);
-
-  const mediaPending = mediaRaw.filter(isPendingItem);
-  const media = mediaRaw.map(toMediaUrl).filter(isRealUrl);
-  const __hasPending = (mediaPending.length > 0) || !!p.processing;
-
-  // Watermark processing overlay (created once)
-  let wmOverlay = document.getElementById("dlgWmOverlay");
-  if (!wmOverlay && dlgStageWrap) {
-    wmOverlay = document.createElement("div");
-    wmOverlay.id = "dlgWmOverlay";
-    wmOverlay.className = "hidden absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-black/50 text-white text-sm";
-    wmOverlay.textContent = "正在加浮水印，請稍候…";
-    dlgStageWrap.appendChild(wmOverlay);
-  }
-  if (wmOverlay) wmOverlay.classList.toggle("hidden", !__hasPending);
 
   let currentIndex = 0;
 
   function showDialogMedia(index) {
     if (!media.length) {
-      if (__hasPending && dlgHint) {
-        dlgHint.textContent = "正在加浮水印，完成後會自動顯示";
-      }
       if (dlgImg) {
         dlgImg.src = "";
         dlgImg.classList.add("hidden");
@@ -736,7 +710,10 @@ async function openDialog(id) {
   }
 
   if (dlgImg) {
-    dlgImg.onclick = () => openLightbox(media, currentIndex);
+    dlgImg.onclick = () => {
+      if (__isProcessing && (!media || !media.length)) return;
+      openLightbox(media, currentIndex);
+    };
   }
 
   if (dlgVideo) {
@@ -747,6 +724,7 @@ async function openDialog(id) {
       if (now - __dlgVideoLastTap < 320) {
         ev.preventDefault();
         ev.stopPropagation();
+        if (__isProcessing && (!media || !media.length)) return;
         openLightbox(media, currentIndex);
       }
       __dlgVideoLastTap = now;
@@ -857,11 +835,11 @@ async function openDialog(id) {
     if (!breedType) {
       // 沒選左邊：右邊保持 disabled +「請先選擇品種」
       btSel.value = "";
-      resetEditBreedRight();       // 會塞入「請先選擇品種」並 disabled
+      resetEditBreedRight();       // 會塞入「請先選擇品種」並 disabled :contentReference[oaicite:8]{index=8}
       updateEditBreedLabel();
     } else {
       btSel.value = breedType;
-      buildEditBreedOptions();     // 右邊會變成可選 + 第一個 option「請選擇」
+      buildEditBreedOptions();     // 右邊會變成可選 + 第一個 option「請選擇」:contentReference[oaicite:9]{index=9}
       updateEditBreedLabel();
 
       // breedValue 不在選項裡就回到 placeholder，避免顯示空白
@@ -890,41 +868,6 @@ async function openDialog(id) {
   if (!dlg.open) {
     __lockDialogScroll();
     dlg.showModal();
-
-
-// 若有待處理媒體：每 1 秒輪詢一次，直到全部變成可顯示 URL（不會曝光原檔，因為原檔在 uploads 私有路徑）
-if (__hasPending) {
-  try { if (window.__wmPollTimer) clearInterval(window.__wmPollTimer); } catch (_) { }
-  window.__wmPollTimer = setInterval(async () => {
-    try {
-      const snap2 = await getDoc(doc(db, "pets", currentDocId));
-      if (!snap2.exists()) return;
-      const p2 = { id: snap2.id, ...snap2.data() };
-      const still = hasAnyPending(p2);
-      if (!still) {
-        clearInterval(window.__wmPollTimer);
-        window.__wmPollTimer = null;
-        // 更新全域清單，避免下一次開 dialog 還是舊資料
-        try {
-          const i = pets.findIndex(x => x.id === p2.id);
-          if (i >= 0) pets[i] = p2;
-        } catch (_) { }
-        if (document.getElementById("petDialog")?.open) {
-          await openDialog(currentDocId);
-        }
-      }
-    } catch (_) { }
-  }, 1000);
-
-  const stop = () => {
-    try { if (window.__wmPollTimer) clearInterval(window.__wmPollTimer); } catch (_) { }
-    window.__wmPollTimer = null;
-  };
-  const dlgEl = document.getElementById("petDialog");
-  dlgEl?.addEventListener("close", stop, { once: true });
-  dlgEl?.addEventListener("cancel", stop, { once: true });
-}
-
   }
 }
 
@@ -989,10 +932,13 @@ async function onDelete() {
   }
 
   try {
-    // 刪掉這筆的所有圖片與合照資料夾
+    // 刪掉這筆的所有圖片與合照資料夾（含 uploads 暫存與縮圖）
     await deleteAllUnder(`pets/${currentDocId}`);
     await deleteAllUnder(`adopted/${currentDocId}`);
+    await deleteAllUnder(`uploads/pets/${currentDocId}`);
+    await deleteAllUnder(`uploads/adopted/${currentDocId}`);
     await deleteAllUnder(`thumbs/pets/${currentDocId}`);
+    await deleteAllUnder(`thumbs/adopted/${currentDocId}`);
     // 最後刪 Firestore 文件
     await deleteDoc(doc(db, "pets", currentDocId));
     await loadPets();
@@ -1084,6 +1030,7 @@ async function saveEdit() {
     // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
     const { items, removeUrls } = editImagesState;
     const newUrls = [];
+    const __pendingImages = [];
 
     // 依序處理（保持順序）
     for (const it of items) {
@@ -1094,19 +1041,28 @@ async function saveEdit() {
 
       if (it.kind === "file") {
         const f = it.file;
-        // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
-const type = (f && f.type) || '';
-let ext = 'bin';
-if (type.startsWith('image/')) ext = 'jpg';
-else if (type.startsWith('video/')) ext = 'mp4';
+        // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔到 uploads（前台不讀）
+        const type = (f && f.type) || '';
+        let ext = 'bin';
+        if (type.startsWith('image/')) ext = 'jpg';
+        else if (type.startsWith('video/')) ext = 'mp4';
 
-const base = f.name.replace(/\.[^.]+$/, "");
-const idx = String(newUrls.length).padStart(3, "0");
-const upPath = `uploads/pets/${currentDocId}/${idx}_${Date.now()}_${base}.${ext}`;
-const r = sRef(storage, upPath);
-await uploadBytes(r, f, { contentType: type || "application/octet-stream" });
-newUrls.push(makePendingToken(upPath));
-}
+        const base = f.name.replace(/\.[^.]+$/, '');
+        const path = `uploads/pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
+        const r = sRef(storage, path);
+        await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
+        __pendingImages.push(path);
+      }
+    }
+
+    // 若有新檔：先寫入 pendingImages / processing；等後端處理完才會把成品 URL 填進 images
+    if (__pendingImages.length) {
+      try {
+        await updateDoc(doc(db, "pets", currentDocId), {
+          pendingImages: __pendingImages,
+          processing: true,
+        });
+      } catch (_) { /* ignore */ }
     }
 
     // 刪除被移除的舊圖（忽略刪失敗）
@@ -1135,7 +1091,7 @@ newUrls.push(makePendingToken(upPath));
     }
 
     newData.images = newUrls;
-    const __updatePayload = { ...newData, processing: newUrls.some(isPendingToken), ...__thumbFieldDeletes };
+    const __updatePayload = { ...newData, ...__thumbFieldDeletes };
 
     // ③ 寫回 Firestore
     await updateDoc(doc(db, "pets", currentDocId), __updatePayload);
@@ -1840,28 +1796,28 @@ async function onConfirmAdopted() {
   const stopDots = startDots(btn, "儲存中");
 
   const files = adoptedSelected.slice(0, 5);
-  const urls = [];
+  const pendingAdoptedPhotos = [];
   try {
     for (const f of files) {
-      // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
+      // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔到 uploads（前台不讀）
       const type = (f && f.type) || '';
       let ext = 'bin';
       if (type.startsWith('image/')) ext = 'jpg';
       else if (type.startsWith('video/')) ext = 'mp4';
 
-      const base = f.name.replace(/\.[^.]+$/, "");
-      const idx = String(urls.length).padStart(3, "0");
-      const upPath = `uploads/adopted/${currentDocId}/${idx}_${Date.now()}_${base}.${ext}`;
-      const r = sRef(storage, upPath);
-      await uploadBytes(r, f, { contentType: type || "application/octet-stream" });
-      urls.push(makePendingToken(upPath));
+      const base = f.name.replace(/\.[^.]+$/, '');
+      const path = `uploads/adopted/${currentDocId}/${Date.now()}_${base}.${ext}`;
+      const r = sRef(storage, path);
+      await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
+      pendingAdoptedPhotos.push(path);
     }
 
     await updateDoc(doc(db, "pets", currentDocId), {
       status: "adopted",
       adoptedAt: serverTimestamp(),
-      adoptedPhotos: urls,
-      processing: urls.some(isPendingToken),
+      adoptedPhotos: [],
+      pendingAdoptedPhotos,
+      adoptedProcessing: !!pendingAdoptedPhotos.length,
       showOnHome: true,
       showOnCats: false,
       showOnDogs: false,

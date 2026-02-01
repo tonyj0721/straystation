@@ -1412,34 +1412,33 @@
         // 1) 新增基本文件
         const docRef = await addDoc(collection(db, "pets"), payload);
 
-        // 2) 逐張上傳到 uploads 私有暫存（前台永遠不會讀到原檔）
-const makePendingToken = (p) => `__PENDING__:${p}`;
-const genUUID = () => {
-  try { return (crypto && crypto.randomUUID) ? crypto.randomUUID() : null; } catch (_) { }
-  return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
-};
+        // 2) 上傳原檔到 uploads 暫存（前台不讀），並在 Firestore 標記 pending/processing
+        const pendingImages = [];
+        for (const f of selectedFiles) {
+          // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
+          const type = (f && f.type) || '';
+          // 路徑副檔名固定用 jpg/mp4，讓後端輸出格式一致（避免 iPhone/WebM 問題）
+          let ext = 'bin';
+          if (type.startsWith('image/')) ext = 'jpg';
+          else if (type.startsWith('video/')) ext = 'mp4';
 
-const pending = [];
-for (const f of selectedFiles) {
-  // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔到 uploads/**
-  const type = (f && f.type) || '';
-  // 路徑副檔名固定用 jpg/mp4，讓後端輸出格式一致（避免 iPhone/WebM 問題）
-  let ext = 'bin';
-  if (type.startsWith('image/')) ext = 'jpg';
-  else if (type.startsWith('video/')) ext = 'mp4';
+          const base = f.name.replace(/\.[^.]+$/, '');
+          const path = `uploads/pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
+          const r = sRef(storage, path);
+          await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
+          pendingImages.push(path);
+        }
 
-  const base = f.name.replace(/\.[^.]+$/, '');
-  const idx = String(pending.length).padStart(3, '0');
-  const upPath = `uploads/pets/${docRef.id}/${idx}_${Date.now()}_${base}_${genUUID()}.${ext}`;
-  const r = sRef(storage, upPath);
-  await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
-  pending.push(makePendingToken(upPath));
-}
+        // 3) 先寫入 pendingImages / processing；等後端處理完才會把成品 URL 填進 images
+        if (pendingImages.length) {
+          await updateDoc(doc(db, "pets", docRef.id), {
+            images: [],
+            pendingImages,
+            processing: true,
+          });
+        }
 
-// 3) 回寫 images 欄位（先寫 pending token，等 Cloud Function 產出水印成品後再替換）
-if (pending.length) {
-  await updateDoc(doc(db, "pets", docRef.id), { images: pending, processing: true });
-}// UI 收尾
+        // UI 收尾
         stopDots();
         submitBtn.disabled = false;
         submitText.textContent = "登錄";
@@ -1763,16 +1762,12 @@ if (pending.length) {
 
       wrap.innerHTML = list
         .map((p) => {
-          const mediaCandidates = Array.isArray(p.images) ? p.images : (p.image ? [p.image] : []);
-          const firstItem = mediaCandidates.find((x) => (typeof isRealUrl === "function" ? isRealUrl(x) : (typeof x === "string" && x))) || "";
-          const mediaUrl = (typeof toMediaUrl === "function") ? toMediaUrl(firstItem) : (typeof firstItem === "string" ? firstItem : "");
+          const mediaUrl = (Array.isArray(p.images) && p.images[0]) || p.image || "";
           const isVid = typeof isVideoUrl === "function" && isVideoUrl(mediaUrl);
           const videoPath = isVid ? storagePathFromDownloadUrl(mediaUrl) : "";
           const videoThumb = (isVid && p.thumbByPath && videoPath) ? (p.thumbByPath[videoPath] || "") : "";
 
-          const thumb = (!mediaUrl)
-            ? `<div class="media-thumb" style="background:#f3f4f6;"></div>`
-            : (isVid
+          const thumb = isVid
             ? (videoThumb
               ? `
                <div class="media-thumb">
@@ -1790,7 +1785,7 @@ if (pending.length) {
                <div class="media-thumb">
                  <img src="${mediaUrl}" alt="" loading="lazy" decoding="async">
                </div>
-              `));
+              `;
 
           return `
         <div class="rounded-xl ring-1 ring-gray-200 p-3 flex gap-3 items-center cursor-pointer"
