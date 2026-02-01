@@ -1042,14 +1042,8 @@
       const snap = await getDocs(qRef);
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      // 還在等浮水印的先不要顯示
-      const visible = all.filter(p => {
-        const needs = Array.isArray(p.needsWmPaths) ? p.needsWmPaths : [];
-        return needs.length === 0;
-      });
-
-      const cats = visible.filter(p => p.species === "貓").slice(0, 6);
-      const dogs = visible.filter(p => p.species === "狗").slice(0, 6);
+      const cats = all.filter(p => p.species === "貓").slice(0, 6);
+      const dogs = all.filter(p => p.species === "狗").slice(0, 6);
 
       pets.length = 0;
       pets.push(...[...cats, ...dogs]);

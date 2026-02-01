@@ -1104,15 +1104,8 @@
       const qRef = query(collection(db, "pets"), where("status", "==", "available"), orderBy("createdAt", "desc"));
       const snap = await getDocs(qRef);
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-      const visible = all.filter(p => {
-        const needs = Array.isArray(p.needsWmPaths) ? p.needsWmPaths : [];
-        if (needs.length > 0) return false; // 還在等浮水印 → 不顯示
-        return p.species === SPECIES;
-      });
-
       pets.length = 0;
-      pets.push(...visible);
+      pets.push(...all.filter(p => p.species === SPECIES));
       buildBreedOptionsByType(); // ← 新的
       render(pets);
       openFromDeepLink();
