@@ -1103,9 +1103,7 @@
     async function loadPets() {
       const qRef = query(collection(db, "pets"), where("status", "==", "available"), orderBy("createdAt", "desc"));
       const snap = await getDocs(qRef);
-      const all0 = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      // mediaReady=false 代表圖片/影片尚在後端浮水印處理中：前台先不顯示（舊資料沒這欄位會正常顯示）
-      const all = all0.filter(p => p.mediaReady !== false);
+      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       pets.length = 0;
       pets.push(...all.filter(p => p.species === SPECIES));
       buildBreedOptionsByType(); // ← 新的

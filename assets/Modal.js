@@ -475,12 +475,6 @@ function startDots(span, base) {
   return () => clearInterval(t); // 回傳停止函式
 }
 
-// 產生一次性的上傳 session id（用來讓 Cloud Function 回寫正確的一批檔案）
-function makeSessionId() {
-  try { return crypto.randomUUID(); } catch (_) { }
-  return `s_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-}
-
 // 用 nameLower / name 檢查是否重複；exceptId 表示忽略自己（編輯時用）
 async function isNameTaken(name, exceptId = null) {
   const kw = (name || "").trim().toLowerCase();
@@ -968,104 +962,65 @@ async function saveEdit() {
   const stopDots = startDots(txt, "儲存中");
 
   try {
-    // 依照「目前畫面順序」組出最終 images
-    // - 沒有新增檔案：可以直接回寫 images（因為都是已浮水印的舊 URL）
-    // - 有新增檔案：不回寫 downloadURL（避免前台短暫看到未浮水印原檔），改用 pending* 欄位讓後端處理完再自動回寫
+    // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
     const { items, removeUrls } = editImagesState;
-    const hasNewUploads = (items || []).some(it => it && it.kind === 'file');
+    const newUrls = [];
 
-    if (!hasNewUploads) {
-      // === A) 只有 URL 重排/刪除：安全，直接更新 images + 立即刪除不需要的舊檔 ===
-      const newUrls = [];
-      for (const it of (items || [])) {
-        if (it && it.kind === 'url') newUrls.push(it.url);
+    // 依序處理（保持順序）
+    for (const it of items) {
+      if (it.kind === "url") {
+        newUrls.push(it.url);
+        continue;
       }
 
-      // 刪除被移除的舊圖（忽略刪失敗）
-      // 同步刪掉後端產生的縮圖：thumbs/<原路徑去副檔名>.jpg
-      // 並清理 Firestore 的 thumbByPath 對應 key（避免越積越多）
-      const __thumbFieldDeletes = {};
-      for (const url of (removeUrls || [])) {
-        try {
-          const enc = String(url).split('/o/')[1].split('?')[0];
-          const mediaPath = decodeURIComponent(enc);
+      if (it.kind === "file") {
+        const f = it.file;
+        // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
+const type = (f && f.type) || '';
+let ext = 'bin';
+if (type.startsWith('image/')) ext = 'jpg';
+else if (type.startsWith('video/')) ext = 'mp4';
 
-          // 1) 刪原檔
-          await deleteObject(sRef(storage, mediaPath));
-
-          // 2) 若是影片：刪縮圖 + 嘗試刪欄位 key（沿用舊邏輯）
-          if (isVideoUrl(url)) {
-            const tPath = thumbPathFromMediaPath(mediaPath);
-            if (tPath) {
-              try { await deleteObject(sRef(storage, tPath)); } catch (_) { /* ignore */ }
-            }
-            __thumbFieldDeletes[`thumbByPath.${mediaPath}`] = deleteField();
-          }
-        } catch (_) {
-          // 靜默忽略
-        }
-      }
-
-      newData.images = newUrls;
-      const __updatePayload = { ...newData, ...__thumbFieldDeletes };
-
-      // ③ 寫回 Firestore
-      await updateDoc(doc(db, 'pets', currentDocId), __updatePayload);
-
-    } else {
-      // === B) 有新增檔案：走「做法 B」(processing) ===
-      // 1) 上傳新檔（只寫 Storage path + session），不取 downloadURL
-      const sessionId = makeSessionId();
-      const plan = [];
-
-      for (const it of (items || [])) {
-        if (!it) continue;
-        if (it.kind === 'url') {
-          plan.push({ k: 'url', u: it.url });
-          continue;
-        }
-        if (it.kind === 'file') {
-          const f = it.file;
-          const type = (f && f.type) || '';
-          let ext = 'bin';
-          if (type.startsWith('image/')) ext = 'jpg';
-          else if (type.startsWith('video/')) ext = 'mp4';
-
-          const base = f.name.replace(/\.[^.]+$/, '');
-          const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
-          const r = sRef(storage, path);
-
-          await uploadBytes(r, f, {
-            contentType: type || 'application/octet-stream',
-            customMetadata: { wmSession: sessionId },
-          });
-
-          plan.push({ k: 'path', p: path });
-        }
-      }
-
-      // 2) 先把「待刪除的舊檔」記起來（不要立刻刪，避免前台仍在用舊圖時斷圖）
-      const pendingDeleteMediaPaths = [];
-      for (const url of (removeUrls || [])) {
-        try {
-          const enc = String(url).split('/o/')[1].split('?')[0];
-          const mediaPath = decodeURIComponent(enc);
-          if (mediaPath) pendingDeleteMediaPaths.push(mediaPath);
-        } catch (_) { }
-      }
-
-      // 3) 寫入 pending 狀態：後端浮水印完成後會自動回寫 images 並套用這次排序
-      await updateDoc(doc(db, 'pets', currentDocId), {
-        ...newData,
-        pendingSessionId: sessionId,
-        pendingTarget: 'images',
-        pendingMode: 'replace',
-        pendingImagesPlan: plan,
-        pendingStartedAt: serverTimestamp(),
-        pendingDeleteMediaPaths: pendingDeleteMediaPaths,
-      });
+const base = f.name.replace(/\.[^.]+$/, '');
+const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
+const r = sRef(storage, path);
+await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
+newUrls.push(await getDownloadURL(r));
+}
     }
-// ④ 重載列表並同步當前物件
+
+    // 刪除被移除的舊圖（忽略刪失敗）
+    // 同步刪掉後端產生的縮圖：thumbs/<原路徑去副檔名>.jpg
+    // 並清理 Firestore 的 thumbByPath 對應 key（避免越積越多）
+    const __thumbFieldDeletes = {};
+    for (const url of (removeUrls || [])) {
+      try {
+        const enc = String(url).split("/o/")[1].split("?")[0];
+        const mediaPath = decodeURIComponent(enc);
+
+        // 1) 刪原檔
+        await deleteObject(sRef(storage, mediaPath));
+
+        // 2) 若是影片：刪縮圖 + 刪欄位 key
+        if (isVideoUrl(url)) {
+          const tPath = thumbPathFromMediaPath(mediaPath);
+          if (tPath) {
+            try { await deleteObject(sRef(storage, tPath)); } catch (_) { /* ignore */ }
+          }
+          __thumbFieldDeletes[`thumbByPath.${mediaPath}`] = deleteField();
+        }
+      } catch (e) {
+        // 靜默忽略
+      }
+    }
+
+    newData.images = newUrls;
+    const __updatePayload = { ...newData, ...__thumbFieldDeletes };
+
+    // ③ 寫回 Firestore
+    await updateDoc(doc(db, "pets", currentDocId), __updatePayload);
+
+    // ④ 重載列表並同步當前物件
     await loadPets();
     currentDoc = { ...currentDoc, ...newData };
 
@@ -1765,8 +1720,7 @@ async function onConfirmAdopted() {
   const stopDots = startDots(btn, "儲存中");
 
   const files = adoptedSelected.slice(0, 5);
-  const sessionId = makeSessionId();
-  const paths = [];
+  const urls = [];
   try {
     for (const f of files) {
       // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
@@ -1778,32 +1732,18 @@ async function onConfirmAdopted() {
       const base = f.name.replace(/\.[^.]+$/, '');
       const path = `adopted/${currentDocId}/${Date.now()}_${base}.${ext}`;
       const r = sRef(storage, path);
-      await uploadBytes(r, f, {
-        contentType: type || 'application/octet-stream',
-        customMetadata: { wmSession: sessionId },
-      });
-      paths.push(path);
+      await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
+      urls.push(await getDownloadURL(r));
     }
 
-    // 做法 B：先把狀態寫入，但不立刻寫入 downloadURL（避免前台短暫看到未浮水印原檔）
-    // 合照浮水印完成後，Cloud Function 會依 pending* 欄位回寫 adoptedPhotos
     await updateDoc(doc(db, "pets", currentDocId), {
       status: "adopted",
       adoptedAt: serverTimestamp(),
-      adoptedPhotos: [],
-      adoptedPhotosReady: false,
-      // 合照處理完成後才上幸福的歸宿（避免沒有圖）
-      showOnHome: false,
+      adoptedPhotos: urls,
+      showOnHome: true,
       showOnCats: false,
       showOnDogs: false,
       showOnIndex: false,
-
-      pendingSessionId: sessionId,
-      pendingTarget: "adoptedPhotos",
-      pendingMode: "replace",
-      pendingMediaPaths: paths,
-      pendingAfter: { showOnHome: true, adoptedPhotosReady: true },
-      pendingStartedAt: serverTimestamp(),
     });
 
     await loadPets();
@@ -1815,7 +1755,7 @@ async function onConfirmAdopted() {
     // 用全域 Swal（不在 dialog 裡），所以關掉 modal 也看得到
     await Swal.fire({
       icon: "success",
-      title: "已標記為「已送養」（合照處理中）",
+      title: "已標記為「已送養」",
       showConfirmButton: false,
       timer: 1500,
     });
