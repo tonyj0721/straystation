@@ -523,52 +523,6 @@ async function openDialog(id) {
     }
   }
 
-  // 1.5 浮水印：後端還在處理時先等待，避免短暫看到無浮水印的照片/影片
-  const __hasMedia = (d) => {
-    const hasImages = (Array.isArray(d?.images) && d.images.length > 0) || (typeof d?.image === "string" && !!d.image);
-    const hasAdopted = Array.isArray(d?.adoptedPhotos) && d.adoptedPhotos.length > 0;
-    return !!(hasImages || hasAdopted);
-  };
-
-  if (typeof Swal !== "undefined" && p && p.mediaReady === false && __hasMedia(p)) {
-    const dlgEl = document.getElementById("petDialog");
-    try {
-      Swal.fire({
-        target: (dlgEl && dlgEl.open) ? dlgEl : document.body,
-        backdrop: !!(dlgEl && dlgEl.open),
-        title: "浮水印製作中",
-        html: "照片/影片正在加浮水印，請稍候…",
-        allowOutsideClick: false,
-        allowEscapeKey: false,
-        showConfirmButton: false,
-        didOpen: () => { try { Swal.showLoading(); } catch (_) { } },
-      });
-    } catch (_) { /* ignore */ }
-
-    let ready = false;
-    for (let i = 0; i < 20; i++) {
-      await new Promise((r) => setTimeout(r, 900));
-      try {
-        const snap2 = await getDoc(doc(db, "pets", id));
-        if (snap2.exists()) {
-          const d2 = snap2.data() || {};
-          if (d2.mediaReady !== false || !__hasMedia(d2)) {
-            p = { id: snap2.id, ...d2 };
-            ready = true;
-            break;
-          }
-        }
-      } catch (_) { }
-    }
-
-    try { Swal.close(); } catch (_) { }
-
-    if (!ready) {
-      await swalInDialog({ icon: "info", title: "照片/影片處理中", text: "浮水印尚未完成，請稍後再試。" });
-      return;
-    }
-  }
-
   // 2. 共用狀態 + URL
   currentDoc = p;
   currentDocId = p.id;
@@ -1062,16 +1016,6 @@ newUrls.push(await getDownloadURL(r));
 
     newData.images = newUrls;
     const __updatePayload = { ...newData, ...__thumbFieldDeletes };
-
-    // 浮水印：只要這次有「新上傳」的媒體，就先標記未完成；沒媒體則直接放行
-    const __hasNewFiles = (items || []).some(it => it && it.kind === "file");
-    if (newUrls.length === 0) {
-      __updatePayload.mediaReady = true;
-      __updatePayload.mediaReadyAt = deleteField();
-    } else if (__hasNewFiles) {
-      __updatePayload.mediaReady = false;
-      __updatePayload.mediaReadyAt = deleteField();
-    }
 
     // ③ 寫回 Firestore
     await updateDoc(doc(db, "pets", currentDocId), __updatePayload);
@@ -1796,9 +1740,6 @@ async function onConfirmAdopted() {
       status: "adopted",
       adoptedAt: serverTimestamp(),
       adoptedPhotos: urls,
-      // 有合照就先擋住前台顯示，等後端浮水印完成再放行
-      mediaReady: (urls.length === 0),
-      mediaReadyAt: deleteField(),
       showOnHome: true,
       showOnCats: false,
       showOnDogs: false,
@@ -1856,7 +1797,6 @@ async function onUnadopt() {
       status: "available",
       adoptedAt: deleteField(),
       adoptedPhotos: [],
-      mediaReady: true,
       showOnHome: false,
       showOnCats: true,
       showOnDogs: true,

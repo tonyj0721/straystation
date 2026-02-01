@@ -1369,9 +1369,6 @@
         neutered: document.getElementById('neutered')?.checked || false,
         vaccinated: document.getElementById('vaccinated')?.checked || false,
         images: [],
-
-        // 浮水印：有上傳媒體就先標記為未完成，等後端處理完再讓前台顯示
-        mediaReady: (Array.isArray(selectedFiles) && selectedFiles.length === 0),
         status: "available",
         showOnHome: false,
         showOnCats: true,
@@ -1434,7 +1431,7 @@ urls.push(await getDownloadURL(r));
 
         // 3) 回寫 images 欄位
         if (urls.length) {
-          await updateDoc(doc(db, "pets", docRef.id), { images: urls, mediaReady: false, mediaReadyAt: deleteField() });
+          await updateDoc(doc(db, "pets", docRef.id), { images: urls });
         }
 
         // UI 收尾

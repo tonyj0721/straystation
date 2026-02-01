@@ -1042,9 +1042,8 @@
       const snap = await getDocs(qRef);
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      // 浮水印 Gate：mediaReady === false 的資料先不要顯示（避免看到未浮水印）
-      const cats = all.filter(p => p.species === "貓" && p.mediaReady !== false).slice(0, 6);
-      const dogs = all.filter(p => p.species === "狗" && p.mediaReady !== false).slice(0, 6);
+      const cats = all.filter(p => p.species === "貓").slice(0, 6);
+      const dogs = all.filter(p => p.species === "狗").slice(0, 6);
 
       pets.length = 0;
       pets.push(...[...cats, ...dogs]);

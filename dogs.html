@@ -893,7 +893,8 @@
       const q = new URLSearchParams(location.search);
       const id = q.get('pet');
       if (!id || !Array.isArray(pets)) return;
-      openDialog(id);
+      const hit = pets.find(p => p.id === id);
+      if (hit) openDialog(hit.id);
     }
 
     function render(list) {
@@ -1104,7 +1105,7 @@
       const snap = await getDocs(qRef);
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       pets.length = 0;
-      pets.push(...all.filter(p => p.species === SPECIES && p.mediaReady !== false));
+      pets.push(...all.filter(p => p.species === SPECIES));
       buildBreedOptionsByType(); // ← 新的
       render(pets);
       openFromDeepLink();
