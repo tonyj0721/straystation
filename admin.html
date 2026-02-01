@@ -1413,26 +1413,34 @@
         const docRef = await addDoc(collection(db, "pets"), payload);
 
         // 2) 逐張上傳圖片，取得 Storage URL
-        const urls = [];
-        for (const f of selectedFiles) {
-          // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
-const type = (f && f.type) || '';
-// 路徑副檔名固定用 jpg/mp4，讓後端覆蓋後檔名/格式一致（避免 iPhone/WebM 問題）
-let ext = 'bin';
-if (type.startsWith('image/')) ext = 'jpg';
-else if (type.startsWith('video/')) ext = 'mp4';
+        
+// 後端浮水印：前端只上傳原檔到 uploads/，並寫入 pendingMediaPlan（前台會顯示「處理中」直到完成）
+const pendingMediaPlan = [];
+const now = Date.now();
+for (let i = 0; i < selectedFiles.length; i++) {
+  const f = selectedFiles[i];
+  const isVid = (f && String(f.type || "").startsWith("video/"));
+  const ext = isVid ? "mp4" : "jpg";
+  const base = (f?.name || `media_${i}`).replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9_\-\u4e00-\u9fa5]+/g, "_");
+  const seq = String(i).padStart(2, "0");
+  const upPath = `uploads/pets/${docRef.id}/${seq}_${now}_${base}.${ext}`;
+  pendingMediaPlan.push(upPath);
+}
 
-const base = f.name.replace(/\.[^.]+$/, '');
-const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
-const r = sRef(storage, path);
-await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
-urls.push(await getDownloadURL(r));
-        }
+if (pendingMediaPlan.length) {
+  await updateDoc(doc(db, "pets", docRef.id), {
+    mediaProcessing: true,
+    pendingMediaPlan,
+  });
+}
 
-        // 3) 回寫 images 欄位
-        if (urls.length) {
-          await updateDoc(doc(db, "pets", docRef.id), { images: urls });
-        }
+// 逐一上傳（保持順序、避免併發造成時序混亂）
+for (let i = 0; i < selectedFiles.length; i++) {
+  const f = selectedFiles[i];
+  const path = pendingMediaPlan[i];
+  const r = sRef(storage, path);
+  await uploadBytes(r, f, { contentType: (f.type || "") });
+}
 
         // UI 收尾
         stopDots();
