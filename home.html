@@ -616,19 +616,48 @@
       };
     }
 
-    async function loadPets() {
+    function isPendingToken(u) { return typeof u === "string" && u.startsWith("__PENDING__:"); }
+
+    // 舊資料/不同 schema 容錯：可能是 string URL，也可能是 {url, downloadURL, path...}
+    function toMediaUrl(x) {
+      if (typeof x === "string") return x;
+      if (x && typeof x === "object") {
+        const u = x.url || x.downloadURL || x.downloadUrl || x.src || x.href || "";
+        if (typeof u === "string" && u) return u;
+        const p = x.path || x.storagePath || x.fullPath || "";
+        if (typeof p === "string" && p) return `__PATH__:${p}`;
+      }
+      return "";
+    }
+
+    function isPendingItem(x) {
+      if (typeof x === "string") return isPendingToken(x);
+      if (x && typeof x === "object") {
+        const p = x.path || x.storagePath || x.fullPath || "";
+        if (typeof p === "string" && p.startsWith("uploads/")) return true;
+        const u = toMediaUrl(x);
+        return isPendingToken(u);
+      }
+      return false;
+    }
+
+    function isRealUrl(x) {
+      const u = toMediaUrl(x);
+      if (!u || typeof u !== "string") return false;
+      if (isPendingToken(u)) return false;
+      if (u.startsWith("__PATH__:")) return false;
+      return true;
+    }
+
+async function loadPets() {
       const qRef = query(collection(db, 'pets'), where('status', '==', 'adopted'), orderBy('createdAt', 'desc'));
       const snap = await getDocs(qRef);
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      // 只顯示「已有水印成品」的合照：避免剛標記送養時（後端處理中）畫面出現空白
-      const list = all.filter(p => {
-        if (p && p.showOnHome === false) return false;
-        return Array.isArray(p.adoptedPhotos) && p.adoptedPhotos.length > 0;
-      });
+      const list = all;
       if (grid) grid.innerHTML = list.map(cardHTML).join('');
 
-      // 顯示已領養數量（只算有成品合照者）
+      // 顯示已領養數量
       const countEl = document.getElementById('adoptedCount');
       if (countEl) countEl.textContent = String(list.length);
 
@@ -636,7 +665,7 @@
       let allPhotos = [];
       for (const p of list) {
         if (Array.isArray(p.adoptedPhotos)) {
-          allPhotos.push(...p.adoptedPhotos);
+          allPhotos.push(...p.adoptedPhotos.filter(isRealUrl).map(toMediaUrl));
         }
       }
       // 去重複

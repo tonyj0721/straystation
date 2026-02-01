@@ -891,6 +891,41 @@
       return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
     }
 
+    function isPendingToken(u) {
+      return typeof u === "string" && u.startsWith("__PENDING__:");
+    }
+
+    // 舊資料/不同 schema 容錯：可能是 string URL，也可能是 {url, downloadURL, path...}
+    function toMediaUrl(x) {
+      if (typeof x === "string") return x;
+      if (x && typeof x === "object") {
+        const u = x.url || x.downloadURL || x.downloadUrl || x.src || x.href || "";
+        if (typeof u === "string" && u) return u;
+        const p = x.path || x.storagePath || x.fullPath || "";
+        if (typeof p === "string" && p) return `__PATH__:${p}`;
+      }
+      return "";
+    }
+
+    function isPendingItem(x) {
+      if (typeof x === "string") return isPendingToken(x);
+      if (x && typeof x === "object") {
+        const p = x.path || x.storagePath || x.fullPath || "";
+        if (typeof p === "string" && p.startsWith("uploads/")) return true;
+        const u = toMediaUrl(x);
+        return isPendingToken(u);
+      }
+      return false;
+    }
+
+    function isRealUrl(x) {
+      const u = toMediaUrl(x);
+      if (!u || typeof u !== "string") return false;
+      if (isPendingToken(u)) return false;
+      if (u.startsWith("__PATH__:")) return false;
+      return true;
+    }
+
     // downloadUrl → Storage path（用於 thumbByPath）
     function storagePathFromDownloadUrl(url) {
       try {
@@ -931,16 +966,21 @@
     }
 
     function createCardHTML(p) {
-      const imgs = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
-      const img = imgs[0] || '';
-
-      const mediaUrl = img;
+      const mediaCandidates = (Array.isArray(p.images) && p.images.length)
+        ? p.images
+        : (p.image ? [p.image] : []);
+      const firstItem = mediaCandidates.find(isRealUrl) || "";
+      const mediaUrl = toMediaUrl(firstItem);
       const isVid = isVideoUrl(mediaUrl);
       const videoPath = isVid ? storagePathFromDownloadUrl(mediaUrl) : "";
       const videoThumb = (isVid && p.thumbByPath && videoPath) ? (p.thumbByPath[videoPath] || "") : "";
 
-      const coverHTML = isVid
-        ? (videoThumb
+      const coverHTML = (!mediaUrl)
+          ? `
+              <div class="rounded-t-2xl aspect-[4/3] bg-gray-100"></div>
+            `
+          : (isVid
+            ? (videoThumb
           ? `
             <div class="blur-fit rounded-t-2xl aspect-[4/3]" style="--bg: url('${videoThumb}')">
               <img src="${videoThumb}" alt="${p.name}">
@@ -957,7 +997,7 @@
             <div class="blur-fit rounded-t-2xl aspect-[4/3]" style="--bg: url('${mediaUrl}')">
               <img src="${mediaUrl}" alt="${p.name}">
             </div>
-          `;
+          `);
       return `
         <article class="group rounded-2xl overflow-hidden ring-1 ring-gray-200 bg-white hover:shadow-soft transition-shadow snap-start">
           ${coverHTML}
