@@ -1374,6 +1374,9 @@
         showOnCats: true,
         showOnDogs: true,
         showOnIndex: true,
+        // 浮水印處理狀態（有上傳媒體就先設為未就緒）
+        mediaReady: (selectedFiles.length === 0),
+        wmPending: [],
         createdAt: serverTimestamp(), // Firestore 伺服器時間
       };
 
@@ -1414,19 +1417,33 @@
 
         // 2) 逐張上傳圖片，取得 Storage URL
         const urls = [];
+        const plans = [];
+        const pendingPaths = [];
+
+        // 先算出這批上傳會用到的 Storage paths，並先寫回 Firestore（避免後端處理比 images 更新更早完成）
         for (const f of selectedFiles) {
           // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
-const type = (f && f.type) || '';
-// 路徑副檔名固定用 jpg/mp4，讓後端覆蓋後檔名/格式一致（避免 iPhone/WebM 問題）
-let ext = 'bin';
-if (type.startsWith('image/')) ext = 'jpg';
-else if (type.startsWith('video/')) ext = 'mp4';
+          const type = (f && f.type) || '';
+          // 路徑副檔名固定用 jpg/mp4，讓後端覆蓋後檔名/格式一致（避免 iPhone/WebM 問題）
+          let ext = 'bin';
+          if (type.startsWith('image/')) ext = 'jpg';
+          else if (type.startsWith('video/')) ext = 'mp4';
 
-const base = f.name.replace(/\.[^.]+$/, '');
-const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
-const r = sRef(storage, path);
-await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
-urls.push(await getDownloadURL(r));
+          const base = f.name.replace(/\.[^.]+$/, '');
+          const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
+          plans.push({ f, type, path });
+          pendingPaths.push(path);
+        }
+
+        if (pendingPaths.length) {
+          await updateDoc(doc(db, "pets", docRef.id), { mediaReady: false, wmPending: pendingPaths });
+        }
+
+        // 逐檔上傳
+        for (const pl of plans) {
+          const r = sRef(storage, pl.path);
+          await uploadBytes(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
+          urls.push(await getDownloadURL(r));
         }
 
         // 3) 回寫 images 欄位
@@ -1451,30 +1468,71 @@ urls.push(await getDownloadURL(r));
         fileCount.textContent = "已選 0 / 5 張";
         syncBreedSelectors();
 
-        // 先啟動重新載入列表（避免等到提示結束才開始抓資料）
-        const reloadPromise = loadPets();
-
         // ★ 登錄完成 → 捲到最上方（先 smooth，最後再硬捲補正）
         window.scrollTo({ top: 0, behavior: "smooth" });
         setTimeout(forceScrollTop, 250); // smooth 途中若被打斷，250ms 後硬捲補正
 
+        // 若有媒體：等待後端完成浮水印後才「顯示登錄完成」並把資料放進列表（避免空窗被點開）
+        if (pendingPaths.length) {
+          Swal.fire({
+            icon: "info",
+            title: "浮水印處理中…",
+            text: "處理完成後才會顯示在列表，並自動開啟詳情。",
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            showConfirmButton: false,
+            didOpen: () => {
+              Swal.showLoading();
+            },
+            returnFocus: false,
+          });
 
-        // 成功提示後直接打開詳情
-        Swal.fire({
-          icon: "success",
-          title: "已成功登錄！",
-          showConfirmButton: false,
-          timer: 1500,
-          returnFocus: false, // 避免關閉後把焦點還給原 input 而導致捲動回彈
-        }).then(async () => {
           try {
-            await reloadPromise;
+            await __waitPetMediaReady(docRef.id);
+          } catch (e) {
+            console.error("waitPetMediaReady error:", e);
+          }
+
+          // 完成後才載入列表
+          try {
+            await loadPets();
           } catch (e) {
             console.error("loadPets error:", e);
           }
-          forceScrollTop(); // ✅ 保證捲到最上面（不會卡在一半）
-          openDialog(docRef.id);
-        });
+
+          Swal.close();
+          forceScrollTop();
+
+          Swal.fire({
+            icon: "success",
+            title: "已成功登錄！",
+            showConfirmButton: false,
+            timer: 1500,
+            returnFocus: false,
+          }).then(() => {
+            openDialog(docRef.id);
+          });
+
+        } else {
+          // 沒有媒體：直接更新列表與提示
+          const reloadPromise = loadPets();
+
+          Swal.fire({
+            icon: "success",
+            title: "已成功登錄！",
+            showConfirmButton: false,
+            timer: 1500,
+            returnFocus: false, // 避免關閉後把焦點還給原 input 而導致捲動回彈
+          }).then(async () => {
+            try {
+              await reloadPromise;
+            } catch (e) {
+              console.error("loadPets error:", e);
+            }
+            forceScrollTop(); // ✅ 保證捲到最上面（不會卡在一半）
+            openDialog(docRef.id);
+          });
+        }
 
       } catch (err) {
         stopDots();
@@ -1491,7 +1549,7 @@ urls.push(await getDownloadURL(r));
       const q = query(collection(db, "pets"), orderBy("createdAt", "desc"));
       const snap = await getDocs(q);
       pets.length = 0;
-      pets.push(...snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      pets.push(...snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p && p.mediaReady !== false));
       applyFilterAndRender();
     }
 
@@ -1603,7 +1661,7 @@ urls.push(await getDownloadURL(r));
             fbLimit(100)
           );
           const snapPrefix = await getDocs(qPrefix);
-          prefix = snapPrefix.docs.map(d => ({ id: d.id, ...d.data() }));
+          prefix = snapPrefix.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p && p.mediaReady !== false);
         } catch (e) {
           console.warn("prefix search skipped:", e);
         }
@@ -1629,6 +1687,7 @@ urls.push(await getDownloadURL(r));
 
         const contains = recentDocs
           .map(d => ({ id: d.id, ...d.data() }))
+          .filter(p => p && p.mediaReady !== false)
           .filter(p => {
             const nm = String(p.name || "");
             const nmLower = String(p.nameLower || nm).toLowerCase();

@@ -1103,7 +1103,7 @@
     async function loadPets() {
       const qRef = query(collection(db, "pets"), where("status", "==", "available"), orderBy("createdAt", "desc"));
       const snap = await getDocs(qRef);
-      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const all = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p && p.mediaReady !== false);
       pets.length = 0;
       pets.push(...all.filter(p => p.species === SPECIES));
       buildBreedOptionsByType(); // ← 新的
