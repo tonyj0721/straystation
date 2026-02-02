@@ -1040,7 +1040,7 @@
     async function loadPets() {
       const qRef = query(collection(db, "pets"), where("status", "==", "available"), orderBy("createdAt", "desc"));
       const snap = await getDocs(qRef);
-      const all = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p && p.mediaReady !== false);
+      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
       const cats = all.filter(p => p.species === "貓").slice(0, 6);
       const dogs = all.filter(p => p.species === "狗").slice(0, 6);
