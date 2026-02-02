@@ -76,12 +76,6 @@ dialog::backdrop {
   --stageW: 100vw;
 }
 
-/* 影片模式：只讓 #lbWrap 自己到底（不影響照片） */
-#lbWrap.lb-video-mode {
-  align-self: flex-end;
-  /* 影片：貼底 */
-}
-
 #lightbox #lbImg,
 #lightbox #lbVideo {
   max-height: calc(100dvh - 122px);
@@ -357,7 +351,8 @@ video.video-preview::-webkit-media-controls-enclosure {
 
 /* ✅ 只有影片時：往上移，避開 iOS 原生控制列的右上角按鈕 */
 #dlgStageWrap.dlg-video-mode #dlgClose {
-  top: -36px;   /* 你可以調 -30 ~ -48 之間，看最順的距離 */
+  top: -36px;
+  /* 你可以調 -30 ~ -48 之間，看最順的距離 */
   right: 4px;
 }
 
