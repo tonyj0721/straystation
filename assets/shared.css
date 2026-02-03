@@ -80,13 +80,13 @@ dialog::backdrop {
 
 /* Lightbox：iPhone 相簿風格的固定影片控制列 */
 #lbControls {
-  bottom: 49px;
+  bottom: 48px;
   z-index: 30;
 }
 
 .lb-controls-bar {
-  width: 310px;
-  height: 44px;
+  width: 330px;
+  height: 46px;
   padding: 8px 12px;
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.9);
@@ -455,8 +455,8 @@ video.video-preview::-webkit-media-controls-enclosure {
 
 /* Lightbox：影片時，把關閉按鈕移到影片右邊（紅圈位置附近） */
 #lbClose {
-  left: 30px;
-  top: 30px;
+  left: 20px;
+  top: 10px;
   /* 可以依實際感覺微調 */
 }
 
