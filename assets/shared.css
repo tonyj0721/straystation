@@ -79,7 +79,6 @@ dialog::backdrop {
   padding-top: var(--lbTopPad);
   padding-bottom: calc(var(--lbThumbDockH) + var(--lbCtlH) + var(--lbCtlGap));
   box-sizing: border-box;
-  transition: padding-bottom 120ms ease;
 
   --stageW: 100vw;
 }
@@ -102,7 +101,6 @@ dialog::backdrop {
 }
 
 .lb-controls-bar {
-  position: relative;
   width: min(720px, calc(100vw - 32px));
   height: var(--lbCtlH);
   padding: 8px 12px;
@@ -114,7 +112,6 @@ dialog::backdrop {
   display: flex;
   align-items: center;
   gap: 12px;
-  transition: height 120ms ease, padding 120ms ease, border-radius 120ms ease;
 }
 
 .lb-ctl-btn {
@@ -143,15 +140,6 @@ dialog::backdrop {
   display: block;
 }
 
-.lb-ctl-btn img {
-  width: 22px;
-  height: 22px;
-  object-fit: contain;
-  display: block;
-  pointer-events: none;
-  user-select: none;
-}
-
 .lb-ctl-seek {
   flex: 1 1 auto;
   min-width: 120px;
@@ -159,69 +147,17 @@ dialog::backdrop {
   appearance: none;
   height: 18px; /* 給 thumb 好抓 */
   background: transparent;
-
-  /* 已播放/未播放 的分段比例（由 JS 更新） */
-  --lbSeekPct: 0%;
 }
 
 .lb-ctl-seek:focus {
   outline: none;
 }
 
-/* iPhone 相簿：拖曳時顯示時間列（不顯示進度球） */
-.lb-scrub-times{
-  width: 100%;
-  display: none;
-  align-items: baseline;
-  justify-content: space-between;
-  color: rgba(17,24,39,0.9);
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: 0.2px;
-  padding: 0 2px;
-  user-select: none;
-  pointer-events: none;
-}
-
-.lb-scrub-times.hidden{ display:none; }
-
-.lb-controls-bar.is-scrubbing{
-  height: var(--lbCtlH);
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: center;
-  gap: 10px;
-  padding: 12px 14px;
-  border-radius: 24px;
-}
-
-.lb-controls-bar.is-scrubbing .lb-scrub-times{
-  display: flex;
-}
-
-.lb-controls-bar.is-scrubbing .lb-ctl-btn{
-  display: none;
-}
-
-.lb-controls-bar.is-scrubbing .lb-ctl-seek{
-  flex: 0 0 auto;
-  width: 100%;
-  min-width: 0;
-}
-
-
 /* WebKit track */
 .lb-ctl-seek::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 9999px;
-  /* 深色=已播放、淺色=未播放（像 iPhone 相簿） */
-  background: linear-gradient(
-    to right,
-    rgba(17, 24, 39, 0.55) 0%,
-    rgba(17, 24, 39, 0.55) var(--lbSeekPct),
-    rgba(17, 24, 39, 0.18) var(--lbSeekPct),
-    rgba(17, 24, 39, 0.18) 100%
-  );
+  background: rgba(17, 24, 39, 0.28);
 }
 
 /* WebKit thumb */
@@ -231,11 +167,8 @@ dialog::backdrop {
   width: 18px;
   height: 18px;
   border-radius: 9999px;
-  /* ✅ 拿掉進度球（仍保留一個「不可見 thumb」讓拖曳/點擊可用） */
-  background: transparent;
+  background: #111827;
   border: 0;
-  box-shadow: none;
-  opacity: 0;
   margin-top: -7px; /* (thumbH-trackH)/2 */
 }
 
@@ -243,23 +176,15 @@ dialog::backdrop {
 .lb-ctl-seek::-moz-range-track {
   height: 4px;
   border-radius: 9999px;
-  background: linear-gradient(
-    to right,
-    rgba(17, 24, 39, 0.55) 0%,
-    rgba(17, 24, 39, 0.55) var(--lbSeekPct),
-    rgba(17, 24, 39, 0.18) var(--lbSeekPct),
-    rgba(17, 24, 39, 0.18) 100%
-  );
+  background: rgba(17, 24, 39, 0.28);
 }
 
 .lb-ctl-seek::-moz-range-thumb {
   width: 18px;
   height: 18px;
   border-radius: 9999px;
-  background: transparent;
+  background: #111827;
   border: 0;
-  box-shadow: none;
-  opacity: 0;
 }
 
 /* 防止瀏覽器顯示原生控制列（我們用自製控制列） */
