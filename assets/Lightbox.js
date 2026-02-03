@@ -92,6 +92,290 @@ const lbNext = document.getElementById("lbNext");
 const lbClose = document.getElementById("lbClose");
 const lbWrap = document.getElementById("lbWrap");   // ← 新增
 
+// iPhone 相簿風格：自訂影片控制列（固定顯示，不自動隱藏）
+const lbControls = document.getElementById("lbControls");
+const lbCtlPlay = document.getElementById("lbCtlPlay");
+const lbCtlSeek = document.getElementById("lbCtlSeek");
+const lbCtlMute = document.getElementById("lbCtlMute");
+
+const __LB_SVG_PLAY  = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
+const __LB_SVG_PAUSE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zm8 0h4v14h-4z"></path></svg>';
+const __LB_SVG_VOL   = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h4l5 4V6L7 10H3z"></path></svg>';
+const __LB_SVG_MUTE  = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h4l5 4V6L7 10H3z"></path><path d="M16 9l5 5m0-5l-5 5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"></path></svg>';
+
+/**
+ * ✅ PNG 圖示支援（像 iPhone 相簿）
+ * 你可以：
+ * 1) 在 HTML button 上加 data-icon-play / data-icon-pause / data-icon-vol / data-icon-mute
+ * 2) 或在全域設 window.LB_LIGHTBOX_ICONS = { play:'...', pause:'...', volume:'...', mute:'...' }
+ *
+ * 如果沒有提供 PNG，會自動回退到 SVG。
+ */
+let __lbIcons = null;
+
+function __lbGetIcons() {
+  if (__lbIcons) return __lbIcons;
+  const g = (window && window.LB_LIGHTBOX_ICONS) ? window.LB_LIGHTBOX_ICONS : {};
+  __lbIcons = {
+    play:   (lbCtlPlay?.dataset?.iconPlay  || g.play   || "").trim(),
+    pause:  (lbCtlPlay?.dataset?.iconPause || g.pause  || "").trim(),
+    volume: (lbCtlMute?.dataset?.iconVol   || g.volume || "").trim(),
+    mute:   (lbCtlMute?.dataset?.iconMute  || g.mute   || "").trim(),
+  };
+  return __lbIcons;
+}
+
+function __lbSetBtnIcon(btn, url, fallbackSvg) {
+  if (!btn) return;
+  if (url) {
+    btn.innerHTML = `<img src="${url}" alt="" aria-hidden="true" draggable="false">`;
+  } else {
+    btn.innerHTML = fallbackSvg;
+  }
+}
+
+// iPhone 相簿：拖曳進度時顯示時間（不顯示進度球）
+let __lbControlsBar = null;
+let __lbScrubRow = null;
+let __lbScrubCur = null;
+let __lbScrubDur = null;
+
+// 這兩個高度要和 shared.css 的 --lbCtlH 對齊
+const __LB_CTLH_IDLE = "44px";
+const __LB_CTLH_SCRUB = "84px";
+
+function __lbGetControlsBar() {
+  if (__lbControlsBar) return __lbControlsBar;
+  __lbControlsBar = lbControls?.querySelector?.(".lb-controls-bar") || null;
+  return __lbControlsBar;
+}
+
+function __lbFormatTimeMMSS(sec) {
+  const s = Math.max(0, Math.round(Number(sec) || 0));
+  const hh = Math.floor(s / 3600);
+  const mm = Math.floor((s % 3600) / 60);
+  const ss = s % 60;
+  if (hh > 0) return `${hh}:${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
+  return `${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
+}
+
+// 短影片（<60s）拖曳時顯示到百分之一秒：00:04.30（像 iPhone 相簿）
+function __lbFormatTimeScrub(sec, dur) {
+  const d = Number(dur) || 0;
+  const v = Math.max(0, Number(sec) || 0);
+
+  // 長影片拖曳時不顯示小數，避免太長
+  if (!(d > 0 && d < 60)) return __lbFormatTimeMMSS(v);
+
+  const whole = Math.floor(v);
+  const hund = Math.floor((v - whole) * 100 + 1e-6);
+  const mm = Math.floor(whole / 60);
+  const ss = whole % 60;
+  return `${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}.${String(hund).padStart(2, "0")}`;
+}
+
+function __lbEnsureScrubRow() {
+  if (__lbScrubRow) return __lbScrubRow;
+  const bar = __lbGetControlsBar();
+  if (!bar) return null;
+
+  const row = document.createElement("div");
+  row.className = "lb-scrub-times hidden";
+  row.setAttribute("aria-hidden", "true");
+
+  const left = document.createElement("span");
+  left.className = "lb-scrub-cur";
+  left.textContent = "00:00";
+
+  const right = document.createElement("span");
+  right.className = "lb-scrub-dur";
+  right.textContent = "00:00";
+
+  row.appendChild(left);
+  row.appendChild(right);
+
+  // 放在 bar 最前面：scrub 模式時會顯示
+  bar.insertBefore(row, bar.firstChild);
+
+  __lbScrubRow = row;
+  __lbScrubCur = left;
+  __lbScrubDur = right;
+  return row;
+}
+
+function __lbUpdateScrubTimes() {
+  if (!lbCtlSeek || !lbVideo) return;
+  __lbEnsureScrubRow();
+  const dur = Number.isFinite(lbVideo.duration) ? lbVideo.duration : 0;
+  const cur = parseFloat(lbCtlSeek.value || "0");
+
+  if (__lbScrubCur) __lbScrubCur.textContent = __lbFormatTimeScrub(cur, dur);
+  if (__lbScrubDur) __lbScrubDur.textContent = __lbFormatTimeMMSS(dur);
+}
+
+function __lbEnterScrub() {
+  const bar = __lbGetControlsBar();
+  if (!bar) return;
+  __lbEnsureScrubRow();
+  bar.classList.add("is-scrubbing");
+  __lbScrubRow?.classList.remove("hidden");
+  // 讓控制列變高（像 iPhone 相簿），並同步保留舞台空間避免蓋到主內容
+  try { lb?.style?.setProperty("--lbCtlH", __LB_CTLH_SCRUB); } catch (_) { }
+  __lbUpdateScrubTimes();
+}
+
+function __lbExitScrub() {
+  const bar = __lbGetControlsBar();
+  if (!bar) return;
+  bar.classList.remove("is-scrubbing");
+  __lbScrubRow?.classList.add("hidden");
+  try { lb?.style?.setProperty("--lbCtlH", __LB_CTLH_IDLE); } catch (_) { }
+}
+
+let __lbSeeking = false;
+
+function __lbIsVideoMode() {
+  return !!(lbVideo && !lbVideo.classList.contains("hidden") && lbVideo.src);
+}
+
+function __lbUpdateControls(force = false) {
+  if (!lbControls) return;
+
+  // 只在影片時顯示控制列
+  if (!__lbIsVideoMode()) {
+    lbControls.classList.add("hidden");
+    __lbExitScrub();
+    return;
+  }
+  lbControls.classList.remove("hidden");
+
+  if (!lbVideo) return;
+
+  // Play / Pause icon (支援 PNG)
+  const icons = __lbGetIcons();
+  if (lbCtlPlay) {
+    if (icons.play && icons.pause) {
+      __lbSetBtnIcon(lbCtlPlay, lbVideo.paused ? icons.play : icons.pause, lbVideo.paused ? __LB_SVG_PLAY : __LB_SVG_PAUSE);
+    } else {
+      lbCtlPlay.innerHTML = lbVideo.paused ? __LB_SVG_PLAY : __LB_SVG_PAUSE;
+    }
+  }
+
+  // Volume / Mute icon (支援 PNG)
+  if (lbCtlMute) {
+    if (icons.volume && icons.mute) {
+      __lbSetBtnIcon(lbCtlMute, lbVideo.muted ? icons.mute : icons.volume, lbVideo.muted ? __LB_SVG_MUTE : __LB_SVG_VOL);
+    } else {
+      lbCtlMute.innerHTML = lbVideo.muted ? __LB_SVG_MUTE : __LB_SVG_VOL;
+    }
+  }
+
+  // Seek bar
+  if (lbCtlSeek) {
+    const dur = Number.isFinite(lbVideo.duration) ? lbVideo.duration : 0;
+    if (dur > 0) lbCtlSeek.max = String(dur);
+    if (!__lbSeeking || force) {
+      const t = Number.isFinite(lbVideo.currentTime) ? lbVideo.currentTime : 0;
+      lbCtlSeek.value = String(t);
+    }
+
+    // ✅ 已播放/未播放顏色分段（像 iPhone 相簿）
+    // 透過 CSS 變數控制 track 的 linear-gradient
+    try {
+      const cur = parseFloat(lbCtlSeek.value || "0");
+      const pct = (dur > 0 && Number.isFinite(cur)) ? (cur / dur) * 100 : 0;
+      lbCtlSeek.style.setProperty("--lbSeekPct", `${Math.max(0, Math.min(100, pct)).toFixed(3)}%`);
+    } catch (_) { }
+  }
+
+  // 拖拉時讓秒數泡泡跟著更新
+  __lbUpdateScrubTimes();
+}
+
+function __lbInitControlsOnce() {
+  if (!lbVideo || !lbControls) return;
+  if (lbControls.dataset.__inited === "1") return;
+  lbControls.dataset.__inited = "1";
+
+  // 初始 icon（PNG 優先，否則 SVG）
+  const icons = __lbGetIcons();
+  if (lbCtlPlay) {
+    __lbSetBtnIcon(lbCtlPlay, icons.play, __LB_SVG_PLAY);
+  }
+  if (lbCtlMute) {
+    __lbSetBtnIcon(lbCtlMute, icons.volume, __LB_SVG_VOL);
+  }
+
+  // 建立秒數泡泡（預設隱藏）
+  __lbEnsureScrubRow();
+  __lbExitScrub();
+
+  // 按鈕互動
+  lbCtlPlay?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (!lbVideo) return;
+    if (lbVideo.paused) {
+      try { lbVideo.play(); } catch (_) { }
+    } else {
+      try { lbVideo.pause(); } catch (_) { }
+    }
+    __lbUpdateControls(true);
+  });
+
+  lbCtlMute?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (!lbVideo) return;
+    lbVideo.muted = !lbVideo.muted;
+    __lbUpdateControls(true);
+  });
+
+  const markSeekingOn = () => {
+    __lbSeeking = true;
+    // 像 iPhone 相簿：按住拖曳時顯示時間列（不顯示進度球）
+    __lbEnterScrub();
+    // ✅ 重要：直接關掉 swipe，避免外層 touchmove 的 preventDefault 破壞 range 拖曳
+    try { isSwipeZone = false; } catch (_) { }
+  };
+
+  const markSeekingOff = () => {
+    __lbSeeking = false;
+    __lbExitScrub();
+    // 不要在這裡立刻打開 swipe：否則事件冒泡到 lightbox touchend 時會被判定成滑動切換
+    // 下一次觸控會由 lightbox 的 touchstart 重新判斷區域
+  };
+
+  lbCtlSeek?.addEventListener("pointerdown", markSeekingOn, { passive: true });
+  lbCtlSeek?.addEventListener("pointerup", markSeekingOff, { passive: true });
+  lbCtlSeek?.addEventListener("pointercancel", markSeekingOff, { passive: true });
+  lbCtlSeek?.addEventListener("touchstart", markSeekingOn, { passive: true });
+  lbCtlSeek?.addEventListener("touchend", markSeekingOff, { passive: true });
+  lbCtlSeek?.addEventListener("touchcancel", markSeekingOff, { passive: true });
+  lbCtlSeek?.addEventListener("change", markSeekingOff, { passive: true });
+
+  lbCtlSeek?.addEventListener("input", (e) => {
+    if (!lbVideo || !lbCtlSeek) return;
+    const v = parseFloat(lbCtlSeek.value || "0");
+    if (Number.isFinite(v)) {
+      try { lbVideo.currentTime = v; } catch (_) { }
+    }
+    __lbUpdateControls(true);
+  }, { passive: true });
+
+  // 影片狀態更新
+  const sync = () => __lbUpdateControls(false);
+  lbVideo.addEventListener("loadedmetadata", sync);
+  lbVideo.addEventListener("durationchange", sync);
+  lbVideo.addEventListener("timeupdate", () => {
+    if (__lbSeeking) return;
+    __lbUpdateControls(false);
+  });
+  lbVideo.addEventListener("play", sync);
+  lbVideo.addEventListener("pause", sync);
+  lbVideo.addEventListener("ended", sync);
+  lbVideo.addEventListener("volumechange", sync);
+}
+
+
 let lbImages = [];
 let lbIndex = 0;
 let lbReturnToDialog = false;
@@ -105,6 +389,8 @@ function renderLightboxMedia() {
       lbVideo.classList.add("hidden");
     }
     if (lbWrap) lbWrap.classList.remove("lb-video-mode"); // ← 新增
+    if (lbControls) lbControls.classList.add("hidden");
+  __lbExitScrub();
     return;
   }
 
@@ -122,17 +408,25 @@ function renderLightboxMedia() {
       lbVideo.classList.remove("hidden");
       lbVideo.src = url;
       lbVideo.playsInline = true;
-      lbVideo.controls = true;
+      // ✅ 改用自訂控制列（不會播放到一半隱藏）
+      lbVideo.controls = false;
+      __lbInitControlsOnce();
+      __lbUpdateControls(true);
       try { lbVideo.play().catch(() => { }); } catch (_) { }
     } else {
       try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
       lbVideo.classList.add("hidden");
+      __lbSeeking = false;
+      __lbExitScrub();
+      __lbUpdateControls(true);
       lbImg.classList.remove("hidden");
       lbImg.src = url;
     }
   } else if (lbImg) {
     lbImg.src = url;
   }
+
+  __lbUpdateControls(false);
 
   const lbThumbsInner = document.getElementById("lbThumbsInner");
   if (lbThumbsInner) {
@@ -308,6 +602,8 @@ function closeLightbox() {
     lbVideo.removeAttribute("src");
     try { lbVideo.load && lbVideo.load(); } catch (_) { }
   }
+  if (lbControls) lbControls.classList.add("hidden");
+  __lbExitScrub();
 
   if (lb) {
     lb.classList.add("hidden");
@@ -372,8 +668,14 @@ lb?.addEventListener("touchstart", (e) => {
   const h = window.innerHeight || document.documentElement.clientHeight || 0;
 
   if (isCurrentLightboxVideo()) {
-    // 影片時：上面 80% 可以左右滑，下面 20% 留給進度條
-    isSwipeZone = touchStartY < h * 0.8;
+    // 影片時：避免滑動干擾「控制列/縮圖列」操作（拖拉進度條、點縮圖）
+    const inUi = !!(e.target && e.target.closest && e.target.closest("#lbControls, #lbThumbs"));
+    if (inUi) {
+      isSwipeZone = false;
+    } else {
+      // 其他區域仍可左右滑切換
+      isSwipeZone = true;
+    }
   } else {
     // 圖片時：整個畫面都可以左右滑
     isSwipeZone = true;
@@ -381,6 +683,11 @@ lb?.addEventListener("touchstart", (e) => {
 }, { passive: true });
 
 lb?.addEventListener("touchend", (e) => {
+  // 結束點在控制列/縮圖列上：一律不要做左右滑切換（避免拖曳進度條放開時誤判）
+  const inUiEnd = !!(e.target && e.target.closest && e.target.closest("#lbControls, #lbThumbs"));
+  if (inUiEnd) return;
+
+
   // 如果這次觸控是在「下面那一塊」，直接讓影片自己處理（拉進度條等）
   if (!isSwipeZone) return;
 
@@ -399,7 +706,7 @@ lb?.addEventListener("wheel", (e) => {
 }, { passive: false });
 
 lb?.addEventListener("touchmove", (e) => {
-  // 在下面 20% 那一塊，就不要吃掉事件，讓影片進度條可以拖
+  // 在控制列/縮圖列上就不要吃掉事件，讓拖拉進度條/點縮圖順暢
   if (!isSwipeZone) return;
 
   e.preventDefault();
