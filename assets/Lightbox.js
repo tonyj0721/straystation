@@ -101,6 +101,37 @@ const __LB_SVG_PAUSE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 
 const __LB_SVG_VOL   = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h4l5 4V6L7 10H3z"></path></svg>';
 const __LB_SVG_MUTE  = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h4l5 4V6L7 10H3z"></path><path d="M16 9l5 5m0-5l-5 5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"></path></svg>';
 
+/**
+ * ✅ PNG 圖示支援（像 iPhone 相簿）
+ * 你可以：
+ * 1) 在 HTML button 上加 data-icon-play / data-icon-pause / data-icon-vol / data-icon-mute
+ * 2) 或在全域設 window.LB_LIGHTBOX_ICONS = { play:'...', pause:'...', volume:'...', mute:'...' }
+ *
+ * 如果沒有提供 PNG，會自動回退到 SVG。
+ */
+let __lbIcons = null;
+
+function __lbGetIcons() {
+  if (__lbIcons) return __lbIcons;
+  const g = (window && window.LB_LIGHTBOX_ICONS) ? window.LB_LIGHTBOX_ICONS : {};
+  __lbIcons = {
+    play:   (lbCtlPlay?.dataset?.iconPlay  || g.play   || "").trim(),
+    pause:  (lbCtlPlay?.dataset?.iconPause || g.pause  || "").trim(),
+    volume: (lbCtlMute?.dataset?.iconVol   || g.volume || "").trim(),
+    mute:   (lbCtlMute?.dataset?.iconMute  || g.mute   || "").trim(),
+  };
+  return __lbIcons;
+}
+
+function __lbSetBtnIcon(btn, url, fallbackSvg) {
+  if (!btn) return;
+  if (url) {
+    btn.innerHTML = `<img src="${url}" alt="" aria-hidden="true" draggable="false">`;
+  } else {
+    btn.innerHTML = fallbackSvg;
+  }
+}
+
 let __lbSeeking = false;
 
 function __lbIsVideoMode() {
@@ -119,14 +150,23 @@ function __lbUpdateControls(force = false) {
 
   if (!lbVideo) return;
 
-  // Play / Pause icon
+  // Play / Pause icon (支援 PNG)
+  const icons = __lbGetIcons();
   if (lbCtlPlay) {
-    lbCtlPlay.innerHTML = lbVideo.paused ? __LB_SVG_PLAY : __LB_SVG_PAUSE;
+    if (icons.play && icons.pause) {
+      __lbSetBtnIcon(lbCtlPlay, lbVideo.paused ? icons.play : icons.pause, lbVideo.paused ? __LB_SVG_PLAY : __LB_SVG_PAUSE);
+    } else {
+      lbCtlPlay.innerHTML = lbVideo.paused ? __LB_SVG_PLAY : __LB_SVG_PAUSE;
+    }
   }
 
-  // Mute icon
+  // Volume / Mute icon (支援 PNG)
   if (lbCtlMute) {
-    lbCtlMute.innerHTML = lbVideo.muted ? __LB_SVG_MUTE : __LB_SVG_VOL;
+    if (icons.volume && icons.mute) {
+      __lbSetBtnIcon(lbCtlMute, lbVideo.muted ? icons.mute : icons.volume, lbVideo.muted ? __LB_SVG_MUTE : __LB_SVG_VOL);
+    } else {
+      lbCtlMute.innerHTML = lbVideo.muted ? __LB_SVG_MUTE : __LB_SVG_VOL;
+    }
   }
 
   // Seek bar
@@ -153,9 +193,14 @@ function __lbInitControlsOnce() {
   if (lbControls.dataset.__inited === "1") return;
   lbControls.dataset.__inited = "1";
 
-  // 初始 icon
-  if (lbCtlPlay) lbCtlPlay.innerHTML = __LB_SVG_PLAY;
-  if (lbCtlMute) lbCtlMute.innerHTML = __LB_SVG_VOL;
+  // 初始 icon（PNG 優先，否則 SVG）
+  const icons = __lbGetIcons();
+  if (lbCtlPlay) {
+    __lbSetBtnIcon(lbCtlPlay, icons.play, __LB_SVG_PLAY);
+  }
+  if (lbCtlMute) {
+    __lbSetBtnIcon(lbCtlMute, icons.volume, __LB_SVG_VOL);
+  }
 
   // 按鈕互動
   lbCtlPlay?.addEventListener("click", (e) => {
