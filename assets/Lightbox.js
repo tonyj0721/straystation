@@ -88,8 +88,6 @@ const lb = document.getElementById("lightbox");
 const lbImg = document.getElementById("lbImg");
 const lbVideo = document.getElementById("lbVideo");
 const lbPrev = document.getElementById("lbPrev");
-const lbNext = document.getElementById("lbNext");
-const lbClose = document.getElementById("lbClose");
 const lbWrap = document.getElementById("lbWrap");   // ← 新增
 
 // iPhone 相簿風格：自訂影片控制列（固定顯示，不自動隱藏）
@@ -457,17 +455,6 @@ function lbShow(delta) {
   lbIndex = (lbIndex + delta + lbImages.length) % lbImages.length;
   renderLightboxMedia();
 }
-
-
-lbPrev?.addEventListener('click', (e) => {
-  e.stopPropagation();
-  lbShow(-1);
-});
-
-lbNext?.addEventListener('click', (e) => {
-  e.stopPropagation();
-  lbShow(1);
-});
 
 lbClose?.addEventListener('click', (e) => {
   e.stopPropagation();
