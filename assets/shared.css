@@ -147,6 +147,9 @@ dialog::backdrop {
   appearance: none;
   height: 18px; /* 給 thumb 好抓 */
   background: transparent;
+
+  /* 已播放/未播放 的分段比例（由 JS 更新） */
+  --lbSeekPct: 0%;
 }
 
 .lb-ctl-seek:focus {
@@ -157,7 +160,14 @@ dialog::backdrop {
 .lb-ctl-seek::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 9999px;
-  background: rgba(17, 24, 39, 0.28);
+  /* 深色=已播放、淺色=未播放（像 iPhone 相簿） */
+  background: linear-gradient(
+    to right,
+    rgba(17, 24, 39, 0.55) 0%,
+    rgba(17, 24, 39, 0.55) var(--lbSeekPct),
+    rgba(17, 24, 39, 0.18) var(--lbSeekPct),
+    rgba(17, 24, 39, 0.18) 100%
+  );
 }
 
 /* WebKit thumb */
@@ -167,8 +177,11 @@ dialog::backdrop {
   width: 18px;
   height: 18px;
   border-radius: 9999px;
-  background: #111827;
+  /* ✅ 拿掉進度球（仍保留一個「不可見 thumb」讓拖曳/點擊可用） */
+  background: transparent;
   border: 0;
+  box-shadow: none;
+  opacity: 0;
   margin-top: -7px; /* (thumbH-trackH)/2 */
 }
 
@@ -176,15 +189,23 @@ dialog::backdrop {
 .lb-ctl-seek::-moz-range-track {
   height: 4px;
   border-radius: 9999px;
-  background: rgba(17, 24, 39, 0.28);
+  background: linear-gradient(
+    to right,
+    rgba(17, 24, 39, 0.55) 0%,
+    rgba(17, 24, 39, 0.55) var(--lbSeekPct),
+    rgba(17, 24, 39, 0.18) var(--lbSeekPct),
+    rgba(17, 24, 39, 0.18) 100%
+  );
 }
 
 .lb-ctl-seek::-moz-range-thumb {
   width: 18px;
   height: 18px;
   border-radius: 9999px;
-  background: #111827;
+  background: transparent;
   border: 0;
+  box-shadow: none;
+  opacity: 0;
 }
 
 /* 防止瀏覽器顯示原生控制列（我們用自製控制列） */

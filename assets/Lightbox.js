@@ -139,6 +139,14 @@ function __lbUpdateControls(force = false) {
       const t = Number.isFinite(lbVideo.currentTime) ? lbVideo.currentTime : 0;
       lbCtlSeek.value = String(t);
     }
+
+    // ✅ 已播放/未播放顏色分段（像 iPhone 相簿）
+    // 透過 CSS 變數控制 track 的 linear-gradient
+    try {
+      const cur = parseFloat(lbCtlSeek.value || "0");
+      const pct = (dur > 0 && Number.isFinite(cur)) ? (cur / dur) * 100 : 0;
+      lbCtlSeek.style.setProperty("--lbSeekPct", `${Math.max(0, Math.min(100, pct)).toFixed(3)}%`);
+    } catch (_) { }
   }
 }
 
