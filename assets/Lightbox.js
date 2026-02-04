@@ -92,252 +92,6 @@ const lbNext = document.getElementById("lbNext");
 const lbClose = document.getElementById("lbClose");
 const lbWrap = document.getElementById("lbWrap");   // ← 新增
 
-// ---- Lightbox：自製影片控制列（仿 iPhone 相簿，不會自動隱藏） ----
-const lbControls = document.getElementById("lbControls");
-const lbPlayBtn = document.getElementById("lbPlay");
-const lbSeek = document.getElementById("lbSeek");
-const lbMuteBtn = document.getElementById("lbMute");
-
-const __LB_PLAY_PNG = './images/icons/play.png';
-const __LB_PAUSE_PNG = './images/icons/pause.png';
-const __LB_VOL_PNG = './images/icons/volume.png';
-const __LB_MUTE_PNG = './images/icons/mute.png';
-
-// Create <img> icons once (use PNG instead of SVG)
-const __lbPlayImg = document.createElement('img');
-__lbPlayImg.className = 'lb-controls-icon';
-__lbPlayImg.alt = '';
-__lbPlayImg.decoding = 'async';
-__lbPlayImg.loading = 'eager';
-__lbPlayImg.draggable = false;
-
-const __lbMuteImg = document.createElement('img');
-__lbMuteImg.className = 'lb-controls-icon';
-__lbMuteImg.alt = '';
-__lbMuteImg.decoding = 'async';
-__lbMuteImg.loading = 'eager';
-__lbMuteImg.draggable = false;
-
-// Ensure buttons contain the <img>
-if (lbPlayBtn && !lbPlayBtn.querySelector('img')) lbPlayBtn.appendChild(__lbPlayImg);
-if (lbMuteBtn && !lbMuteBtn.querySelector('img')) lbMuteBtn.appendChild(__lbMuteImg);
-
-
-// ---- iPhone 相簿拖曳進度條：展開控制列 + 顯示時間、隱藏縮圖/關閉鍵 ----
-let lbScrubTimes = document.getElementById('lbScrubTimes');
-let lbTimeCur = document.getElementById('lbTimeCur');
-let lbTimeDur = document.getElementById('lbTimeDur');
-
-function __lbEnsureTimeLabels() {
-  if (!lbControls) return;
-  const bar = lbControls.querySelector('.lb-controls-bar');
-  if (!bar) return;
-
-  lbScrubTimes = document.getElementById('lbScrubTimes');
-  lbTimeCur = document.getElementById('lbTimeCur');
-  lbTimeDur = document.getElementById('lbTimeDur');
-
-  if (lbScrubTimes && lbTimeCur && lbTimeDur) return;
-
-  lbScrubTimes = document.createElement('div');
-  lbScrubTimes.id = 'lbScrubTimes';
-  lbScrubTimes.className = 'lb-scrub-times';
-  lbTimeCur = document.createElement('span');
-  lbTimeCur.id = 'lbTimeCur';
-  lbTimeCur.textContent = '00:00.00';
-  lbTimeDur = document.createElement('span');
-  lbTimeDur.id = 'lbTimeDur';
-  lbTimeDur.textContent = '00:00';
-  lbScrubTimes.appendChild(lbTimeCur);
-  lbScrubTimes.appendChild(lbTimeDur);
-
-  // 放在 range 前面（拖曳時會顯示）
-  const seekEl = document.getElementById('lbSeek');
-  if (seekEl && seekEl.parentNode === bar) {
-    bar.insertBefore(lbScrubTimes, seekEl);
-  } else {
-    bar.insertBefore(lbScrubTimes, bar.firstChild);
-  }
-}
-
-function __lbPad2(n) { n = Math.floor(Math.max(0, n)); return (n < 10 ? '0' : '') + n; }
-
-function __lbFmtTime(sec, withCentis) {
-  const s = Math.max(0, Number(sec) || 0);
-  const m = Math.floor(s / 60);
-  const ss = s - (m * 60);
-  if (!withCentis) {
-    return `${__lbPad2(m)}:${__lbPad2(Math.floor(ss))}`;
-  }
-  const whole = Math.floor(ss);
-  const centis = Math.floor((ss - whole) * 100 + 1e-9);
-  return `${__lbPad2(m)}:${__lbPad2(whole)}.${__lbPad2(centis)}`;
-}
-
-function __lbUpdateTimeLabels(currentSec, durationSec, scrubbing) {
-  __lbEnsureTimeLabels();
-  if (!lbTimeCur || !lbTimeDur) return;
-  lbTimeCur.textContent = __lbFmtTime(currentSec, !!scrubbing);
-  lbTimeDur.textContent = __lbFmtTime(durationSec, false);
-}
-
-function __lbSetScrubUI(on) {
-  if (!lb) return;
-  lb.classList.toggle('lb-scrubbing', !!on);
-}
-
-
-let __lbScrubbing = false;
-let __lbWasPlaying = false;
-
-function __lbSetIcons() {
-  if (!lbVideo || lbVideo.classList.contains("hidden")) return;
-  if (lbPlayBtn) __lbPlayImg.src = (lbVideo.paused ? __LB_PLAY_PNG : __LB_PAUSE_PNG);
-  const muted = !!lbVideo.muted || (Number(lbVideo.volume) === 0);
-  if (lbMuteBtn) __lbMuteImg.src = (muted ? __LB_MUTE_PNG : __LB_VOL_PNG);
-}
-
-function __lbSyncSeek() {
-  if (!lbVideo || lbVideo.classList.contains("hidden") || !lbSeek) return;
-  const dur = Number(lbVideo.duration);
-  const cur = Number(lbVideo.currentTime);
-  if (!Number.isFinite(dur) || dur <= 0) {
-    lbSeek.value = "0";
-    try { lbSeek.style.setProperty("--lbSeekPct", "0%"); } catch (_) { }
-    return;
-}
-  if (__lbScrubbing) return;
-  const v = Math.max(0, Math.min(1000, Math.round((cur / dur) * 1000)));
-  lbSeek.value = String(v);
-  // 兩段色進度條（已播放 / 未播放）
-  try { lbSeek.style.setProperty('--lbSeekPct', `${(v / 1000) * 100}%`); } catch (_) { }
-
-}
-
-function __lbSyncControls() {
-  __lbSetIcons();
-  __lbSyncSeek();
-  // 同步時間（拖曳中顯示小數）
-  if (lbVideo && !lbVideo.classList.contains("hidden")) {
-    const dur = Number(lbVideo.duration);
-    if (Number.isFinite(dur) && dur > 0) {
-      const cur = Number(lbVideo.currentTime);
-      __lbUpdateTimeLabels(cur, dur, __lbScrubbing);
-    }
-  }
-}
-
-function __lbTogglePlay() {
-  if (!lbVideo || lbVideo.classList.contains("hidden")) return;
-  if (lbVideo.paused) {
-    try { lbVideo.play().catch(() => { }); } catch (_) { }
-  } else {
-    try { lbVideo.pause(); } catch (_) { }
-  }
-}
-
-function __lbToggleMute() {
-  if (!lbVideo || lbVideo.classList.contains("hidden")) return;
-  const willMute = !(lbVideo.muted || Number(lbVideo.volume) === 0);
-  lbVideo.muted = willMute;
-  if (!willMute && Number(lbVideo.volume) === 0) lbVideo.volume = 1;
-  __lbSetIcons();
-}
-
-function __lbSeekToRatio(r) {
-  if (!lbVideo || lbVideo.classList.contains("hidden")) return;
-  const dur = Number(lbVideo.duration);
-  if (!Number.isFinite(dur) || dur <= 0) return;
-  const t = Math.max(0, Math.min(dur, dur * r));
-  try { lbVideo.currentTime = t; } catch (_) { }
-}
-
-function __lbScrubStart() {
-  if (!lbVideo || lbVideo.classList.contains("hidden")) return;
-  __lbEnsureTimeLabels();
-  __lbScrubbing = true;
-  __lbWasPlaying = !lbVideo.paused;
-  try { lbVideo.pause(); } catch (_) { }
-  // 進入拖曳模式：展開 UI、顯示時間、隱藏縮圖列/關閉鍵
-  __lbSetScrubUI(true);
-
-  const dur = Number(lbVideo.duration);
-  const cur = Number(lbVideo.currentTime);
-  if (Number.isFinite(dur) && dur > 0) {
-    __lbUpdateTimeLabels(cur, dur, true);
-  }
-}
-
-
-function __lbScrubEnd() {
-  if (!lbVideo || lbVideo.classList.contains("hidden")) return;
-  __lbScrubbing = false;
-
-  // 離開拖曳模式：恢復 UI
-  __lbSetScrubUI(false);
-
-  if (__lbWasPlaying) {
-    try { lbVideo.play().catch(() => { }); } catch (_) { }
-  }
-  __lbWasPlaying = false;
-
-  // 結束時同步一次時間/圖示/進度
-  try {
-    const dur = Number(lbVideo.duration);
-    const cur = Number(lbVideo.currentTime);
-    if (Number.isFinite(dur) && dur > 0) __lbUpdateTimeLabels(cur, dur, false);
-  } catch (_) { }
-  __lbSyncControls();
-}
-
-
-// 綁定事件（只做一次）
-lbPlayBtn?.addEventListener("click", (e) => { e.stopPropagation(); __lbTogglePlay(); });
-lbMuteBtn?.addEventListener("click", (e) => { e.stopPropagation(); __lbToggleMute(); });
-
-__lbEnsureTimeLabels();
-
-lbSeek?.addEventListener("input", (e) => {
-  const v = Number(e.target?.value || 0);
-  // 先更新條的顏色（避免拖曳時延遲）
-  try { lbSeek.style.setProperty("--lbSeekPct", `${(v / 1000) * 100}%`); } catch (_) { }
-  __lbSeekToRatio(v / 1000);
-  // 拖曳時顯示「目前時間」(含小數)
-  if (__lbScrubbing && lbVideo && !lbVideo.classList.contains('hidden')) {
-    const dur = Number(lbVideo.duration);
-    if (Number.isFinite(dur) && dur > 0) {
-      const t = (v / 1000) * dur;
-      __lbUpdateTimeLabels(t, dur, true);
-    }
-  }
-});
-
-if ("PointerEvent" in window) {
-  lbSeek?.addEventListener("pointerdown", __lbScrubStart);
-  lbSeek?.addEventListener("pointerup", __lbScrubEnd);
-  lbSeek?.addEventListener("pointercancel", __lbScrubEnd);
-} else {
-  lbSeek?.addEventListener("touchstart", __lbScrubStart, { passive: true });
-  lbSeek?.addEventListener("touchend", __lbScrubEnd, { passive: true });
-  lbSeek?.addEventListener("mousedown", __lbScrubStart);
-  lbSeek?.addEventListener("mouseup", __lbScrubEnd);
-}
-
-lbVideo?.addEventListener("loadedmetadata", () => {
-  __lbSyncControls();
-  try {
-    const dur = Number(lbVideo.duration);
-    const cur = Number(lbVideo.currentTime);
-    if (Number.isFinite(dur) && dur > 0) __lbUpdateTimeLabels(cur, dur, false);
-  } catch (_) { }
-});
-lbVideo?.addEventListener("timeupdate", __lbSyncControls);
-lbVideo?.addEventListener("play", __lbSyncControls);
-lbVideo?.addEventListener("pause", __lbSyncControls);
-lbVideo?.addEventListener("volumechange", __lbSyncControls);
-lbVideo?.addEventListener("ended", __lbSyncControls);
-lbVideo?.addEventListener("click", (e) => { e.stopPropagation(); __lbTogglePlay(); });
-
 let lbImages = [];
 let lbIndex = 0;
 let lbReturnToDialog = false;
@@ -351,7 +105,6 @@ function renderLightboxMedia() {
       lbVideo.classList.add("hidden");
     }
     if (lbWrap) lbWrap.classList.remove("lb-video-mode"); // ← 新增
-    if (lb) lb.classList.remove("lb-video-ui");
     return;
   }
 
@@ -362,10 +115,6 @@ function renderLightboxMedia() {
   if (lbWrap) {
     lbWrap.classList.toggle("lb-video-mode", !!isVid);   // ← 新增
   }
-  if (lb) {
-    lb.classList.toggle("lb-video-ui", !!isVid);
-    if (!isVid) lb.classList.remove("lb-scrubbing");
-  }
 
   if (lbImg && lbVideo) {
     if (isVid) {
@@ -373,17 +122,11 @@ function renderLightboxMedia() {
       lbVideo.classList.remove("hidden");
       lbVideo.src = url;
       lbVideo.playsInline = true;
-      lbVideo.controls = false;
-      try { lbVideo.removeAttribute("controls"); } catch (_) { }
-      lbVideo.setAttribute("playsinline", "");
-      lbVideo.setAttribute("webkit-playsinline", "");
-      lbVideo.disablePictureInPicture = true;
-      __lbSyncControls();
+      lbVideo.controls = true;
       try { lbVideo.play().catch(() => { }); } catch (_) { }
     } else {
       try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
       lbVideo.classList.add("hidden");
-      if (lb) lb.classList.remove("lb-video-ui");
       lbImg.classList.remove("hidden");
       lbImg.src = url;
     }
@@ -567,7 +310,6 @@ function closeLightbox() {
   }
 
   if (lb) {
-    lb.classList.remove("lb-video-ui");
     lb.classList.add("hidden");
     lb.classList.remove("flex");
   }
@@ -630,16 +372,8 @@ lb?.addEventListener("touchstart", (e) => {
   const h = window.innerHeight || document.documentElement.clientHeight || 0;
 
   if (isCurrentLightboxVideo()) {
-    // 影片時：控制列 + 縮圖列 這一段不要左右滑（留給拖曳進度／點縮圖）
-    let cutoff = h * 0.8;
-    try {
-      const rCtrl = document.getElementById("lbControls")?.getBoundingClientRect();
-      const rThumb = document.getElementById("lbThumbs")?.getBoundingClientRect();
-      const topCtrl = (rCtrl && Number.isFinite(rCtrl.top)) ? rCtrl.top : cutoff;
-      const topThumb = (rThumb && Number.isFinite(rThumb.top)) ? rThumb.top : cutoff;
-      cutoff = Math.min(topCtrl, topThumb, cutoff);
-    } catch (_) { }
-    isSwipeZone = touchStartY < cutoff;
+    // 影片時：上面 80% 可以左右滑，下面 20% 留給進度條
+    isSwipeZone = touchStartY < h * 0.8;
   } else {
     // 圖片時：整個畫面都可以左右滑
     isSwipeZone = true;

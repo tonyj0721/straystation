@@ -599,21 +599,13 @@
   <div id="lightbox" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[9999]">
     <div id="lbWrap" class="relative inline-block">
       <img id="lbImg" class="object-contain rounded-lg" />
-      <video id="lbVideo" playsinline class="object-contain rounded-lg hidden"></video>
+      <video id="lbVideo" playsinline controls class="object-contain rounded-lg hidden"></video>
       <button id="lbClose" class="ui-close-btn absolute top-1 right-1 z-10" aria-label="關閉"><svg viewBox="0 0 24 24"
           aria-hidden="true" focusable="false" class="ui-close-icon">
           <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
         </svg></button>
       <button id="lbPrev" class="absolute text-white text-4xl select-none">❮</button>
       <button id="lbNext" class="absolute text-white text-4xl select-none">❯</button>
-    </div>
-
-    <div id="lbControls" class="absolute w-full flex justify-center px-4 pointer-events-none">
-      <div class="lb-controls-bar pointer-events-auto" role="group" aria-label="影片控制列">
-        <button id="lbPlay" class="lb-controls-btn" type="button" aria-label="播放／暫停"></button>
-        <input id="lbSeek" class="lb-controls-seek" type="range" min="0" max="1000" value="0" step="1" aria-label="播放進度" />
-        <button id="lbMute" class="lb-controls-btn" type="button" aria-label="靜音／取消靜音"></button>
-      </div>
     </div>
     <div id="lbThumbs" class="absolute w-full flex justify-center px-4 py-2">
       <div id="lbThumbsInner" class="flex gap-2"></div>
