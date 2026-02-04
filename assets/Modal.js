@@ -1064,7 +1064,6 @@ async function onDelete() {
     // 最後刪 Firestore 文件
     await deleteDoc(doc(db, "pets", currentDocId));
     await loadPets();
-    progress.done();
     await Swal.fire({ icon: "success", title: "刪除成功", showConfirmButton: false, timer: 1500, });
   } catch (err) {
     await Swal.fire({ icon: "error", title: "刪除失敗", text: err.message });
@@ -1299,7 +1298,6 @@ async function saveEdit() {
     currentDoc = { ...currentDoc, ...newData, mediaReady: (__updatePayload.mediaReady ?? currentDoc?.mediaReady), wmPending: (__updatePayload.wmPending ?? currentDoc?.wmPending) };
 
     // ⑤ UI 收尾（無論彈窗狀態，成功提示一下）
-    progress.done();
     progress.stop();
     btn.disabled = false;
     txt.textContent = "儲存";
