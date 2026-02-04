@@ -92,70 +92,9 @@ const lbNext = document.getElementById("lbNext");
 const lbClose = document.getElementById("lbClose");
 const lbWrap = document.getElementById("lbWrap");   // ← 新增
 
-// ---- iPhone Photos style controls (custom) ----
-const lbControls = document.getElementById("lbControls");
-const lbPlayBtn = document.getElementById("lbPlayBtn");
-const lbMuteBtn = document.getElementById("lbMuteBtn");
-const lbSeek = document.getElementById("lbSeek");
-const lbPlayIcon = document.getElementById("lbPlayIcon");
-const lbMuteIcon = document.getElementById("lbMuteIcon");
-const lbTimeRow = document.getElementById("lbTimeRow");
-const lbCurTime = document.getElementById("lbCurTime");
-const lbDurTime = document.getElementById("lbDurTime");
-
-// 你有改過 png 路徑的話，就改這 4 個常數即可
-const __LB_PLAY_PNG  = "lb_play.png";
-const __LB_PAUSE_PNG = "lb_pause.png";
-const __LB_VOL_PNG   = "lb_volume.png";
-const __LB_MUTE_PNG  = "lb_mute.png";
-
-let __lbWasPlayingBeforeScrub = false;
-let __lbScrubbing = false;
-   // ← 新增
-
 let lbImages = [];
 let lbIndex = 0;
 let lbReturnToDialog = false;
-
-function __fmtTime(sec, withMs) {
-  if (!isFinite(sec) || sec < 0) sec = 0;
-  const m = Math.floor(sec / 60);
-  const s = sec - m * 60;
-  const mm = String(m).padStart(2, "0");
-  const ss = String(Math.floor(s)).padStart(2, "0");
-  if (!withMs) return `${mm}:${ss}`;
-  const cs = Math.floor((s - Math.floor(s)) * 100); // centiseconds
-  return `${mm}:${ss}.${String(cs).padStart(2, "0")}`;
-}
-
-function __setSeekPct(pct) {
-  if (!lbSeek) return;
-  const v = Math.max(0, Math.min(100, pct));
-  lbSeek.style.setProperty("--lbSeekPct", v + "%");
-}
-
-function __syncIcons() {
-  if (!lbVideo) return;
-  if (lbPlayIcon) lbPlayIcon.src = lbVideo.paused ? __LB_PLAY_PNG : __LB_PAUSE_PNG;
-  if (lbMuteIcon) lbMuteIcon.src = lbVideo.muted ? __LB_MUTE_PNG : __LB_VOL_PNG;
-}
-
-function __syncTimeUI(current, duration) {
-  if (lbCurTime) lbCurTime.textContent = __fmtTime(current, true);
-  if (lbDurTime) lbDurTime.textContent = __fmtTime(duration, false);
-}
-
-function __syncSeekUI() {
-  if (!lbSeek || !lbVideo) return;
-  const dur = lbVideo.duration || 0;
-  const cur = lbVideo.currentTime || 0;
-  const max = isFinite(dur) && dur > 0 ? dur : 1;
-  lbSeek.max = String(max);
-  lbSeek.value = String(Math.min(cur, max));
-  __setSeekPct((Math.min(cur, max) / max) * 100);
-  __syncTimeUI(cur, max);
-}
-
 
 function renderLightboxMedia() {
   if (!lbImages.length) {
@@ -166,8 +105,6 @@ function renderLightboxMedia() {
       lbVideo.classList.add("hidden");
     }
     if (lbWrap) lbWrap.classList.remove("lb-video-mode"); // ← 新增
-    if (lbControls) lbControls.classList.add('hidden');
-    if (lbWrap) lbWrap.classList.remove('lb-scrubbing');
     return;
   }
 
@@ -185,21 +122,16 @@ function renderLightboxMedia() {
       lbVideo.classList.remove("hidden");
       lbVideo.src = url;
       lbVideo.playsInline = true;
-      lbVideo.controls = false;
-      if (lbControls) lbControls.classList.remove('hidden');
-      __syncIcons();
-      __syncSeekUI();
+      lbVideo.controls = true;
       try { lbVideo.play().catch(() => { }); } catch (_) { }
     } else {
       try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
       lbVideo.classList.add("hidden");
       lbImg.classList.remove("hidden");
       lbImg.src = url;
-      if (lbControls) lbControls.classList.add('hidden');
     }
   } else if (lbImg) {
     lbImg.src = url;
-      if (lbControls) lbControls.classList.add('hidden');
   }
 
   const lbThumbsInner = document.getElementById("lbThumbsInner");
@@ -482,94 +414,3 @@ window.openLightbox = openLightbox;
 window.closeLightbox = closeLightbox;
 window.lockScroll = lockScroll;
 window.unlockScroll = unlockScroll;
-
-// ----------------- Custom control bindings -----------------
-(function bindLightboxControls(){
-  if (!lbVideo || !lbSeek) return;
-
-  // Init icons if present
-  if (lbPlayIcon && !lbPlayIcon.src) lbPlayIcon.src = __LB_PLAY_PNG;
-  if (lbMuteIcon && !lbMuteIcon.src) lbMuteIcon.src = __LB_VOL_PNG;
-
-  const onPlayToggle = (e) => {
-    e && e.preventDefault();
-    if (lbVideo.classList.contains("hidden")) return;
-    if (lbVideo.paused) lbVideo.play().catch(()=>{});
-    else lbVideo.pause();
-  };
-
-  const onMuteToggle = (e) => {
-    e && e.preventDefault();
-    if (lbVideo.classList.contains("hidden")) return;
-    lbVideo.muted = !lbVideo.muted;
-    __syncIcons();
-  };
-
-  lbPlayBtn && lbPlayBtn.addEventListener("click", onPlayToggle);
-  lbMuteBtn && lbMuteBtn.addEventListener("click", onMuteToggle);
-
-  // Keep UI in sync
-  lbVideo.addEventListener("play", __syncIcons);
-  lbVideo.addEventListener("pause", __syncIcons);
-  lbVideo.addEventListener("volumechange", __syncIcons);
-  lbVideo.addEventListener("timeupdate", () => { if (!__lbScrubbing) __syncSeekUI(); });
-  lbVideo.addEventListener("loadedmetadata", __syncSeekUI);
-  lbVideo.addEventListener("durationchange", __syncSeekUI);
-
-  const beginScrub = (e) => {
-    if (lbVideo.classList.contains("hidden")) return;
-    __lbScrubbing = true;
-    __lbWasPlayingBeforeScrub = !lbVideo.paused;
-    try { lbVideo.pause(); } catch(_){}
-    lbWrap && lbWrap.classList.add("lb-scrubbing");
-    __syncSeekUI();
-    // iOS: avoid page scrolling during scrub
-    if (e && e.cancelable) e.preventDefault();
-  };
-
-  const endScrub = (e) => {
-    if (!__lbScrubbing) return;
-    __lbScrubbing = false;
-    lbWrap && lbWrap.classList.remove("lb-scrubbing");
-    if (__lbWasPlayingBeforeScrub) lbVideo.play().catch(()=>{});
-    __syncSeekUI();
-    if (e && e.cancelable) e.preventDefault();
-  };
-
-  const scrubToEvent = (e) => {
-    if (!__lbScrubbing) return;
-    const rect = lbSeek.getBoundingClientRect();
-    const clientX =
-      (e.touches && e.touches[0] && e.touches[0].clientX) ||
-      (e.changedTouches && e.changedTouches[0] && e.changedTouches[0].clientX) ||
-      e.clientX;
-    const pct = (clientX - rect.left) / rect.width;
-    const max = parseFloat(lbSeek.max || "1") || 1;
-    const t = Math.max(0, Math.min(max, pct * max));
-    lbVideo.currentTime = t;
-    lbSeek.value = String(t);
-    __setSeekPct((t / max) * 100);
-    __syncTimeUI(t, max);
-    if (e && e.cancelable) e.preventDefault();
-  };
-
-  // Pointer events first (Chrome/modern)
-  lbSeek.addEventListener("pointerdown", (e) => { beginScrub(e); scrubToEvent(e); }, { passive:false });
-  window.addEventListener("pointermove", scrubToEvent, { passive:false });
-  window.addEventListener("pointerup", endScrub, { passive:false });
-  window.addEventListener("pointercancel", endScrub, { passive:false });
-
-  // iOS Safari fallback
-  lbSeek.addEventListener("touchstart", (e) => { beginScrub(e); scrubToEvent(e); }, { passive:false });
-  window.addEventListener("touchmove", scrubToEvent, { passive:false });
-  window.addEventListener("touchend", endScrub, { passive:false });
-  window.addEventListener("touchcancel", endScrub, { passive:false });
-
-  // Also allow dragging the native range value (desktop)
-  lbSeek.addEventListener("input", (e) => {
-    if (lbVideo.classList.contains("hidden")) return;
-    const t = parseFloat(lbSeek.value || "0") || 0;
-    lbVideo.currentTime = t;
-    __syncSeekUI();
-  });
-})();
