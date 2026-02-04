@@ -379,155 +379,137 @@ video.video-preview::-webkit-media-controls-enclosure {
   }
 }
 
+/* ================================
+   iPhone Photos-style video controls
+   - Shows only for video
+   - Fixed above thumbnails
+   - Scrubbing expands UP (image size unchanged)
+==================================*/
 
-/* ===============================
-   Lightbox 影片控制列（仿 iPhone 相簿）：拖曳時向上展開、圖片不縮放
-   - 關鍵：控制列用 fixed + bottom 固定，展開只往上長
-   =============================== */
-
-/* 可調：進度條粗細（拖曳前後都一樣） */
 :root{
-  --lbTrackH: 6px;          /* 進度條厚度：想更細改 4px、想更厚改 8px */
-  --lbThumb: 14px;          /* 拖曳球大小 */
-  --lbControlsGap: 14px;    /* 控制列與縮圖列間距 */
-  --lbThumbsH: 70px;        /* 縮圖高度（和 .lb-thumb 一致） */
+  --lbTrackH: 6px; /* 進度條粗細：4 更細、8 更厚 */
+  --lbSeekPlayed: rgba(0,0,0,.55);
+  --lbSeekUnplayed: rgba(0,0,0,.18);
 }
 
-/* 控制列容器：固定在縮圖列上方（不影響圖片大小） */
-#lbControls{
+#lbWrap.lb-video-mode #lbControls{ display:flex; }
+#lbWrap:not(.lb-video-mode) #lbControls{ display:none !important; }
+
+#lbControls.lb-controls{
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: calc(env(safe-area-inset-bottom) + var(--lbThumbsH) + var(--lbControlsGap));
-  z-index: 40;
-  display: flex;
-  justify-content: center;
-  pointer-events: none; /* 讓外層不吃點擊；內層 bar 再打開 */
-}
-
-#lbControls .lb-controls-bar{
-  pointer-events: auto;
-  width: min(560px, calc(100vw - 28px));
-  background: rgba(0,0,0,.45);
-  -webkit-backdrop-filter: blur(18px);
-  backdrop-filter: blur(18px);
-  border-radius: 9999px;
-  padding: 10px 14px;
-  display: flex;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(720px, calc(100vw - 24px));
+  bottom: calc(env(safe-area-inset-bottom) + 86px); /* 86px = 縮圖列高度（你目前 lightbox padding-bottom 也用到） */
+  z-index: 10005;
   align-items: center;
   gap: 12px;
-  box-shadow: 0 16px 40px rgba(0,0,0,.35);
-}
-
-/* 拖曳時：只改 bar 內部排版（不動 bottom），所以會「向上」展開 */
-#lightbox.lb-scrubbing #lbControls .lb-controls-bar{
-  border-radius: 24px;
-  padding: 12px 16px;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 10px;
-}
-
-/* 拖曳時：縮圖列、左右切換、關閉鍵隱藏（圖片大小不變） */
-#lightbox.lb-scrubbing #lbThumbs{
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-}
-
-#lightbox.lb-scrubbing #lbPrev,
-#lightbox.lb-scrubbing #lbNext,
-#lightbox.lb-scrubbing #lbClose{
-  opacity: 0;
-  pointer-events: none;
-}
-
-/* 拖曳時：隱藏播放/靜音，只留時間與進度條（跟 iPhone 相簿一致） */
-#lightbox.lb-scrubbing #lbPlay,
-#lightbox.lb-scrubbing #lbMute{
-  display: none;
-}
-
-/* 時間列：平常不顯示，拖曳時才顯示 */
-.lb-scrub-times{
-  display: none;
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum";
-  color: rgba(255,255,255,.92);
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 1;
-  justify-content: space-between;
-  align-items: center;
-}
-
-#lightbox.lb-scrubbing .lb-scrub-times{
-  display: flex;
-}
-
-/* ===== 兩色進度條（已播放/未播放） ===== */
-#lbSeek{
-  flex: 1 1 auto;
-  width: 100%;
-  -webkit-appearance: none;
-  appearance: none;
-  background: transparent;
-  height: 28px;  /* 給 thumb 觸控區 */
-  margin: 0;
-  padding: 0;
-  touch-action: none;
-}
-
-/* WebKit track */
-#lbSeek::-webkit-slider-runnable-track{
-  height: var(--lbTrackH);
+  padding: 14px 16px;
   border-radius: 9999px;
-  background:
-    linear-gradient(to right,
-      rgba(255,255,255,.55) 0%,
-      rgba(255,255,255,.55) var(--lbSeekPct, 0%),
-      rgba(255,255,255,.18) var(--lbSeekPct, 0%),
-      rgba(255,255,255,.18) 100%);
+  background: rgba(245,245,245,.75);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 10px 28px rgba(0,0,0,.18);
+  pointer-events: auto;
 }
 
-/* WebKit thumb */
-#lbSeek::-webkit-slider-thumb{
-  -webkit-appearance: none;
-  appearance: none;
-  width: var(--lbThumb);
-  height: var(--lbThumb);
-  border-radius: 9999px;
-  background: rgba(255,255,255,.95);
-  box-shadow: 0 6px 16px rgba(0,0,0,.35);
-  margin-top: calc((var(--lbTrackH) - var(--lbThumb)) / 2);
-}
-
-/* Firefox track */
-#lbSeek::-moz-range-track{
-  height: var(--lbTrackH);
-  border-radius: 9999px;
-  background: rgba(255,255,255,.18);
-}
-
-#lbSeek::-moz-range-progress{
-  height: var(--lbTrackH);
-  border-radius: 9999px;
-  background: rgba(255,255,255,.55);
-}
-
-#lbSeek::-moz-range-thumb{
-  width: var(--lbThumb);
-  height: var(--lbThumb);
+.lb-ctl-btn{
+  width: 44px;
+  height: 44px;
   border-radius: 9999px;
   border: 0;
-  background: rgba(255,255,255,.95);
-  box-shadow: 0 6px 16px rgba(0,0,0,.35);
+  background: transparent;
+  display: grid;
+  place-items: center;
+  padding: 0;
 }
-
-/* icon img */
-.lb-controls-icon{
+.lb-ctl-btn img{
   width: 28px;
   height: 28px;
   display: block;
 }
 
+.lb-seek-wrap{ flex: 1 1 auto; min-width: 120px; }
+
+.lb-time-row{
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 20px;
+  line-height: 1.2;
+  margin-bottom: 10px;
+  color: rgba(0,0,0,.78);
+}
+
+/* Two-tone seek bar (always same thickness) */
+#lbSeek.lb-controls-seek{
+  width: 100%;
+  height: 24px; /* 給 thumb 空間，避免掉下去 */
+  --lbSeekPct: 0%;
+  background: linear-gradient(to right,
+    var(--lbSeekPlayed) 0%,
+    var(--lbSeekPlayed) var(--lbSeekPct),
+    var(--lbSeekUnplayed) var(--lbSeekPct),
+    var(--lbSeekUnplayed) 100%);
+  background-size: 100% var(--lbTrackH);
+  background-repeat: no-repeat;
+  background-position: center;
+  border-radius: 9999px;
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
+  padding: 0;
+  margin: 0;
+  touch-action: none; /* iOS 可拖曳 */
+}
+
+#lbSeek.lb-controls-seek::-webkit-slider-runnable-track{
+  height: var(--lbTrackH);
+  background: transparent;
+  border: 0;
+}
+#lbSeek.lb-controls-seek::-webkit-slider-thumb{
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,.25);
+  margin-top: calc((var(--lbTrackH) - 12px) / 2); /* thumb 置中 */
+}
+
+#lbSeek.lb-controls-seek::-moz-range-track{
+  height: var(--lbTrackH);
+  background: transparent;
+  border: 0;
+}
+#lbSeek.lb-controls-seek::-moz-range-progress{
+  height: var(--lbTrackH);
+  background: transparent;
+}
+#lbSeek.lb-controls-seek::-moz-range-thumb{
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: #fff;
+  border: 0;
+}
+
+/* Scrubbing state (expand upward; don't resize media) */
+#lbWrap.lb-scrubbing #lbThumbs{ display:none; }
+#lbWrap.lb-scrubbing #lbPrev,
+#lbWrap.lb-scrubbing #lbNext,
+#lbWrap.lb-scrubbing #lbClose{ display:none !important; }
+
+#lbWrap.lb-scrubbing #lbControls{
+  border-radius: 28px;
+  padding: 16px 18px 18px;
+}
+#lbWrap.lb-scrubbing #lbTimeRow{ display:flex; }
+#lbWrap.lb-scrubbing #lbPlayBtn,
+#lbWrap.lb-scrubbing #lbMuteBtn{ display:none; }
+
+/* IMPORTANT: expand UP (bottom fixed, height grows upward) */
+#lbWrap.lb-scrubbing #lbControls{
+  bottom: calc(env(safe-area-inset-bottom) + 86px);
+}
