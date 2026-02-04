@@ -1409,7 +1409,7 @@
       const submitBtn = $("#submitBtn");
       const submitText = $("#submitText");
       submitBtn.disabled = true;
-      const stopDots = startDots(submitText, "登錄中");
+      const stopProgress = startProgress(submitText, "登錄中");
 
       try {
         // 1) 新增基本文件
@@ -1452,7 +1452,7 @@
         }
 
         // UI 收尾
-        stopDots();
+        stopProgress();
         submitBtn.disabled = false;
         submitText.textContent = "登錄";
 
@@ -1535,7 +1535,7 @@
         }
 
       } catch (err) {
-        stopDots();
+        stopProgress();
         submitBtn.disabled = false;
         submitText.textContent = "登錄";
         Swal.fire({ icon: "error", title: "登錄失敗", text: err.message });

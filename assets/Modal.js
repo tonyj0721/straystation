@@ -475,6 +475,53 @@ function startDots(span, base) {
   return () => clearInterval(t); // 回傳停止函式
 }
 
+// ===============================
+// 小工具：按鈕/文字上的「進度條（不確定進度）」
+//  - target 可傳 button 或 span
+//  - 回傳 stop() 會把內容還原
+// ===============================
+function startProgress(target, base) {
+  if (!target) return () => { };
+
+  const orig = {
+    html: target.innerHTML,
+    text: target.textContent,
+    ariaBusy: target.getAttribute && target.getAttribute("aria-busy"),
+  };
+
+  // 統一用「兩行：文字 + 小進度條」避免版面跳
+  const label = document.createElement("span");
+  label.className = "btn-progress-label";
+  label.textContent = base;
+
+  const bar = document.createElement("span");
+  bar.className = "btn-progress-bar";
+
+  const wrap = document.createElement("span");
+  wrap.className = "btn-progress";
+  wrap.appendChild(label);
+  wrap.appendChild(bar);
+
+  // 清空再塞（button / span 都可）
+  target.innerHTML = "";
+  target.appendChild(wrap);
+  try { target.setAttribute("aria-busy", "true"); } catch (_) { }
+
+  return () => {
+    // 還原
+    try {
+      target.innerHTML = orig.html;
+    } catch (_) {
+      // fallback
+      try { target.textContent = orig.text; } catch { }
+    }
+    try {
+      if (orig.ariaBusy == null) target.removeAttribute("aria-busy");
+      else target.setAttribute("aria-busy", orig.ariaBusy);
+    } catch (_) { }
+  };
+}
+
 // 用 nameLower / name 檢查是否重複；exceptId 表示忽略自己（編輯時用）
 async function isNameTaken(name, exceptId = null) {
   const kw = (name || "").trim().toLowerCase();
@@ -1055,7 +1102,7 @@ async function saveEdit() {
 
   // ② 確認後才開始「儲存中…」與鎖定按鈕
   btn.disabled = true;
-  const stopDots = startDots(txt, "儲存中");
+  const stopProgress = startProgress(txt, "儲存中");
 
   try {
     // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
@@ -1178,7 +1225,7 @@ async function saveEdit() {
     currentDoc = { ...currentDoc, ...newData, mediaReady: (__updatePayload.mediaReady ?? currentDoc?.mediaReady), wmPending: (__updatePayload.wmPending ?? currentDoc?.wmPending) };
 
     // ⑤ UI 收尾（無論彈窗狀態，成功提示一下）
-    stopDots();
+    stopProgress();
     btn.disabled = false;
     txt.textContent = "儲存";
 
@@ -1192,7 +1239,7 @@ async function saveEdit() {
 
   } catch (err) {
     // 失敗也要確保 UI 復原
-    stopDots();
+    stopProgress();
     btn.disabled = false;
     txt.textContent = "儲存";
     await swalInDialog({ icon: "error", title: "更新失敗", text: err.message });
@@ -1870,7 +1917,7 @@ async function onConfirmAdopted() {
   // 動態點點（沿用你檔案內的 startDots）
   btn.disabled = true;
   btn.setAttribute("aria-busy", "true");
-  const stopDots = startDots(btn, "儲存中");
+  const stopProgress = startProgress(btn, "儲存中");
 
   const files = adoptedSelected.slice(0, 5);
   const urls = [];
@@ -1943,7 +1990,7 @@ async function onConfirmAdopted() {
   } catch (err) {
     await swalInDialog({ icon: "error", title: "已送養標記失敗", text: err.message });
   } finally {
-    stopDots();
+    stopProgress();
     btn.disabled = false;
     btn.removeAttribute("aria-busy");
     btn.textContent = "儲存領養資訊";
