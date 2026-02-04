@@ -567,7 +567,6 @@ function startFakeProgress(setFn) {
 }
 
 // 用 nameLower / name 檢查是否重複；exceptId 表示忽略自己（編輯時用）
- / name 檢查是否重複；exceptId 表示忽略自己（編輯時用）
 async function isNameTaken(name, exceptId = null) {
   const kw = (name || "").trim().toLowerCase();
   if (!kw) return false;
