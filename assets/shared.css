@@ -69,174 +69,22 @@ dialog::backdrop {
 
   align-items: center;
   justify-content: center;
+  padding-top: 36px;
+  padding-bottom: 86px;
   box-sizing: border-box;
-
-  /* ✅ Layout vars（對齊 iPhone 相簿） */
-  --lbTopPad: 36px;
-  --lbThumbsH: 86px;   /* 70px thumb + py-2(16px) */
-  --lbControlsH: 0px;  /* 非影片時 = 0 */
-
-  padding-top: var(--lbTopPad);
-  padding-bottom: calc(var(--lbThumbsH) + var(--lbControlsH));
 
   --stageW: 100vw;
 }
 
-/* 只有影片時才需要控制列的空間 */
-#lightbox.lb-video-ui {
-  --lbControlsH: 56px; /* 控制列高度（可微調 48~60） */
-}
-
 #lightbox #lbImg,
 #lightbox #lbVideo {
-  max-height: calc(100dvh - (var(--lbTopPad) + var(--lbThumbsH) + var(--lbControlsH)));
+  max-height: calc(100dvh - 122px);
   max-width: calc(100vw - 72px);
 }
 
 #lbThumbs {
   /* 🔥 貼齊 iPhone 下方 UI */
   bottom: env(safe-area-inset-bottom);
-  height: var(--lbThumbsH);
-}
-
-/* ===============================
-   Lightbox：影片控制列（仿 iPhone 相簿）
-   - 貼齊縮圖列上方
-   - 不會播放到一半自動隱藏（因為是自製 UI）
-   =============================== */
-
-#lbControls {
-  left: 0;
-  right: 0;
-  bottom: calc(env(safe-area-inset-bottom) + var(--lbThumbsH));
-  height: var(--lbControlsH);
-  align-items: center;
-  box-sizing: border-box;
-}
-
-#lightbox:not(.lb-video-ui) #lbControls {
-  display: none;
-}
-
-.lb-controls-bar {
-  width: min(720px, 100%);
-  height: 44px;
-  border-radius: 9999px;
-  padding: 0 10px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-
-  background: rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.lb-controls-btn {
-  width: 44px;
-  height: 44px;
-  border: 0;
-  padding: 0;
-  border-radius: 9999px;
-  background: transparent;
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.lb-controls-btn:active {
-  transform: scale(0.98);
-}
-
-.lb-controls-icon{width:22px;height:22px;display:block;object-fit:contain;}
-.lb-controls-btn img {
-  width: 22px;
-  height: 22px;
-display: block;
-}
-
-.lb-controls-seek {
-  flex: 1 1 auto;
-  min-width: 120px;
-  /* 給 range 足夠的垂直空間，避免 thumb 被推到 track 下方 */
-  height: 24px;
-  border-radius: 9999px;
-
-  /* 進度條兩段色（已播放 / 未播放） */
-  --lbSeekPct: 0%;
-  --lbSeekPlayed: rgba(0, 0, 0, 0.55);
-  --lbSeekUnplayed: rgba(0, 0, 0, 0.18);
-
-  /* 把 3px 的 track 畫在正中間（像 iPhone 相簿） */
-  background: linear-gradient(to right,
-    var(--lbSeekPlayed) 0%,
-    var(--lbSeekPlayed) var(--lbSeekPct),
-    var(--lbSeekUnplayed) var(--lbSeekPct),
-    var(--lbSeekUnplayed) 100%);
-  background-size: 100% 3px;
-  background-repeat: no-repeat;
-  background-position: center;
-
-  -webkit-appearance: none;
-  appearance: none;
-  outline: none;
-  padding: 0;
-  margin: 0;
-}
-
-/* WebKit track（Safari / Chrome） */
-.lb-controls-seek::-webkit-slider-runnable-track {
-  height: 3px;
-  border-radius: 9999px;
-  background: linear-gradient(to right,
-    var(--lbSeekPlayed) 0%,
-    var(--lbSeekPlayed) var(--lbSeekPct),
-    var(--lbSeekUnplayed) var(--lbSeekPct),
-    var(--lbSeekUnplayed) 100%);
-}
-
-/* Firefox track */
-.lb-controls-seek::-moz-range-track {
-  height: 3px;
-  border-radius: 9999px;
-  background: linear-gradient(to right,
-    var(--lbSeekPlayed) 0%,
-    var(--lbSeekPlayed) var(--lbSeekPct),
-    var(--lbSeekUnplayed) var(--lbSeekPct),
-    var(--lbSeekUnplayed) 100%);
-}
-
-
-/* WebKit */
-.lb-controls-seek::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 12px;
-  height: 12px;
-  border-radius: 9999px;
-  background: #fff;
-  /* 讓白色小球垂直置中在 3px track 上（Safari/Chrome） */
-  margin-top: calc((3px - 12px) / 2);
-}
-
-/* Firefox */
-.lb-controls-seek::-moz-range-thumb {
-  width: 12px;
-  height: 12px;
-  border-radius: 9999px;
-  background: #fff;
-  border: 0;
-}
-
-/* 讓主影片也不顯示原生控制列（iOS / Chrome） */
-#lbVideo::-webkit-media-controls,
-#lbVideo::-webkit-media-controls-panel,
-#lbVideo::-webkit-media-controls-play-button,
-#lbVideo::-webkit-media-controls-start-playback-button,
-#lbVideo::-webkit-media-controls-enclosure {
-  display: none !important;
-  -webkit-appearance: none;
 }
 
 /* 🔥 Lightbox 縮圖：改用 wrapper（支援影片） */
@@ -530,3 +378,156 @@ video.video-preview::-webkit-media-controls-enclosure {
     top: -36px;
   }
 }
+
+
+/* ===============================
+   Lightbox 影片控制列（仿 iPhone 相簿）：拖曳時向上展開、圖片不縮放
+   - 關鍵：控制列用 fixed + bottom 固定，展開只往上長
+   =============================== */
+
+/* 可調：進度條粗細（拖曳前後都一樣） */
+:root{
+  --lbTrackH: 6px;          /* 進度條厚度：想更細改 4px、想更厚改 8px */
+  --lbThumb: 14px;          /* 拖曳球大小 */
+  --lbControlsGap: 14px;    /* 控制列與縮圖列間距 */
+  --lbThumbsH: 70px;        /* 縮圖高度（和 .lb-thumb 一致） */
+}
+
+/* 控制列容器：固定在縮圖列上方（不影響圖片大小） */
+#lbControls{
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(env(safe-area-inset-bottom) + var(--lbThumbsH) + var(--lbControlsGap));
+  z-index: 40;
+  display: flex;
+  justify-content: center;
+  pointer-events: none; /* 讓外層不吃點擊；內層 bar 再打開 */
+}
+
+#lbControls .lb-controls-bar{
+  pointer-events: auto;
+  width: min(560px, calc(100vw - 28px));
+  background: rgba(0,0,0,.45);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  border-radius: 9999px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 16px 40px rgba(0,0,0,.35);
+}
+
+/* 拖曳時：只改 bar 內部排版（不動 bottom），所以會「向上」展開 */
+#lightbox.lb-scrubbing #lbControls .lb-controls-bar{
+  border-radius: 24px;
+  padding: 12px 16px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+/* 拖曳時：縮圖列、左右切換、關閉鍵隱藏（圖片大小不變） */
+#lightbox.lb-scrubbing #lbThumbs{
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+#lightbox.lb-scrubbing #lbPrev,
+#lightbox.lb-scrubbing #lbNext,
+#lightbox.lb-scrubbing #lbClose{
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 拖曳時：隱藏播放/靜音，只留時間與進度條（跟 iPhone 相簿一致） */
+#lightbox.lb-scrubbing #lbPlay,
+#lightbox.lb-scrubbing #lbMute{
+  display: none;
+}
+
+/* 時間列：平常不顯示，拖曳時才顯示 */
+.lb-scrub-times{
+  display: none;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  color: rgba(255,255,255,.92);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#lightbox.lb-scrubbing .lb-scrub-times{
+  display: flex;
+}
+
+/* ===== 兩色進度條（已播放/未播放） ===== */
+#lbSeek{
+  flex: 1 1 auto;
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  height: 28px;  /* 給 thumb 觸控區 */
+  margin: 0;
+  padding: 0;
+  touch-action: none;
+}
+
+/* WebKit track */
+#lbSeek::-webkit-slider-runnable-track{
+  height: var(--lbTrackH);
+  border-radius: 9999px;
+  background:
+    linear-gradient(to right,
+      rgba(255,255,255,.55) 0%,
+      rgba(255,255,255,.55) var(--lbSeekPct, 0%),
+      rgba(255,255,255,.18) var(--lbSeekPct, 0%),
+      rgba(255,255,255,.18) 100%);
+}
+
+/* WebKit thumb */
+#lbSeek::-webkit-slider-thumb{
+  -webkit-appearance: none;
+  appearance: none;
+  width: var(--lbThumb);
+  height: var(--lbThumb);
+  border-radius: 9999px;
+  background: rgba(255,255,255,.95);
+  box-shadow: 0 6px 16px rgba(0,0,0,.35);
+  margin-top: calc((var(--lbTrackH) - var(--lbThumb)) / 2);
+}
+
+/* Firefox track */
+#lbSeek::-moz-range-track{
+  height: var(--lbTrackH);
+  border-radius: 9999px;
+  background: rgba(255,255,255,.18);
+}
+
+#lbSeek::-moz-range-progress{
+  height: var(--lbTrackH);
+  border-radius: 9999px;
+  background: rgba(255,255,255,.55);
+}
+
+#lbSeek::-moz-range-thumb{
+  width: var(--lbThumb);
+  height: var(--lbThumb);
+  border-radius: 9999px;
+  border: 0;
+  background: rgba(255,255,255,.95);
+  box-shadow: 0 6px 16px rgba(0,0,0,.35);
+}
+
+/* icon img */
+.lb-controls-icon{
+  width: 28px;
+  height: 28px;
+  display: block;
+}
+

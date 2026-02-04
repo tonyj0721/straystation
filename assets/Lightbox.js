@@ -123,6 +123,70 @@ if (lbPlayBtn && !lbPlayBtn.querySelector('img')) lbPlayBtn.appendChild(__lbPlay
 if (lbMuteBtn && !lbMuteBtn.querySelector('img')) lbMuteBtn.appendChild(__lbMuteImg);
 
 
+// ---- iPhone 相簿拖曳進度條：展開控制列 + 顯示時間、隱藏縮圖/關閉鍵 ----
+let lbScrubTimes = document.getElementById('lbScrubTimes');
+let lbTimeCur = document.getElementById('lbTimeCur');
+let lbTimeDur = document.getElementById('lbTimeDur');
+
+function __lbEnsureTimeLabels() {
+  if (!lbControls) return;
+  const bar = lbControls.querySelector('.lb-controls-bar');
+  if (!bar) return;
+
+  lbScrubTimes = document.getElementById('lbScrubTimes');
+  lbTimeCur = document.getElementById('lbTimeCur');
+  lbTimeDur = document.getElementById('lbTimeDur');
+
+  if (lbScrubTimes && lbTimeCur && lbTimeDur) return;
+
+  lbScrubTimes = document.createElement('div');
+  lbScrubTimes.id = 'lbScrubTimes';
+  lbScrubTimes.className = 'lb-scrub-times';
+  lbTimeCur = document.createElement('span');
+  lbTimeCur.id = 'lbTimeCur';
+  lbTimeCur.textContent = '00:00.00';
+  lbTimeDur = document.createElement('span');
+  lbTimeDur.id = 'lbTimeDur';
+  lbTimeDur.textContent = '00:00';
+  lbScrubTimes.appendChild(lbTimeCur);
+  lbScrubTimes.appendChild(lbTimeDur);
+
+  // 放在 range 前面（拖曳時會顯示）
+  const seekEl = document.getElementById('lbSeek');
+  if (seekEl && seekEl.parentNode === bar) {
+    bar.insertBefore(lbScrubTimes, seekEl);
+  } else {
+    bar.insertBefore(lbScrubTimes, bar.firstChild);
+  }
+}
+
+function __lbPad2(n) { n = Math.floor(Math.max(0, n)); return (n < 10 ? '0' : '') + n; }
+
+function __lbFmtTime(sec, withCentis) {
+  const s = Math.max(0, Number(sec) || 0);
+  const m = Math.floor(s / 60);
+  const ss = s - (m * 60);
+  if (!withCentis) {
+    return `${__lbPad2(m)}:${__lbPad2(Math.floor(ss))}`;
+  }
+  const whole = Math.floor(ss);
+  const centis = Math.floor((ss - whole) * 100 + 1e-9);
+  return `${__lbPad2(m)}:${__lbPad2(whole)}.${__lbPad2(centis)}`;
+}
+
+function __lbUpdateTimeLabels(currentSec, durationSec, scrubbing) {
+  __lbEnsureTimeLabels();
+  if (!lbTimeCur || !lbTimeDur) return;
+  lbTimeCur.textContent = __lbFmtTime(currentSec, !!scrubbing);
+  lbTimeDur.textContent = __lbFmtTime(durationSec, false);
+}
+
+function __lbSetScrubUI(on) {
+  if (!lb) return;
+  lb.classList.toggle('lb-scrubbing', !!on);
+}
+
+
 let __lbScrubbing = false;
 let __lbWasPlaying = false;
 
@@ -153,6 +217,14 @@ function __lbSyncSeek() {
 function __lbSyncControls() {
   __lbSetIcons();
   __lbSyncSeek();
+  // 同步時間（拖曳中顯示小數）
+  if (lbVideo && !lbVideo.classList.contains("hidden")) {
+    const dur = Number(lbVideo.duration);
+    if (Number.isFinite(dur) && dur > 0) {
+      const cur = Number(lbVideo.currentTime);
+      __lbUpdateTimeLabels(cur, dur, __lbScrubbing);
+    }
+  }
 }
 
 function __lbTogglePlay() {
@@ -182,29 +254,62 @@ function __lbSeekToRatio(r) {
 
 function __lbScrubStart() {
   if (!lbVideo || lbVideo.classList.contains("hidden")) return;
+  __lbEnsureTimeLabels();
   __lbScrubbing = true;
   __lbWasPlaying = !lbVideo.paused;
   try { lbVideo.pause(); } catch (_) { }
+  // 進入拖曳模式：展開 UI、顯示時間、隱藏縮圖列/關閉鍵
+  __lbSetScrubUI(true);
+
+  const dur = Number(lbVideo.duration);
+  const cur = Number(lbVideo.currentTime);
+  if (Number.isFinite(dur) && dur > 0) {
+    __lbUpdateTimeLabels(cur, dur, true);
+  }
 }
+
 
 function __lbScrubEnd() {
   if (!lbVideo || lbVideo.classList.contains("hidden")) return;
   __lbScrubbing = false;
+
+  // 離開拖曳模式：恢復 UI
+  __lbSetScrubUI(false);
+
   if (__lbWasPlaying) {
     try { lbVideo.play().catch(() => { }); } catch (_) { }
   }
   __lbWasPlaying = false;
+
+  // 結束時同步一次時間/圖示/進度
+  try {
+    const dur = Number(lbVideo.duration);
+    const cur = Number(lbVideo.currentTime);
+    if (Number.isFinite(dur) && dur > 0) __lbUpdateTimeLabels(cur, dur, false);
+  } catch (_) { }
+  __lbSyncControls();
 }
+
 
 // 綁定事件（只做一次）
 lbPlayBtn?.addEventListener("click", (e) => { e.stopPropagation(); __lbTogglePlay(); });
 lbMuteBtn?.addEventListener("click", (e) => { e.stopPropagation(); __lbToggleMute(); });
+
+__lbEnsureTimeLabels();
 
 lbSeek?.addEventListener("input", (e) => {
   const v = Number(e.target?.value || 0);
   // 先更新條的顏色（避免拖曳時延遲）
   try { lbSeek.style.setProperty("--lbSeekPct", `${(v / 1000) * 100}%`); } catch (_) { }
   __lbSeekToRatio(v / 1000);
+  // 拖曳時顯示「目前時間」(含小數)
+  if (__lbScrubbing && lbVideo && !lbVideo.classList.contains('hidden')) {
+    const dur = Number(lbVideo.duration);
+    if (Number.isFinite(dur) && dur > 0) {
+      const t = (v / 1000) * dur;
+      __lbUpdateTimeLabels(t, dur, true);
+    }
+  }
 });
 
 if ("PointerEvent" in window) {
@@ -218,7 +323,14 @@ if ("PointerEvent" in window) {
   lbSeek?.addEventListener("mouseup", __lbScrubEnd);
 }
 
-lbVideo?.addEventListener("loadedmetadata", __lbSyncControls);
+lbVideo?.addEventListener("loadedmetadata", () => {
+  __lbSyncControls();
+  try {
+    const dur = Number(lbVideo.duration);
+    const cur = Number(lbVideo.currentTime);
+    if (Number.isFinite(dur) && dur > 0) __lbUpdateTimeLabels(cur, dur, false);
+  } catch (_) { }
+});
 lbVideo?.addEventListener("timeupdate", __lbSyncControls);
 lbVideo?.addEventListener("play", __lbSyncControls);
 lbVideo?.addEventListener("pause", __lbSyncControls);
@@ -252,6 +364,7 @@ function renderLightboxMedia() {
   }
   if (lb) {
     lb.classList.toggle("lb-video-ui", !!isVid);
+    if (!isVid) lb.classList.remove("lb-scrubbing");
   }
 
   if (lbImg && lbVideo) {
