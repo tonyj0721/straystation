@@ -366,6 +366,10 @@
             <div id="imgPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
           </div>
           <div class="flex gap-3 pt-2">
+            <button id="clearBtn" type="button"
+              class="px-4 py-2 rounded-xl bg-white text-gray-800 ring-1 ring-gray-300 hover:bg-gray-50">
+              清除
+            </button>
             <button id="submitBtn" type="submit"
               class="px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-gray-800 flex items-center gap-2">
               <span id="submitText">登錄</span>
@@ -676,7 +680,7 @@
       getFirestore, collection, getDocs, query, orderBy, where,
       doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp, limit as fbLimit, deleteField,
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
-    import { getStorage, ref as sRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject, listAll, } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
+    import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject, listAll, } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
     import {
       getAuth,
       signOut,
@@ -693,7 +697,7 @@
       collection, getDocs, query, orderBy, where,
       doc, getDoc, updateDoc, deleteDoc, serverTimestamp, fbLimit,
       deleteField,
-      sRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject, listAll,
+      sRef, uploadBytes, getDownloadURL, deleteObject, listAll,
     });
 
     const auth = getAuth(app);
@@ -1332,7 +1336,47 @@
       }, 80);
     }
 
+    
     // ===============================
+    // 清除表單（新增模式）
+    // ===============================
+    function clearPetFormAndUI() {
+      const form = $("#petForm");
+      if (form) form.reset();
+
+      // 清空圖片預覽/計數/暫存檔案
+      const imgPreview = $("#imgPreview");
+      const fileCount = $("#fileCount");
+      if (imgPreview) imgPreview.innerHTML = "";
+      if (fileCount) fileCount.textContent = "已選 0 / 5 張";
+      selectedFiles = [];
+
+      // 同步品種選單（依目前 breedType / breed 狀態）
+      if (typeof syncBreedSelectors === "function") syncBreedSelectors();
+
+      // 清除「名字已被使用」提示/紅框
+      if (window.resetNameCheck) window.resetNameCheck();
+    }
+
+    // 清除按鈕：清空表單並捲回表單區塊
+    const clearBtn = $("#clearBtn");
+    if (clearBtn) {
+      clearBtn.addEventListener("click", () => {
+        clearPetFormAndUI();
+
+        const target = document.querySelector(
+          'section.lg\\:col-span-1.bg-white.rounded-2xl.ring-1.ring-gray-200.shadow-soft.p-5'
+        );
+        if (target) {
+          target.scrollIntoView({ behavior: "smooth", block: "start" });
+        } else {
+          // 找不到目標就退而求其次捲到頂
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+      });
+    }
+
+// ===============================
     // 表單送出：新增動物資料
     // ===============================
     $("#petForm").addEventListener("submit", async (e) => {
@@ -1409,9 +1453,7 @@
       const submitBtn = $("#submitBtn");
       const submitText = $("#submitText");
       submitBtn.disabled = true;
-      const progress = startProgress(submitText, "登錄中");
-      progress.set(1);
-      let stopFake = startFakeProgress(progress.set);
+      const stopDots = startDots(submitText, "登錄中");
 
       try {
         // 1) 新增基本文件
@@ -1419,12 +1461,6 @@
 
         // 2) 逐張上傳圖片，取得 Storage URL
         const urls = [];
-        const __totalBytes = (selectedFiles || []).reduce((s, f) => s + (Number(f && f.size) || 0), 0);
-        let __uploadedBytes = 0;
-        if (__totalBytes > 0) {
-          if (stopFake) { try { stopFake(); } catch (_) { } stopFake = null; }
-          progress.set(0);
-        }
         const plans = [];
         const pendingPaths = [];
 
@@ -1450,21 +1486,7 @@
         // 逐檔上傳
         for (const pl of plans) {
           const r = sRef(storage, pl.path);
-          if (__totalBytes > 0 && typeof uploadBytesResumable === "function") {
-            await uploadResumableWithProgress(
-              r,
-              pl.f,
-              { contentType: pl.type || "application/octet-stream" },
-              (bt, tb) => {
-                const pct = Math.min(85, Math.round(((__uploadedBytes + bt) / __totalBytes) * 85));
-                progress.set(pct);
-              }
-            );
-            __uploadedBytes += (Number(pl.f.size) || 0);
-            progress.set(Math.min(85, Math.round((__uploadedBytes / __totalBytes) * 85)));
-          } else {
-            await uploadBytes(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
-          }
+          await uploadBytes(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
           urls.push(await getDownloadURL(r));
         }
 
@@ -1474,10 +1496,7 @@
         }
 
         // UI 收尾
-        if (stopFake) { try { stopFake(); } catch (_) { } stopFake = null; }
-        progress.set(90);
-        progress.done();
-        progress.stop();
+        stopDots();
         submitBtn.disabled = false;
         submitText.textContent = "登錄";
 
@@ -1560,8 +1579,7 @@
         }
 
       } catch (err) {
-        if (stopFake) { try { stopFake(); } catch (_) { } stopFake = null; }
-        progress.stop();
+        stopDots();
         submitBtn.disabled = false;
         submitText.textContent = "登錄";
         Swal.fire({ icon: "error", title: "登錄失敗", text: err.message });
