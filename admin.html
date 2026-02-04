@@ -370,11 +370,7 @@
               class="px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-gray-800 flex items-center gap-2">
               <span id="submitText">登錄</span>
             </button>
-          <button id="clearBtn" type="button"
-              class="px-4 py-2 rounded-xl bg-white text-gray-800 ring-1 ring-gray-300 hover:bg-gray-50">
-              清除
-            </button>
-            </div>
+          </div>
         </form>
       </section>
 
@@ -1336,47 +1332,7 @@
       }, 80);
     }
 
-    
     // ===============================
-    // 清除表單（新增模式）
-    // ===============================
-    function clearPetFormAndUI() {
-      const form = $("#petForm");
-      if (form) form.reset();
-
-      // 清空圖片預覽/計數/暫存檔案
-      const imgPreview = $("#imgPreview");
-      const fileCount = $("#fileCount");
-      if (imgPreview) imgPreview.innerHTML = "";
-      if (fileCount) fileCount.textContent = "已選 0 / 5 張";
-      selectedFiles = [];
-
-      // 同步品種選單（依目前 breedType / breed 狀態）
-      if (typeof syncBreedSelectors === "function") syncBreedSelectors();
-
-      // 清除「名字已被使用」提示/紅框
-      if (window.resetNameCheck) window.resetNameCheck();
-    }
-
-    // 清除按鈕：清空表單並捲回表單區塊
-    const clearBtn = $("#clearBtn");
-    if (clearBtn) {
-      clearBtn.addEventListener("click", () => {
-        clearPetFormAndUI();
-
-        const target = document.querySelector(
-          'section.lg\\:col-span-1.bg-white.rounded-2xl.ring-1.ring-gray-200.shadow-soft.p-5'
-        );
-        if (target) {
-          target.scrollIntoView({ behavior: "smooth", block: "start" });
-        } else {
-          // 找不到目標就退而求其次捲到頂
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        }
-      });
-    }
-
-// ===============================
     // 表單送出：新增動物資料
     // ===============================
     $("#petForm").addEventListener("submit", async (e) => {

@@ -29,54 +29,6 @@ dialog::backdrop {
   background: rgba(0, 0, 0, 0.9);
 }
 
-/* ===============================
-   按鈕/文字：不確定進度進度條（取代 ... 點點）
-   - 搭配 Modal.js 的 startProgress()
-   =============================== */
-.btn-progress {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  line-height: 1.1;
-}
-
-.btn-progress-top {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-
-.btn-progress-label {
-  display: inline-block;
-}
-
-.btn-progress-pct {
-  display: inline-block;
-  opacity: 0.9;
-  font-variant-numeric: tabular-nums;
-}
-
-.btn-progress-track {
-  position: relative;
-  width: 64px;
-  height: 4px;
-  border-radius: 9999px;
-  overflow: hidden;
-  /* 多數 loading 都在深色按鈕上（白字），用白色系最清楚 */
-  background: rgba(255, 255, 255, 0.28);
-}
-
-.btn-progress-fill {
-  height: 100%;
-  width: 0%;
-  border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.92);
-  transition: width 0.15s linear;
-}
-
 /* 🔥 Modal 縮圖 */
 .dlg-thumb {
   width: 70px;
