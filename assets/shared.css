@@ -42,13 +42,26 @@ dialog::backdrop {
   line-height: 1.1;
 }
 
-.btn-progress-label {
-  display: block;
+.btn-progress-top {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
-.btn-progress-bar {
+.btn-progress-label {
+  display: inline-block;
+}
+
+.btn-progress-pct {
+  display: inline-block;
+  opacity: 0.9;
+  font-variant-numeric: tabular-nums;
+}
+
+.btn-progress-track {
   position: relative;
-  width: 56px;
+  width: 64px;
   height: 4px;
   border-radius: 9999px;
   overflow: hidden;
@@ -56,24 +69,12 @@ dialog::backdrop {
   background: rgba(255, 255, 255, 0.28);
 }
 
-.btn-progress-bar::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  width: 38%;
+.btn-progress-fill {
+  height: 100%;
+  width: 0%;
   border-radius: 9999px;
   background: rgba(255, 255, 255, 0.92);
-  transform: translateX(-60%);
-  animation: btn-indeterminate 0.95s ease-in-out infinite;
-}
-
-@keyframes btn-indeterminate {
-  0% {
-    transform: translateX(-60%);
-  }
-  100% {
-    transform: translateX(220%);
-  }
+  transition: width 0.15s linear;
 }
 
 /* 🔥 Modal 縮圖 */

@@ -481,7 +481,7 @@ function startDots(span, base) {
 //  - 回傳 stop() 會把內容還原
 // ===============================
 function startProgress(target, base) {
-  if (!target) return () => { };
+  if (!target) return { stop: () => { }, set: () => { }, done: () => { } };
 
   const orig = {
     html: target.innerHTML,
@@ -489,30 +489,47 @@ function startProgress(target, base) {
     ariaBusy: target.getAttribute && target.getAttribute("aria-busy"),
   };
 
-  // 統一用「兩行：文字 + 小進度條」避免版面跳
+  // 兩行：文字(含百分比) + 進度條(可設定 width)
   const label = document.createElement("span");
   label.className = "btn-progress-label";
   label.textContent = base;
 
-  const bar = document.createElement("span");
-  bar.className = "btn-progress-bar";
+  const pct = document.createElement("span");
+  pct.className = "btn-progress-pct";
+  pct.textContent = "0%";
+
+  const top = document.createElement("span");
+  top.className = "btn-progress-top";
+  top.appendChild(label);
+  top.appendChild(pct);
+
+  const fill = document.createElement("span");
+  fill.className = "btn-progress-fill";
+  fill.style.width = "0%";
+
+  const track = document.createElement("span");
+  track.className = "btn-progress-track";
+  track.appendChild(fill);
 
   const wrap = document.createElement("span");
   wrap.className = "btn-progress";
-  wrap.appendChild(label);
-  wrap.appendChild(bar);
+  wrap.appendChild(top);
+  wrap.appendChild(track);
 
-  // 清空再塞（button / span 都可）
   target.innerHTML = "";
   target.appendChild(wrap);
   try { target.setAttribute("aria-busy", "true"); } catch (_) { }
 
-  return () => {
-    // 還原
-    try {
-      target.innerHTML = orig.html;
-    } catch (_) {
-      // fallback
+  const set = (p) => {
+    const n = Math.max(0, Math.min(100, Math.round(Number(p) || 0)));
+    pct.textContent = `${n}%`;
+    fill.style.width = `${n}%`;
+  };
+
+  const done = () => set(100);
+
+  const stop = () => {
+    try { target.innerHTML = orig.html; } catch (_) {
       try { target.textContent = orig.text; } catch { }
     }
     try {
@@ -520,9 +537,37 @@ function startProgress(target, base) {
       else target.setAttribute("aria-busy", orig.ariaBusy);
     } catch (_) { }
   };
+
+  return { set, done, stop };
+}
+
+
+// 上傳（可回報進度）
+function uploadResumableWithProgress(storageRef, file, metadata, onProgress) {
+  return new Promise((resolve, reject) => {
+    const task = uploadBytesResumable(storageRef, file, metadata);
+    task.on(
+      "state_changed",
+      (snap) => { try { onProgress && onProgress(snap.bytesTransferred, snap.totalBytes); } catch (_) { } },
+      (err) => reject(err),
+      () => resolve(task.snapshot)
+    );
+  });
+}
+
+// 沒有可量測進度時，用「假進度」讓使用者知道還在跑
+function startFakeProgress(setFn) {
+  let p = 0;
+  const id = setInterval(() => {
+    // 越接近 90% 越慢
+    p = Math.min(90, p + Math.max(1, Math.round((90 - p) / 10)));
+    try { setFn(p); } catch (_) { }
+  }, 250);
+  return () => clearInterval(id);
 }
 
 // 用 nameLower / name 檢查是否重複；exceptId 表示忽略自己（編輯時用）
+ / name 檢查是否重複；exceptId 表示忽略自己（編輯時用）
 async function isNameTaken(name, exceptId = null) {
   const kw = (name || "").trim().toLowerCase();
   if (!kw) return false;
@@ -1020,6 +1065,7 @@ async function onDelete() {
     // 最後刪 Firestore 文件
     await deleteDoc(doc(db, "pets", currentDocId));
     await loadPets();
+    progress.done();
     await Swal.fire({ icon: "success", title: "刪除成功", showConfirmButton: false, timer: 1500, });
   } catch (err) {
     await Swal.fire({ icon: "error", title: "刪除失敗", text: err.message });
@@ -1102,12 +1148,26 @@ async function saveEdit() {
 
   // ② 確認後才開始「儲存中…」與鎖定按鈕
   btn.disabled = true;
-  const stopProgress = startProgress(txt, "儲存中");
+  const progress = startProgress(txt, "儲存中");
+  progress.set(1);
+  let stopFake = startFakeProgress(progress.set);
+
 
   try {
     // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
     const { items, removeUrls } = editImagesState;
     const newUrls = [];
+    // 進度：以「上傳總 bytes」當主要百分比依據（其餘 Firestore/刪除收尾占最後 15%）
+    const __filesToUpload = (items || []).filter((it) => it && it.kind === "file" && it.file);
+    const __totalBytes = __filesToUpload.reduce((s, it) => s + (Number(it.file.size) || 0), 0);
+    let __uploadedBytes = 0;
+
+    if (__totalBytes > 0) {
+      // 有實際可量測的上傳，就改用真進度
+      if (stopFake) { try { stopFake(); } catch (_) { } stopFake = null; }
+      progress.set(0);
+    }
+
 
 
     // 先把「要刪除的舊圖」轉成 Storage paths（順便用於清理 wmPending）
@@ -1171,12 +1231,27 @@ async function saveEdit() {
         const type = it.__uploadType || (f && f.type) || '';
         const path = it.__uploadPath;
         const r = sRef(storage, path);
-        await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
+        if (__totalBytes > 0 && typeof uploadBytesResumable === "function") {
+          await uploadResumableWithProgress(
+            r,
+            f,
+            { contentType: type || "application/octet-stream" },
+            (bt, tb) => {
+              const pct = Math.min(85, Math.round(((__uploadedBytes + bt) / __totalBytes) * 85));
+              progress.set(pct);
+            }
+          );
+          __uploadedBytes += (Number(f.size) || 0);
+          progress.set(Math.min(85, Math.round((__uploadedBytes / __totalBytes) * 85)));
+        } else {
+          await uploadBytes(r, f, { contentType: type || "application/octet-stream" });
+        }
         newUrls.push(await getDownloadURL(r));
       }
     }
 
-
+    if (stopFake) { try { stopFake(); } catch (_) { } stopFake = null; }
+    progress.set(90);
 
     // 刪除被移除的舊圖（忽略刪失敗）
     // 同步刪掉後端產生的縮圖：thumbs/<原路徑去副檔名>.jpg
@@ -1225,7 +1300,8 @@ async function saveEdit() {
     currentDoc = { ...currentDoc, ...newData, mediaReady: (__updatePayload.mediaReady ?? currentDoc?.mediaReady), wmPending: (__updatePayload.wmPending ?? currentDoc?.wmPending) };
 
     // ⑤ UI 收尾（無論彈窗狀態，成功提示一下）
-    stopProgress();
+    progress.done();
+    progress.stop();
     btn.disabled = false;
     txt.textContent = "儲存";
 
@@ -1239,7 +1315,8 @@ async function saveEdit() {
 
   } catch (err) {
     // 失敗也要確保 UI 復原
-    stopProgress();
+    if (stopFake) { try { stopFake(); } catch (_) { } stopFake = null; }
+    progress.stop();
     btn.disabled = false;
     txt.textContent = "儲存";
     await swalInDialog({ icon: "error", title: "更新失敗", text: err.message });
@@ -1917,10 +1994,21 @@ async function onConfirmAdopted() {
   // 動態點點（沿用你檔案內的 startDots）
   btn.disabled = true;
   btn.setAttribute("aria-busy", "true");
-  const stopProgress = startProgress(btn, "儲存中");
+  const progress = startProgress(btn, "儲存中");
+
+  progress.set(1);
+  let stopFake = startFakeProgress(progress.set);
+
 
   const files = adoptedSelected.slice(0, 5);
   const urls = [];
+  const __totalBytes = (files || []).reduce((s, f) => s + (Number(f && f.size) || 0), 0);
+  let __uploadedBytes = 0;
+  if (__totalBytes > 0) {
+    if (stopFake) { try { stopFake(); } catch (_) { } stopFake = null; }
+    progress.set(0);
+  }
+
   try {
 
     const plans = [];
@@ -1952,11 +2040,26 @@ async function onConfirmAdopted() {
 
     for (const pl of plans) {
       const r = sRef(storage, pl.path);
-      await uploadBytes(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
+      if (__totalBytes > 0 && typeof uploadBytesResumable === "function") {
+        await uploadResumableWithProgress(
+          r,
+          pl.f,
+          { contentType: pl.type || "application/octet-stream" },
+          (bt, tb) => {
+            const pct = Math.min(85, Math.round(((__uploadedBytes + bt) / __totalBytes) * 85));
+            progress.set(pct);
+          }
+        );
+        __uploadedBytes += (Number(pl.f.size) || 0);
+        progress.set(Math.min(85, Math.round((__uploadedBytes / __totalBytes) * 85)));
+      } else {
+        await uploadBytes(r, pl.f, { contentType: pl.type || "application/octet-stream" });
+      }
       urls.push(await getDownloadURL(r));
     }
 
-
+    if (stopFake) { try { stopFake(); } catch (_) { } stopFake = null; }
+    progress.set(90);
 
     await updateDoc(doc(db, "pets", currentDocId), {
       status: "adopted",
@@ -1990,7 +2093,8 @@ async function onConfirmAdopted() {
   } catch (err) {
     await swalInDialog({ icon: "error", title: "已送養標記失敗", text: err.message });
   } finally {
-    stopProgress();
+    if (stopFake) { try { stopFake(); } catch (_) { } stopFake = null; }
+    progress.stop();
     btn.disabled = false;
     btn.removeAttribute("aria-busy");
     btn.textContent = "儲存領養資訊";
