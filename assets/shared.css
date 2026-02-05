@@ -401,9 +401,9 @@ video.video-preview::-webkit-media-controls-enclosure {
 
 #lbClose{
   left: 18px;
-  top: 4px;
-  width: 41px;
-  height: 41px;
+  top: 3px;
+  width: 43px;
+  height: 43px;
   background: rgba(255, 0, 0);
 }
 
