@@ -428,12 +428,16 @@ video.video-preview::-webkit-media-controls-enclosure {
 
 /* 進度條拖曳中：控制列上移、增加上方空間、隱藏左右按鈕、顯示時間 */
 #lbBottom.lb-seeking #lbControls {
-  padding-top: 24px;
-  gap: .75rem;
+  padding-top: 25px;
+  gap: 10px;
 }
 
 #lbBottom.lb-seeking .lb-seek-time {
   display: flex;
+}
+
+#lbBottom.lb-seeking #lbSeekTime {
+  padding-top: 5px;
 }
 
 #lbBottom.lb-seeking #lbPlayBtn,
