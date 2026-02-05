@@ -384,12 +384,19 @@ video.video-preview::-webkit-media-controls-enclosure {
 
 /* 讓控制列 + 縮圖列一組貼齊底部（含 safe area） */
 #lbBottom{
-  bottom: env(safe-area-inset-bottom);
+  bottom: -20px;
   pointer-events: none; /* 只讓內部元件可以點 */
 }
 
 #lbControls, #lbThumbs{
   pointer-events: auto;
+}
+
+#lbControls{
+  background: rgba(255,255,255,0.95);
+  width: 320px;
+  height: 46px;
+  border-radius: 24px;
 }
 
 /* 進度條：已播(淺) / 未播(深) 兩色 */
