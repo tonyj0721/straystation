@@ -384,7 +384,7 @@ video.video-preview::-webkit-media-controls-enclosure {
 
 /* 讓控制列 + 縮圖列一組貼齊底部（含 safe area） */
 #lbBottom{
-  bottom: -20px;
+  bottom: -35px;
   pointer-events: none; /* 只讓內部元件可以點 */
 }
 
