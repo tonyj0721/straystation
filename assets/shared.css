@@ -384,7 +384,7 @@ video.video-preview::-webkit-media-controls-enclosure {
 
 /* 讓控制列 + 縮圖列一組貼齊底部（含 safe area） */
 #lbBottom{
-  bottom: -38px;
+  bottom: env(safe-area-inset-bottom);
   pointer-events: none; /* 只讓內部元件可以點 */
 }
 
@@ -392,19 +392,63 @@ video.video-preview::-webkit-media-controls-enclosure {
   pointer-events: auto;
 }
 
+/* ===============================
+   拖曳進度條：向上展開控制列 + 顯示時間（圖 1 → 圖 2）
+   =============================== */
+
+/* 時間列（預設隱藏；拖曳時顯示） */
 #lbControls{
-  background: rgba(198,193,188,0.95);
-  width: 346px;
-  height: 48px;
-  border-radius: 22px;
+  position: relative;
+  transition: transform .18s ease, padding .18s ease, gap .18s ease;
+  will-change: transform;
 }
 
-#lbClose{
-  left: 16px;
-  top: 1px;
-  width: 44px;
-  height: 44px;
-  background: rgba(250, 225, 199);
+.lb-seek-time{
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  top: .6rem;
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  line-height: 1;
+  color: rgba(255,255,255,0.92);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+/* 進度條拖曳中：控制列上移、增加上方空間、隱藏左右按鈕、顯示時間 */
+#lbBottom.lb-seeking #lbControls{
+  transform: translateY(-28px);
+  padding-top: 2.25rem; /* 讓時間列與進度條有空間 */
+  padding-bottom: 1.25rem;
+  gap: .75rem;
+}
+
+#lbBottom.lb-seeking .lb-seek-time{
+  display: flex;
+}
+
+#lbBottom.lb-seeking #lbPlayBtn,
+#lbBottom.lb-seeking #lbMuteBtn{
+  opacity: 0;
+  transform: scale(0.92);
+  width: 0;
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+}
+
+/* 讓縮圖列在拖曳時淡出（更接近 iPhone 相簿） */
+#lbThumbs{
+  transition: opacity .18s ease, transform .18s ease;
+}
+
+#lbBottom.lb-seeking #lbThumbs{
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
 }
 
 /* 進度條：已播(淺) / 未播(深) 兩色 */
@@ -414,10 +458,10 @@ video.video-preview::-webkit-media-controls-enclosure {
   height: 6px;
   border-radius: 9999px;
   background: linear-gradient(to right,
-    rgba(132,131,136,0.45) 0%,
-    rgba(132,131,136,0.45) var(--p,0%),
-    rgba(227,224,227,0.75) var(--p,0%),
-    rgba(227,224,227,0.75) 100%);
+    rgba(255,255,255,0.75) 0%,
+    rgba(255,255,255,0.75) var(--p,0%),
+    rgba(0,0,0,0.45) var(--p,0%),
+    rgba(0,0,0,0.45) 100%);
   outline: none;
 }
 

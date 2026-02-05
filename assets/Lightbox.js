@@ -100,8 +100,13 @@ const lbPlayIcon = document.getElementById("lbPlayIcon");
 const lbSeek = document.getElementById("lbSeek");
 const lbMuteBtn = document.getElementById("lbMuteBtn");
 const lbVolumeIcon = document.getElementById("lbVolumeIcon");
+const lbSeekTime = document.getElementById("lbSeekTime");
+const lbTimeCur = document.getElementById("lbTimeCur");
+const lbTimeDur = document.getElementById("lbTimeDur");
 
 let __lbControlsBound = false;
+let __lbIsSeeking = false;
+let __lbWasPlayingBeforeSeek = false;
 
 function __pct(n) {
   const v = Math.max(0, Math.min(100, n));
@@ -119,6 +124,45 @@ function __setLbVolumeIcon() {
   lbVolumeIcon.src = muted ? "images/icons/mute.png" : "images/icons/volume.png";
 }
 
+function __fmtTime(t, withMs = false) {
+  const sec = Number.isFinite(t) ? Math.max(0, t) : 0;
+  const m = Math.floor(sec / 60);
+  const s = sec - m * 60;
+  const ss = Math.floor(s);
+  const ms = Math.floor((s - ss) * 100);
+
+  const mmStr = String(m).padStart(2, "0");
+  const ssStr = String(ss).padStart(2, "0");
+  if (!withMs) return `${mmStr}:${ssStr}`;
+  return `${mmStr}:${ssStr}.${String(ms).padStart(2, "0")}`;
+}
+
+function __setLbTimeLabels(curSec, durSec) {
+  if (!lbTimeCur || !lbTimeDur) return;
+  // 參考 iPhone 相簿：拖曳時左邊顯示到小數、右邊總長不顯示小數
+  lbTimeCur.textContent = __fmtTime(curSec, true);
+  lbTimeDur.textContent = __fmtTime(durSec, false);
+}
+
+function __enterLbSeeking() {
+  if (__lbIsSeeking) return;
+  if (!lbBottom || !lbVideo) return;
+  __lbIsSeeking = true;
+  __lbWasPlayingBeforeSeek = !lbVideo.paused;
+  lbBottom.classList.add("lb-seeking");
+  // 拖曳時先暫停（更接近相簿的 scrub 行為）
+  try { lbVideo.pause?.(); } catch (_) { }
+}
+
+function __exitLbSeeking() {
+  if (!__lbIsSeeking) return;
+  __lbIsSeeking = false;
+  lbBottom?.classList.remove("lb-seeking");
+  if (lbVideo && __lbWasPlayingBeforeSeek) {
+    try { lbVideo.play?.().catch(() => {}); } catch (_) { }
+  }
+}
+
 function __setLbSeekByTime() {
   if (!lbSeek || !lbVideo) return;
   const dur = Number.isFinite(lbVideo.duration) ? lbVideo.duration : 0;
@@ -131,6 +175,9 @@ function __setLbSeekByTime() {
   const ratio = Math.max(0, Math.min(1, cur / dur));
   lbSeek.value = String(Math.round(ratio * 1000));
   lbSeek.style.setProperty("--p", __pct(ratio * 100));
+
+  // 拖曳時顯示時間
+  if (__lbIsSeeking) __setLbTimeLabels(cur, dur);
 }
 
 function __bindLbControlsOnce() {
@@ -169,17 +216,50 @@ function __bindLbControlsOnce() {
     const dur = Number.isFinite(lbVideo.duration) ? lbVideo.duration : 0;
     if (!dur || dur <= 0) return;
     const ratio = Math.max(0, Math.min(1, Number(lbSeek.value) / 1000));
-    try { lbVideo.currentTime = ratio * dur; } catch (_) {}
+    const target = ratio * dur;
+    // 即時更新 UI（不用等 video.seeked）
+    __setLbTimeLabels(target, dur);
+    try { lbVideo.currentTime = target; } catch (_) {}
     __setLbSeekByTime();
   };
-  lbSeek?.addEventListener("input", (e) => { e.stopPropagation(); seekToValue(); });
-  lbSeek?.addEventListener("change", (e) => { e.stopPropagation(); seekToValue(); });
+
+  // 進入/離開拖曳狀態（用 pointer 事件即可同時覆蓋 mouse + touch）
+  const onSeekStart = (e) => {
+    e.stopPropagation();
+    __enterLbSeeking();
+    // 進入拖曳時先刷新一次時間，避免閃一下 00:00
+    if (lbVideo) __setLbTimeLabels(lbVideo.currentTime || 0, lbVideo.duration || 0);
+  };
+  const onSeekEnd = (e) => {
+    e.stopPropagation();
+    // 放手後收起（控制列回到圖 1）
+    __exitLbSeeking();
+  };
+
+  lbSeek?.addEventListener("pointerdown", onSeekStart);
+  lbSeek?.addEventListener("pointerup", onSeekEnd);
+  lbSeek?.addEventListener("pointercancel", onSeekEnd);
+  document.addEventListener("pointerup", onSeekEnd);
+  document.addEventListener("pointercancel", onSeekEnd);
+
+  lbSeek?.addEventListener("input", (e) => {
+    e.stopPropagation();
+    if (!__lbIsSeeking) __enterLbSeeking();
+    seekToValue();
+  });
+  lbSeek?.addEventListener("change", (e) => {
+    e.stopPropagation();
+    seekToValue();
+    __exitLbSeeking();
+  });
 
   // 影片事件同步 UI
   lbVideo?.addEventListener("loadedmetadata", () => {
     __setLbSeekByTime();
     __setLbVolumeIcon();
     __setLbPlayIcon(!lbVideo.paused);
+    // 預先寫入總長，供拖曳時直接顯示
+    __setLbTimeLabels(lbVideo.currentTime || 0, lbVideo.duration || 0);
   });
 
   lbVideo?.addEventListener("timeupdate", () => { __setLbSeekByTime(); });
