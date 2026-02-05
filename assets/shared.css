@@ -396,12 +396,12 @@ video.video-preview::-webkit-media-controls-enclosure {
   background: rgba(255,255,255,0.95);
   width: 346px;
   height: 48px;
-  border-radius: 23px;
+  border-radius: 22px;
 }
 
 #lbClose{
-  left: 18px;
-  top: 3px;
+  left: 17px;
+  top: 2px;
   width: 43px;
   height: 43px;
   background: rgba(255, 0, 0);
