@@ -394,7 +394,7 @@ video.video-preview::-webkit-media-controls-enclosure {
 
 #lbControls{
   background: rgba(255,255,255,0.95);
-  width: 330px;
+  width: 340px;
   height: 48px;
   border-radius: 24px;
 }
@@ -402,6 +402,9 @@ video.video-preview::-webkit-media-controls-enclosure {
 #lbClose{
   left: 20px;
   top: 6px;
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255);
 }
 
 /* 進度條：已播(淺) / 未播(深) 兩色 */
