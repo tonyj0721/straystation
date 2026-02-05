@@ -92,6 +92,104 @@ const lbNext = document.getElementById("lbNext");
 const lbClose = document.getElementById("lbClose");
 const lbWrap = document.getElementById("lbWrap");   // ← 新增
 
+// ---- Lightbox 自訂影片控制列（iPhone 相簿風格） ----
+const lbBottom = document.getElementById("lbBottom");
+const lbControls = document.getElementById("lbControls");
+const lbPlayBtn = document.getElementById("lbPlayBtn");
+const lbPlayIcon = document.getElementById("lbPlayIcon");
+const lbSeek = document.getElementById("lbSeek");
+const lbMuteBtn = document.getElementById("lbMuteBtn");
+const lbVolumeIcon = document.getElementById("lbVolumeIcon");
+
+let __lbControlsBound = false;
+
+function __pct(n) {
+  const v = Math.max(0, Math.min(100, n));
+  return v.toFixed(3).replace(/\.0+$/, "") + "%";
+}
+
+function __setLbPlayIcon(isPlaying) {
+  if (!lbPlayIcon) return;
+  lbPlayIcon.src = isPlaying ? "images/icons/pause.png" : "images/icons/play.png";
+}
+
+function __setLbVolumeIcon() {
+  if (!lbVolumeIcon || !lbVideo) return;
+  const muted = !!lbVideo.muted || (typeof lbVideo.volume === "number" && lbVideo.volume === 0);
+  lbVolumeIcon.src = muted ? "images/icons/mute.png" : "images/icons/volume.png";
+}
+
+function __setLbSeekByTime() {
+  if (!lbSeek || !lbVideo) return;
+  const dur = Number.isFinite(lbVideo.duration) ? lbVideo.duration : 0;
+  const cur = Number.isFinite(lbVideo.currentTime) ? lbVideo.currentTime : 0;
+  if (!dur || dur <= 0) {
+    lbSeek.value = "0";
+    lbSeek.style.setProperty("--p", "0%");
+    return;
+  }
+  const ratio = Math.max(0, Math.min(1, cur / dur));
+  lbSeek.value = String(Math.round(ratio * 1000));
+  lbSeek.style.setProperty("--p", __pct(ratio * 100));
+}
+
+function __bindLbControlsOnce() {
+  if (__lbControlsBound) return;
+  __lbControlsBound = true;
+
+  // 播放 / 暫停
+  lbPlayBtn?.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!lbVideo || lbVideo.classList.contains("hidden")) return;
+    try {
+      if (lbVideo.paused) {
+        lbVideo.play?.().catch(() => {});
+      } else {
+        lbVideo.pause?.();
+      }
+    } catch (_) {}
+    __setLbPlayIcon(!lbVideo.paused);
+  });
+
+  // 靜音 / 取消靜音
+  lbMuteBtn?.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!lbVideo || lbVideo.classList.contains("hidden")) return;
+    try {
+      lbVideo.muted = !lbVideo.muted;
+    } catch (_) {}
+    __setLbVolumeIcon();
+  });
+
+  // 拖拉進度
+  const seekToValue = () => {
+    if (!lbVideo || !lbSeek) return;
+    const dur = Number.isFinite(lbVideo.duration) ? lbVideo.duration : 0;
+    if (!dur || dur <= 0) return;
+    const ratio = Math.max(0, Math.min(1, Number(lbSeek.value) / 1000));
+    try { lbVideo.currentTime = ratio * dur; } catch (_) {}
+    __setLbSeekByTime();
+  };
+  lbSeek?.addEventListener("input", (e) => { e.stopPropagation(); seekToValue(); });
+  lbSeek?.addEventListener("change", (e) => { e.stopPropagation(); seekToValue(); });
+
+  // 影片事件同步 UI
+  lbVideo?.addEventListener("loadedmetadata", () => {
+    __setLbSeekByTime();
+    __setLbVolumeIcon();
+    __setLbPlayIcon(!lbVideo.paused);
+  });
+
+  lbVideo?.addEventListener("timeupdate", () => { __setLbSeekByTime(); });
+  lbVideo?.addEventListener("play", () => { __setLbPlayIcon(true); });
+  lbVideo?.addEventListener("pause", () => { __setLbPlayIcon(false); });
+  lbVideo?.addEventListener("volumechange", () => { __setLbVolumeIcon(); });
+  lbVideo?.addEventListener("ended", () => { __setLbPlayIcon(false); });
+}
+
+
 let lbImages = [];
 let lbIndex = 0;
 let lbReturnToDialog = false;
@@ -103,13 +201,25 @@ function renderLightboxMedia() {
       try { lbVideo.pause(); } catch (_) { }
       lbVideo.src = "";
       lbVideo.classList.add("hidden");
+      __setLbPlayIcon(false);
+      if (lbSeek) { lbSeek.value = "0"; lbSeek.style.setProperty("--p","0%"); }
+
     }
     if (lbWrap) lbWrap.classList.remove("lb-video-mode"); // ← 新增
+    if (lbControls) lbControls.classList.add("hidden");
+    __setLbPlayIcon(false);
+    if (lbSeek) { lbSeek.value = "0"; lbSeek.style.setProperty("--p","0%"); }
+
     return;
   }
 
   const url = lbImages[lbIndex] || "";
   const isVid = isVideoUrl(url);
+
+  // 影片才顯示自訂控制列；圖片隱藏
+  if (lbControls) lbControls.classList.toggle("hidden", !isVid);
+  __bindLbControlsOnce();
+
 
   // 根據是否為影片切換 class
   if (lbWrap) {
@@ -122,7 +232,11 @@ function renderLightboxMedia() {
       lbVideo.classList.remove("hidden");
       lbVideo.src = url;
       lbVideo.playsInline = true;
-      lbVideo.controls = true;
+      lbVideo.controls = false;
+      __setLbPlayIcon(false);
+      if (lbSeek) { lbSeek.value = "0"; lbSeek.style.setProperty("--p","0%"); }
+      __setLbVolumeIcon();
+
       try { lbVideo.play().catch(() => { }); } catch (_) { }
     } else {
       try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
@@ -239,6 +353,11 @@ function openLightbox(images, index = 0) {
     lbThumbsInner.innerHTML = "";
     lbImages.forEach((url, i) => {
       const isVid = isVideoUrl(url);
+
+  // 影片才顯示自訂控制列；圖片隱藏
+  if (lbControls) lbControls.classList.toggle("hidden", !isVid);
+  __bindLbControlsOnce();
+
       const wrapper = document.createElement("div");
       wrapper.className = "lb-thumb" + (i === lbIndex ? " active" : "");
 
@@ -302,6 +421,10 @@ function openLightbox(images, index = 0) {
 }
 // 🔥 關閉 Lightbox：回到 dialog 或直接解鎖
 function closeLightbox() {
+  if (lbControls) lbControls.classList.add("hidden");
+  __setLbPlayIcon(false);
+  if (lbSeek) { lbSeek.value = "0"; lbSeek.style.setProperty("--p","0%"); }
+
   // 關閉前一定要把影片停掉
   if (lbVideo) {
     try { lbVideo.pause(); } catch (_) { }
