@@ -159,7 +159,7 @@ function __exitLbSeeking() {
   __lbIsSeeking = false;
   lbBottom?.classList.remove("lb-seeking");
   if (lbVideo && __lbWasPlayingBeforeSeek) {
-    try { lbVideo.play?.().catch(() => { }); } catch (_) { }
+    try { lbVideo.play?.().catch(() => {}); } catch (_) { }
   }
 }
 
@@ -191,11 +191,11 @@ function __bindLbControlsOnce() {
     if (!lbVideo || lbVideo.classList.contains("hidden")) return;
     try {
       if (lbVideo.paused) {
-        lbVideo.play?.().catch(() => { });
+        lbVideo.play?.().catch(() => {});
       } else {
         lbVideo.pause?.();
       }
-    } catch (_) { }
+    } catch (_) {}
     __setLbPlayIcon(!lbVideo.paused);
   });
 
@@ -206,7 +206,7 @@ function __bindLbControlsOnce() {
     if (!lbVideo || lbVideo.classList.contains("hidden")) return;
     try {
       lbVideo.muted = !lbVideo.muted;
-    } catch (_) { }
+    } catch (_) {}
     __setLbVolumeIcon();
   });
 
@@ -219,7 +219,7 @@ function __bindLbControlsOnce() {
     const target = ratio * dur;
     // 即時更新 UI（不用等 video.seeked）
     __setLbTimeLabels(target, dur);
-    try { lbVideo.currentTime = target; } catch (_) { }
+    try { lbVideo.currentTime = target; } catch (_) {}
     __setLbSeekByTime();
   };
 
@@ -282,13 +282,13 @@ function renderLightboxMedia() {
       lbVideo.src = "";
       lbVideo.classList.add("hidden");
       __setLbPlayIcon(false);
-      if (lbSeek) { lbSeek.value = "0"; lbSeek.style.setProperty("--p", "0%"); }
+      if (lbSeek) { lbSeek.value = "0"; lbSeek.style.setProperty("--p","0%"); }
 
     }
     if (lbWrap) lbWrap.classList.remove("lb-video-mode"); // ← 新增
     if (lbControls) lbControls.classList.add("hidden");
     __setLbPlayIcon(false);
-    if (lbSeek) { lbSeek.value = "0"; lbSeek.style.setProperty("--p", "0%"); }
+    if (lbSeek) { lbSeek.value = "0"; lbSeek.style.setProperty("--p","0%"); }
 
     return;
   }
@@ -314,7 +314,7 @@ function renderLightboxMedia() {
       lbVideo.playsInline = true;
       lbVideo.controls = false;
       __setLbPlayIcon(false);
-      if (lbSeek) { lbSeek.value = "0"; lbSeek.style.setProperty("--p", "0%"); }
+      if (lbSeek) { lbSeek.value = "0"; lbSeek.style.setProperty("--p","0%"); }
       __setLbVolumeIcon();
 
       try { lbVideo.play().catch(() => { }); } catch (_) { }
@@ -434,9 +434,9 @@ function openLightbox(images, index = 0) {
     lbImages.forEach((url, i) => {
       const isVid = isVideoUrl(url);
 
-      // 影片才顯示自訂控制列；圖片隱藏
-      if (lbControls) lbControls.classList.toggle("hidden", !isVid);
-      __bindLbControlsOnce();
+  // 影片才顯示自訂控制列；圖片隱藏
+  if (lbControls) lbControls.classList.toggle("hidden", !isVid);
+  __bindLbControlsOnce();
 
       const wrapper = document.createElement("div");
       wrapper.className = "lb-thumb" + (i === lbIndex ? " active" : "");
@@ -503,7 +503,7 @@ function openLightbox(images, index = 0) {
 function closeLightbox() {
   if (lbControls) lbControls.classList.add("hidden");
   __setLbPlayIcon(false);
-  if (lbSeek) { lbSeek.value = "0"; lbSeek.style.setProperty("--p", "0%"); }
+  if (lbSeek) { lbSeek.value = "0"; lbSeek.style.setProperty("--p","0%"); }
 
   // 關閉前一定要把影片停掉
   if (lbVideo) {
