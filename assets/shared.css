@@ -400,10 +400,10 @@ video.video-preview::-webkit-media-controls-enclosure {
 }
 
 #lbClose{
-  left: 17px;
-  top: 2px;
-  width: 43px;
-  height: 43px;
+  left: 16px;
+  top: 3px;
+  width: 44px;
+  height: 44px;
   background: rgba(250, 225, 199);
 }
 
