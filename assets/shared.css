@@ -393,7 +393,7 @@ video.video-preview::-webkit-media-controls-enclosure {
 }
 
 #lbControls{
-  background: rgba(255,255,255,0.95);
+  background: rgba(198,193,188,0.95);
   width: 346px;
   height: 48px;
   border-radius: 22px;
@@ -404,7 +404,7 @@ video.video-preview::-webkit-media-controls-enclosure {
   top: 2px;
   width: 43px;
   height: 43px;
-  background: rgba(255, 0, 0);
+  background: rgba(250, 225, 199);
 }
 
 /* 進度條：已播(淺) / 未播(深) 兩色 */
@@ -414,10 +414,10 @@ video.video-preview::-webkit-media-controls-enclosure {
   height: 6px;
   border-radius: 9999px;
   background: linear-gradient(to right,
-    rgba(0,0,0,0.45) 0%,
-    rgba(0,0,0,0.45) var(--p,0%),
-    rgba(255,255,255,0.75) var(--p,0%),
-    rgba(255,255,255,0.75) 100%);
+    rgba(132,131,136,0.45) 0%,
+    rgba(132,131,136,0.45) var(--p,0%),
+    rgba(227,224,227,0.75) var(--p,0%),
+    rgba(227,224,227,0.75) 100%);
   outline: none;
 }
 
