@@ -394,14 +394,14 @@ video.video-preview::-webkit-media-controls-enclosure {
 
 #lbControls{
   background: rgba(255,255,255,0.95);
-  width: 290px;
+  width: 300px;
   height: 47px;
   border-radius: 24px;
 }
 
 #lbClose{
-  left: 0px;
-  top: 0px;
+  left: -10px;
+  top: -5px;
 }
 
 /* 進度條：已播(淺) / 未播(深) 兩色 */
