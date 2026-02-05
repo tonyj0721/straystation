@@ -384,12 +384,27 @@ video.video-preview::-webkit-media-controls-enclosure {
 
 /* 讓控制列 + 縮圖列一組貼齊底部（含 safe area） */
 #lbBottom{
-  bottom: env(safe-area-inset-bottom);
+  bottom: -38px;
   pointer-events: none; /* 只讓內部元件可以點 */
 }
 
 #lbControls, #lbThumbs{
   pointer-events: auto;
+}
+
+#lbControls{
+  background: rgba(198,193,188,0.95);
+  width: 346px;
+  height: 48px;
+  border-radius: 22px;
+}
+
+#lbClose{
+  left: 16px;
+  top: 1px;
+  width: 44px;
+  height: 44px;
+  background: rgba(250, 225, 199);
 }
 
 /* ===============================
@@ -420,9 +435,9 @@ video.video-preview::-webkit-media-controls-enclosure {
 
 /* 進度條拖曳中：控制列上移、增加上方空間、隱藏左右按鈕、顯示時間 */
 #lbBottom.lb-seeking #lbControls{
-  transform: translateY(-28px);
+  
   padding-top: 2.25rem; /* 讓時間列與進度條有空間 */
-  padding-bottom: 1.25rem;
+  
   gap: .75rem;
 }
 
@@ -458,10 +473,10 @@ video.video-preview::-webkit-media-controls-enclosure {
   height: 6px;
   border-radius: 9999px;
   background: linear-gradient(to right,
-    rgba(255,255,255,0.75) 0%,
-    rgba(255,255,255,0.75) var(--p,0%),
-    rgba(0,0,0,0.45) var(--p,0%),
-    rgba(0,0,0,0.45) 100%);
+    rgba(132,131,136,0.45) 0%,
+    rgba(132,131,136,0.45) var(--p,0%),
+    rgba(227,224,227,0.75) var(--p,0%),
+    rgba(227,224,227,0.75) 100%);
   outline: none;
 }
 
