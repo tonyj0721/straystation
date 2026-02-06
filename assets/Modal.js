@@ -475,6 +475,79 @@ function startDots(span, base) {
   return () => clearInterval(t); // 回傳停止函式
 }
 
+// ===============================
+// 小工具：按鈕上的「百分比進度條」（百分比文字固定置中）
+//  - 用法：
+//      const pb = startPercentBar(targetEl);
+//      pb.set(42);
+//      pb.stop();
+// ===============================
+function startPercentBar(targetEl, opts = {}) {
+  const el = targetEl;
+  const width = opts.width ?? 140;
+  const height = opts.height ?? 20;
+
+  // 保留原本內容（可回復）
+  const prevHtml = el.innerHTML;
+  const prevAria = el.getAttribute("aria-label");
+
+  // 清空並建立進度條
+  el.innerHTML = "";
+  el.setAttribute("aria-label", "進度 0% ");
+
+  const wrap = document.createElement("span");
+  wrap.style.display = "inline-block";
+  wrap.style.position = "relative";
+  wrap.style.width = width + "px";
+  wrap.style.height = height + "px";
+  wrap.style.borderRadius = "999px";
+  wrap.style.overflow = "hidden";
+  wrap.style.border = "1px solid rgba(255,255,255,0.35)";
+  wrap.style.background = "rgba(255,255,255,0.10)";
+  wrap.style.boxShadow = "0 0 0 1px rgba(0,0,0,0.15) inset";
+
+  const fill = document.createElement("span");
+  fill.style.display = "block";
+  fill.style.height = "100%";
+  fill.style.width = "0%";
+  // 用漸層做出你圖示那種質感（不依賴 Tailwind class）
+  fill.style.background = "linear-gradient(90deg, rgba(186,198,255,0.85), rgba(92,122,255,0.95))";
+  fill.style.transition = "width 120ms linear";
+
+  const label = document.createElement("span");
+  label.textContent = "0%";
+  label.style.position = "absolute";
+  label.style.left = "50%";
+  label.style.top = "50%";
+  label.style.transform = "translate(-50%, -50%)";
+  label.style.fontSize = "12px";
+  label.style.fontWeight = "700";
+  label.style.letterSpacing = "0.3px";
+  label.style.color = "#fff";
+  label.style.textShadow = "0 1px 2px rgba(0,0,0,0.45)";
+  label.style.userSelect = "none";
+
+  wrap.appendChild(fill);
+  wrap.appendChild(label);
+  el.appendChild(wrap);
+
+  const api = {
+    set(p) {
+      const pct = Math.max(0, Math.min(100, Math.round(Number(p) || 0)));
+      fill.style.width = pct + "%";
+      label.textContent = pct + "%";
+      el.setAttribute("aria-label", `進度 ${pct}%`);
+    },
+    stop() {
+      el.innerHTML = prevHtml;
+      if (prevAria == null) el.removeAttribute("aria-label");
+      else el.setAttribute("aria-label", prevAria);
+    },
+  };
+
+  return api;
+}
+
 // 用 nameLower / name 檢查是否重複；exceptId 表示忽略自己（編輯時用）
 async function isNameTaken(name, exceptId = null) {
   const kw = (name || "").trim().toLowerCase();
@@ -1055,7 +1128,8 @@ async function saveEdit() {
 
   // ② 確認後才開始「儲存中…」與鎖定按鈕
   btn.disabled = true;
-  const stopDots = startDots(txt, "儲存中");
+  const pb = startPercentBar(txt, { width: 140, height: 20 });
+  pb.set(0);
 
   try {
     // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
@@ -1112,6 +1186,15 @@ async function saveEdit() {
     }
 
     // 依序處理（保持順序）
+    const totalBytes = items
+      .filter((it) => it.kind === "file" && it.file && Number.isFinite(it.file.size))
+      .reduce((s, it) => s + (it.file.size || 0), 0);
+    let uploadedBytes = 0;
+    const updatePct = (done, total) => {
+      if (!total || total <= 0) return;
+      pb.set(Math.round((done / total) * 100));
+    };
+
     for (const it of items) {
       if (it.kind === "url") {
         newUrls.push(it.url);
@@ -1124,7 +1207,31 @@ async function saveEdit() {
         const type = it.__uploadType || (f && f.type) || '';
         const path = it.__uploadPath;
         const r = sRef(storage, path);
-        await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
+        if (typeof uploadBytesResumable === "function" && totalBytes > 0) {
+          await new Promise((resolve, reject) => {
+            const task = uploadBytesResumable(r, f, { contentType: type || 'application/octet-stream' });
+            task.on(
+              "state_changed",
+              (snap) => {
+                try {
+                  updatePct(uploadedBytes + (snap.bytesTransferred || 0), totalBytes);
+                } catch (_) { }
+              },
+              (err) => reject(err),
+              () => {
+                try {
+                  uploadedBytes += (task.snapshot?.totalBytes || f.size || 0);
+                  updatePct(uploadedBytes, totalBytes);
+                } catch (_) { }
+                resolve();
+              }
+            );
+          });
+        } else {
+          await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
+          uploadedBytes += (f && f.size) ? f.size : 0;
+          updatePct(uploadedBytes, totalBytes);
+        }
         newUrls.push(await getDownloadURL(r));
       }
     }
@@ -1178,7 +1285,8 @@ async function saveEdit() {
     currentDoc = { ...currentDoc, ...newData, mediaReady: (__updatePayload.mediaReady ?? currentDoc?.mediaReady), wmPending: (__updatePayload.wmPending ?? currentDoc?.wmPending) };
 
     // ⑤ UI 收尾（無論彈窗狀態，成功提示一下）
-    stopDots();
+    pb.set(100);
+    pb.stop();
     btn.disabled = false;
     txt.textContent = "儲存";
 
@@ -1192,7 +1300,7 @@ async function saveEdit() {
 
   } catch (err) {
     // 失敗也要確保 UI 復原
-    stopDots();
+    pb.stop();
     btn.disabled = false;
     txt.textContent = "儲存";
     await swalInDialog({ icon: "error", title: "更新失敗", text: err.message });
@@ -1867,10 +1975,11 @@ function resetAdoptedSelection() {
 async function onConfirmAdopted() {
   const btn = document.getElementById("btnConfirmAdopted");
 
-  // 動態點點（沿用你檔案內的 startDots）
+  // 進度條（取代動態點點）
   btn.disabled = true;
   btn.setAttribute("aria-busy", "true");
-  const stopDots = startDots(btn, "儲存中");
+  const pb = startPercentBar(btn, { width: 160, height: 22 });
+  pb.set(0);
 
   const files = adoptedSelected.slice(0, 5);
   const urls = [];
@@ -1903,9 +2012,42 @@ async function onConfirmAdopted() {
       currentDoc = { ...(currentDoc || {}), mediaReady: false, wmPending: nextPending };
     }
 
+    const totalBytes = plans
+      .filter((p) => p.f && Number.isFinite(p.f.size))
+      .reduce((s, p) => s + (p.f.size || 0), 0);
+    let uploadedBytes = 0;
+    const updatePct = (done, total) => {
+      if (!total || total <= 0) return;
+      pb.set(Math.round((done / total) * 100));
+    };
+
     for (const pl of plans) {
       const r = sRef(storage, pl.path);
-      await uploadBytes(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
+      if (typeof uploadBytesResumable === "function" && totalBytes > 0) {
+        await new Promise((resolve, reject) => {
+          const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
+          task.on(
+            "state_changed",
+            (snap) => {
+              try {
+                updatePct(uploadedBytes + (snap.bytesTransferred || 0), totalBytes);
+              } catch (_) { }
+            },
+            (err) => reject(err),
+            () => {
+              try {
+                uploadedBytes += (task.snapshot?.totalBytes || pl.f.size || 0);
+                updatePct(uploadedBytes, totalBytes);
+              } catch (_) { }
+              resolve();
+            }
+          );
+        });
+      } else {
+        await uploadBytes(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
+        uploadedBytes += (pl.f && pl.f.size) ? pl.f.size : 0;
+        updatePct(uploadedBytes, totalBytes);
+      }
       urls.push(await getDownloadURL(r));
     }
 
@@ -1943,7 +2085,8 @@ async function onConfirmAdopted() {
   } catch (err) {
     await swalInDialog({ icon: "error", title: "已送養標記失敗", text: err.message });
   } finally {
-    stopDots();
+    pb.set(100);
+    pb.stop();
     btn.disabled = false;
     btn.removeAttribute("aria-busy");
     btn.textContent = "儲存領養資訊";
