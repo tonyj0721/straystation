@@ -404,7 +404,7 @@ video.video-preview::-webkit-media-controls-enclosure {
   transition: padding .18s ease, gap .18s ease;
   background: rgba(198, 193, 188, 0.95);
   width: 346px;
-  /*border-radius: 22px;*/
+  border-radius: 22px;
   gap: .25rem;
 }
 
@@ -455,6 +455,10 @@ video.video-preview::-webkit-media-controls-enclosure {
   opacity: 0;
   transform: translateY(10px);
   pointer-events: none;
+}
+
+#lbBottom.lb-seeking #lbSeek {
+  height: 12px;
 }
 
 /* 進度條：已播(淺) / 未播(深) 兩色 */
