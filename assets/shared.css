@@ -405,7 +405,19 @@ video.video-preview::-webkit-media-controls-enclosure {
   background: rgba(198, 193, 188, 0.95);
   width: 346px;
   border-radius: 23px;
-  gap: 6px;
+  gap: 5px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+#lbPlayBtn{
+  width: 34x;
+  height: 34px;
+}
+
+#lbPlayIcon{
+  width: 34px;
+  height: 34px;
 }
 
 .lb-seek-time {
