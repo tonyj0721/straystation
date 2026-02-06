@@ -402,7 +402,7 @@ video.video-preview::-webkit-media-controls-enclosure {
 #lbControls {
   position: relative;
   transition: padding .18s ease, gap .18s ease;
-  background: rgba(0, 21, 255, 0.95);
+  background: rgba(245, 245, 245, 0.95);
   width: 346px;
   border-radius: 23px;
   gap: 6px;
@@ -490,10 +490,10 @@ video.video-preview::-webkit-media-controls-enclosure {
   height: 7px;
   border-radius: 9999px;
   background: linear-gradient(to right,
-      rgba(255, 0, 0, 0.75) 0%,
-      rgba(255, 0, 0, 0.75) var(--p, 0%),
-      rgba(255, 0, 0, 0.45) var(--p, 0%),
-      rgba(255, 0, 0, 0.45) 100%);
+      rgba(134, 133, 138, 0.75) 0%,
+      rgba(134, 133, 138, 0.75) var(--p, 0%),
+      rgba(229, 229, 231, 0.45) var(--p, 0%),
+      rgba(229, 229, 231, 0.45) 100%);
   outline: none;
 }
 
@@ -532,4 +532,12 @@ video.video-preview::-webkit-media-controls-enclosure {
 #lbVideo::-webkit-media-controls-enclosure {
   display: none !important;
   -webkit-appearance: none;
+}
+
+#lbClose {
+  left: 16px;
+  top: 1px;
+  width: 44px;
+  height: 44px;
+  background: rgba(254, 254, 254);
 }
