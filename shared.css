@@ -383,69 +383,145 @@ video.video-preview::-webkit-media-controls-enclosure {
    =============================== */
 
 /* 讓控制列 + 縮圖列一組貼齊底部（含 safe area） */
-#lbBottom{
+#lbBottom {
   bottom: -38px;
-  pointer-events: none; /* 只讓內部元件可以點 */
+  pointer-events: none;
+  /* 只讓內部元件可以點 */
 }
 
-#lbControls, #lbThumbs{
+#lbControls,
+#lbThumbs {
   pointer-events: auto;
 }
 
-#lbControls{
-  background: rgba(255,255,255,0.95);
+/* ===============================
+   拖曳進度條：向上展開控制列 + 顯示時間（圖 1 → 圖 2）
+   =============================== */
+
+/* 時間列（預設隱藏；拖曳時顯示） */
+#lbControls {
+  position: relative;
+  transition: padding .18s ease, gap .18s ease;
+  background: rgba(0, 21, 255, 0.95);
   width: 346px;
-  height: 48px;
-  border-radius: 24px;
+  border-radius: 23px;
+  gap: 6px;
+  padding-left: 6px;
+  padding-right: 6px;
+  padding-top: 6px;
+  padding-bottom: 6px;
 }
 
-#lbClose{
-  left: 18px;
-  top: 4px;
-  width: 42px;
-  height: 42px;
-  background: rgba(255, 0, 0);
+#lbPlayBtn,
+#lbPlayIcon,
+#lbMuteBtn,
+#lbVolumeIcon {
+  width: 36px;
+  height: 36px;
+}
+
+.lb-seek-time {
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  top: .6rem;
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  line-height: 1;
+  color: rgba(18, 18, 18, 0.92);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+/* 進度條拖曳中：控制列上移、增加上方空間、隱藏左右按鈕、顯示時間 */
+#lbBottom.lb-seeking #lbControls {
+
+  padding-top: 29px;
+  /* 讓時間列與進度條有空間 */
+
+  gap: 13px;
+}
+
+#lbBottom.lb-seeking .lb-seek-time {
+  display: flex;
+}
+
+#lbBottom.lb-seeking #lbPlayBtn,
+#lbBottom.lb-seeking #lbMuteBtn {
+  opacity: 0;
+  transform: scale(0.92);
+  width: 0;
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+}
+
+/* 讓縮圖列在拖曳時淡出（更接近 iPhone 相簿） */
+#lbThumbs {
+  transition: opacity .18s ease, transform .18s ease;
+}
+
+#lbBottom.lb-seeking #lbThumbs {
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+}
+
+#lbBottom.lb-seeking #lbSeek {
+  height: 13px;
+}
+
+#lbTimeCur {
+  margin-left: 4px;
+  margin-top: 8px;
+}
+
+#lbTimeDur {
+  margin-right: 4px;
+  margin-top: 8px;
 }
 
 /* 進度條：已播(淺) / 未播(深) 兩色 */
-.lb-seek{
+.lb-seek {
   -webkit-appearance: none;
   appearance: none;
-  height: 6px;
+  height: 7px;
   border-radius: 9999px;
   background: linear-gradient(to right,
-    rgba(0,0,0,0.45) 0%,
-    rgba(0,0,0,0.45) var(--p,0%),
-    rgba(255,255,255,0.75) var(--p,0%),
-    rgba(255,255,255,0.75) 100%);
+      rgba(255, 0, 0, 0.75) 0%,
+      rgba(255, 0, 0, 0.75) var(--p, 0%),
+      rgba(255, 0, 0, 0.45) var(--p, 0%),
+      rgba(255, 0, 0, 0.45) 100%);
   outline: none;
 }
 
 /* iOS / Chrome：range thumb */
-.lb-seek::-webkit-slider-thumb{
+.lb-seek::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 14px;
   height: 14px;
   border-radius: 9999px;
-  background: rgba(255,255,255,0.95);
-  box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 }
 
-.lb-seek::-moz-range-thumb{
+.lb-seek::-moz-range-thumb {
   width: 14px;
   height: 14px;
   border-radius: 9999px;
-  background: rgba(255,255,255,0.95);
+  background: rgba(255, 255, 255, 0.95);
   border: 0;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 }
 
 /* Firefox track */
-.lb-seek::-moz-range-track{
+.lb-seek::-moz-range-track {
   height: 6px;
   border-radius: 9999px;
-  background: rgba(0,0,0,0.45);
+  background: rgba(0, 0, 0, 0.45);
 }
 
 /* Lightbox 主影片：不顯示原生控制列（避免播放時跑出一套） */
