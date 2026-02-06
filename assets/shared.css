@@ -406,10 +406,10 @@ video.video-preview::-webkit-media-controls-enclosure {
   width: 346px;
   border-radius: 23px;
   gap: 2px;
-  padding-left: 7px;
-  padding-right: 7px;
-  padding-top: 5px;
-  padding-bottom: 5px;
+  padding-left: 6px;
+  padding-right: 6px;
+  padding-top: 6px;
+  padding-bottom: 6px;
 }
 
 #lbPlayBtn,
