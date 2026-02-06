@@ -405,7 +405,7 @@ video.video-preview::-webkit-media-controls-enclosure {
   background: rgba(198, 193, 188, 0.95);
   width: 346px;
   border-radius: 23px;
-  gap: 13px;
+  gap: 6px;
 }
 
 .lb-seek-time {
@@ -470,8 +470,8 @@ video.video-preview::-webkit-media-controls-enclosure {
   background: linear-gradient(to right,
       rgba(255, 0, 0, 0.75) 0%,
       rgba(255, 0, 0, 0.75) var(--p, 0%),
-      rgba(233, 233, 233, 0.45) var(--p, 0%),
-      rgba(233, 233, 233, 0.45) 100%);
+      rgba(255, 0, 0, 0.45) var(--p, 0%),
+      rgba(255, 0, 0, 0.45) 100%);
   outline: none;
 }
 
