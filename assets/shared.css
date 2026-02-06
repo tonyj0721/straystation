@@ -405,7 +405,7 @@ video.video-preview::-webkit-media-controls-enclosure {
   background: rgba(198, 193, 188, 0.95);
   width: 346px;
   /*border-radius: 22px;*/
-  gap: .25rem;
+  gap: .75rem;
 }
 
 .lb-seek-time {
@@ -418,7 +418,7 @@ video.video-preview::-webkit-media-controls-enclosure {
   justify-content: space-between;
   font-size: 14px;
   line-height: 1;
-  color: rgba(255, 255, 255, 0.92);
+  color: rgba(18, 18, 18, 0.92);
   font-variant-numeric: tabular-nums;
   pointer-events: none;
 }
@@ -464,10 +464,10 @@ video.video-preview::-webkit-media-controls-enclosure {
   height: 6px;
   border-radius: 9999px;
   background: linear-gradient(to right,
-      rgba(255, 255, 255, 0.75) 0%,
-      rgba(255, 255, 255, 0.75) var(--p, 0%),
-      rgba(0, 0, 0, 0.45) var(--p, 0%),
-      rgba(0, 0, 0, 0.45) 100%);
+      rgba(100, 100, 100, 0.75) 0%,
+      rgba(100, 100, 100, 0.75) var(--p, 0%),
+      rgba(233, 233, 233, 0.45) var(--p, 0%),
+      rgba(233, 233, 233, 0.45) 100%);
   outline: none;
 }
 
