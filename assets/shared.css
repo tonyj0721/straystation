@@ -420,8 +420,8 @@ video.video-preview::-webkit-media-controls-enclosure {
 
 #lbPlayIcon,
 #lbVolumeIcon {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
 }
 
 
@@ -541,6 +541,7 @@ video.video-preview::-webkit-media-controls-enclosure {
 }
 
 #lbClose {
+  overflow: visible;
   left: 16px;
   top: 1px;
   width: 44px;
@@ -549,6 +550,11 @@ video.video-preview::-webkit-media-controls-enclosure {
 }
 
 #lbbackIcon{
-  width: 44px;
-  height: 44px;
+  overflow: visible;
+  width: 50px;
+  height: 50px;
+}
+
+#lightbox #lbbackIcon {
+  overflow: visible;
 }
