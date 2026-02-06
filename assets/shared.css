@@ -420,6 +420,15 @@ video.video-preview::-webkit-media-controls-enclosure {
   height: 36px;
 }
 
+#lbMuteBtn {
+  width: 36px;
+  height: 36px;
+}
+
+#lbVolumeIcon{
+  width: 36px;
+  height: 36px;
+}
 .lb-seek-time {
   position: absolute;
   left: 1rem;
