@@ -541,20 +541,17 @@ video.video-preview::-webkit-media-controls-enclosure {
 }
 
 #lbClose {
-  overflow: visible;
   left: 16px;
-  top: 1px;
+  top: 0px;
   width: 44px;
   height: 44px;
   background: rgba(254, 254, 254);
+  overflow: visible;
 }
 
 #lbbackIcon{
-  overflow: visible;
-  width: 50px;
-  height: 50px;
-}
-
-#lightbox #lbbackIcon {
-  overflow: visible;
+  width: 44px;
+  height: 44px;
+  transform: scale(1.3);
+  transform-origin: center;
 }
