@@ -600,10 +600,6 @@
     <div id="lbWrap" class="relative inline-block">
       <img id="lbImg" class="object-contain rounded-lg" />
       <video id="lbVideo" playsinline class="object-contain rounded-lg hidden"></video>
-      <button id="lbClose" class="ui-close-btn absolute top-1 right-1 z-10" aria-label="關閉"><svg viewBox="0 0 24 24"
-          aria-hidden="true" focusable="false" class="ui-close-icon">
-          <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
-        </svg></button>
       <button id="lbPrev" class="absolute text-white text-4xl select-none">❮</button>
       <button id="lbNext" class="absolute text-white text-4xl select-none">❯</button>
     </div>
@@ -630,6 +626,8 @@
         <div id="lbThumbsInner" class="flex gap-2"></div>
       </div>
     </div>
+    <button id="lbClose" class="ui-close-btn absolute top-1 right-1 z-10" aria-label="關閉"><img id="lbPlayIcon"
+        src="images/icons/back.png" alt="" class="w-10 h-10 object-contain pointer-events-none"></button>
   </div>
 
   <script src="./assets/firebase-config.js"></script>
