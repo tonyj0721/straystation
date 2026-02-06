@@ -405,7 +405,7 @@ video.video-preview::-webkit-media-controls-enclosure {
   background: rgba(0, 21, 255, 0.95);
   width: 346px;
   border-radius: 23px;
-  gap: 2px;
+  gap: 4px;
   padding-left: 6px;
   padding-right: 6px;
   padding-top: 6px;
@@ -438,10 +438,10 @@ video.video-preview::-webkit-media-controls-enclosure {
 /* 進度條拖曳中：控制列上移、增加上方空間、隱藏左右按鈕、顯示時間 */
 #lbBottom.lb-seeking #lbControls {
 
-  padding-top: 2.1rem;
+  padding-top: 30px;
   /* 讓時間列與進度條有空間 */
 
-  gap: .75rem;
+  gap: 10px;
 }
 
 #lbBottom.lb-seeking .lb-seek-time {
@@ -470,7 +470,17 @@ video.video-preview::-webkit-media-controls-enclosure {
 }
 
 #lbBottom.lb-seeking #lbSeek {
-  height: 12px;
+  height: 13px;
+}
+
+#lbTimeCur {
+  margin-left: 4px;
+  margin-top: 8px;
+}
+
+#lbTimeDur {
+  margin-right: 4px;
+  margin-top: 8px;
 }
 
 /* 進度條：已播(淺) / 未播(深) 兩色 */
