@@ -408,29 +408,18 @@ video.video-preview::-webkit-media-controls-enclosure {
   gap: 2px;
   padding-left: 7px;
   padding-right: 7px;
-  padding-top: 3px;
-  padding-bottom: 3px;
+  padding-top: 5px;
+  padding-bottom: 5px;
 }
 
-#lbPlayBtn{
+#lbPlayBtn,
+#lbPlayIcon,
+#lbMuteBtn,
+#lbVolumeIcon {
   width: 36px;
   height: 36px;
 }
 
-#lbPlayIcon{
-  width: 100px;
-  height: 100px;
-}
-
-#lbMuteBtn {
-  width: 36px;
-  height: 36px;
-}
-
-#lbVolumeIcon{
-  width: 36px;
-  height: 36px;
-}
 .lb-seek-time {
   position: absolute;
   left: 1rem;
@@ -448,10 +437,10 @@ video.video-preview::-webkit-media-controls-enclosure {
 
 /* 進度條拖曳中：控制列上移、增加上方空間、隱藏左右按鈕、顯示時間 */
 #lbBottom.lb-seeking #lbControls {
-  
+
   padding-top: 2.1rem;
   /* 讓時間列與進度條有空間 */
-  
+
   gap: .75rem;
 }
 
