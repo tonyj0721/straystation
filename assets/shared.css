@@ -413,12 +413,18 @@ video.video-preview::-webkit-media-controls-enclosure {
 }
 
 #lbPlayBtn,
-#lbPlayIcon,
-#lbMuteBtn,
-#lbVolumeIcon {
-  width: 34px;
-  height: 34px;
+#lbMuteBtn{
+  width: 36px;
+  height: 36px;
 }
+
+#lbPlayIcon,
+#lbVolumeIcon {
+  width: 36px;
+  height: 36px;
+}
+
+
 
 .lb-seek-time {
   position: absolute;
@@ -543,6 +549,6 @@ video.video-preview::-webkit-media-controls-enclosure {
 }
 
 #lbbackIcon{
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
 }
