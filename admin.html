@@ -676,7 +676,7 @@
       getFirestore, collection, getDocs, query, orderBy, where,
       doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp, limit as fbLimit, deleteField,
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
-    import { getStorage, ref as sRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject, listAll, } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
+    import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject, listAll, } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
     import {
       getAuth,
       signOut,
@@ -693,7 +693,7 @@
       collection, getDocs, query, orderBy, where,
       doc, getDoc, updateDoc, deleteDoc, serverTimestamp, fbLimit,
       deleteField,
-      sRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject, listAll,
+      sRef, uploadBytes, getDownloadURL, deleteObject, listAll,
     });
 
     const auth = getAuth(app);
@@ -1409,8 +1409,7 @@
       const submitBtn = $("#submitBtn");
       const submitText = $("#submitText");
       submitBtn.disabled = true;
-      const pb = startPercentBar(submitText, { width: 140, height: 20 });
-      pb.set(0);
+      const stopDots = startDots(submitText, "登錄中");
 
       try {
         // 1) 新增基本文件
@@ -1440,41 +1439,10 @@
           await updateDoc(doc(db, "pets", docRef.id), { mediaReady: false, wmPending: pendingPaths });
         }
 
-        // 逐檔上傳（顯示百分比）
-        const totalBytes = plans
-          .filter(p => p.f && Number.isFinite(p.f.size))
-          .reduce((s, p) => s + (p.f.size || 0), 0);
-        let uploadedBytes = 0;
-        const updatePct = (done, total) => {
-          if (!total || total <= 0) return;
-          pb.set(Math.round((done / total) * 100));
-        };
-
+        // 逐檔上傳
         for (const pl of plans) {
           const r = sRef(storage, pl.path);
-          if (typeof uploadBytesResumable === "function" && totalBytes > 0) {
-            await new Promise((resolve, reject) => {
-              const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
-              task.on(
-                "state_changed",
-                (snap) => {
-                  try { updatePct(uploadedBytes + (snap.bytesTransferred || 0), totalBytes); } catch (_) { }
-                },
-                (err) => reject(err),
-                () => {
-                  try {
-                    uploadedBytes += (task.snapshot?.totalBytes || pl.f.size || 0);
-                    updatePct(uploadedBytes, totalBytes);
-                  } catch (_) { }
-                  resolve();
-                }
-              );
-            });
-          } else {
-            await uploadBytes(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
-            uploadedBytes += (pl.f && pl.f.size) ? pl.f.size : 0;
-            updatePct(uploadedBytes, totalBytes);
-          }
+          await uploadBytes(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
           urls.push(await getDownloadURL(r));
         }
 
@@ -1484,8 +1452,7 @@
         }
 
         // UI 收尾
-        pb.set(100);
-        pb.stop();
+        stopDots();
         submitBtn.disabled = false;
         submitText.textContent = "登錄";
 
@@ -1568,7 +1535,7 @@
         }
 
       } catch (err) {
-        pb.stop();
+        stopDots();
         submitBtn.disabled = false;
         submitText.textContent = "登錄";
         Swal.fire({ icon: "error", title: "登錄失敗", text: err.message });
