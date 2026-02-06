@@ -416,8 +416,8 @@ video.video-preview::-webkit-media-controls-enclosure {
 #lbPlayIcon,
 #lbMuteBtn,
 #lbVolumeIcon {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
 }
 
 .lb-seek-time {
@@ -540,4 +540,9 @@ video.video-preview::-webkit-media-controls-enclosure {
   width: 44px;
   height: 44px;
   background: rgba(254, 254, 254);
+}
+
+#lbbackIcon{
+  width: 36px;
+  height: 36px;
 }
