@@ -405,19 +405,21 @@ video.video-preview::-webkit-media-controls-enclosure {
   background: rgba(0, 21, 255, 0.95);
   width: 346px;
   border-radius: 23px;
-  gap: 3px;
-  padding-top: 4px;
-  padding-bottom: 4px;
+  gap: 2px;
+  padding-left: 7px;
+  padding-right: 7px;
+  padding-top: 3px;
+  padding-bottom: 3px;
 }
 
 #lbPlayBtn{
-  width: 36x;
+  width: 36px;
   height: 36px;
 }
 
 #lbPlayIcon{
-  width: 36px;
-  height: 36px;
+  width: 100px;
+  height: 100px;
 }
 
 #lbMuteBtn {
