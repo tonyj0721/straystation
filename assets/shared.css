@@ -405,7 +405,7 @@ video.video-preview::-webkit-media-controls-enclosure {
   background: rgba(0, 21, 255, 0.95);
   width: 346px;
   border-radius: 23px;
-  gap: 3px;
+  gap: 5px;
   padding-left: 6px;
   padding-right: 6px;
   padding-top: 6px;
@@ -441,7 +441,7 @@ video.video-preview::-webkit-media-controls-enclosure {
   padding-top: 29px;
   /* 讓時間列與進度條有空間 */
 
-  gap: 9px;
+  gap: 11px;
 }
 
 #lbBottom.lb-seeking .lb-seek-time {
