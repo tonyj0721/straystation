@@ -384,7 +384,7 @@ video.video-preview::-webkit-media-controls-enclosure {
 
 /* 讓控制列 + 縮圖列一組貼齊底部（含 safe area） */
 #lbBottom {
-  bottom: env(safe-area-inset-bottom);
+  bottom: -38px;
   pointer-events: none;
   /* 只讓內部元件可以點 */
 }
@@ -425,7 +425,7 @@ video.video-preview::-webkit-media-controls-enclosure {
 /* 進度條拖曳中：控制列上移、增加上方空間、隱藏左右按鈕、顯示時間 */
 #lbBottom.lb-seeking #lbControls {
   
-  padding-top: 2.25rem;
+  padding-top: 24px;
   /* 讓時間列與進度條有空間 */
   
   gap: .75rem;
