@@ -92,21 +92,15 @@ const lbNext = document.getElementById("lbNext");
 const lbClose = document.getElementById("lbClose");
 const lbWrap = document.getElementById("lbWrap");   // ← 新增
 
-// ---- Lightbox：相簿式沉浸模式（點主圖/主影片切換，非原生 fullscreen） ----
-let lbImmersive = false;
-const __setLbImmersive = (on) => {
-  lbImmersive = !!on;
+// ---- Lightbox 沉浸模式（相簿式：切換 UI 顯示/隱藏，不使用原生 fullscreen） ----
+let __lbImmersive = false;
+function __setLbImmersive(on) {
+  __lbImmersive = !!on;
   if (!lb) return;
-  lb.classList.toggle("lb-immersive", lbImmersive);
+  lb.classList.toggle('lb-immersive', __lbImmersive);
+}
+function __toggleLbImmersive() { __setLbImmersive(!__lbImmersive); }
 
-  // 影片避免跳原生控制列
-  if (lbVideo) {
-    try { lbVideo.controls = false; } catch (_) { }
-    lbVideo.removeAttribute("controls");
-  }
-};
-const __toggleLbImmersive = () => __setLbImmersive(!lbImmersive);
-   // ← 新增
 
 // ---- Lightbox 自訂影片控制列（iPhone 相簿風格） ----
 const lbBottom = document.getElementById("lbBottom");
@@ -166,6 +160,7 @@ function __enterLbSeeking() {
   __lbIsSeeking = true;
   __lbWasPlayingBeforeSeek = !lbVideo.paused;
   lbBottom.classList.add("lb-seeking");
+  lb?.classList.add("lb-seeking");
   // 拖曳時先暫停（更接近相簿的 scrub 行為）
   try { lbVideo.pause?.(); } catch (_) { }
 }
@@ -174,6 +169,7 @@ function __exitLbSeeking() {
   if (!__lbIsSeeking) return;
   __lbIsSeeking = false;
   lbBottom?.classList.remove("lb-seeking");
+  lb?.classList.remove("lb-seeking");
   if (lbVideo && __lbWasPlayingBeforeSeek) {
     try { lbVideo.play?.().catch(() => { }); } catch (_) { }
   }
@@ -439,6 +435,7 @@ dlg?.addEventListener('close', () => {
 // 🔥 開啟 Lightbox：關掉 dialog + 維持背景鎖定
 
 function openLightbox(images, index = 0) {
+  __setLbImmersive(false);
   lbImages = images || [];
   lbIndex = Math.max(0, Math.min(index, lbImages.length - 1));
   lbReturnToDialog = !!(dlg && dlg.open);
@@ -509,10 +506,7 @@ function openLightbox(images, index = 0) {
     lb.classList.add("flex");
   }
 
-  
-  // 每次打開都回到一般模式
-  __setLbImmersive(false);
-// 關掉 Modal（移除 backdrop）
+  // 關掉 Modal（移除 backdrop）
   if (dlg?.open) dlg.close();
 
   // 鎖背景（避免底層頁面被捲動）
@@ -520,8 +514,9 @@ function openLightbox(images, index = 0) {
 }
 // 🔥 關閉 Lightbox：回到 dialog 或直接解鎖
 function closeLightbox() {
-  // 關閉時結束沉浸模式
   __setLbImmersive(false);
+  lb?.classList.remove("lb-seeking");
+  lbBottom?.classList.remove("lb-seeking");
   if (lbControls) lbControls.classList.add("hidden");
   __setLbPlayIcon(false);
   if (lbSeek) { lbSeek.value = "0"; lbSeek.style.setProperty("--p", "0%"); }
@@ -570,17 +565,17 @@ lbClose?.addEventListener('click', (e) => {
   closeLightbox();
 });
 
-
-// 點主圖 / 主影片：切換相簿式沉浸模式（隱藏關閉鍵/控制列/縮圖列）
-const __onStageTap = (e) => {
-  // 避免在拖曳時間棒時誤觸
-  if (lbBottom?.classList?.contains("lb-seeking")) return;
+// 點主圖/主影片：切換沉浸式（像 iPhone 相簿）
+lbWrap?.addEventListener('click', (e) => {
+  // 避免點到進度條拖曳/按鈕時誤觸
+  if (__lbIsSeeking) return;
+  // 如果點的是按鈕本身，就不切換
+  const t = e.target;
+  if (t && (t.closest?.('#lbClose') || t.closest?.('#lbPrev') || t.closest?.('#lbNext') || t.closest?.('#lbControls') || t.closest?.('#lbThumbs'))) return;
+  e.preventDefault();
   e.stopPropagation();
   __toggleLbImmersive();
-};
-
-lbImg?.addEventListener("click", __onStageTap);
-lbVideo?.addEventListener("click", __onStageTap);
+});
 
 // 🔥 點黑幕關閉
 lb?.addEventListener("click", (e) => {
