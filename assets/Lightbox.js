@@ -472,6 +472,9 @@ function openLightbox(images, index = 0) {
   lbIndex = Math.max(0, Math.min(index, lbImages.length - 1));
   lbReturnToDialog = !!(dlg && dlg.open);
 
+  // 每次開啟都先回到「非沉浸式」
+  __setLbImmersive(false);
+
   // 建立縮圖列
   const lbThumbsInner = document.getElementById("lbThumbsInner");
   if (lbThumbsInner) {
@@ -546,9 +549,10 @@ function openLightbox(images, index = 0) {
 }
 // 🔥 關閉 Lightbox：回到 dialog 或直接解鎖
 function closeLightbox() {
-  
+  // 關閉時一定回到非沉浸式 + 非拖曳狀態
   __setLbImmersive(false);
-if (lbControls) lbControls.classList.add("hidden");
+  try { __exitLbSeeking(); } catch (_) { }
+  if (lbControls) lbControls.classList.add("hidden");
   __setLbPlayIcon(false);
   if (lbSeek) { lbSeek.value = "0"; lbSeek.style.setProperty("--p", "0%"); }
 

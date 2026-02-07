@@ -69,11 +69,35 @@ dialog::backdrop {
 
   align-items: center;
   justify-content: center;
-  padding-top: 36px;
-  padding-bottom: 86px;
+
+  /* 一般模式：保留上/下空間讓 UI 不被瀏海/底部 Home Bar 擋住 */
+  padding-top: max(36px, env(safe-area-inset-top));
+  padding-bottom: max(86px, env(safe-area-inset-bottom));
   box-sizing: border-box;
 
   --stageW: 100vw;
+}
+
+/* 沉浸式（像 iPhone 相簿）：背景/主圖真正滿版覆蓋，允許畫到 Safari UI 底下 */
+#lightbox.lb-immersive {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+#lightbox.lb-immersive #lbClose,
+#lightbox.lb-immersive #lbPrev,
+#lightbox.lb-immersive #lbNext,
+#lightbox.lb-immersive #lbBottom {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 沉浸式主圖/主影片：吃滿視窗 */
+#lightbox.lb-immersive #lbImg,
+#lightbox.lb-immersive #lbVideo {
+  max-height: 100dvh !important;
+  max-width: 100vw !important;
+  border-radius: 0 !important;
 }
 
 #lightbox #lbImg,
