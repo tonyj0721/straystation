@@ -475,6 +475,66 @@ function startDots(span, base) {
   return () => clearInterval(t); // 回傳停止函式
 }
 
+
+// ===============================
+// 小工具：按鈕上的「百分比進度條」
+// ===============================
+function startPercentBar(targetEl, { widthPx = 140 } = {}) {
+  const el = targetEl;
+  if (!el) return { set: () => {}, stop: () => {} };
+
+  if (!el.dataset.__origHtml) el.dataset.__origHtml = el.innerHTML;
+
+  el.innerHTML = `
+    <span class="relative inline-flex items-center justify-center" style="width:${widthPx}px;height:28px;">
+      <span class="absolute inset-0 rounded-full bg-black/30 ring-1 ring-white/25 overflow-hidden"></span>
+      <span data-fill class="absolute left-0 top-0 h-full rounded-full bg-white/40" style="width:0%"></span>
+      <span data-label class="relative z-10 text-xs font-semibold text-white">0%</span>
+    </span>
+  `;
+
+  const fill = el.querySelector("[data-fill]");
+  const label = el.querySelector("[data-label]");
+
+  const set = (p) => {
+    const v = Math.max(0, Math.min(100, Math.round(p)));
+    if (fill) fill.style.width = v + "%";
+    if (label) label.textContent = v + "%";
+  };
+
+  const stop = (restoreHtml = null) => {
+    el.innerHTML = restoreHtml != null ? restoreHtml : (el.dataset.__origHtml || "");
+  };
+
+  set(0);
+  return { set, stop };
+}
+
+// 單檔上傳：回報進度 + 回傳 downloadURL
+function uploadResumableWithProgress(storageRef, file, meta, onProgress) {
+  return new Promise((resolve, reject) => {
+    const task = uploadBytesResumable(storageRef, file, meta);
+    task.on(
+      "state_changed",
+      (snap) => {
+        try { onProgress?.(snap); } catch { }
+      },
+      (err) => reject(err),
+      async () => {
+        try {
+          const url = await getDownloadURL(task.snapshot.ref);
+          resolve({ url, snapshot: task.snapshot });
+        } catch (e) { reject(e); }
+      }
+    );
+  });
+}
+
+// 讓 module 也能用（admin.html 內會用到）
+window.startPercentBar = startPercentBar;
+window.uploadResumableWithProgress = uploadResumableWithProgress;
+
+
 // 用 nameLower / name 檢查是否重複；exceptId 表示忽略自己（編輯時用）
 async function isNameTaken(name, exceptId = null) {
   const kw = (name || "").trim().toLowerCase();
@@ -562,21 +622,12 @@ function __renderProcessingState(p = null) {
   } catch (_) { /* ignore */ }
 }
 
-async function __waitPetMediaReady(petId, { maxTries = 120, intervalMs = 800, onProgress = null } = {}) {
+async function __waitPetMediaReady(petId, { maxTries = 120, intervalMs = 800 } = {}) {
   for (let i = 0; i < maxTries; i++) {
     const snap = await getDoc(doc(db, "pets", petId));
     if (!snap.exists()) return null;
     const data = snap.data() || {};
     const p = { id: snap.id, ...data };
-
-    // 沒有媒體 → 不用等
-
-    // 回報後端真實進度（需後端寫入 mediaProgress: 0~100）
-    if (typeof onProgress === "function") {
-      const v = Number(p.mediaProgress);
-      if (Number.isFinite(v)) onProgress(Math.max(0, Math.min(100, v)), p);
-      else onProgress(null, p);
-    }
 
     // 沒有媒體 → 不用等
     if (!__hasMediaForWatermark(p)) return p;
@@ -1064,7 +1115,8 @@ async function saveEdit() {
 
   // ② 確認後才開始「儲存中…」與鎖定按鈕
   btn.disabled = true;
-  const stopDots = startDots(txt, "儲存中");
+  const prog = startPercentBar(btn);
+  prog.set(0);
 
   try {
     // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
@@ -1121,6 +1173,11 @@ async function saveEdit() {
     }
 
     // 依序處理（保持順序）
+    const __files = items.filter((x) => x && x.kind === "file").map((x) => x.file).filter(Boolean);
+    const totalBytes = __files.reduce((s, f) => s + (f.size || 0), 0) || 0;
+    let doneBytes = 0;
+    if (totalBytes === 0) prog.set(100);
+
     for (const it of items) {
       if (it.kind === "url") {
         newUrls.push(it.url);
@@ -1133,8 +1190,14 @@ async function saveEdit() {
         const type = it.__uploadType || (f && f.type) || '';
         const path = it.__uploadPath;
         const r = sRef(storage, path);
-        await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
-        newUrls.push(await getDownloadURL(r));
+        const meta = { contentType: type || 'application/octet-stream' };
+        const { url } = await uploadResumableWithProgress(r, f, meta, (snap) => {
+          if (!totalBytes) return;
+          prog.set(((doneBytes + snap.bytesTransferred) / totalBytes) * 100);
+        });
+        doneBytes += (f.size || 0);
+        if (totalBytes) prog.set((doneBytes / totalBytes) * 100);
+        newUrls.push(url);
       }
     }
 
@@ -1187,9 +1250,9 @@ async function saveEdit() {
     currentDoc = { ...currentDoc, ...newData, mediaReady: (__updatePayload.mediaReady ?? currentDoc?.mediaReady), wmPending: (__updatePayload.wmPending ?? currentDoc?.wmPending) };
 
     // ⑤ UI 收尾（無論彈窗狀態，成功提示一下）
-    stopDots();
+    prog.set(100);
+    prog.stop();
     btn.disabled = false;
-    txt.textContent = "儲存";
 
     const wasOpen = dlg.open;
     if (wasOpen) dlg.close();
@@ -1201,9 +1264,9 @@ async function saveEdit() {
 
   } catch (err) {
     // 失敗也要確保 UI 復原
-    stopDots();
+    prog.set(100);
+    prog.stop();
     btn.disabled = false;
-    txt.textContent = "儲存";
     await swalInDialog({ icon: "error", title: "更新失敗", text: err.message });
   }
 }
@@ -1879,7 +1942,8 @@ async function onConfirmAdopted() {
   // 動態點點（沿用你檔案內的 startDots）
   btn.disabled = true;
   btn.setAttribute("aria-busy", "true");
-  const stopDots = startDots(btn, "儲存中");
+  const prog = startPercentBar(btn);
+  prog.set(0);
 
   const files = adoptedSelected.slice(0, 5);
   const urls = [];
@@ -1912,10 +1976,20 @@ async function onConfirmAdopted() {
       currentDoc = { ...(currentDoc || {}), mediaReady: false, wmPending: nextPending };
     }
 
+    const totalBytes = plans.reduce((s,x)=>s + ((x.f&&x.f.size)?x.f.size:0),0) || 0;
+    let doneBytes = 0;
+    if (totalBytes === 0) prog.set(100);
+
     for (const pl of plans) {
       const r = sRef(storage, pl.path);
-      await uploadBytes(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
-      urls.push(await getDownloadURL(r));
+      const meta = { contentType: pl.type || 'application/octet-stream' };
+      const { url } = await uploadResumableWithProgress(r, pl.f, meta, (snap) => {
+        if (!totalBytes) return;
+        prog.set(((doneBytes + snap.bytesTransferred) / totalBytes) * 100);
+      });
+      doneBytes += (pl.f && pl.f.size) ? pl.f.size : 0;
+      if (totalBytes) prog.set((doneBytes / totalBytes) * 100);
+      urls.push(url);
     }
 
 
@@ -1952,7 +2026,8 @@ async function onConfirmAdopted() {
   } catch (err) {
     await swalInDialog({ icon: "error", title: "已送養標記失敗", text: err.message });
   } finally {
-    stopDots();
+    prog.set(100);
+    prog.stop();
     btn.disabled = false;
     btn.removeAttribute("aria-busy");
     btn.textContent = "儲存領養資訊";
