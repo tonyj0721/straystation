@@ -92,234 +92,6 @@ const lbNext = document.getElementById("lbNext");
 const lbClose = document.getElementById("lbClose");
 const lbWrap = document.getElementById("lbWrap");   // ← 新增
 
-// ---- Lightbox 自訂影片控制列（iPhone 相簿風格） ----
-const lbBottom = document.getElementById("lbBottom");
-const lbControls = document.getElementById("lbControls");
-const lbPlayBtn = document.getElementById("lbPlayBtn");
-const lbPlayIcon = document.getElementById("lbPlayIcon");
-const lbSeek = document.getElementById("lbSeek");
-const lbMuteBtn = document.getElementById("lbMuteBtn");
-const lbVolumeIcon = document.getElementById("lbVolumeIcon");
-const lbSeekTime = document.getElementById("lbSeekTime");
-const lbTimeCur = document.getElementById("lbTimeCur");
-const lbTimeDur = document.getElementById("lbTimeDur");
-
-let __lbControlsBound = false;
-let __lbIsSeeking = false;
-let __lbWasPlayingBeforeSeek = false;
-
-// 點一下主圖/主影片：進入沉浸式（全螢幕 + 隱藏 UI）；再點一下恢復
-let __lbImmersive = false;
-
-function __pct(n) {
-  const v = Math.max(0, Math.min(100, n));
-  return v.toFixed(3).replace(/\.0+$/, "") + "%";
-}
-
-function __setLbPlayIcon(isPlaying) {
-  if (!lbPlayIcon) return;
-  lbPlayIcon.src = isPlaying ? "images/icons/pause.png" : "images/icons/play.png";
-}
-
-function __setLbVolumeIcon() {
-  if (!lbVolumeIcon || !lbVideo) return;
-  const muted = !!lbVideo.muted || (typeof lbVideo.volume === "number" && lbVideo.volume === 0);
-  lbVolumeIcon.src = muted ? "images/icons/mute.png" : "images/icons/volume.png";
-}
-
-function __fmtTime(t, withMs = false) {
-  const sec = Number.isFinite(t) ? Math.max(0, t) : 0;
-  const m = Math.floor(sec / 60);
-  const s = sec - m * 60;
-  const ss = Math.floor(s);
-  const ms = Math.floor((s - ss) * 100);
-
-  const mmStr = String(m).padStart(2, "0");
-  const ssStr = String(ss).padStart(2, "0");
-  if (!withMs) return `${mmStr}:${ssStr}`;
-  return `${mmStr}:${ssStr}.${String(ms).padStart(2, "0")}`;
-}
-
-function __setLbTimeLabels(curSec, durSec) {
-  if (!lbTimeCur || !lbTimeDur) return;
-  // 參考 iPhone 相簿：拖曳時左邊顯示到小數、右邊總長不顯示小數
-  lbTimeCur.textContent = __fmtTime(curSec, true);
-  lbTimeDur.textContent = __fmtTime(durSec, false);
-}
-
-function __enterLbSeeking() {
-  if (__lbIsSeeking) return;
-  if (!lbBottom || !lbVideo) return;
-  __lbIsSeeking = true;
-  __lbWasPlayingBeforeSeek = !lbVideo.paused;
-  lbBottom.classList.add("lb-seeking");
-  // 拖曳時先暫停（更接近相簿的 scrub 行為）
-  try { lbVideo.pause?.(); } catch (_) { }
-}
-
-function __exitLbSeeking() {
-  if (!__lbIsSeeking) return;
-  __lbIsSeeking = false;
-  lbBottom?.classList.remove("lb-seeking");
-  if (lbVideo && __lbWasPlayingBeforeSeek) {
-    try { lbVideo.play?.().catch(() => { }); } catch (_) { }
-  }
-}
-
-
-function __requestLightboxFullscreen() {
-  // 盡量讓主媒體進全螢幕；失敗也沒關係（仍可隱藏 UI）
-  try {
-    if (isCurrentLightboxVideo() && lbVideo && !lbVideo.classList.contains("hidden")) {
-      if (typeof lbVideo.requestFullscreen === "function") return lbVideo.requestFullscreen();
-      // iOS Safari：影片走 webkitEnterFullscreen（會進原生全螢幕播放器）
-      if (typeof lbVideo.webkitEnterFullscreen === "function") return lbVideo.webkitEnterFullscreen();
-    }
-    // 圖片：用包裹層進全螢幕（較穩）
-    if (lbWrap && typeof lbWrap.requestFullscreen === "function") return lbWrap.requestFullscreen();
-    if (lb && typeof lb.requestFullscreen === "function") return lb.requestFullscreen();
-  } catch (_) { }
-}
-
-function __exitLightboxFullscreen() {
-  try {
-    if (document.fullscreenElement && typeof document.exitFullscreen === "function") {
-      return document.exitFullscreen();
-    }
-  } catch (_) { }
-  // iOS 影片全螢幕通常不能程式退出（由使用者點「完成」）
-  try {
-    if (lbVideo && typeof lbVideo.webkitExitFullscreen === "function") return lbVideo.webkitExitFullscreen();
-  } catch (_) { }
-}
-
-function __enterLbImmersive() {
-  if (__lbImmersive) return;
-  __lbImmersive = true;
-  __exitLbSeeking();
-  lb?.classList.add("lb-immersive");
-  __requestLightboxFullscreen();
-}
-
-function __exitLbImmersive(skipExitFullscreen = false) {
-  if (!__lbImmersive) return;
-  __lbImmersive = false;
-  lb?.classList.remove("lb-immersive");
-  if (!skipExitFullscreen) __exitLightboxFullscreen();
-}
-
-function __toggleLbImmersive() {
-  if (__lbImmersive) __exitLbImmersive(false);
-  else __enterLbImmersive();
-}
-
-function __setLbSeekByTime() {
-  if (!lbSeek || !lbVideo) return;
-  const dur = Number.isFinite(lbVideo.duration) ? lbVideo.duration : 0;
-  const cur = Number.isFinite(lbVideo.currentTime) ? lbVideo.currentTime : 0;
-  if (!dur || dur <= 0) {
-    lbSeek.value = "0";
-    lbSeek.style.setProperty("--p", "0%");
-    return;
-  }
-  const ratio = Math.max(0, Math.min(1, cur / dur));
-  lbSeek.value = String(Math.round(ratio * 1000));
-  lbSeek.style.setProperty("--p", __pct(ratio * 100));
-
-  // 拖曳時顯示時間
-  if (__lbIsSeeking) __setLbTimeLabels(cur, dur);
-}
-
-function __bindLbControlsOnce() {
-  if (__lbControlsBound) return;
-  __lbControlsBound = true;
-
-  // 播放 / 暫停
-  lbPlayBtn?.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!lbVideo || lbVideo.classList.contains("hidden")) return;
-    try {
-      if (lbVideo.paused) {
-        lbVideo.play?.().catch(() => { });
-      } else {
-        lbVideo.pause?.();
-      }
-    } catch (_) { }
-    __setLbPlayIcon(!lbVideo.paused);
-  });
-
-  // 靜音 / 取消靜音
-  lbMuteBtn?.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!lbVideo || lbVideo.classList.contains("hidden")) return;
-    try {
-      lbVideo.muted = !lbVideo.muted;
-    } catch (_) { }
-    __setLbVolumeIcon();
-  });
-
-  // 拖拉進度
-  const seekToValue = () => {
-    if (!lbVideo || !lbSeek) return;
-    const dur = Number.isFinite(lbVideo.duration) ? lbVideo.duration : 0;
-    if (!dur || dur <= 0) return;
-    const ratio = Math.max(0, Math.min(1, Number(lbSeek.value) / 1000));
-    const target = ratio * dur;
-    // 即時更新 UI（不用等 video.seeked）
-    __setLbTimeLabels(target, dur);
-    try { lbVideo.currentTime = target; } catch (_) { }
-    __setLbSeekByTime();
-  };
-
-  // 進入/離開拖曳狀態（用 pointer 事件即可同時覆蓋 mouse + touch）
-  const onSeekStart = (e) => {
-    e.stopPropagation();
-    __enterLbSeeking();
-    // 進入拖曳時先刷新一次時間，避免閃一下 00:00
-    if (lbVideo) __setLbTimeLabels(lbVideo.currentTime || 0, lbVideo.duration || 0);
-  };
-  const onSeekEnd = (e) => {
-    e.stopPropagation();
-    // 放手後收起（控制列回到圖 1）
-    __exitLbSeeking();
-  };
-
-  lbSeek?.addEventListener("pointerdown", onSeekStart);
-  lbSeek?.addEventListener("pointerup", onSeekEnd);
-  lbSeek?.addEventListener("pointercancel", onSeekEnd);
-  document.addEventListener("pointerup", onSeekEnd);
-  document.addEventListener("pointercancel", onSeekEnd);
-
-  lbSeek?.addEventListener("input", (e) => {
-    e.stopPropagation();
-    if (!__lbIsSeeking) __enterLbSeeking();
-    seekToValue();
-  });
-  lbSeek?.addEventListener("change", (e) => {
-    e.stopPropagation();
-    seekToValue();
-    __exitLbSeeking();
-  });
-
-  // 影片事件同步 UI
-  lbVideo?.addEventListener("loadedmetadata", () => {
-    __setLbSeekByTime();
-    __setLbVolumeIcon();
-    __setLbPlayIcon(!lbVideo.paused);
-    // 預先寫入總長，供拖曳時直接顯示
-    __setLbTimeLabels(lbVideo.currentTime || 0, lbVideo.duration || 0);
-  });
-
-  lbVideo?.addEventListener("timeupdate", () => { __setLbSeekByTime(); });
-  lbVideo?.addEventListener("play", () => { __setLbPlayIcon(true); });
-  lbVideo?.addEventListener("pause", () => { __setLbPlayIcon(false); });
-  lbVideo?.addEventListener("volumechange", () => { __setLbVolumeIcon(); });
-  lbVideo?.addEventListener("ended", () => { __setLbPlayIcon(false); });
-}
-
-
 let lbImages = [];
 let lbIndex = 0;
 let lbReturnToDialog = false;
@@ -331,25 +103,13 @@ function renderLightboxMedia() {
       try { lbVideo.pause(); } catch (_) { }
       lbVideo.src = "";
       lbVideo.classList.add("hidden");
-      __setLbPlayIcon(false);
-      if (lbSeek) { lbSeek.value = "0"; lbSeek.style.setProperty("--p", "0%"); }
-
     }
     if (lbWrap) lbWrap.classList.remove("lb-video-mode"); // ← 新增
-    if (lbControls) lbControls.classList.add("hidden");
-    __setLbPlayIcon(false);
-    if (lbSeek) { lbSeek.value = "0"; lbSeek.style.setProperty("--p", "0%"); }
-
     return;
   }
 
   const url = lbImages[lbIndex] || "";
   const isVid = isVideoUrl(url);
-
-  // 影片才顯示自訂控制列；圖片隱藏
-  if (lbControls) lbControls.classList.toggle("hidden", !isVid);
-  __bindLbControlsOnce();
-
 
   // 根據是否為影片切換 class
   if (lbWrap) {
@@ -362,11 +122,7 @@ function renderLightboxMedia() {
       lbVideo.classList.remove("hidden");
       lbVideo.src = url;
       lbVideo.playsInline = true;
-      lbVideo.controls = false;
-      __setLbPlayIcon(false);
-      if (lbSeek) { lbSeek.value = "0"; lbSeek.style.setProperty("--p", "0%"); }
-      __setLbVolumeIcon();
-
+      lbVideo.controls = true;
       try { lbVideo.play().catch(() => { }); } catch (_) { }
     } else {
       try { lbVideo.pause && lbVideo.pause(); } catch (_) { }
@@ -483,11 +239,6 @@ function openLightbox(images, index = 0) {
     lbThumbsInner.innerHTML = "";
     lbImages.forEach((url, i) => {
       const isVid = isVideoUrl(url);
-
-      // 影片才顯示自訂控制列；圖片隱藏
-      if (lbControls) lbControls.classList.toggle("hidden", !isVid);
-      __bindLbControlsOnce();
-
       const wrapper = document.createElement("div");
       wrapper.className = "lb-thumb" + (i === lbIndex ? " active" : "");
 
@@ -551,13 +302,6 @@ function openLightbox(images, index = 0) {
 }
 // 🔥 關閉 Lightbox：回到 dialog 或直接解鎖
 function closeLightbox() {
-  // 關閉時一定恢復 UI 狀態
-  __exitLbImmersive(true);
-
-  if (lbControls) lbControls.classList.add("hidden");
-  __setLbPlayIcon(false);
-  if (lbSeek) { lbSeek.value = "0"; lbSeek.style.setProperty("--p", "0%"); }
-
   // 關閉前一定要把影片停掉
   if (lbVideo) {
     try { lbVideo.pause(); } catch (_) { }
@@ -602,22 +346,6 @@ lbClose?.addEventListener('click', (e) => {
   closeLightbox();
 });
 
-
-// 點一下主圖/主影片：全螢幕 + 隱藏 UI；再點一下恢復
-    lbWrap?.addEventListener("click", (e) => {
-      // 點到按鈕就不要切換（避免影響關閉/左右切換）
-      if (e.target && typeof e.target.closest === "function") {
-        if (e.target.closest("#lbClose, #lbPrev, #lbNext")) return;
-      }
-      // 只在點到主媒體區域才觸發（避免誤觸）
-      const t = e.target;
-      if (t !== lbWrap && t !== lbImg && t !== lbVideo) return;
-
-      e.preventDefault();
-      e.stopPropagation();
-      __toggleLbImmersive();
-    });
-
 // 🔥 點黑幕關閉
 lb?.addEventListener("click", (e) => {
   if (e.target === lb) closeLightbox();
@@ -629,21 +357,6 @@ document.addEventListener("keydown", (e) => {
     closeLightbox();
   }
 });
-
-
-// 若使用者用系統手勢/ESC 退出全螢幕，UI 也要同步回來（桌機/Android）
-    document.addEventListener("fullscreenchange", () => {
-      if (!lb || lb.classList.contains("hidden")) return;
-      if (__lbImmersive && !document.fullscreenElement) {
-        __exitLbImmersive(true);
-      }
-    });
-
-    // iOS：影片進/出原生全螢幕時同步狀態
-    lbVideo?.addEventListener("webkitendfullscreen", () => {
-      if (!lb || lb.classList.contains("hidden")) return;
-      if (__lbImmersive) __exitLbImmersive(true);
-    });
 
 // 🔥 手機滑動切換（上面 80% 可以左右滑，最下面 20% 給影片進度條用）
 let touchStartX = 0;
