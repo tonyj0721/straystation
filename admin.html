@@ -663,7 +663,61 @@
       ? withStableSearchRender
       : (fn) => fn();
 
-    // --- Set a fixed minimum height for the results area (no inner scrolling) ---
+    
+// ===============================
+// 進度條（百分比）- 取代「…點點」
+// ===============================
+function startPercentBar(targetEl, { widthPx = 140 } = {}) {
+  const el = targetEl;
+  if (!el) return { set: () => {}, stop: () => {} };
+
+  // 保存原始內容
+  if (!el.dataset.__origHtml) el.dataset.__origHtml = el.innerHTML;
+
+  el.innerHTML = `
+    <span class="relative inline-flex items-center justify-center" style="width:${widthPx}px;height:28px;">
+      <span class="absolute inset-0 rounded-full bg-black/30 ring-1 ring-white/25 overflow-hidden"></span>
+      <span data-fill class="absolute left-0 top-0 h-full rounded-full bg-white/40" style="width:0%"></span>
+      <span data-label class="relative z-10 text-xs font-semibold text-white">0%</span>
+    </span>
+  `;
+
+  const fill = el.querySelector("[data-fill]");
+  const label = el.querySelector("[data-label]");
+
+  const set = (p) => {
+    const v = Math.max(0, Math.min(100, Math.round(p)));
+    if (fill) fill.style.width = v + "%";
+    if (label) label.textContent = v + "%";
+  };
+  const stop = (restoreText = null) => {
+    el.innerHTML = restoreText != null ? restoreText : (el.dataset.__origHtml || "");
+  };
+
+  set(0);
+  return { set, stop };
+}
+
+// 單檔上傳（可回報 bytesTransferred）
+function uploadResumableWithProgress(storageRef, file, meta, onProgress) {
+  return new Promise((resolve, reject) => {
+    const task = uploadBytesResumable(storageRef, file, meta);
+    task.on(
+      "state_changed",
+      (snap) => {
+        try { onProgress?.(snap); } catch { }
+      },
+      (err) => reject(err),
+      async () => {
+        try {
+          const url = await getDownloadURL(task.snapshot.ref);
+          resolve({ url, snapshot: task.snapshot });
+        } catch (e) { reject(e); }
+      }
+    );
+  });
+}
+// --- Set a fixed minimum height for the results area (no inner scrolling) ---
     (function setResultsFloor() {
       const rowsMobile = document.getElementById('rowsMobile');
       const rows = document.getElementById('rows');
@@ -681,7 +735,7 @@
       getFirestore, collection, getDocs, query, orderBy, where,
       doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp, limit as fbLimit, deleteField,
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
-    import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject, listAll, } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
+    import { getStorage, ref as sRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject, listAll, } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
     import {
       getAuth,
       signOut,
@@ -698,7 +752,7 @@
       collection, getDocs, query, orderBy, where,
       doc, getDoc, updateDoc, deleteDoc, serverTimestamp, fbLimit,
       deleteField,
-      sRef, uploadBytes, getDownloadURL, deleteObject, listAll,
+      sRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject, listAll,
     });
 
     const auth = getAuth(app);
@@ -1449,7 +1503,8 @@
       const submitBtn = $("#submitBtn");
       const submitText = $("#submitText");
       submitBtn.disabled = true;
-      const stopDots = startDots(submitText, "登錄中");
+      const prog = startPercentBar(submitBtn);
+       prog.set(0);
 
       try {
         // 1) 新增基本文件
@@ -1480,21 +1535,38 @@
         }
 
         // 逐檔上傳
-        for (const pl of plans) {
-          const r = sRef(storage, pl.path);
-          await uploadBytes(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
-          urls.push(await getDownloadURL(r));
-        }
+        
+// 逐檔上傳（可顯示百分比）
+const totalBytes = plans.reduce((s, x) => s + ((x.f && x.f.size) ? x.f.size : 0), 0) || 0;
+let doneBytes = 0;
 
-        // 3) 回寫 images 欄位
+if (totalBytes === 0) prog.set(100);
+
+for (const pl of plans) {
+  const r = sRef(storage, pl.path);
+  const meta = { contentType: pl.type || 'application/octet-stream' };
+
+  const { url } = await uploadResumableWithProgress(r, pl.f, meta, (snap) => {
+    if (!totalBytes) return;
+    const pct = ((doneBytes + snap.bytesTransferred) / totalBytes) * 100;
+    prog.set(pct);
+  });
+
+  doneBytes += (pl.f && pl.f.size) ? pl.f.size : 0;
+  if (totalBytes) prog.set((doneBytes / totalBytes) * 100);
+
+  urls.push(url);
+}
+
+// 3) 回寫 images 欄位
         if (urls.length) {
           await updateDoc(doc(db, "pets", docRef.id), { images: urls });
         }
 
         // UI 收尾
-        stopDots();
+        prog.set(100);
+        prog.stop(`<span id="submitText">登錄</span>`);
         submitBtn.disabled = false;
-        submitText.textContent = "登錄";
 
         // ★ 清空名字欄位 + 把「已被使用」提示/紅框移除
         const nameInput = document.getElementById("name");
@@ -1575,9 +1647,9 @@
         }
 
       } catch (err) {
-        stopDots();
+        prog.set(100);
+        prog.stop(`<span id="submitText">登錄</span>`);
         submitBtn.disabled = false;
-        submitText.textContent = "登錄";
         Swal.fire({ icon: "error", title: "登錄失敗", text: err.message });
       }
     });
