@@ -562,12 +562,21 @@ function __renderProcessingState(p = null) {
   } catch (_) { /* ignore */ }
 }
 
-async function __waitPetMediaReady(petId, { maxTries = 120, intervalMs = 800 } = {}) {
+async function __waitPetMediaReady(petId, { maxTries = 120, intervalMs = 800, onProgress = null } = {}) {
   for (let i = 0; i < maxTries; i++) {
     const snap = await getDoc(doc(db, "pets", petId));
     if (!snap.exists()) return null;
     const data = snap.data() || {};
     const p = { id: snap.id, ...data };
+
+    // 沒有媒體 → 不用等
+
+    // 回報後端真實進度（需後端寫入 mediaProgress: 0~100）
+    if (typeof onProgress === "function") {
+      const v = Number(p.mediaProgress);
+      if (Number.isFinite(v)) onProgress(Math.max(0, Math.min(100, v)), p);
+      else onProgress(null, p);
+    }
 
     // 沒有媒體 → 不用等
     if (!__hasMediaForWatermark(p)) return p;
