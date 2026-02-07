@@ -69,8 +69,7 @@ dialog::backdrop {
 
   align-items: center;
   justify-content: center;
-
-  /* 一般模式：保留上/下空間讓 UI 不被瀏海/底部 Home Bar 擋住 */
+  /* 一般模式：UI 顯示時避開瀏海/底部 home bar */
   padding-top: max(36px, env(safe-area-inset-top));
   padding-bottom: max(86px, env(safe-area-inset-bottom));
   box-sizing: border-box;
@@ -78,32 +77,54 @@ dialog::backdrop {
   --stageW: 100vw;
 }
 
-/* 沉浸式（像 iPhone 相簿）：背景/主圖真正滿版覆蓋，允許畫到 Safari UI 底下 */
+#lightbox #lbImg,
+#lightbox #lbVideo {
+  max-height: calc(100dvh - 122px);
+  max-width: calc(100vw - 72px);
+}
+
+/* 底部控制列/縮圖列：貼底並吃 safe-area */
+#lbBottom {
+  bottom: 0;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 拖曳影片時間棒時：先把關閉鍵隱藏（避免誤觸） */
+#lightbox.lb-seeking #lbClose {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* =========================
+   相簿式沉浸模式（非原生 fullscreen）
+   - 只切換 UI 顯示/隱藏
+   - 內容允許鋪滿整個螢幕（可被 Safari UI 覆蓋）
+   ========================= */
+
+/* 沉浸式：不再預留上下 padding，讓內容可以延伸到最上最下 */
 #lightbox.lb-immersive {
   padding-top: 0 !important;
   padding-bottom: 0 !important;
 }
 
+/* 沉浸式：主圖/主影片吃滿視窗 */
+#lightbox.lb-immersive #lbImg,
+#lightbox.lb-immersive #lbVideo {
+  max-width: 100vw !important;
+  max-height: 100dvh !important;
+  border-radius: 0 !important;
+}
+
+/* 沉浸式：隱藏 Lightbox UI（關閉、左右鍵、控制列、縮圖列） */
 #lightbox.lb-immersive #lbClose,
 #lightbox.lb-immersive #lbPrev,
-#lightbox.lb-immersive #lbNext,
-#lightbox.lb-immersive #lbBottom {
+#lightbox.lb-immersive #lbNext {
   opacity: 0;
   pointer-events: none;
 }
 
-/* 沉浸式主圖/主影片：吃滿視窗 */
-#lightbox.lb-immersive #lbImg,
-#lightbox.lb-immersive #lbVideo {
-  max-height: 100dvh !important;
-  max-width: 100vw !important;
-  border-radius: 0 !important;
-}
-
-#lightbox #lbImg,
-#lightbox #lbVideo {
-  max-height: calc(100dvh - 122px);
-  max-width: calc(100vw - 72px);
+#lightbox.lb-immersive #lbBottom {
+  display: none;
 }
 
 #lbThumbs {
@@ -528,25 +549,3 @@ video.video-preview::-webkit-media-controls-enclosure {
   display: none !important;
   -webkit-appearance: none;
 }
-
-/* ===== Lightbox 沉浸式（iPhone 相簿感：只隱藏UI、仍是覆蓋全畫面） ===== */
-#lightbox.lb-immersive{
-  padding-top: 0;
-  padding-bottom: 0;
-}
-#lightbox.lb-immersive #lbBottom{ display:none; }
-#lightbox.lb-immersive #lbClose,
-#lightbox.lb-immersive #lbPrev,
-#lightbox.lb-immersive #lbNext{ opacity:0; pointer-events:none; }
-#lightbox.lb-immersive #lbWrap{
-  width: 100vw;
-  height: 100dvh;
-}
-#lightbox.lb-immersive #lbImg,
-#lightbox.lb-immersive #lbVideo{
-  max-width: 100vw;
-  max-height: 100dvh;
-  border-radius: 0;
-}
-/* 沉浸式時，不預留左右按鈕空間 */
-#lightbox.lb-immersive{ --stageW: 100vw; }
