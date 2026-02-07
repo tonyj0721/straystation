@@ -87,33 +87,6 @@
       /* 避免 iOS 用 opacity 影響觀感 */
     }
   </style>
-
-<style>
-/* SweetAlert 浮水印進度條 */
-.wmProgWrap{
-  position:relative;
-  height:18px;
-  border-radius:9999px;
-  background:rgba(0,0,0,.45);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.25), 0 0 14px rgba(255,255,255,.18);
-  overflow:hidden;
-}
-.wmProgFill{
-  position:absolute; inset:0 auto 0 0;
-  width:0%;
-  border-radius:9999px;
-  background:linear-gradient(90deg, rgba(159,184,255,.9), rgba(99,124,255,.95));
-}
-.wmProgText{
-  position:absolute; inset:0;
-  display:flex; align-items:center; justify-content:center;
-  font-weight:700; font-size:12px;
-  color:#fff;
-  text-shadow:0 1px 2px rgba(0,0,0,.6);
-  pointer-events:none;
-}
-</style>
-
 </head>
 
 <body class="text-gray-800 bg-gradient-to-br from-brand-50 to-white">
@@ -1463,7 +1436,7 @@
         }
 
         if (pendingPaths.length) {
-          await updateDoc(doc(db, "pets", docRef.id), { mediaReady: false, wmPending: pendingPaths, wmTotal: pendingPaths.length, wmDone: 0, mediaProgress: 0 });
+          await updateDoc(doc(db, "pets", docRef.id), { mediaReady: false, wmPending: pendingPaths });
         }
 
         // 逐檔上傳
@@ -1504,40 +1477,17 @@
           Swal.fire({
             icon: "info",
             title: "浮水印處理中…",
-            html: `
-              <div class="mt-3 text-sm text-gray-600">處理完成後才會顯示在列表，並自動開啟詳情。</div>
-              <div class="mt-4 w-full">
-                <div class="wmProgWrap">
-                  <div class="wmProgFill" style="width:0%"></div>
-                  <div class="wmProgText">0%</div>
-                </div>
-              </div>
-            `,
+            text: "處理完成後才會顯示在列表，並自動開啟詳情。",
             allowOutsideClick: false,
             allowEscapeKey: false,
             showConfirmButton: false,
             didOpen: () => {
-              const wrap = Swal.getPopup()?.querySelector('.wmProgWrap');
-              const fill = Swal.getPopup()?.querySelector('.wmProgFill');
-              const text = Swal.getPopup()?.querySelector('.wmProgText');
-              window.__setWmSwalProgress = (p) => {
-                const v = Math.max(0, Math.min(100, Math.round(Number(p) || 0)));
-                if (fill) fill.style.width = v + '%';
-                if (text) text.textContent = v + '%';
-              };
-              window.__setWmSwalProgress(1);
+              Swal.showLoading();
             },
             returnFocus: false,
           });
 
           try {
-            await __waitPetMediaReady(docRef.id, {
-              onProgress: (p) => window.__setWmSwalProgress && window.__setWmSwalProgress(p),
-            });
-          } catch (e) {
-            console.error("waitPetMediaReady error:", e);
-          }
-try {
             await __waitPetMediaReady(docRef.id);
           } catch (e) {
             console.error("waitPetMediaReady error:", e);
