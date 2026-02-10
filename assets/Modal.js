@@ -479,7 +479,7 @@ function startDots(span, base) {
 // 小工具：按鈕上的「百分比進度條」
 //  - iconUrl 你可以換成任何 PNG/GIF/SVG（想換別種動物就改這個路徑）
 // ===============================
-const UPLOAD_PROGRESS_ICON_URL = window.UPLOAD_PROGRESS_ICON_URL || "images/奔跑貓咪.png";
+const UPLOAD_PROGRESS_ICON_URL = window.UPLOAD_PROGRESS_ICON_URL || "./images/奔跑貓咪.png";
 window.UPLOAD_PROGRESS_ICON_URL = UPLOAD_PROGRESS_ICON_URL;
 
 function startUploadProgress(btn, { label = "上傳中", iconUrl = UPLOAD_PROGRESS_ICON_URL } = {}) {
