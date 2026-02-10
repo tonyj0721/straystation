@@ -788,6 +788,65 @@
     // 小工具：選擇器
     const $ = (q) => document.querySelector(q);
 
+
+    // ===============================
+    // 小工具：按鈕上的「百分比進度條」
+    //  - 若你有小動物 PNG：可在任何地方先設定 window.__progressMascotPng = "images/xxx.png"
+    // ===============================
+    function startProgressBar(btn, baseText = "上傳中") {
+      const orig = { disabled: btn.disabled, html: btn.innerHTML, text: btn.textContent, ariaBusy: btn.getAttribute("aria-busy") };
+      const iconSrc = (window.__progressMascotPng || "").trim();
+
+      btn.setAttribute("aria-busy", "true");
+      btn.innerHTML = `
+        <div class="w-full flex items-center gap-3">
+          ${iconSrc ? `<img src="${iconSrc}" alt="" style="width:28px;height:28px;flex:0 0 auto;" />` : ``}
+          <div class="flex-1">
+            <div class="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+              <div class="progress-fill h-full" style="width:0%;background:linear-gradient(90deg,#f7b267,#fef08a,#86efac);"></div>
+            </div>
+            <div class="mt-1 text-[11px] text-gray-600">${baseText}</div>
+          </div>
+          <div class="progress-text text-sm font-semibold tabular-nums" style="min-width:44px;text-align:right;">0%</div>
+        </div>
+      `.trim();
+
+      const fill = btn.querySelector(".progress-fill");
+      const txt = btn.querySelector(".progress-text");
+
+      const set = (pct) => {
+        const p = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
+        if (fill) fill.style.width = `${p}%`;
+        if (txt) txt.textContent = `${p}%`;
+      };
+
+      const stop = () => {
+        btn.removeAttribute("aria-busy");
+        btn.innerHTML = orig.html;
+        if (orig.ariaBusy == null) btn.removeAttribute("aria-busy"); else btn.setAttribute("aria-busy", orig.ariaBusy);
+        btn.disabled = orig.disabled;
+      };
+
+      return { set, stop, orig };
+    }
+
+    function uploadResumableWithOverallProgress(storageRef, file, options, completedBytes, totalBytes, onOverallPct) {
+      return new Promise((resolve, reject) => {
+        const task = uploadBytesResumable(storageRef, file, options);
+        task.on("state_changed",
+          (snap) => {
+            const overall = totalBytes > 0
+              ? ((completedBytes + snap.bytesTransferred) / totalBytes) * 100
+              : 0;
+            try { onOverallPct(overall); } catch (_) { }
+          },
+          (err) => reject(err),
+          () => resolve(task.snapshot)
+        );
+      });
+    }
+
+
     const speciesInputs = document.querySelectorAll('input[name="species"]');
     const breedTypeSel = $("#breedType");
     const breedSel = $("#breed");
@@ -1476,14 +1535,11 @@
         }
       }
 
-      // 按鈕進度狀態（百分比進度條）
+      // 按鈕進度狀態
       const submitBtn = $("#submitBtn");
       submitBtn.disabled = true;
-      const prog = startUploadProgress(submitBtn, {
-        baseText: "上傳中",
-        // 你之後要換成自己的 png：把路徑改成你的檔案即可
-        mascotSrc: "assets/progress-mascot.png",
-      });
+      const prog = startProgressBar(submitBtn, "上傳中");
+      prog.set(0);
 
       try {
         // 1) 新增基本文件
@@ -1513,30 +1569,21 @@
           await updateDoc(doc(db, "pets", docRef.id), { mediaReady: false, wmPending: pendingPaths });
         }
 
-        // 逐檔上傳（用 uploadBytesResumable 才能拿到進度）
-        const totalBytes = plans.reduce((sum, p) => sum + (p.f?.size || 0), 0) || 1;
-        let doneBytes = 0;
-
+        // 逐檔上傳（進度條以「總 bytes」計算）
+        const __totalBytes = plans.reduce((s, x) => s + ((x.f && x.f.size) || 0), 0);
+        let __completedBytes = 0;
         for (const pl of plans) {
           const r = sRef(storage, pl.path);
-
-          // 逐檔上傳：把單檔進度換算成「整體進度」
-          await new Promise((resolve, reject) => {
-            const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
-            task.on(
-              "state_changed",
-              (snap) => {
-                const cur = Math.min(snap.bytesTransferred || 0, pl.f?.size || snap.totalBytes || 0);
-                const pct = Math.round(((doneBytes + cur) / totalBytes) * 100);
-                prog.update(pct);
-              },
-              reject,
-              resolve
-            );
-          });
-
-          doneBytes += (pl.f?.size || 0);
-          prog.update(Math.round((doneBytes / totalBytes) * 100));
+          await uploadResumableWithOverallProgress(
+            r,
+            pl.f,
+            { contentType: pl.type || 'application/octet-stream' },
+            __completedBytes,
+            __totalBytes,
+            (p) => prog.set(p)
+          );
+          __completedBytes += (pl.f.size || 0);
+          prog.set(__totalBytes ? (__completedBytes / __totalBytes) * 100 : 100);
           urls.push(await getDownloadURL(r));
         }
 
@@ -2072,6 +2119,9 @@
     loadPets();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script>
+    window.__progressMascotPng = "images/奔跑貓咪.png";
+  </script>
   <script src="assets/Modal.js"></script>
   <script src="assets/Lightbox.js"></script>
   <script>
