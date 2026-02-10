@@ -266,7 +266,7 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- 左：登錄表單 -->
-      <section class="lg:col-span-1 bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
+      <section id="formSection" class="lg:col-span-1 bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
         <h2 class="text-lg font-semibold mb-6">登錄表單</h2>
         <form id="petForm" class="space-y-4">
           <div>
@@ -369,6 +369,12 @@
             <button id="submitBtn" type="submit"
               class="px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-gray-800 flex items-center gap-2">
               <span id="submitText">登錄</span>
+            </button>
+
+            <!-- 新增：清除表單 -->
+            <button id="clearBtn" type="button"
+              class="px-4 py-2 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 text-gray-900">
+              清除
             </button>
           </div>
         </form>
@@ -839,6 +845,9 @@
     const fileCount = $("#fileCount");
     const imgPreview = $("#imgPreview");
 
+    // 新增：清除按鈕
+    const clearBtn = $("#clearBtn");
+
     const MAX_FILES = 5;
     const PREVIEW_MAX = 720;      // 預覽縮圖長邊上限（越小越順）
     const PREVIEW_QUALITY = 0.82; // JPEG 品質（0~1）
@@ -1071,6 +1080,58 @@
     }
 
     const __previewTileMap = new Map(); // File -> tile element（保留 DOM，避免重畫閃爍）
+
+    // ===============================
+    // 新增：清除表單（含圖片/影片預覽）＋ 捲動回登錄表單
+    // ===============================
+    function clearSelectedMedia() {
+      // 釋放所有 objectURL / 快取
+      try {
+        selectedFiles.forEach((f) => revokeThumb(f));
+      } catch (_) { }
+      selectedFiles = [];
+      try { imgFiles.value = ""; } catch (_) { }
+
+      // 清空縮圖 DOM 與對應 map
+      try { imgPreview.innerHTML = ""; } catch (_) { }
+      try { __previewTileMap.clear(); } catch (_) { }
+
+      // 更新顯示
+      try { fileCount.textContent = `已選 0 / ${MAX_FILES} 張`; } catch (_) { }
+    }
+
+    function clearPetFormAndScroll() {
+      const form = document.getElementById("petForm");
+      // 1) 清空所有表單欄位（回到預設值）
+      try { form?.reset(); } catch (_) { }
+
+      // 2) 重新同步品種下拉（reset 可能讓 UI 與狀態不同步）
+      try {
+        syncBreedSelectors();
+        breedTypeSel.value = "";
+        buildBreedOptions();
+        updateBreedLabel();
+      } catch (_) { }
+
+      // 3) 清空圖片/影片
+      clearSelectedMedia();
+
+      // 4) 捲動回「登錄表單」區塊
+      const formSection = document.getElementById("formSection");
+      try {
+        formSection?.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (_) {
+        // fallback
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      // 5) 讓使用者可以立刻輸入
+      try { document.getElementById("name")?.focus(); } catch (_) { }
+    }
+
+    // 綁定清除按鈕
+    clearBtn?.addEventListener("click", clearPetFormAndScroll);
+
 
     function __makePreviewTile(file) {
       const wrap = document.createElement("div");
