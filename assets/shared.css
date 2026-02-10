@@ -402,13 +402,15 @@ video.video-preview::-webkit-media-controls-enclosure {
   transition: padding .5s ease, gap .5s ease;
   background: rgba(18, 18, 18, 0.95);
   width: 346px;
+  padding-top: 8px;/*12*/
+  padding-bottom: 8px;/*12*/
   border-radius: 22px;
 }
 
 /* 進度條拖曳中：控制列上移、增加上方空間、隱藏左右按鈕、顯示時間 */
 #lbBottom.lb-seeking #lbControls {
-  padding-top: 2.25rem;
-  gap: .75rem;
+  padding-top: 30px;/*36*/
+  gap: 10px;/*12*/
 }
 
 #lbBottom.lb-seeking .lb-seek-time {
@@ -458,13 +460,13 @@ video.video-preview::-webkit-media-controls-enclosure {
 .lb-seek {
   -webkit-appearance: none;
   appearance: none;
-  height: 6px;
+  height: 7px;/*6*/
   border-radius: 9999px;
   background: linear-gradient(to right,
-      rgba(100, 100, 100) 0%,
-      rgba(100, 100, 100) var(--p, 0%),
-      rgba(100, 100, 100) var(--p, 0%),
-      rgba(100, 100, 100) 100%);
+      rgba(0, 0, 0) 0%,
+      rgba(0, 0, 0) var(--p, 0%),
+      rgba(0, 0, 0) var(--p, 0%),
+      rgba(0, 0, 0) 100%);
   outline: none;
 }
 
