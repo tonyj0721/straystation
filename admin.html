@@ -18,7 +18,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="icon" href="images/dogpaw-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="images/dogpaw-180.png">
-  <title>管理後台｜台中簡媽媽狗園</title>
+  <title>測試</title>
   <meta name="description" content="TailwindCSS + Firebase Firestore 後台：登錄、管理動物資料；沿用前台 Modal/Lightbox。" />
   <meta name="theme-color" content="#fcd34d">
   <link rel="manifest" href="./manifest.webmanifest">
@@ -367,16 +367,12 @@
           </div>
           <div class="grid grid-cols-2 gap-3">
             <button id="submitBtn" type="submit"
-              class="w-full px-4 py-3 rounded-xl bg-gray-900 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-gray-800 transition-colors">
+              class="w-full px-4 py-3 rounded-xl bg-gray-900 text-white text-sm flex items-center justify-center gap-2 hover:bg-gray-800">
               登錄
             </button>
             <button id="clearBtn" type="button"
-              class="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-600 text-sm font-medium flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-              清除
+              class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm flex items-center justify-center hover:bg-gray-50">
+              清除全部資料
             </button>
           </div>
         </form>
@@ -841,6 +837,43 @@
       updateBreedLabel();
     });
     syncBreedSelectors(); // 初始化一次
+
+    // 清除按鈕邏輯
+    const clearBtn = document.getElementById('clearBtn');
+    const petForm = document.getElementById('petForm');
+    const formSection = document.querySelector('section.lg\\:col-span-1.bg-white.rounded-2xl.ring-1.ring-gray-200.shadow-soft.p-5');
+
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        // 1. 重置表單欄位（名字、年齡、性別、健康勾選、簡介）
+        petForm.reset();
+
+        // 2. 清除 Firebase 上傳相關的圖片/影片快取與狀態
+        if (typeof selectedFiles !== 'undefined') {
+          // 釋放舊的預覽圖片記憶體
+          selectedFiles.forEach(file => {
+            if (typeof revokeThumb === 'function') revokeThumb(file);
+          });
+          selectedFiles.length = 0; // 清空待上傳陣列
+        }
+
+        // 3. 重置預覽 UI
+        const imgPreview = document.getElementById('imgPreview');
+        const fileCount = document.getElementById('fileCount');
+        if (imgPreview) imgPreview.innerHTML = '';
+        if (fileCount) fileCount.textContent = '已選 0 / 5 張';
+
+        // 4. 重置品種下拉選單同步狀態 (呼叫您原本定義的函式)
+        if (typeof syncBreedSelectors === 'function') {
+          syncBreedSelectors();
+        }
+
+        // 5. 捲動到登錄表單區塊高度
+        if (formSection) {
+          formSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    }
 
     // ===============================
     // 新增：圖片選取/預覽（最多 5 張）- 不卡頓版（縮圖/快取/手機拖曳排序）
@@ -1341,33 +1374,6 @@
         root.scrollTop = 0;
         document.body.scrollTop = 0;
       }, 80);
-    }
-
-    // 清除功能實作
-    const clearBtn = document.getElementById('clearBtn');
-    const targetSection = document.querySelector('section.lg\\:col-span-1.bg-white.rounded-2xl.ring-1.ring-gray-200.shadow-soft.p-5');
-
-    if (clearBtn) {
-      clearBtn.addEventListener('click', () => {
-        // 1. 重置表單基本欄位
-        petForm.reset();
-
-        // 2. 清空圖片預覽區域與檔案陣列
-        selectedFiles = [];
-        if (imgPreview) imgPreview.innerHTML = '';
-        if (fileCount) fileCount.textContent = '已選 0 / 5 張';
-
-        // 3. 重置品種下拉選單 (觸發您原有的同步邏輯)
-        syncBreedSelectors();
-
-        // 4. 平滑捲動到表單頂部
-        if (targetSection) {
-          targetSection.scrollIntoView({
-            behavior: 'smooth',
-            block: 'start'
-          });
-        }
-      });
     }
 
     // ===============================
