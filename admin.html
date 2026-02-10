@@ -1407,9 +1407,8 @@
 
       // 按鈕進度狀態
       const submitBtn = $("#submitBtn");
-      const submitText = $("#submitText");
       submitBtn.disabled = true;
-      const stopDots = startDots(submitText, "登錄中");
+      const stopDots = startDots(submitBtn, "上傳中");
 
       try {
         // 1) 新增基本文件
@@ -1453,8 +1452,8 @@
 
         // UI 收尾
         stopDots();
-        submitBtn.disabled = false;
-        submitText.textContent = "登錄";
+        submitBtn.disabled = true;
+        submitBtn.textContent = "處理中...";
 
         // ★ 清空名字欄位 + 把「已被使用」提示/紅框移除
         const nameInput = document.getElementById("name");
@@ -1501,44 +1500,44 @@
           }
 
           Swal.close();
-          forceScrollTop();
 
-          Swal.fire({
+          await Swal.fire({
             icon: "success",
             title: "已成功登錄！",
             showConfirmButton: false,
             timer: 1500,
             returnFocus: false,
-          }).then(() => {
-            openDialog(docRef.id);
           });
+          forceScrollTop();
+          openDialog(docRef.id);
+
 
         } else {
           // 沒有媒體：直接更新列表與提示
           const reloadPromise = loadPets();
 
-          Swal.fire({
+          await Swal.fire({
             icon: "success",
             title: "已成功登錄！",
             showConfirmButton: false,
             timer: 1500,
             returnFocus: false, // 避免關閉後把焦點還給原 input 而導致捲動回彈
-          }).then(async () => {
-            try {
-              await reloadPromise;
-            } catch (e) {
-              console.error("loadPets error:", e);
-            }
-            forceScrollTop(); // ✅ 保證捲到最上面（不會卡在一半）
-            openDialog(docRef.id);
           });
+          try {
+            await reloadPromise;
+          } catch (e) {
+            console.error("loadPets error:", e);
+          }
+          forceScrollTop(); // ✅ 保證捲到最上面（不會卡在一半）
+          openDialog(docRef.id);
+
         }
 
       } catch (err) {
-        stopDots();
+        await Swal.fire({ icon: "error", title: "登錄失敗", text: err.message });
+      } finally {
         submitBtn.disabled = false;
-        submitText.textContent = "登錄";
-        Swal.fire({ icon: "error", title: "登錄失敗", text: err.message });
+        submitBtn.textContent = "登錄";
       }
     });
 
