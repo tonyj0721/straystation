@@ -370,7 +370,7 @@
               class="w-full px-4 py-3 rounded-xl bg-gray-900 text-white text-sm flex items-center justify-center gap-2 hover:bg-gray-800">
               登錄
             </button>
-            <button id="clearBtn" type="button"
+            <button id="btnClear" type="button"
               class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm flex items-center justify-center hover:bg-gray-50">
               清除
             </button>
@@ -843,10 +843,9 @@
     // ===============================
     const imgFiles = $("#imgFiles");
     const btnPick = $("#btnPick");
+    const btnClear = $("#btnClear");
     const fileCount = $("#fileCount");
     const imgPreview = $("#imgPreview");
-
-    const clearBtn = $("#clearBtn");
 
     const MAX_FILES = 5;
     const PREVIEW_MAX = 720;      // 預覽縮圖長邊上限（越小越順）
@@ -897,54 +896,46 @@
     btnPick?.addEventListener("click", () => imgFiles.click());
 
     // ===============================
-    // 新增：清除表單（含圖片/影片）＋捲回登錄表單
+    // 清除表單（清掉所有資料 + 圖片預覽）並捲回登錄表單區塊
     // ===============================
-    function clearPetFormAndScroll() {
+    function scrollToPetForm() {
+      const form = document.getElementById("petForm");
+      const section = form?.closest("section");
+      if (!section) return;
+      section.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function clearPetFormAndMedia({ scroll = true } = {}) {
       const form = document.getElementById("petForm");
       if (form) form.reset();
 
-      // 清掉名字重複檢查提示/紅框
-      if (window.resetNameCheck) resetNameCheck();
-
-      // 清掉預覽＆釋放 objectURL
-      try {
-        // 停掉可能正在播放的預覽影片
-        imgPreview?.querySelectorAll("video.video-preview").forEach((v) => {
-          try { v.pause(); } catch (_) { }
-        });
-      } catch (_) { }
-
-      try {
-        selectedFiles.forEach((f) => revokeThumb(f));
-      } catch (_) { }
-
-      selectedFiles = [];
-      imgPreview.innerHTML = "";
-      fileCount.textContent = "已選 0 / 5 張";
-
-      // 清掉快取（避免殘留）
-      try { __previewTileMap.clear(); } catch (_) { }
-      try { thumbUrlCache.clear(); } catch (_) { }
-      try { thumbPromiseCache.clear(); } catch (_) { }
-
-      // 依目前物種重新初始化品種選單（reset 後 radio 會回到預設：貓）
-      syncBreedSelectors();
-
-      // 捲回登錄表單 section
-      const sec = document.getElementById("formSection");
-      if (sec) {
-        sec.scrollIntoView({ behavior: "smooth", block: "start" });
-        // 保險：避免 smooth 被其他 focus / DOM 影響中斷
-        setTimeout(() => sec.scrollIntoView({ behavior: "auto", block: "start" }), 220);
+      // 清掉名字欄位 + 名字重複提示
+      const nameInput = document.getElementById("name");
+      if (nameInput) nameInput.value = "";
+      if (window.resetNameCheck) {
+        try { resetNameCheck(); } catch (_) { }
       }
 
-      // 最後把游標放回名字，方便直接輸入
-      try { document.getElementById("name")?.focus?.({ preventScroll: true }); } catch (_) { }
+      // 清掉已選檔案 + 預覽（包含釋放 objectURL）
+      try {
+        for (const f of selectedFiles) revokeThumb(f);
+      } catch (_) { }
+      selectedFiles = [];
+      __previewTileMap.clear();
+      if (imgPreview) imgPreview.innerHTML = "";
+      if (imgFiles) imgFiles.value = "";
+
+      // 重新初始化品種下拉、計數
+      syncBreedSelectors();
+      try { renderPreviews(); } catch (_) {
+        if (fileCount) fileCount.textContent = `已選 0 / ${MAX_FILES} 張`;
+      }
+
+      if (scroll) scrollToPetForm();
     }
 
-    clearBtn?.addEventListener("click", (e) => {
-      e.preventDefault();
-      clearPetFormAndScroll();
+    btnClear?.addEventListener("click", () => {
+      clearPetFormAndMedia({ scroll: true });
     });
 
     function revokeThumb(file) {
