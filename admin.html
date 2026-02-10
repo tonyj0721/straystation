@@ -18,7 +18,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="icon" href="images/dogpaw-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="images/dogpaw-180.png">
-  <title>管理後台｜台中簡媽媽狗園</title>
+  <title>測試</title>
   <meta name="description" content="TailwindCSS + Firebase Firestore 後台：登錄、管理動物資料；沿用前台 Modal/Lightbox。" />
   <meta name="theme-color" content="#fcd34d">
   <link rel="manifest" href="./manifest.webmanifest">
@@ -266,7 +266,7 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- 左：登錄表單 -->
-      <section id="formSection" class="lg:col-span-1 bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
+      <section class="lg:col-span-1 bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
         <h2 class="text-lg font-semibold mb-6">登錄表單</h2>
         <form id="petForm" class="space-y-4">
           <div>
@@ -370,8 +370,8 @@
               class="w-full px-4 py-3 rounded-xl bg-gray-900 text-white text-sm flex items-center justify-center gap-2 hover:bg-gray-800">
               登錄
             </button>
-            <button id="clearBtn" type="button"
-              class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm flex items-center justify-center gap-2 hover:bg-gray-50">
+            <button id="btnClear" type="button"
+              class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm flex items-center justify-center hover:bg-gray-50">
               清除
             </button>
           </div>
@@ -1312,6 +1312,52 @@
       imgFiles.value = ""; // 清空 input，避免重複選取不到
     });
 
+    
+    // ===============================
+    // 清除按鈕：重置表單 + 清空預覽 + 滑回表單區
+    // ===============================
+    (function setupClearButton(){
+      const btnClear = document.getElementById('btnClear');
+      if (!btnClear) return;
+
+      // 精準抓取左側表單區塊（含捲動定位）
+      const formSection = document.querySelector('section.lg\:col-span-1.bg-white.rounded-2xl.ring-1.ring-gray-200.shadow-soft.p-5');
+      const formEl = document.getElementById('petForm');
+
+      btnClear.addEventListener('click', () => {
+        try {
+          // 1) 重置表單欄位
+          formEl?.reset();
+
+          // 2) 同步下拉（還原「品種類型 / 品種」聯動與標籤）
+          try { syncBreedSelectors(); } catch(_) {}
+
+          // 3) 清空已選媒體與預覽
+          try {
+            // 釋放已建立的 objectURL，避免記憶體外洩
+            try {
+              thumbUrlCache.forEach((url) => { try { URL.revokeObjectURL(url); } catch(_){} });
+              thumbUrlCache.clear()
+            } catch(_){}
+            try {
+              videoObjUrlCache.forEach((url) => { try { URL.revokeObjectURL(url); } catch(_){} });
+              videoObjUrlCache.clear()
+            } catch(_){}
+            selectedFiles.length = 0; // 清空陣列
+            if (imgPreview) imgPreview.innerHTML = '';
+            if (fileCount) fileCount.textContent = '已選 0 / 5 張';
+          } catch(_){}
+
+          // 4) 專心滑回表單區（避免因焦點或彈窗導致回彈）
+          try { formSection?.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(_){}
+          // 5) 最後把焦點放到第一個欄位（不再次觸發捲動）
+          try { document.getElementById('name')?.focus({ preventScroll: true }); } catch(_){}
+        } catch(e) {
+          console.warn('清除按鈕發生錯誤：', e);
+        }
+      });
+    })();
+
     // ===============================
     // 捲到最上方（保險版）
     // ===============================
@@ -2020,48 +2066,6 @@
         });
       });
     }
-  
-    // ===============================
-    // 清除按鈕：清掉表單並捲動到表單區
-    // ===============================
-    document.getElementById('clearBtn')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      const form = document.getElementById('petForm');
-      form?.reset();
-
-      // 釋放縮圖資源並清空預覽
-      try {
-        if (Array.isArray(selectedFiles)) {
-          selectedFiles.forEach((f) => { try { revokeThumb(f); } catch (_) {} });
-        }
-      } catch (_) {}
-      selectedFiles = [];
-      if (typeof renderPreviews === 'function') {
-        try { renderPreviews(); } catch (_) {}
-      } else {
-        try {
-          const imgPreview = document.getElementById('imgPreview');
-          if (imgPreview) imgPreview.innerHTML = '';
-          const fileCount = document.getElementById('fileCount');
-          if (fileCount) fileCount.textContent = '已選 0 / 5 張';
-        } catch (_) {}
-      }
-
-      // 重建品種下拉（回到預設狀態）
-      try { syncBreedSelectors(); } catch (_) {}
-
-      // 捲動到表單區塊頂端
-      const target = document.getElementById('formSection');
-      if (target && target.scrollIntoView) {
-        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      } else {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
-
-      // 將焦點回到名字欄位
-      try { document.getElementById('name')?.focus(); } catch (_) {}
-    });
-
   </script>
 </body>
 
