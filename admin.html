@@ -18,7 +18,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="icon" href="images/dogpaw-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="images/dogpaw-180.png">
-  <title>測試</title>
+  <title>管理後台｜台中簡媽媽狗園</title>
   <meta name="description" content="TailwindCSS + Firebase Firestore 後台：登錄、管理動物資料；沿用前台 Modal/Lightbox。" />
   <meta name="theme-color" content="#fcd34d">
   <link rel="manifest" href="./manifest.webmanifest">
@@ -266,7 +266,7 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- 左：登錄表單 -->
-      <section class="lg:col-span-1 bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
+      <section id="formSection" class="lg:col-span-1 bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
         <h2 class="text-lg font-semibold mb-6">登錄表單</h2>
         <form id="petForm" class="space-y-4">
           <div>
@@ -370,9 +370,10 @@
               class="w-full px-4 py-3 rounded-xl bg-gray-900 text-white text-sm flex items-center justify-center gap-2 hover:bg-gray-800">
               登錄
             </button>
+          
             <button id="clearBtn" type="button"
               class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm flex items-center justify-center hover:bg-gray-50">
-              清除全部資料
+              清除
             </button>
           </div>
         </form>
@@ -837,43 +838,6 @@
       updateBreedLabel();
     });
     syncBreedSelectors(); // 初始化一次
-
-    // 清除按鈕邏輯
-    const clearBtn = document.getElementById('clearBtn');
-    const petForm = document.getElementById('petForm');
-    const formSection = document.querySelector('section.lg\\:col-span-1.bg-white.rounded-2xl.ring-1.ring-gray-200.shadow-soft.p-5');
-
-    if (clearBtn) {
-      clearBtn.addEventListener('click', () => {
-        // 1. 重置表單欄位（名字、年齡、性別、健康勾選、簡介）
-        petForm.reset();
-
-        // 2. 清除 Firebase 上傳相關的圖片/影片快取與狀態
-        if (typeof selectedFiles !== 'undefined') {
-          // 釋放舊的預覽圖片記憶體
-          selectedFiles.forEach(file => {
-            if (typeof revokeThumb === 'function') revokeThumb(file);
-          });
-          selectedFiles.length = 0; // 清空待上傳陣列
-        }
-
-        // 3. 重置預覽 UI
-        const imgPreview = document.getElementById('imgPreview');
-        const fileCount = document.getElementById('fileCount');
-        if (imgPreview) imgPreview.innerHTML = '';
-        if (fileCount) fileCount.textContent = '已選 0 / 5 張';
-
-        // 4. 重置品種下拉選單同步狀態 (呼叫您原本定義的函式)
-        if (typeof syncBreedSelectors === 'function') {
-          syncBreedSelectors();
-        }
-
-        // 5. 捲動到登錄表單區塊高度
-        if (formSection) {
-          formSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      });
-    }
 
     // ===============================
     // 新增：圖片選取/預覽（最多 5 張）- 不卡頓版（縮圖/快取/手機拖曳排序）
@@ -1348,6 +1312,53 @@
       renderPreviews();
       imgFiles.value = ""; // 清空 input，避免重複選取不到
     });
+
+    // ===============================
+    // 新增：清除表單（含圖片/影片）並捲回登錄表單位置
+    // ===============================
+    const clearBtn = document.getElementById("clearBtn");
+    function __scrollToFormSection() {
+      const sec = document.getElementById("formSection");
+      if (!sec) return;
+      // 先 smooth，再補一次 hard scroll，避免被 focus/重排打斷
+      sec.scrollIntoView({ behavior: "smooth", block: "start" });
+      setTimeout(() => {
+        const y = sec.getBoundingClientRect().top + window.scrollY;
+        const root = document.documentElement;
+        const prev = root.style.scrollBehavior;
+        root.style.scrollBehavior = "auto";
+        window.scrollTo(0, y);
+        root.style.scrollBehavior = prev || "";
+      }, 260);
+    }
+
+    function __clearPetFormAll() {
+      const form = document.getElementById("petForm");
+      // 1) 清空表單欄位（含 radio/checkbox/select/textarea）
+      try { form?.reset(); } catch (_) { }
+
+      // 2) 清空檔案選擇與預覽（包含快取 objectURL）
+      try {
+        (selectedFiles || []).forEach((f) => { try { revokeThumb(f); } catch (_) { } });
+      } catch (_) { }
+      selectedFiles = [];
+      try { imgPreview.innerHTML = ""; } catch (_) { }
+      try { __previewTileMap.clear(); } catch (_) { }
+      try { fileCount.textContent = `已選 0 / ${MAX_FILES} 張`; } catch (_) { }
+      try { imgFiles.value = ""; } catch (_) { }
+
+      // 3) 依物種重置品種下拉與標籤
+      try { syncBreedSelectors(); } catch (_) { }
+
+      // 4) 清掉「名字重複」提示/紅框（如果有）
+      try { if (window.resetNameCheck) window.resetNameCheck(); } catch (_) { }
+    }
+
+    clearBtn?.addEventListener("click", () => {
+      __clearPetFormAll();
+      __scrollToFormSection();
+    });
+
 
     // ===============================
     // 捲到最上方（保險版）
