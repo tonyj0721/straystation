@@ -74,6 +74,8 @@ dialog::backdrop {
   box-sizing: border-box;
 
   --stageW: 100vw;
+
+  background: #000;
 }
 
 #lightbox #lbImg,
@@ -398,7 +400,7 @@ video.video-preview::-webkit-media-controls-enclosure {
 #lbControls {
   position: relative;
   transition: padding .5s ease, gap .5s ease;
-  background: rgba(198, 193, 188, 0.95);
+  background: rgba(18, 18, 18, 0.95);
   width: 346px;
   border-radius: 22px;
 }
@@ -459,10 +461,10 @@ video.video-preview::-webkit-media-controls-enclosure {
   height: 6px;
   border-radius: 9999px;
   background: linear-gradient(to right,
-      rgba(255, 255, 255, 0.75) 0%,
-      rgba(255, 255, 255, 0.75) var(--p, 0%),
-      rgba(0, 0, 0, 0.45) var(--p, 0%),
-      rgba(0, 0, 0, 0.45) 100%);
+      rgba(100, 100, 100) 0%,
+      rgba(100, 100, 100) var(--p, 0%),
+      rgba(100, 100, 100) var(--p, 0%),
+      rgba(100, 100, 100) 100%);
   outline: none;
 }
 
