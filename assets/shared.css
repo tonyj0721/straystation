@@ -405,6 +405,7 @@ video.video-preview::-webkit-media-controls-enclosure {
   padding-top: 8px;/*12*/
   padding-bottom: 8px;/*12*/
   border-radius: 22px;
+  gap: 10px;
 }
 
 /* 進度條拖曳中：控制列上移、增加上方空間、隱藏左右按鈕、顯示時間 */
@@ -460,7 +461,7 @@ video.video-preview::-webkit-media-controls-enclosure {
 .lb-seek {
   -webkit-appearance: none;
   appearance: none;
-  height: 7px;/*6*/
+  height: 8px;/*7...6*/
   border-radius: 9999px;
   background: linear-gradient(to right,
       rgba(0, 0, 0) 0%,
@@ -468,6 +469,10 @@ video.video-preview::-webkit-media-controls-enclosure {
       rgba(0, 0, 0) var(--p, 0%),
       rgba(0, 0, 0) 100%);
   outline: none;
+}
+
+#lightbox.lb-seeking #lbSeek {
+  height: 14px;
 }
 
 /* iOS / Chrome：range thumb */
