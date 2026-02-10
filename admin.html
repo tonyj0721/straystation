@@ -266,7 +266,7 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- 左：登錄表單 -->
-      <section id="formSection" class="lg:col-span-1 bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
+      <section class="lg:col-span-1 bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
         <h2 class="text-lg font-semibold mb-6">登錄表單</h2>
         <form id="petForm" class="space-y-4">
           <div>
@@ -369,10 +369,6 @@
             <button id="submitBtn" type="submit"
               class="px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-gray-800 flex items-center gap-2">
               <span id="submitText">登錄</span>
-            </button>
-            <button id="btnClear" type="button"
-              class="px-4 py-2 rounded-xl border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
-              清除
             </button>
           </div>
         </form>
@@ -1411,8 +1407,9 @@
 
       // 按鈕進度狀態
       const submitBtn = $("#submitBtn");
+      const submitText = $("#submitText");
       submitBtn.disabled = true;
-      const stopDots = startDots(submitBtn, "上傳中");
+      const stopDots = startDots(submitText, "登錄中");
 
       try {
         // 1) 新增基本文件
@@ -1456,8 +1453,8 @@
 
         // UI 收尾
         stopDots();
-        submitBtn.disabled = true;
-        submitBtn.textContent = "處理中...";
+        submitBtn.disabled = false;
+        submitText.textContent = "登錄";
 
         // ★ 清空名字欄位 + 把「已被使用」提示/紅框移除
         const nameInput = document.getElementById("name");
@@ -1504,44 +1501,44 @@
           }
 
           Swal.close();
+          forceScrollTop();
 
-          await Swal.fire({
+          Swal.fire({
             icon: "success",
             title: "已成功登錄！",
             showConfirmButton: false,
             timer: 1500,
             returnFocus: false,
+          }).then(() => {
+            openDialog(docRef.id);
           });
-          forceScrollTop();
-          openDialog(docRef.id);
-
 
         } else {
           // 沒有媒體：直接更新列表與提示
           const reloadPromise = loadPets();
 
-          await Swal.fire({
+          Swal.fire({
             icon: "success",
             title: "已成功登錄！",
             showConfirmButton: false,
             timer: 1500,
             returnFocus: false, // 避免關閉後把焦點還給原 input 而導致捲動回彈
+          }).then(async () => {
+            try {
+              await reloadPromise;
+            } catch (e) {
+              console.error("loadPets error:", e);
+            }
+            forceScrollTop(); // ✅ 保證捲到最上面（不會卡在一半）
+            openDialog(docRef.id);
           });
-          try {
-            await reloadPromise;
-          } catch (e) {
-            console.error("loadPets error:", e);
-          }
-          forceScrollTop(); // ✅ 保證捲到最上面（不會卡在一半）
-          openDialog(docRef.id);
-
         }
 
       } catch (err) {
-        await Swal.fire({ icon: "error", title: "登錄失敗", text: err.message });
-      } finally {
+        stopDots();
         submitBtn.disabled = false;
-        submitBtn.textContent = "登錄";
+        submitText.textContent = "登錄";
+        Swal.fire({ icon: "error", title: "登錄失敗", text: err.message });
       }
     });
 
@@ -1979,54 +1976,7 @@
     // 再呼叫一次（與 IIFE 等價，保險）
     window.loadPets = loadPets;
     loadPets();
-  
-    // ===============================
-    // 清除表單：清空所有欄位 + 清空已選檔案/預覽，並捲動回「登錄表單」區塊
-    // ===============================
-    const btnClear = document.getElementById("btnClear");
-    function clearPetFormAndScroll() {
-      // 1) 清空欄位（radio / select / textarea / checkbox 皆會回到預設）
-      try { document.getElementById("petForm")?.reset(); } catch (_) { }
-
-      // 2) 清空檔案 input（必須手動）
-      try { imgFiles.value = ""; } catch (_) { }
-
-      // 3) 清空已選檔案狀態 + 釋放縮圖/影片 objectURL
-      try {
-        (selectedFiles || []).forEach((f) => { try { revokeThumb(f); } catch (_) { } });
-      } catch (_) { }
-
-      try { selectedFiles = []; } catch (_) { /* ignore */ }
-
-      // 4) 清空預覽 DOM
-      try {
-        imgPreview.innerHTML = "";
-        __previewTileMap?.clear?.();
-      } catch (_) { }
-
-      // 5) 更新計數
-      try { fileCount.textContent = `已選 0 / ${MAX_FILES} 張`; } catch (_) { }
-
-      // 6) 重建品種下拉（reset 後需要同步一次）
-      try { syncBreedSelectors(); } catch (_) { }
-      try { buildBreedOptions(); } catch (_) { }
-      try { updateBreedLabel(); } catch (_) { }
-
-      // 7) 捲動到表單區塊
-      const sec = document.getElementById("formSection");
-      if (sec) {
-        sec.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
-      // 8) 方便連續輸入：把焦點放回名字
-      try { document.getElementById("name")?.focus?.(); } catch (_) { }
-    }
-
-    btnClear?.addEventListener("click", (e) => {
-      e.preventDefault();
-      clearPetFormAndScroll();
-    });
-
-</script>
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="assets/Modal.js"></script>
   <script src="assets/Lightbox.js"></script>
