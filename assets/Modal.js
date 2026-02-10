@@ -892,9 +892,9 @@ async function openDialog(id) {
   const btnAdopted = document.getElementById("btnAdopted");
   const btnUnadopt = document.getElementById("btnUnadopt");
 
-  btnAdopted?.classList.toggle("hidden", isAdopted);
-  btnUnadopt?.classList.toggle("hidden", !isAdopted);
-  if (btnUnadopt) btnUnadopt.onclick = onUnadopt;
+  btnAdopted.classList.toggle("hidden", isAdopted);
+  btnUnadopt.classList.toggle("hidden", !isAdopted);
+  btnUnadopt.onclick = onUnadopt;
 
   document.getElementById("adoptedUpload").classList.add("hidden");
 
@@ -915,49 +915,37 @@ function scrollDialogTop() {
 
 // 綁定 Dialog 內各種按鈕行為
 function bindDialogActions() {
-  const $ = (id) => document.getElementById(id);
-  const on = (id, handler) => {
-    const el = $(id);
-    if (!el) return null;
-    el.onclick = handler;
-    return el;
+  document.getElementById("btnDelete").onclick = onDelete;
+  document.getElementById("btnEdit").onclick = () => setEditMode(true);
+
+  document.getElementById("btnAdopted").onclick = () => {
+    // ✅ 按「已送養」時，把「編輯那排」(actionBar) 一起藏起來
+    document.getElementById("actionBar")?.classList.add("hidden");
+    const up = document.getElementById("adoptedUpload");
+    up.classList.remove("hidden");
+    document.getElementById("btnPickAdopted")?.focus();
+    up.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  // 這些按鈕若因為版面/權限被移除，避免直接噴錯讓整個 Dialog 壞掉
-  on("btnDelete", onDelete);
-  on("btnEdit", () => setEditMode(true));
+  document.getElementById("btnPickAdopted").onclick = () =>
+    document.getElementById("adoptedFiles").click();
 
-  on("btnAdopted", () => {
-    // ✅ 按「已送養」時，把「編輯那排」(actionBar) 一起藏起來
-    $("actionBar")?.classList.add("hidden");
-    const up = $("adoptedUpload");
-    if (up) {
-      up.classList.remove("hidden");
-      $("btnPickAdopted")?.focus();
-      up.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  });
-
-  on("btnPickAdopted", () => $("adoptedFiles")?.click());
-
-  on("btnConfirmAdopted", onConfirmAdopted);
-
-  on("btnCancelAdopted", async (e) => {
-    e?.preventDefault?.();
+  document.getElementById("btnConfirmAdopted").onclick = onConfirmAdopted;
+  document.getElementById("btnCancelAdopted").onclick = async (e) => {
+    e.preventDefault();
     await openDialog(currentDocId);   // 一定要 await，等內容重畫完
-    try { resetAdoptedSelection(); } catch (_) { }
+    resetAdoptedSelection();
     scrollDialogTop();
-  });
-
-  on("btnSave", saveEdit);
+  };
+  document.getElementById("btnSave").onclick = saveEdit;
 
   // 取消編輯：回到瀏覽模式內容 + 回頂端
-  on("btnCancel", async (e) => {
-    e?.preventDefault?.();
+  document.getElementById("btnCancel").onclick = async (e) => {
+    e.preventDefault();
     await openDialog(currentDocId);   // 一定要 await，等內容重畫完
-    try { resetAdoptedSelection(); } catch (_) { }
+    resetAdoptedSelection();
     scrollDialogTop();
-  });
+  };
 }
 
 // 刪除目前這筆
@@ -1009,6 +997,7 @@ function setEditMode(on) {
 // ===============================
 async function saveEdit() {
   const btn = document.getElementById("btnSave");
+  const txt = document.getElementById("saveText");
   const dlg = document.getElementById("petDialog");
 
   // 蒐集欄位
@@ -1066,7 +1055,7 @@ async function saveEdit() {
 
   // ② 確認後才開始「儲存中…」與鎖定按鈕
   btn.disabled = true;
-  const stopDots = startDots(btn, "上傳中");
+  const stopDots = startDots(txt, "儲存中");
 
   try {
     // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
@@ -1184,89 +1173,29 @@ async function saveEdit() {
     // ③ 寫回 Firestore
     await updateDoc(doc(db, "pets", currentDocId), __updatePayload);
 
+    // ④ 重載列表並同步當前物件
+    await loadPets();
+    currentDoc = { ...currentDoc, ...newData, mediaReady: (__updatePayload.mediaReady ?? currentDoc?.mediaReady), wmPending: (__updatePayload.wmPending ?? currentDoc?.wmPending) };
+
     // ⑤ UI 收尾（無論彈窗狀態，成功提示一下）
     stopDots();
-    btn.disabled = true;
-    btn.textContent = "處理中...";
+    btn.disabled = false;
+    txt.textContent = "儲存";
 
     const wasOpen = dlg.open;
     if (wasOpen) dlg.close();
+    await Swal.fire({ icon: "success", title: "已儲存", showConfirmButton: false, timer: 1500 });
+    if (wasOpen) { __lockDialogScroll(); dlg.showModal(); }
 
-    if (pendingPaths.length) {
-      Swal.fire({
-        icon: "info",
-        title: "浮水印處理中…",
-        text: "處理完成後才會顯示在列表，並自動開啟詳情。",
-        allowOutsideClick: false,
-        allowEscapeKey: false,
-        showConfirmButton: false,
-        didOpen: () => {
-          Swal.showLoading();
-        },
-        returnFocus: false,
-      });
+    setEditMode(false);
+    await openDialog(currentDocId);
 
-      try {
-        await __waitPetMediaReady(currentDocId);
-      } catch (e) {
-        console.error("waitPetMediaReady error:", e);
-      }
-
-      // 完成後才載入列表
-      try {
-        await loadPets();
-      } catch (e) {
-        console.error("loadPets error:", e);
-      }
-
-      currentDoc = { ...currentDoc, ...newData, mediaReady: (__updatePayload.mediaReady ?? currentDoc?.mediaReady), wmPending: (__updatePayload.wmPending ?? currentDoc?.wmPending) };
-
-      Swal.close();
-
-      await Swal.fire({
-        icon: "success",
-        title: "已更新",
-        showConfirmButton: false,
-        timer: 1500,
-        returnFocus: false,
-      });
-      if (wasOpen) { __lockDialogScroll(); dlg.showModal(); }
-      setEditMode(false);
-      await openDialog(currentDocId);
-
-    } else {
-      // 沒有媒體：直接更新列表與提示
-      const reloadPromise = loadPets();
-
-      await Swal.fire({
-        icon: "success",
-        title: "已更新",
-        showConfirmButton: false,
-        timer: 1500,
-        returnFocus: false,
-      });
-      try {
-        await reloadPromise;
-      } catch (e) {
-        console.error("loadPets error:", e);
-      }
-
-      currentDoc = { ...currentDoc, ...newData, mediaReady: (__updatePayload.mediaReady ?? currentDoc?.mediaReady), wmPending: (__updatePayload.wmPending ?? currentDoc?.wmPending) };
-
-      if (wasOpen) { __lockDialogScroll(); dlg.showModal(); }
-      setEditMode(false);
-      await openDialog(currentDocId);
-    }
   } catch (err) {
     // 失敗也要確保 UI 復原
-    await swalInDialog({
-      icon: "error",
-      title: "更新失敗",
-      text: err.message
-    });
-  } finally {
+    stopDots();
     btn.disabled = false;
-    btn.textContent = "儲存";
+    txt.textContent = "儲存";
+    await swalInDialog({ icon: "error", title: "更新失敗", text: err.message });
   }
 }
 
@@ -1941,7 +1870,7 @@ async function onConfirmAdopted() {
   // 動態點點（沿用你檔案內的 startDots）
   btn.disabled = true;
   btn.setAttribute("aria-busy", "true");
-  const stopDots = startDots(btn, "上傳中");
+  const stopDots = startDots(btn, "儲存中");
 
   const files = adoptedSelected.slice(0, 5);
   const urls = [];
@@ -1980,6 +1909,8 @@ async function onConfirmAdopted() {
       urls.push(await getDownloadURL(r));
     }
 
+
+
     await updateDoc(doc(db, "pets", currentDocId), {
       status: "adopted",
       adoptedAt: serverTimestamp(),
@@ -1989,81 +1920,30 @@ async function onConfirmAdopted() {
       showOnDogs: false,
       showOnIndex: false,
       // 浮水印處理狀態
-      mediaReady: pendingPaths.length ? false : true,
-      wmPending: pendingPaths.length ? nextPending : [],
+      mediaReady: (pendingPaths && pendingPaths.length) ? false : true,
+      wmPending: (pendingPaths && pendingPaths.length) ? nextPending : [],
     });
 
-    stopDots();
-    btn.disabled = true;
-    btn.setAttribute("aria-busy", "true");
-    btn.textContent = "處理中...";
+    await loadPets();
 
     // 先關閉 modal
     const dlg = document.getElementById("petDialog");
     if (dlg?.open) dlg.close();
 
-    if (pendingPaths.length) {
-      Swal.fire({
-        icon: "info",
-        title: "浮水印處理中…",
-        text: "處理完成後才會顯示在列表。",
-        allowOutsideClick: false,
-        allowEscapeKey: false,
-        showConfirmButton: false,
-        didOpen: () => {
-          Swal.showLoading();
-        },
-        returnFocus: false,
-      });
+    // 用全域 Swal（不在 dialog 裡），所以關掉 modal 也看得到
+    await Swal.fire({
+      icon: "success",
+      title: "已標記為「已送養」",
+      showConfirmButton: false,
+      timer: 1500,
+    });
 
-      try {
-        await __waitPetMediaReady(currentDocId);
-      } catch (e) {
-        console.error("waitPetMediaReady error:", e);
-      }
-
-      // 完成後才載入列表
-      try {
-        await loadPets();
-      } catch (e) {
-        console.error("loadPets error:", e);
-      }
-
-      Swal.close();
-
-      await Swal.fire({
-        icon: "success",
-        title: "已標記為「已送養」",
-        showConfirmButton: false,
-        timer: 1500,
-        returnFocus: false,
-      });
-
-      resetAdoptedSelection();
-    } else {
-      // 沒有媒體：直接更新列表與提示
-      const reloadPromise = loadPets();
-
-      // 用全域 Swal（不在 dialog 裡），所以關掉 modal 也看得到
-      await Swal.fire({
-        icon: "success",
-        title: "已標記為「已送養」",
-        showConfirmButton: false,
-        timer: 1500,
-        returnFocus: false,
-      });
-      try {
-        await reloadPromise;
-      } catch (e) {
-        console.error("loadPets error:", e);
-      }
-
-      // 清空已領養選取（保險起見，關閉時通常也會清）
-      resetAdoptedSelection();
-    }
+    // 清空已領養選取（保險起見，關閉時通常也會清）
+    resetAdoptedSelection();
   } catch (err) {
     await swalInDialog({ icon: "error", title: "已送養標記失敗", text: err.message });
   } finally {
+    stopDots();
     btn.disabled = false;
     btn.removeAttribute("aria-busy");
     btn.textContent = "儲存領養資訊";
