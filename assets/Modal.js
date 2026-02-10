@@ -463,7 +463,91 @@ function ensurePreviewThumbURL(file) {
 }
 
 // ===============================
-// 小工具：按鈕上的「…」跳動
+// 小工具：上傳進度（百分比進度條）
+// ===============================
+function __ensureUploadProgressStyles() {
+  if (document.getElementById("__uploadProgressStyles")) return;
+  const s = document.createElement("style");
+  s.id = "__uploadProgressStyles";
+  s.textContent = `
+    .upg-wrap{width:100%;display:flex;flex-direction:column;align-items:center;gap:6px;}
+    .upg-bar{position:relative;width:min(260px,100%);height:12px;border-radius:999px;background:rgba(255,255,255,.35);overflow:hidden;}
+    .upg-fill{height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg,#fbbf24,#86efac);transition:width .12s ease;}
+    .upg-mascot{position:absolute;top:-22px;left:0;width:30px;height:30px;object-fit:contain;pointer-events:none;}
+    .upg-text{font-size:12px;line-height:12px;opacity:.95;}
+  `;
+  document.head.appendChild(s);
+}
+
+// 把按鈕文字換成進度條；回傳 { update(pct), stop() }
+function startUploadProgress(btn, { baseText = "上傳中", mascotSrc = "" } = {}) {
+  if (!btn) return { update: () => { }, stop: () => { } };
+  __ensureUploadProgressStyles();
+
+  // 保存原始內容，方便 stop() 還原
+  if (!btn.dataset._origHtml) btn.dataset._origHtml = btn.innerHTML;
+  btn.setAttribute("aria-busy", "true");
+
+  const wrap = document.createElement("div");
+  wrap.className = "upg-wrap";
+
+  const bar = document.createElement("div");
+  bar.className = "upg-bar";
+
+  const fill = document.createElement("div");
+  fill.className = "upg-fill";
+  bar.appendChild(fill);
+
+  let mascot = null;
+  if (mascotSrc) {
+    mascot = document.createElement("img");
+    mascot.className = "upg-mascot";
+    mascot.src = mascotSrc;
+    mascot.alt = "";
+    bar.appendChild(mascot);
+  }
+
+  const text = document.createElement("div");
+  text.className = "upg-text";
+  text.textContent = "0%";
+
+  wrap.appendChild(bar);
+  wrap.appendChild(text);
+
+  btn.innerHTML = "";
+  btn.appendChild(wrap);
+
+  let lastPct = 0;
+  const clamp = (n) => Math.max(0, Math.min(100, Number.isFinite(+n) ? +n : 0));
+  const render = (pct) => {
+    const p = clamp(pct);
+    lastPct = p;
+    fill.style.width = `${p}%`;
+    text.textContent = `${p}%`;
+    if (mascot) {
+      // 讓小圖沿著進度條移動（置中對齊）
+      const left = `calc(${p}% - 15px)`;
+      mascot.style.left = left;
+    }
+  };
+
+  // 顯示 baseText（無法像點點那樣塞在同一行，改用 title）
+  btn.title = baseText;
+  render(0);
+
+  return {
+    update: (pct) => render(pct),
+    stop: () => {
+      btn.removeAttribute("aria-busy");
+      btn.innerHTML = btn.dataset._origHtml || baseText;
+      delete btn.dataset._origHtml;
+      btn.title = "";
+    }
+  };
+}
+
+// ===============================
+// 小工具：按鈕上的「…」跳動（舊版保留，其他地方可能還在用）
 // ===============================
 function startDots(span, base) {
   let i = 0;
@@ -915,47 +999,32 @@ function scrollDialogTop() {
 
 // 綁定 Dialog 內各種按鈕行為
 function bindDialogActions() {
-  // 不同 modal / 模式下，某些按鈕可能不存在（getElementById 會回 null）。
-  // 這裡全部加上 null guard，避免「Cannot set properties of null (setting 'onclick')」。
-  const btnDelete = document.getElementById("btnDelete");
-  if (btnDelete) btnDelete.onclick = onDelete;
+  document.getElementById("btnDelete").onclick = onDelete;
+  document.getElementById("btnEdit").onclick = () => setEditMode(true);
 
-  const btnEdit = document.getElementById("btnEdit");
-  if (btnEdit) btnEdit.onclick = () => setEditMode(true);
-
-  const btnAdopted = document.getElementById("btnAdopted");
-  if (btnAdopted) btnAdopted.onclick = () => {
+  document.getElementById("btnAdopted").onclick = () => {
     // ✅ 按「已送養」時，把「編輯那排」(actionBar) 一起藏起來
     document.getElementById("actionBar")?.classList.add("hidden");
     const up = document.getElementById("adoptedUpload");
-    if (up) {
-      up.classList.remove("hidden");
-      document.getElementById("btnPickAdopted")?.focus();
-      up.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
+    up.classList.remove("hidden");
+    document.getElementById("btnPickAdopted")?.focus();
+    up.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const btnPickAdopted = document.getElementById("btnPickAdopted");
-  if (btnPickAdopted) btnPickAdopted.onclick = () =>
-    document.getElementById("adoptedFiles")?.click();
+  document.getElementById("btnPickAdopted").onclick = () =>
+    document.getElementById("adoptedFiles").click();
 
-  const btnConfirmAdopted = document.getElementById("btnConfirmAdopted");
-  if (btnConfirmAdopted) btnConfirmAdopted.onclick = onConfirmAdopted;
-
-  const btnCancelAdopted = document.getElementById("btnCancelAdopted");
-  if (btnCancelAdopted) btnCancelAdopted.onclick = async (e) => {
+  document.getElementById("btnConfirmAdopted").onclick = onConfirmAdopted;
+  document.getElementById("btnCancelAdopted").onclick = async (e) => {
     e.preventDefault();
     await openDialog(currentDocId);   // 一定要 await，等內容重畫完
     resetAdoptedSelection();
     scrollDialogTop();
   };
-
-  const btnSave = document.getElementById("btnSave");
-  if (btnSave) btnSave.onclick = saveEdit;
+  document.getElementById("btnSave").onclick = saveEdit;
 
   // 取消編輯：回到瀏覽模式內容 + 回頂端
-  const btnCancel = document.getElementById("btnCancel");
-  if (btnCancel) btnCancel.onclick = async (e) => {
+  document.getElementById("btnCancel").onclick = async (e) => {
     e.preventDefault();
     await openDialog(currentDocId);   // 一定要 await，等內容重畫完
     resetAdoptedSelection();
@@ -1067,9 +1136,13 @@ async function saveEdit() {
     newData.nameLower = newName.toLowerCase();
   }
 
-  // ② 確認後才開始「儲存中…」與鎖定按鈕
+  // ② 確認後才開始「上傳中」與鎖定按鈕（百分比進度條）
   btn.disabled = true;
-  const stopDots = startDots(btn, "上傳中");
+  const prog = startUploadProgress(btn, {
+    baseText: "上傳中",
+    // 你之後要換成自己的 png：把路徑改成你的檔案即可
+    mascotSrc: "images/奔跑貓咪.png",
+  });
 
   try {
     // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
@@ -1126,6 +1199,11 @@ async function saveEdit() {
     }
 
     // 依序處理（保持順序）
+    // 進度只計算「本次新增的檔案」
+    const uploadItems = items.filter((it) => it.kind === "file");
+    const totalBytes = uploadItems.reduce((sum, it) => sum + (it?.file?.size || 0), 0) || 1;
+    let doneBytes = 0;
+
     for (const it of items) {
       if (it.kind === "url") {
         newUrls.push(it.url);
@@ -1138,7 +1216,27 @@ async function saveEdit() {
         const type = it.__uploadType || (f && f.type) || '';
         const path = it.__uploadPath;
         const r = sRef(storage, path);
-        await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
+        // 用 resumable 才能拿到進度
+        if (typeof uploadBytesResumable === "function") {
+          await new Promise((resolve, reject) => {
+            const task = uploadBytesResumable(r, f, { contentType: type || 'application/octet-stream' });
+            task.on(
+              "state_changed",
+              (snap) => {
+                const cur = Math.min(snap.bytesTransferred || 0, f?.size || snap.totalBytes || 0);
+                const pct = Math.round(((doneBytes + cur) / totalBytes) * 100);
+                prog.update(pct);
+              },
+              reject,
+              resolve
+            );
+          });
+        } else {
+          // fallback：沒有進度（理論上不會走到，因為 admin.html 會把 uploadBytesResumable 掛到 window）
+          await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
+        }
+        doneBytes += (f?.size || 0);
+        prog.update(Math.round((doneBytes / totalBytes) * 100));
         newUrls.push(await getDownloadURL(r));
       }
     }
@@ -1188,7 +1286,7 @@ async function saveEdit() {
     await updateDoc(doc(db, "pets", currentDocId), __updatePayload);
 
     // ⑤ UI 收尾（無論彈窗狀態，成功提示一下）
-    stopDots();
+    prog.stop();
     btn.disabled = true;
     btn.textContent = "處理中...";
 
@@ -1268,6 +1366,7 @@ async function saveEdit() {
       text: err.message
     });
   } finally {
+    try { prog?.stop?.(); } catch (_) { }
     btn.disabled = false;
     btn.textContent = "儲存";
   }
@@ -1941,10 +2040,13 @@ function resetAdoptedSelection() {
 async function onConfirmAdopted() {
   const btn = document.getElementById("btnConfirmAdopted");
 
-  // 動態點點（沿用你檔案內的 startDots）
+  // 百分比進度條
   btn.disabled = true;
-  btn.setAttribute("aria-busy", "true");
-  const stopDots = startDots(btn, "上傳中");
+  const prog = startUploadProgress(btn, {
+    baseText: "上傳中",
+    // 你之後要換成自己的 png：把路徑改成你的檔案即可
+    mascotSrc: "assets/progress-mascot.png",
+  });
 
   const files = adoptedSelected.slice(0, 5);
   const urls = [];
@@ -1977,9 +2079,33 @@ async function onConfirmAdopted() {
       currentDoc = { ...(currentDoc || {}), mediaReady: false, wmPending: nextPending };
     }
 
+    // 逐檔上傳（用 uploadBytesResumable 才能拿到進度）
+    const totalBytes = plans.reduce((sum, p) => sum + (p?.f?.size || 0), 0) || 1;
+    let doneBytes = 0;
+
     for (const pl of plans) {
       const r = sRef(storage, pl.path);
-      await uploadBytes(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
+
+      if (typeof uploadBytesResumable === "function") {
+        await new Promise((resolve, reject) => {
+          const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
+          task.on(
+            "state_changed",
+            (snap) => {
+              const cur = Math.min(snap.bytesTransferred || 0, pl.f?.size || snap.totalBytes || 0);
+              const pct = Math.round(((doneBytes + cur) / totalBytes) * 100);
+              prog.update(pct);
+            },
+            reject,
+            resolve
+          );
+        });
+      } else {
+        await uploadBytes(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
+      }
+
+      doneBytes += (pl.f?.size || 0);
+      prog.update(Math.round((doneBytes / totalBytes) * 100));
       urls.push(await getDownloadURL(r));
     }
 
@@ -1996,9 +2122,8 @@ async function onConfirmAdopted() {
       wmPending: pendingPaths.length ? nextPending : [],
     });
 
-    stopDots();
+    prog.stop();
     btn.disabled = true;
-    btn.setAttribute("aria-busy", "true");
     btn.textContent = "處理中...";
 
     // 先關閉 modal
@@ -2067,6 +2192,7 @@ async function onConfirmAdopted() {
   } catch (err) {
     await swalInDialog({ icon: "error", title: "已送養標記失敗", text: err.message });
   } finally {
+    try { prog?.stop?.(); } catch (_) { }
     btn.disabled = false;
     btn.removeAttribute("aria-busy");
     btn.textContent = "儲存領養資訊";
