@@ -266,7 +266,7 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- 左：登錄表單 -->
-      <section id="formSection" class="lg:col-span-1 bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
+      <section class="lg:col-span-1 bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
         <h2 class="text-lg font-semibold mb-6">登錄表單</h2>
         <form id="petForm" class="space-y-4">
           <div>
@@ -370,7 +370,7 @@
               class="w-full px-4 py-3 rounded-xl bg-gray-900 text-white text-sm flex items-center justify-center gap-2 hover:bg-gray-800">
               登錄
             </button>
-            <button id="btnClear" type="button"
+            <button id="clearBtn" type="button"
               class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm flex items-center justify-center hover:bg-gray-50">
               清除
             </button>
@@ -846,6 +846,8 @@
     const fileCount = $("#fileCount");
     const imgPreview = $("#imgPreview");
 
+    const clearBtn = $("#clearBtn");
+
     const MAX_FILES = 5;
     const PREVIEW_MAX = 720;      // 預覽縮圖長邊上限（越小越順）
     const PREVIEW_QUALITY = 0.82; // JPEG 品質（0~1）
@@ -893,6 +895,57 @@
     const EMPTY_GIF = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 
     btnPick?.addEventListener("click", () => imgFiles.click());
+
+    // ===============================
+    // 新增：清除表單（含圖片/影片）＋捲回登錄表單
+    // ===============================
+    function clearPetFormAndScroll() {
+      const form = document.getElementById("petForm");
+      if (form) form.reset();
+
+      // 清掉名字重複檢查提示/紅框
+      if (window.resetNameCheck) resetNameCheck();
+
+      // 清掉預覽＆釋放 objectURL
+      try {
+        // 停掉可能正在播放的預覽影片
+        imgPreview?.querySelectorAll("video.video-preview").forEach((v) => {
+          try { v.pause(); } catch (_) { }
+        });
+      } catch (_) { }
+
+      try {
+        selectedFiles.forEach((f) => revokeThumb(f));
+      } catch (_) { }
+
+      selectedFiles = [];
+      imgPreview.innerHTML = "";
+      fileCount.textContent = "已選 0 / 5 張";
+
+      // 清掉快取（避免殘留）
+      try { __previewTileMap.clear(); } catch (_) { }
+      try { thumbUrlCache.clear(); } catch (_) { }
+      try { thumbPromiseCache.clear(); } catch (_) { }
+
+      // 依目前物種重新初始化品種選單（reset 後 radio 會回到預設：貓）
+      syncBreedSelectors();
+
+      // 捲回登錄表單 section
+      const sec = document.getElementById("formSection");
+      if (sec) {
+        sec.scrollIntoView({ behavior: "smooth", block: "start" });
+        // 保險：避免 smooth 被其他 focus / DOM 影響中斷
+        setTimeout(() => sec.scrollIntoView({ behavior: "auto", block: "start" }), 220);
+      }
+
+      // 最後把游標放回名字，方便直接輸入
+      try { document.getElementById("name")?.focus?.({ preventScroll: true }); } catch (_) { }
+    }
+
+    clearBtn?.addEventListener("click", (e) => {
+      e.preventDefault();
+      clearPetFormAndScroll();
+    });
 
     function revokeThumb(file) {
       const u = thumbUrlCache.get(file);
@@ -1338,61 +1391,6 @@
         document.body.scrollTop = 0;
       }, 80);
     }
-
-    // ===============================
-    // 清除表單 + 捲動回登錄區
-    // ===============================
-    function __scrollToEl(el) {
-      if (!el) return;
-      const root = document.documentElement;
-      const prev = root.style.scrollBehavior;
-      root.style.scrollBehavior = "auto";
-      el.scrollIntoView({ behavior: "auto", block: "start" });
-      requestAnimationFrame(() => {
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
-        // 再補一次避免焦點/重排回彈
-        setTimeout(() => {
-          root.style.scrollBehavior = prev || "";
-          el.scrollIntoView({ behavior: "auto", block: "start" });
-        }, 120);
-      });
-    }
-
-    function clearPetFormAndScroll() {
-      // 釋放已選檔案的 objectURL（縮圖/影片）
-      try { selectedFiles.forEach((f) => revokeThumb(f)); } catch (_) { }
-      selectedFiles = [];
-
-      // reset form
-      const form = document.getElementById("petForm");
-      form?.reset();
-
-      // 清空自訂 UI
-      imgPreview.innerHTML = "";
-      fileCount.textContent = `已選 0 / ${MAX_FILES} 張`;
-      if (imgFiles) imgFiles.value = "";
-
-      // 重置品種下拉/標籤
-      syncBreedSelectors();
-
-      // 清掉「名字重複」之類的提示狀態（若有）
-      try { if (window.resetNameCheck) resetNameCheck(); } catch (_) { }
-
-      // 讓登錄按鈕回到可點狀態
-      const submitBtn = document.getElementById("submitBtn");
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = "登錄";
-      }
-
-      // 捲動回登錄區
-      __scrollToEl(document.getElementById("formSection"));
-    }
-
-    document.getElementById("btnClear")?.addEventListener("click", (e) => {
-      e.preventDefault();
-      clearPetFormAndScroll();
-    });
 
     // ===============================
     // 表單送出：新增動物資料
