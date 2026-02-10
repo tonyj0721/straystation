@@ -18,7 +18,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="icon" href="images/dogpaw-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="images/dogpaw-180.png">
-  <title>測試</title>
+  <title>管理後台｜台中簡媽媽狗園</title>
   <meta name="description" content="TailwindCSS + Firebase Firestore 後台：登錄、管理動物資料；沿用前台 Modal/Lightbox。" />
   <meta name="theme-color" content="#fcd34d">
   <link rel="manifest" href="./manifest.webmanifest">
@@ -266,7 +266,7 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- 左：登錄表單 -->
-      <section class="lg:col-span-1 bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
+      <section id="formSection" class="lg:col-span-1 bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
         <h2 class="text-lg font-semibold mb-6">登錄表單</h2>
         <form id="petForm" class="space-y-4">
           <div>
@@ -370,7 +370,9 @@
               class="w-full px-4 py-3 rounded-xl bg-gray-900 text-white text-sm flex items-center justify-center gap-2 hover:bg-gray-800">
               登錄
             </button>
-            <button id="btnClear" type="button"
+
+            <!-- 新增：清除按鈕（清空表單並捲回登錄區） -->
+            <button id="clearBtn" type="button"
               class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm flex items-center justify-center hover:bg-gray-50">
               清除
             </button>
@@ -1339,53 +1341,52 @@
       }, 80);
     }
 
-    
-
     // ===============================
-    // 清除表單：清掉所有欄位、清空已選媒體，並捲動回登錄表單
-    // ===============================
-    const btnClear = document.getElementById('btnClear');
-    const formSection = document.querySelector('section.lg\\:col-span-1.bg-white.rounded-2xl.ring-1.ring-gray-200.shadow-soft.p-5')
-      || document.getElementById('petForm')?.closest('section');
-
-    function scrollToFormSection() {
-      if (!formSection) return;
-      formSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-
-    function clearPetForm() {
-      // 1) 重置表單欄位
-      const form = document.getElementById('petForm');
-      form?.reset();
-
-      // 2) 清空圖片/影片選取與預覽
-      try {
-        for (const f of selectedFiles) revokeThumb(f);
-      } catch (_) { }
-      selectedFiles = [];
-      try { imgFiles.value = ''; } catch (_) { }
-      try { imgPreview.innerHTML = ''; } catch (_) { }
-      try { __previewTileMap?.clear?.(); } catch (_) { }
-      try { fileCount.textContent = `已選 0 / ${MAX_FILES} 張`; } catch (_) { }
-
-      // 3) 重置品種下拉（以及其右側 disabled/提示）
-      try { syncBreedSelectors(); } catch (_) { }
-
-      // 4) 清掉名字檢查提示/紅框（若有）
-      try { if (window.resetNameCheck) resetNameCheck(); } catch (_) { }
-
-      // 5) 捲回登錄表單
-      scrollToFormSection();
-    }
-
-    btnClear?.addEventListener('click', (e) => {
-      e.preventDefault();
-      clearPetForm();
-    });
-// ===============================
     // 表單送出：新增動物資料
     // ===============================
-    $("#petForm").addEventListener("submit", async (e) => {
+    
+    // ===============================
+    // 清除表單：清掉所有資料並捲回登錄表單區
+    // ===============================
+    const clearBtn = document.getElementById("clearBtn");
+    clearBtn?.addEventListener("click", () => {
+      try {
+        // 清空名字欄位 + 移除「已被使用」提示/紅框
+        const nameInput = document.getElementById("name");
+        if (nameInput) nameInput.value = "";
+        if (window.resetNameCheck) resetNameCheck();
+
+        // 重置表單（會回到預設 radio/checkbox/select 值）
+        const form = document.getElementById("petForm");
+        form?.reset();
+
+        // 清空圖片選取/預覽
+        try { imgFiles.value = ""; } catch (_) { }
+        imgPreview.innerHTML = "";
+        selectedFiles = [];
+        fileCount.textContent = "已選 0 / 5 張";
+
+        // 釋放縮圖快取，避免記憶體累積
+        try {
+          for (const url of thumbUrlCache.values()) {
+            try { URL.revokeObjectURL(url); } catch (_) { }
+          }
+          thumbUrlCache.clear();
+          thumbPromiseCache.clear();
+        } catch (_) { }
+
+        // 重置品種下拉（依目前物種）
+        syncBreedSelectors();
+
+        // 捲動到登錄表單區
+        const section = document.getElementById("formSection");
+        section?.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (err) {
+        console.error("clear form error:", err);
+      }
+    });
+
+$("#petForm").addEventListener("submit", async (e) => {
       e.preventDefault();
 
       // 讀值
