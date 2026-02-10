@@ -18,7 +18,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="icon" href="images/dogpaw-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="images/dogpaw-180.png">
-  <title>管理後台｜台中簡媽媽狗園</title>
+  <title>測試</title>
   <meta name="description" content="TailwindCSS + Firebase Firestore 後台：登錄、管理動物資料；沿用前台 Modal/Lightbox。" />
   <meta name="theme-color" content="#fcd34d">
   <link rel="manifest" href="./manifest.webmanifest">
@@ -370,6 +370,8 @@
               class="px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-gray-800 flex items-center gap-2">
               <span id="submitText">登錄</span>
             </button>
+
+            <!-- 新增：清除表單 -->
             <button id="clearBtn" type="button"
               class="px-4 py-2 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50">
               清除
@@ -897,6 +899,18 @@
         URL.revokeObjectURL(u);
         thumbUrlCache.delete(file);
       }
+
+    // 清空「新增表單」已選媒體（釋放縮圖/影片 objectURL，避免記憶體累積）
+    function resetNewFormSelection() {
+      try {
+        (selectedFiles || []).forEach((f) => { try { revokeThumb(f); } catch (_) { } });
+      } catch (_) { }
+      selectedFiles = [];
+      if (imgPreview) imgPreview.innerHTML = "";
+      if (fileCount) fileCount.textContent = "已選 0 / 5 張";
+      if (imgFiles) imgFiles.value = "";
+    }
+
       thumbPromiseCache.delete(file);
 
       // 影片播放用的 objectURL 也一起釋放
@@ -1216,51 +1230,6 @@
         imgPreview.appendChild(tile); // appendChild 會把既有節點移動到正確位置
       });
     }
-    // ===============================
-    // 清除按鈕：清空登錄表單 + 捲動回表單區塊
-    // ===============================
-    const clearBtn = document.getElementById("clearBtn");
-    const formSection = document.getElementById("formSection");
-    const petForm = document.getElementById("petForm");
-
-    function clearUploadState() {
-      // 停止預覽影片（若有）
-      try {
-        imgPreview?.querySelectorAll("video").forEach((v) => { try { v.pause(); } catch (_) { } });
-      } catch (_) { }
-
-      // 釋放所有 objectURL（縮圖/影片）
-      try {
-        selectedFiles.forEach((f) => { try { revokeThumb(f); } catch (_) { } });
-      } catch (_) { }
-
-      // 清空狀態與 UI
-      selectedFiles = [];
-      try { __previewTileMap?.clear?.(); } catch (_) { }
-      try { imgPreview.innerHTML = ""; } catch (_) { }
-      try { fileCount.textContent = `已選 0 / ${MAX_FILES} 張`; } catch (_) { }
-      try { imgFiles.value = ""; } catch (_) { }
-    }
-
-    function clearPetFormAndScroll() {
-      // 1) 表單 reset（回到初始狀態：species 預設貓、checkbox 取消、文字清空）
-      try { petForm?.reset(); } catch (_) { }
-
-      // 2) 清掉上傳/預覽
-      clearUploadState();
-
-      // 3) 讓品種下拉回到乾淨狀態（因為選項是動態生成的）
-      try { syncBreedSelectors(); } catch (_) { }
-
-      // 4) 捲動回登錄表單區塊
-      try { formSection?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (_) { }
-    }
-
-    clearBtn?.addEventListener("click", (e) => {
-      e.preventDefault();
-      clearPetFormAndScroll();
-    });
-
 
     // 刪除（事件代理）
     imgPreview.addEventListener("click", (e) => {
@@ -1353,6 +1322,47 @@
       renderPreviews();
       imgFiles.value = ""; // 清空 input，避免重複選取不到
     });
+
+    // ===============================
+    // 清除按鈕：清空表單並捲到登錄表單區塊
+    // ===============================
+    const clearBtn = document.getElementById("clearBtn");
+    const formSection = document.getElementById("formSection");
+
+    clearBtn?.addEventListener("click", (e) => {
+      e.preventDefault();
+
+      const form = document.getElementById("petForm");
+      const nameInput = document.getElementById("name");
+
+      // 1) 清空表單欄位
+      try { form?.reset(); } catch (_) { }
+
+      // ★ 名字欄位：同登錄成功時的處理（清掉提示/紅框）
+      if (nameInput) nameInput.value = "";
+      if (window.resetNameCheck) {
+        try { window.resetNameCheck(); } catch (_) { }
+      }
+
+      // 2) 清空已選圖片/影片與預覽
+      resetNewFormSelection();
+
+      // 3) 重建品種下拉（避免 reset 後狀態不同步）
+      try { syncBreedSelectors(); } catch (_) { }
+
+      // 4) 捲到登錄表單區塊
+      try {
+        (formSection || form || document.body).scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (_) {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      // 5) 聚焦到名字欄位（不要再次觸發捲動）
+      setTimeout(() => {
+        try { nameInput?.focus?.({ preventScroll: true }); } catch (_) { }
+      }, 250);
+    });
+
 
     // ===============================
     // 捲到最上方（保險版）
@@ -1511,9 +1521,7 @@
 
         // 重置表單與選擇圖片（先做，避免 DOM 還在變動導致 smooth scroll 卡住）
         e.target.reset();
-        imgPreview.innerHTML = "";
-        selectedFiles = [];
-        fileCount.textContent = "已選 0 / 5 張";
+        resetNewFormSelection();
         syncBreedSelectors();
 
         // ★ 登錄完成 → 捲到最上方（先 smooth，最後再硬捲補正）
