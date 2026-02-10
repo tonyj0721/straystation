@@ -1313,47 +1313,6 @@
     });
 
     // ===============================
-    // 清除表單（含圖片/影片預覽）並捲回登錄表單區塊
-    // ===============================
-    const btnClear = document.getElementById("btnClear");
-    function scrollToFormSection() {
-      const el = document.getElementById("formSection");
-      if (!el) return;
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-      // 補正一次，避免 iOS/Safari smooth 被 focus/重排打斷
-      setTimeout(() => {
-        const y = el.getBoundingClientRect().top + window.pageYOffset;
-        window.scrollTo({ top: Math.max(0, y - 12), behavior: "auto" });
-      }, 350);
-    }
-    function clearPetForm() {
-      // 1) 清空表單欄位
-      const form = document.getElementById("petForm");
-      form?.reset();
-
-      // 2) 清空名字重複提示/紅框（若有啟用）
-      try { window.resetNameCheck?.(); } catch (_) { }
-
-      // 3) 清空媒體預覽與選取檔案
-      try {
-        selectedFiles.forEach((f) => revokeThumb(f));
-      } catch (_) { }
-      selectedFiles = [];
-      __previewTileMap.clear();
-      imgPreview.innerHTML = "";
-      fileCount.textContent = "已選 0 / 5 張";
-      if (imgFiles) imgFiles.value = "";
-
-      // 4) 品種下拉回到初始狀態（含右側 disabled）
-      try { syncBreedSelectors(); } catch (_) { }
-    }
-
-    btnClear?.addEventListener("click", () => {
-      clearPetForm();
-      scrollToFormSection();
-    });
-
-    // ===============================
     // 捲到最上方（保險版）
     // ===============================
     function forceScrollTop() {
@@ -1379,6 +1338,61 @@
         document.body.scrollTop = 0;
       }, 80);
     }
+
+    // ===============================
+    // 清除表單 + 捲動回登錄區
+    // ===============================
+    function __scrollToEl(el) {
+      if (!el) return;
+      const root = document.documentElement;
+      const prev = root.style.scrollBehavior;
+      root.style.scrollBehavior = "auto";
+      el.scrollIntoView({ behavior: "auto", block: "start" });
+      requestAnimationFrame(() => {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        // 再補一次避免焦點/重排回彈
+        setTimeout(() => {
+          root.style.scrollBehavior = prev || "";
+          el.scrollIntoView({ behavior: "auto", block: "start" });
+        }, 120);
+      });
+    }
+
+    function clearPetFormAndScroll() {
+      // 釋放已選檔案的 objectURL（縮圖/影片）
+      try { selectedFiles.forEach((f) => revokeThumb(f)); } catch (_) { }
+      selectedFiles = [];
+
+      // reset form
+      const form = document.getElementById("petForm");
+      form?.reset();
+
+      // 清空自訂 UI
+      imgPreview.innerHTML = "";
+      fileCount.textContent = `已選 0 / ${MAX_FILES} 張`;
+      if (imgFiles) imgFiles.value = "";
+
+      // 重置品種下拉/標籤
+      syncBreedSelectors();
+
+      // 清掉「名字重複」之類的提示狀態（若有）
+      try { if (window.resetNameCheck) resetNameCheck(); } catch (_) { }
+
+      // 讓登錄按鈕回到可點狀態
+      const submitBtn = document.getElementById("submitBtn");
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "登錄";
+      }
+
+      // 捲動回登錄區
+      __scrollToEl(document.getElementById("formSection"));
+    }
+
+    document.getElementById("btnClear")?.addEventListener("click", (e) => {
+      e.preventDefault();
+      clearPetFormAndScroll();
+    });
 
     // ===============================
     // 表單送出：新增動物資料
