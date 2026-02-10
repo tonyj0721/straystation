@@ -463,91 +463,7 @@ function ensurePreviewThumbURL(file) {
 }
 
 // ===============================
-// 小工具：上傳進度（百分比進度條）
-// ===============================
-function __ensureUploadProgressStyles() {
-  if (document.getElementById("__uploadProgressStyles")) return;
-  const s = document.createElement("style");
-  s.id = "__uploadProgressStyles";
-  s.textContent = `
-    .upg-wrap{width:100%;display:flex;flex-direction:column;align-items:center;gap:6px;}
-    .upg-bar{position:relative;width:min(260px,100%);height:12px;border-radius:999px;background:rgba(255,255,255,.35);overflow:hidden;}
-    .upg-fill{height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg,#fbbf24,#86efac);transition:width .12s ease;}
-    .upg-mascot{position:absolute;top:-22px;left:0;width:30px;height:30px;object-fit:contain;pointer-events:none;}
-    .upg-text{font-size:12px;line-height:12px;opacity:.95;}
-  `;
-  document.head.appendChild(s);
-}
-
-// 把按鈕文字換成進度條；回傳 { update(pct), stop() }
-function startUploadProgress(btn, { baseText = "上傳中", mascotSrc = "" } = {}) {
-  if (!btn) return { update: () => { }, stop: () => { } };
-  __ensureUploadProgressStyles();
-
-  // 保存原始內容，方便 stop() 還原
-  if (!btn.dataset._origHtml) btn.dataset._origHtml = btn.innerHTML;
-  btn.setAttribute("aria-busy", "true");
-
-  const wrap = document.createElement("div");
-  wrap.className = "upg-wrap";
-
-  const bar = document.createElement("div");
-  bar.className = "upg-bar";
-
-  const fill = document.createElement("div");
-  fill.className = "upg-fill";
-  bar.appendChild(fill);
-
-  let mascot = null;
-  if (mascotSrc) {
-    mascot = document.createElement("img");
-    mascot.className = "upg-mascot";
-    mascot.src = mascotSrc;
-    mascot.alt = "";
-    bar.appendChild(mascot);
-  }
-
-  const text = document.createElement("div");
-  text.className = "upg-text";
-  text.textContent = "0%";
-
-  wrap.appendChild(bar);
-  wrap.appendChild(text);
-
-  btn.innerHTML = "";
-  btn.appendChild(wrap);
-
-  let lastPct = 0;
-  const clamp = (n) => Math.max(0, Math.min(100, Number.isFinite(+n) ? +n : 0));
-  const render = (pct) => {
-    const p = clamp(pct);
-    lastPct = p;
-    fill.style.width = `${p}%`;
-    text.textContent = `${p}%`;
-    if (mascot) {
-      // 讓小圖沿著進度條移動（置中對齊）
-      const left = `calc(${p}% - 15px)`;
-      mascot.style.left = left;
-    }
-  };
-
-  // 顯示 baseText（無法像點點那樣塞在同一行，改用 title）
-  btn.title = baseText;
-  render(0);
-
-  return {
-    update: (pct) => render(pct),
-    stop: () => {
-      btn.removeAttribute("aria-busy");
-      btn.innerHTML = btn.dataset._origHtml || baseText;
-      delete btn.dataset._origHtml;
-      btn.title = "";
-    }
-  };
-}
-
-// ===============================
-// 小工具：按鈕上的「…」跳動（舊版保留，其他地方可能還在用）
+// 小工具：按鈕上的「…」跳動
 // ===============================
 function startDots(span, base) {
   let i = 0;
@@ -557,6 +473,78 @@ function startDots(span, base) {
     span.textContent = base + ".".repeat(i);
   }, 350);
   return () => clearInterval(t); // 回傳停止函式
+}
+
+// ===============================
+// 小工具：按鈕上的「百分比進度條」
+//  - 會把按鈕內容替換成進度條 + 百分比
+//  - 若你有小動物 PNG：在 admin.html 先設定 window.__progressMascotPng = "images/xxx.png"
+// ===============================
+function startProgressBar(btn, baseText = "上傳中") {
+  const orig = {
+    disabled: btn.disabled,
+    ariaBusy: btn.getAttribute("aria-busy"),
+    html: btn.innerHTML,
+    text: btn.textContent,
+  };
+
+  const iconSrc = (window.__progressMascotPng || "").trim();
+
+  btn.setAttribute("aria-busy", "true");
+  // 讓按鈕內部可以塞進條狀 UI
+  btn.style.paddingTop = btn.style.paddingTop || "10px";
+  btn.style.paddingBottom = btn.style.paddingBottom || "10px";
+
+  btn.innerHTML = `
+    <div class="w-full flex items-center gap-3">
+      ${iconSrc ? `<img src="${iconSrc}" alt="" style="width:28px;height:28px;flex:0 0 auto;" />` : ``}
+      <div class="flex-1">
+        <div class="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+          <div class="progress-fill h-full" style="width:0%;background:linear-gradient(90deg,#f7b267,#fef08a,#86efac);"></div>
+        </div>
+        <div class="mt-1 text-[11px] text-gray-600">${baseText}</div>
+      </div>
+      <div class="progress-text text-sm font-semibold tabular-nums" style="min-width:44px;text-align:right;">0%</div>
+    </div>
+  `.trim();
+
+  const fill = btn.querySelector(".progress-fill");
+  const txt = btn.querySelector(".progress-text");
+
+  const set = (pct) => {
+    const p = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
+    if (fill) fill.style.width = `${p}%`;
+    if (txt) txt.textContent = `${p}%`;
+  };
+
+  const stop = () => {
+    btn.removeAttribute("aria-busy");
+    // 還原按鈕內容（文字用 textContent 還原會吃掉 icon/HTML；所以用 innerHTML）
+    btn.innerHTML = orig.html;
+    if (orig.ariaBusy == null) btn.removeAttribute("aria-busy");
+    else btn.setAttribute("aria-busy", orig.ariaBusy);
+    btn.disabled = orig.disabled;
+  };
+
+  return { set, stop, orig };
+}
+
+// Firebase Storage 上傳（可回報進度）
+// - onOverallPct(0~100)
+function uploadResumableWithOverallProgress(storageRef, file, options, completedBytes, totalBytes, onOverallPct) {
+  return new Promise((resolve, reject) => {
+    const task = uploadBytesResumable(storageRef, file, options);
+    task.on("state_changed",
+      (snap) => {
+        const overall = totalBytes > 0
+          ? ((completedBytes + snap.bytesTransferred) / totalBytes) * 100
+          : 0;
+        try { onOverallPct(overall); } catch (_) { }
+      },
+      (err) => reject(err),
+      () => resolve(task.snapshot)
+    );
+  });
 }
 
 // 用 nameLower / name 檢查是否重複；exceptId 表示忽略自己（編輯時用）
@@ -1136,18 +1124,19 @@ async function saveEdit() {
     newData.nameLower = newName.toLowerCase();
   }
 
-  // ② 確認後才開始「上傳中」與鎖定按鈕（百分比進度條）
+  // ② 確認後才開始「儲存中…」與鎖定按鈕
   btn.disabled = true;
-  const prog = startUploadProgress(btn, {
-    baseText: "上傳中",
-    // 你之後要換成自己的 png：把路徑改成你的檔案即可
-    mascotSrc: "images/奔跑貓咪.png",
-  });
+  const prog = startProgressBar(btn, "上傳中");
+  prog.set(0);
 
   try {
     // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
     const { items, removeUrls } = editImagesState;
     const newUrls = [];
+
+    // 進度條：總上傳大小（bytes）
+    const __totalBytes = items.filter(x => x.kind === "file" && x.file).reduce((s, x) => s + (x.file.size || 0), 0);
+    let __completedBytes = 0;
 
 
     // 先把「要刪除的舊圖」轉成 Storage paths（順便用於清理 wmPending）
@@ -1199,11 +1188,6 @@ async function saveEdit() {
     }
 
     // 依序處理（保持順序）
-    // 進度只計算「本次新增的檔案」
-    const uploadItems = items.filter((it) => it.kind === "file");
-    const totalBytes = uploadItems.reduce((sum, it) => sum + (it?.file?.size || 0), 0) || 1;
-    let doneBytes = 0;
-
     for (const it of items) {
       if (it.kind === "url") {
         newUrls.push(it.url);
@@ -1216,27 +1200,16 @@ async function saveEdit() {
         const type = it.__uploadType || (f && f.type) || '';
         const path = it.__uploadPath;
         const r = sRef(storage, path);
-        // 用 resumable 才能拿到進度
-        if (typeof uploadBytesResumable === "function") {
-          await new Promise((resolve, reject) => {
-            const task = uploadBytesResumable(r, f, { contentType: type || 'application/octet-stream' });
-            task.on(
-              "state_changed",
-              (snap) => {
-                const cur = Math.min(snap.bytesTransferred || 0, f?.size || snap.totalBytes || 0);
-                const pct = Math.round(((doneBytes + cur) / totalBytes) * 100);
-                prog.update(pct);
-              },
-              reject,
-              resolve
-            );
-          });
-        } else {
-          // fallback：沒有進度（理論上不會走到，因為 admin.html 會把 uploadBytesResumable 掛到 window）
-          await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
-        }
-        doneBytes += (f?.size || 0);
-        prog.update(Math.round((doneBytes / totalBytes) * 100));
+        await uploadResumableWithOverallProgress(
+          r,
+          f,
+          { contentType: type || 'application/octet-stream' },
+          __completedBytes,
+          __totalBytes,
+          (p) => prog.set(p)
+        );
+        __completedBytes += (f.size || 0);
+        prog.set(__totalBytes ? (__completedBytes / __totalBytes) * 100 : 100);
         newUrls.push(await getDownloadURL(r));
       }
     }
@@ -1366,7 +1339,6 @@ async function saveEdit() {
       text: err.message
     });
   } finally {
-    try { prog?.stop?.(); } catch (_) { }
     btn.disabled = false;
     btn.textContent = "儲存";
   }
@@ -2040,16 +2012,16 @@ function resetAdoptedSelection() {
 async function onConfirmAdopted() {
   const btn = document.getElementById("btnConfirmAdopted");
 
-  // 百分比進度條
+  // 動態點點（沿用你檔案內的 startDots）
   btn.disabled = true;
-  const prog = startUploadProgress(btn, {
-    baseText: "上傳中",
-    // 你之後要換成自己的 png：把路徑改成你的檔案即可
-    mascotSrc: "assets/progress-mascot.png",
-  });
+  btn.setAttribute("aria-busy", "true");
+  const prog = startProgressBar(btn, "上傳中");
+  prog.set(0);
 
   const files = adoptedSelected.slice(0, 5);
   const urls = [];
+  const __totalBytes = files.reduce((s, f) => s + ((f && f.size) || 0), 0);
+  let __completedBytes = 0;
   try {
 
     const plans = [];
@@ -2079,33 +2051,18 @@ async function onConfirmAdopted() {
       currentDoc = { ...(currentDoc || {}), mediaReady: false, wmPending: nextPending };
     }
 
-    // 逐檔上傳（用 uploadBytesResumable 才能拿到進度）
-    const totalBytes = plans.reduce((sum, p) => sum + (p?.f?.size || 0), 0) || 1;
-    let doneBytes = 0;
-
     for (const pl of plans) {
       const r = sRef(storage, pl.path);
-
-      if (typeof uploadBytesResumable === "function") {
-        await new Promise((resolve, reject) => {
-          const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
-          task.on(
-            "state_changed",
-            (snap) => {
-              const cur = Math.min(snap.bytesTransferred || 0, pl.f?.size || snap.totalBytes || 0);
-              const pct = Math.round(((doneBytes + cur) / totalBytes) * 100);
-              prog.update(pct);
-            },
-            reject,
-            resolve
-          );
-        });
-      } else {
-        await uploadBytes(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
-      }
-
-      doneBytes += (pl.f?.size || 0);
-      prog.update(Math.round((doneBytes / totalBytes) * 100));
+      await uploadResumableWithOverallProgress(
+        r,
+        pl.f,
+        { contentType: pl.type || 'application/octet-stream' },
+        __completedBytes,
+        __totalBytes,
+        (p) => prog.set(p)
+      );
+      __completedBytes += (pl.f.size || 0);
+      prog.set(__totalBytes ? (__completedBytes / __totalBytes) * 100 : 100);
       urls.push(await getDownloadURL(r));
     }
 
@@ -2124,6 +2081,7 @@ async function onConfirmAdopted() {
 
     prog.stop();
     btn.disabled = true;
+    btn.setAttribute("aria-busy", "true");
     btn.textContent = "處理中...";
 
     // 先關閉 modal
@@ -2192,7 +2150,6 @@ async function onConfirmAdopted() {
   } catch (err) {
     await swalInDialog({ icon: "error", title: "已送養標記失敗", text: err.message });
   } finally {
-    try { prog?.stop?.(); } catch (_) { }
     btn.disabled = false;
     btn.removeAttribute("aria-busy");
     btn.textContent = "儲存領養資訊";
