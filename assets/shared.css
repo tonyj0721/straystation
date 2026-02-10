@@ -402,28 +402,33 @@ video.video-preview::-webkit-media-controls-enclosure {
   transition: padding .5s ease, gap .5s ease;
   background: rgba(18, 18, 18, 0.95);
   width: 346px;
-  padding-top: 8px;/*12*/
-  padding-bottom: 8px;/*12*/
+  padding-top: 8px;
+  /*12*/
+  padding-bottom: 8px;
+  /*12*/
   border-radius: 22px;
-  gap: 6px;/*10*/
+  gap: 6px;
+  /*10*/
 }
 
 /* 進度條拖曳中：控制列上移、增加上方空間、隱藏左右按鈕、顯示時間 */
 #lbBottom.lb-seeking #lbControls {
-  padding-top: 31px;/*30*/
-  gap: 11px;/*10*/
+  padding-top: 31px;
+  /*30*/
+  gap: 11px;
+  /*10*/
 }
 
 #lbBottom.lb-seeking .lb-seek-time {
   display: flex;
 }
 
-#lbBottom.lb-seeking #lbTimeCur{
+#lbBottom.lb-seeking #lbTimeCur {
   padding-top: 8px;
   padding-left: 5px;
 }
 
-#lbBottom.lb-seeking #lbTimeDur{
+#lbBottom.lb-seeking #lbTimeDur {
   padding-top: 8px;
   padding-right: 5px;
 }
@@ -462,7 +467,12 @@ video.video-preview::-webkit-media-controls-enclosure {
   transition: opacity .5s ease;
 }
 
-#lbPlayIcon {
+#lbPlayIcon,
+#lbVolumeIcon {
+  transform: scale(1.1);
+}
+
+#lbBackIcon {
   padding-bottom: 3px;
   padding-right: 4px;
   transform: scale(1.1);
@@ -478,7 +488,8 @@ video.video-preview::-webkit-media-controls-enclosure {
 .lb-seek {
   -webkit-appearance: none;
   appearance: none;
-  height: 8px;/*7...6*/
+  height: 8px;
+  /*7...6*/
   border-radius: 9999px;
   background: linear-gradient(to right,
       rgba(0, 0, 0) 0%,
@@ -489,7 +500,8 @@ video.video-preview::-webkit-media-controls-enclosure {
 }
 
 #lightbox.lb-seeking #lbSeek {
-  height: 15px;/*14*/
+  height: 15px;
+  /*14*/
 }
 
 /* iOS / Chrome：range thumb */
