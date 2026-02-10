@@ -892,9 +892,9 @@ async function openDialog(id) {
   const btnAdopted = document.getElementById("btnAdopted");
   const btnUnadopt = document.getElementById("btnUnadopt");
 
-  btnAdopted.classList.toggle("hidden", isAdopted);
-  btnUnadopt.classList.toggle("hidden", !isAdopted);
-  btnUnadopt.onclick = onUnadopt;
+  btnAdopted?.classList.toggle("hidden", isAdopted);
+  btnUnadopt?.classList.toggle("hidden", !isAdopted);
+  if (btnUnadopt) btnUnadopt.onclick = onUnadopt;
 
   document.getElementById("adoptedUpload").classList.add("hidden");
 
@@ -915,37 +915,49 @@ function scrollDialogTop() {
 
 // 綁定 Dialog 內各種按鈕行為
 function bindDialogActions() {
-  document.getElementById("btnDelete").onclick = onDelete;
-  document.getElementById("btnEdit").onclick = () => setEditMode(true);
+  const $ = (id) => document.getElementById(id);
+  const on = (id, handler) => {
+    const el = $(id);
+    if (!el) return null;
+    el.onclick = handler;
+    return el;
+  };
 
-  document.getElementById("btnAdopted").onclick = () => {
+  // 這些按鈕若因為版面/權限被移除，避免直接噴錯讓整個 Dialog 壞掉
+  on("btnDelete", onDelete);
+  on("btnEdit", () => setEditMode(true));
+
+  on("btnAdopted", () => {
     // ✅ 按「已送養」時，把「編輯那排」(actionBar) 一起藏起來
-    document.getElementById("actionBar")?.classList.add("hidden");
-    const up = document.getElementById("adoptedUpload");
-    up.classList.remove("hidden");
-    document.getElementById("btnPickAdopted")?.focus();
-    up.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
+    $("actionBar")?.classList.add("hidden");
+    const up = $("adoptedUpload");
+    if (up) {
+      up.classList.remove("hidden");
+      $("btnPickAdopted")?.focus();
+      up.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  });
 
-  document.getElementById("btnPickAdopted").onclick = () =>
-    document.getElementById("adoptedFiles").click();
+  on("btnPickAdopted", () => $("adoptedFiles")?.click());
 
-  document.getElementById("btnConfirmAdopted").onclick = onConfirmAdopted;
-  document.getElementById("btnCancelAdopted").onclick = async (e) => {
-    e.preventDefault();
+  on("btnConfirmAdopted", onConfirmAdopted);
+
+  on("btnCancelAdopted", async (e) => {
+    e?.preventDefault?.();
     await openDialog(currentDocId);   // 一定要 await，等內容重畫完
-    resetAdoptedSelection();
+    try { resetAdoptedSelection(); } catch (_) { }
     scrollDialogTop();
-  };
-  document.getElementById("btnSave").onclick = saveEdit;
+  });
+
+  on("btnSave", saveEdit);
 
   // 取消編輯：回到瀏覽模式內容 + 回頂端
-  document.getElementById("btnCancel").onclick = async (e) => {
-    e.preventDefault();
+  on("btnCancel", async (e) => {
+    e?.preventDefault?.();
     await openDialog(currentDocId);   // 一定要 await，等內容重畫完
-    resetAdoptedSelection();
+    try { resetAdoptedSelection(); } catch (_) { }
     scrollDialogTop();
-  };
+  });
 }
 
 // 刪除目前這筆
