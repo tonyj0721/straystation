@@ -18,7 +18,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="icon" href="images/dogpaw-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="images/dogpaw-180.png">
-  <title>管理後台｜台中簡媽媽狗園</title>
+  <title>hk4g4</title>
   <meta name="description" content="TailwindCSS + Firebase Firestore 後台：登錄、管理動物資料；沿用前台 Modal/Lightbox。" />
   <meta name="theme-color" content="#fcd34d">
   <link rel="manifest" href="./manifest.webmanifest">
@@ -266,7 +266,7 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- 左：登錄表單 -->
-      <section id="formSection" class="lg:col-span-1 bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
+      <section class="lg:col-span-1 bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
         <h2 class="text-lg font-semibold mb-6">登錄表單</h2>
         <form id="petForm" class="space-y-4">
           <div>
@@ -370,13 +370,11 @@
               class="px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-gray-800 flex items-center gap-2">
               <span id="submitText">登錄</span>
             </button>
-
-            <!-- 清除表單（不送出） -->
-            <button id="clearBtn" type="button"
-              class="px-4 py-2 rounded-xl border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+          <button id="btnClear" type="button"
+              class="px-4 py-2 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 flex items-center gap-2">
               清除
             </button>
-          </div>
+            </div>
         </form>
       </section>
 
@@ -1078,6 +1076,52 @@
 
     const __previewTileMap = new Map(); // File -> tile element（保留 DOM，避免重畫閃爍）
 
+    // ===============================
+    // 清除表單：清空所有欄位 + 清空已選檔案 + 捲動回表單
+    // ===============================
+    const btnClear = $("#btnClear");
+
+    function clearSelectedFiles() {
+      try {
+        // 釋放縮圖/影片 objectURL，避免記憶體累積
+        selectedFiles.forEach((f) => revokeThumb(f));
+      } catch (_) { }
+      selectedFiles = [];
+      try { imgFiles.value = ""; } catch (_) { }
+      try { imgPreview.innerHTML = ""; } catch (_) { }
+      try { __previewTileMap.clear(); } catch (_) { }
+      fileCount.textContent = `已選 0 / ${MAX_FILES} 張`;
+    }
+
+    function scrollToFormSection() {
+      const form = document.getElementById("petForm");
+      const sec = form?.closest("section");
+      if (sec) {
+        sec.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+
+    btnClear?.addEventListener("click", () => {
+      const form = document.getElementById("petForm");
+      if (form) form.reset();
+
+      // reset 後把品種下拉重建回預設狀態
+      try { syncBreedSelectors(); } catch (_) { }
+      try { buildBreedOptions(); } catch (_) { }
+      try { updateBreedLabel(); } catch (_) { }
+      try {
+        const nameLabel = document.getElementById("namelabel");
+        if (nameLabel) nameLabel.textContent = "名字 ";
+      } catch (_) { }
+
+      clearSelectedFiles();
+      scrollToFormSection();
+
+      // 游標回到第一格
+      try { document.getElementById("name")?.focus(); } catch (_) { }
+    });
+
+
     function __makePreviewTile(file) {
       const wrap = document.createElement("div");
       wrap.className = "relative touch-none select-none overflow-hidden";
@@ -1337,47 +1381,6 @@
         document.body.scrollTop = 0;
       }, 80);
     }
-
-    // ===============================
-    // 清空登錄表單（不送出）
-    //  - 清掉所有欄位、已選照片/影片與預覽
-    //  - 捲回「登錄表單」區塊位置
-    // ===============================
-    function clearPetForm({ scroll = true } = {}) {
-      try {
-        const form = document.getElementById("petForm");
-        form?.reset();
-
-        // ★ 清空名字欄位 + 把「已被使用」提示/紅框移除
-        const nameInput = document.getElementById("name");
-        if (nameInput) nameInput.value = "";
-        if (window.resetNameCheck) resetNameCheck();
-
-        // 清空檔案與預覽
-        const imgFilesInput = document.getElementById("imgFiles");
-        if (imgFilesInput) imgFilesInput.value = "";
-        if (typeof imgPreview !== "undefined" && imgPreview) imgPreview.innerHTML = "";
-        if (typeof fileCount !== "undefined" && fileCount) fileCount.textContent = "已選 0 / 5 張";
-        if (typeof selectedFiles !== "undefined") selectedFiles = [];
-
-        // 讓「品種/毛色」連動回到初始狀態（右側 disabled + placeholder）
-        if (typeof syncBreedSelectors === "function") syncBreedSelectors();
-      } catch (_) {
-        // ignore
-      }
-
-      if (scroll) {
-        const formSection = document.getElementById("formSection");
-        formSection?.scrollIntoView({ behavior: "smooth", block: "start" });
-        // 小延遲再 focus，避免 smooth scroll 被打斷
-        setTimeout(() => document.getElementById("name")?.focus?.(), 150);
-      }
-    }
-
-    // 清除按鈕：清空表單並捲回登錄表單區塊
-    document.getElementById("clearBtn")?.addEventListener("click", () => {
-      clearPetForm({ scroll: true });
-    });
 
     // ===============================
     // 表單送出：新增動物資料
