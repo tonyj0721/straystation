@@ -1404,91 +1404,6 @@
     }
 
     // ===============================
-    // 按鈕進度條（取代「上傳中...」點點）
-    //  - 可用 window.UPLOAD_PROGRESS_ICON_URL 指定右上角小動物 PNG
-    // ===============================
-    function startPercentProgress(btn, {
-      iconUrl = window.UPLOAD_PROGRESS_ICON_URL || "images/奔跑貓咪.png",
-    } = {}) {
-      const prev = {
-        html: btn.innerHTML,
-        text: btn.textContent,
-        ariaBusy: btn.getAttribute("aria-busy"),
-      };
-
-      btn.setAttribute("aria-busy", "true");
-
-      // 小型、可塞進按鈕的進度 UI
-      const wrap = document.createElement("div");
-      wrap.style.display = "grid";
-      wrap.style.gridTemplateColumns = "1fr auto";
-      wrap.style.alignItems = "center";
-      wrap.style.gap = "10px";
-      wrap.style.width = "100%";
-
-      const barWrap = document.createElement("div");
-      barWrap.style.position = "relative";
-      barWrap.style.width = "100%";
-      barWrap.style.height = "12px";
-      barWrap.style.borderRadius = "999px";
-      barWrap.style.background = "rgba(255,255,255,0.25)";
-      barWrap.style.overflow = "hidden";
-
-      const fill = document.createElement("div");
-      fill.style.height = "100%";
-      fill.style.width = "0%";
-      fill.style.borderRadius = "999px";
-      // 類似示意圖：左橘右綠（不指定也可，但這裡做出效果）
-      fill.style.background = "linear-gradient(90deg,#fbbf24,#86efac)";
-      fill.style.transition = "width 120ms linear";
-      barWrap.appendChild(fill);
-
-      // 右上角小動物（使用者可自行替換 png）
-      if (iconUrl) {
-        const icon = document.createElement("img");
-        icon.src = iconUrl;
-        icon.alt = "";
-        icon.decoding = "async";
-        icon.loading = "eager";
-        icon.style.position = "absolute";
-        icon.style.right = "-4px";
-        icon.style.top = "-18px";
-        icon.style.width = "30px";
-        icon.style.height = "30px";
-        icon.style.objectFit = "contain";
-        icon.style.pointerEvents = "none";
-        barWrap.appendChild(icon);
-      }
-
-      const pct = document.createElement("div");
-      pct.textContent = "0%";
-      pct.style.fontVariantNumeric = "tabular-nums";
-      pct.style.fontWeight = "700";
-      pct.style.minWidth = "52px";
-      pct.style.textAlign = "right";
-
-      wrap.appendChild(barWrap);
-      wrap.appendChild(pct);
-
-      btn.innerHTML = "";
-      btn.appendChild(wrap);
-
-      const set = (p) => {
-        const n = Math.max(0, Math.min(100, Math.round(p)));
-        fill.style.width = `${n}%`;
-        pct.textContent = `${n}%`;
-      };
-
-      const stop = () => {
-        btn.innerHTML = prev.html;
-        if (prev.ariaBusy == null) btn.removeAttribute("aria-busy");
-        else btn.setAttribute("aria-busy", prev.ariaBusy);
-      };
-
-      return { set, stop };
-    }
-
-    // ===============================
     // 表單送出：新增動物資料
     // ===============================
     $("#petForm").addEventListener("submit", async (e) => {
@@ -1564,8 +1479,7 @@
       // 按鈕進度狀態
       const submitBtn = $("#submitBtn");
       submitBtn.disabled = true;
-      const prog = startPercentProgress(submitBtn);
-      prog.set(0);
+      const prog = startProgressBar(submitBtn, { initial: 0, imgSrc: "images/奔跑貓咪.png" });
 
       try {
         // 1) 新增基本文件
@@ -1595,36 +1509,29 @@
           await updateDoc(doc(db, "pets", docRef.id), { mediaReady: false, wmPending: pendingPaths });
         }
 
-        // 逐檔上傳（顯示百分比進度）
-        const totalBytes = plans.reduce((sum, p) => sum + (p.f?.size || 0), 0) || plans.length || 1;
+        // 逐檔上傳（帶百分比進度）
+        const totalBytes = plans.reduce((sum, pl) => sum + ((pl.f && pl.f.size) ? pl.f.size : 0), 0) || 1;
         let uploadedBase = 0;
 
         for (const pl of plans) {
           const r = sRef(storage, pl.path);
+          const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
 
           await new Promise((resolve, reject) => {
-            const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
             task.on(
-              "state_changed",
+              'state_changed',
               (snap) => {
-                const pct = ((uploadedBase + (snap.bytesTransferred || 0)) / totalBytes) * 100;
-                prog.set(pct);
+                // overall progress = 已完成 + 目前檔案進度
+                const pct = ((uploadedBase + snap.bytesTransferred) / totalBytes) * 100;
+                prog.update(pct);
               },
               (err) => reject(err),
-              () => {
-                // 這個檔案完成，累計基底
-                try {
-                  uploadedBase += (pl.f?.size || task.snapshot?.totalBytes || 0);
-                } catch (_) {
-                  uploadedBase += (pl.f?.size || 0);
-                }
-                prog.set((uploadedBase / totalBytes) * 100);
-                resolve();
-              }
+              () => resolve()
             );
           });
 
-          urls.push(await getDownloadURL(r));
+          uploadedBase += (task.snapshot?.totalBytes || 0);
+          urls.push(await getDownloadURL(task.snapshot.ref));
         }
 
         // 3) 回寫 images 欄位
@@ -1633,9 +1540,9 @@
         }
 
         // UI 收尾
-        prog.stop();
+        prog.done();
+        // （後面還會等待浮水印處理/更新列表，先繼續鎖住按鈕）
         submitBtn.disabled = true;
-        submitBtn.textContent = "處理中...";
 
         // ★ 清空名字欄位 + 把「已被使用」提示/紅框移除
         const nameInput = document.getElementById("name");
@@ -1718,9 +1625,8 @@
       } catch (err) {
         await Swal.fire({ icon: "error", title: "登錄失敗", text: err.message });
       } finally {
-        try { prog.stop(); } catch (_) { }
         submitBtn.disabled = false;
-        submitBtn.textContent = "登錄";
+        try { prog.restore(); } catch (_) { submitBtn.textContent = "登錄"; }
       }
     });
 

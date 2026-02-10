@@ -476,84 +476,76 @@ function startDots(span, base) {
 }
 
 // ===============================
-// 小工具：按鈕上的「百分比進度條」（取代「上傳中...」點點）
-//  - 可用 window.UPLOAD_PROGRESS_ICON_URL 指定右上角小動物 PNG
+// 小工具：按鈕上的「百分比進度條」
+//  - 會把按鈕內容換成：進度條 + 百分比
+//  - 回傳 { update(p), done(), restore() }
 // ===============================
-function startPercentProgress(btn, {
-  iconUrl = window.UPLOAD_PROGRESS_ICON_URL || "images/奔跑貓咪.png",
+function startProgressBar(btn, {
+  initial = 0,
+  imgSrc = "images/奔跑貓咪.png",
+  barHeight = 10,
 } = {}) {
-  const prev = {
-    html: btn.innerHTML,
-    ariaBusy: btn.getAttribute("aria-busy"),
-  };
+  if (!btn) {
+    return {
+      update: () => { },
+      done: () => { },
+      restore: () => { },
+    };
+  }
+
+  // 儲存原狀
+  if (!btn.dataset._origHtml) btn.dataset._origHtml = btn.innerHTML;
+  if (!btn.dataset._origAriaLabel) btn.dataset._origAriaLabel = btn.getAttribute("aria-label") || "";
 
   btn.setAttribute("aria-busy", "true");
 
-  const wrap = document.createElement("div");
-  wrap.style.display = "grid";
-  wrap.style.gridTemplateColumns = "1fr auto";
-  wrap.style.alignItems = "center";
-  wrap.style.gap = "10px";
-  wrap.style.width = "100%";
+  // 進度條 DOM
+  const h = Math.max(6, Number(barHeight) || 10);
+  btn.innerHTML = `
+    <div class="w-full flex flex-col items-center justify-center gap-2 select-none">
+      <div class="relative w-full max-w-[260px]" style="height:${h}px">
+        <div class="absolute inset-0 rounded-full bg-white/25"></div>
+        <div data-progress-fill class="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-orange-300 to-emerald-300" style="width:0%"></div>
+        <img data-progress-runner src="${imgSrc}" alt="" class="absolute -top-[18px] h-8 w-auto pointer-events-none" style="left:0%" />
+      </div>
+      <div data-progress-text class="text-xs leading-none">${Math.round(initial)}%</div>
+    </div>
+  `.trim();
 
-  const barWrap = document.createElement("div");
-  barWrap.style.position = "relative";
-  barWrap.style.width = "100%";
-  barWrap.style.height = "12px";
-  barWrap.style.borderRadius = "999px";
-  barWrap.style.background = "rgba(255,255,255,0.25)";
-  barWrap.style.overflow = "hidden";
+  const fill = btn.querySelector("[data-progress-fill]");
+  const runner = btn.querySelector("[data-progress-runner]");
+  const text = btn.querySelector("[data-progress-text]");
 
-  const fill = document.createElement("div");
-  fill.style.height = "100%";
-  fill.style.width = "0%";
-  fill.style.borderRadius = "999px";
-  fill.style.background = "linear-gradient(90deg,#fbbf24,#86efac)";
-  fill.style.transition = "width 120ms linear";
-  barWrap.appendChild(fill);
+  const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 
-  if (iconUrl) {
-    const icon = document.createElement("img");
-    icon.src = iconUrl;
-    icon.alt = "";
-    icon.decoding = "async";
-    icon.loading = "eager";
-    icon.style.position = "absolute";
-    icon.style.right = "-4px";
-    icon.style.top = "-18px";
-    icon.style.width = "30px";
-    icon.style.height = "30px";
-    icon.style.objectFit = "contain";
-    icon.style.pointerEvents = "none";
-    barWrap.appendChild(icon);
+  function update(pct) {
+    const p = clamp(Number(pct) || 0, 0, 100);
+    if (fill) fill.style.width = `${p}%`;
+    if (text) text.textContent = `${Math.round(p)}%`;
+    if (runner) {
+      // 讓貓咪跑在「填滿」的最右側（略做偏移，避免溢出）
+      const offset = 10; // px
+      runner.style.left = `calc(${p}% - ${offset}px)`;
+    }
   }
 
-  const pct = document.createElement("div");
-  pct.textContent = "0%";
-  pct.style.fontVariantNumeric = "tabular-nums";
-  pct.style.fontWeight = "700";
-  pct.style.minWidth = "52px";
-  pct.style.textAlign = "right";
+  function restore() {
+    btn.removeAttribute("aria-busy");
+    const html = btn.dataset._origHtml;
+    if (html != null) btn.innerHTML = html;
+    const aria = btn.dataset._origAriaLabel;
+    if (aria) btn.setAttribute("aria-label", aria);
+    else btn.removeAttribute("aria-label");
+    delete btn.dataset._origHtml;
+    delete btn.dataset._origAriaLabel;
+  }
 
-  wrap.appendChild(barWrap);
-  wrap.appendChild(pct);
+  function done() {
+    update(100);
+  }
 
-  btn.innerHTML = "";
-  btn.appendChild(wrap);
-
-  const set = (p) => {
-    const n = Math.max(0, Math.min(100, Math.round(p)));
-    fill.style.width = `${n}%`;
-    pct.textContent = `${n}%`;
-  };
-
-  const stop = () => {
-    btn.innerHTML = prev.html;
-    if (prev.ariaBusy == null) btn.removeAttribute("aria-busy");
-    else btn.setAttribute("aria-busy", prev.ariaBusy);
-  };
-
-  return { set, stop };
+  update(initial);
+  return { update, done, restore };
 }
 
 // 用 nameLower / name 檢查是否重複；exceptId 表示忽略自己（編輯時用）
@@ -1135,8 +1127,7 @@ async function saveEdit() {
 
   // ② 確認後才開始「儲存中…」與鎖定按鈕
   btn.disabled = true;
-  const prog = startPercentProgress(btn);
-  prog.set(0);
+  const prog = startProgressBar(btn, { initial: 0, imgSrc: "images/奔跑貓咪.png" });
 
   try {
     // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
@@ -1193,9 +1184,13 @@ async function saveEdit() {
     }
 
     // 依序處理（保持順序）
-    const __fileItems = items.filter((it) => it && it.kind === "file");
-    const __totalBytes = __fileItems.reduce((sum, it) => sum + (it.file?.size || 0), 0) || __fileItems.length || 1;
-    let __uploadedBase = 0;
+    const totalBytes = items.reduce((sum, it) => {
+      if (it.kind !== "file") return sum;
+      const f = it.file;
+      return sum + ((f && f.size) ? f.size : 0);
+    }, 0) || 1;
+    let uploadedBase = 0;
+
     for (const it of items) {
       if (it.kind === "url") {
         newUrls.push(it.url);
@@ -1208,28 +1203,22 @@ async function saveEdit() {
         const type = it.__uploadType || (f && f.type) || '';
         const path = it.__uploadPath;
         const r = sRef(storage, path);
-        // 用 Resumable 才能拿到 bytesTransferred 來做百分比
+        const task = uploadBytesResumable(r, f, { contentType: type || 'application/octet-stream' });
+
         await new Promise((resolve, reject) => {
-          const task = uploadBytesResumable(r, f, { contentType: type || 'application/octet-stream' });
           task.on(
-            "state_changed",
+            'state_changed',
             (snap) => {
-              const pct = ((__uploadedBase + (snap.bytesTransferred || 0)) / __totalBytes) * 100;
-              prog.set(pct);
+              const pct = ((uploadedBase + snap.bytesTransferred) / totalBytes) * 100;
+              prog.update(pct);
             },
             (err) => reject(err),
-            () => {
-              try {
-                __uploadedBase += (f?.size || task.snapshot?.totalBytes || 0);
-              } catch (_) {
-                __uploadedBase += (f?.size || 0);
-              }
-              prog.set((__uploadedBase / __totalBytes) * 100);
-              resolve();
-            }
+            () => resolve()
           );
         });
-        newUrls.push(await getDownloadURL(r));
+
+        uploadedBase += (task.snapshot?.totalBytes || 0);
+        newUrls.push(await getDownloadURL(task.snapshot.ref));
       }
     }
 
@@ -1278,7 +1267,7 @@ async function saveEdit() {
     await updateDoc(doc(db, "pets", currentDocId), __updatePayload);
 
     // ⑤ UI 收尾（無論彈窗狀態，成功提示一下）
-    prog.stop();
+    stopDots();
     btn.disabled = true;
     btn.textContent = "處理中...";
 
@@ -1358,9 +1347,8 @@ async function saveEdit() {
       text: err.message
     });
   } finally {
-    try { prog.stop(); } catch (_) { }
     btn.disabled = false;
-    btn.textContent = "儲存";
+    try { prog.restore(); } catch (_) { btn.textContent = "儲存"; }
   }
 }
 
@@ -2032,11 +2020,9 @@ function resetAdoptedSelection() {
 async function onConfirmAdopted() {
   const btn = document.getElementById("btnConfirmAdopted");
 
-  // 百分比進度條（取代動態點點）
+  // 動態點點（沿用你檔案內的 startDots）
   btn.disabled = true;
-  btn.setAttribute("aria-busy", "true");
-  const prog = startPercentProgress(btn);
-  prog.set(0);
+  const prog = startProgressBar(btn, { initial: 0, imgSrc: "images/奔跑貓咪.png" });
 
   const files = adoptedSelected.slice(0, 5);
   const urls = [];
@@ -2069,34 +2055,25 @@ async function onConfirmAdopted() {
       currentDoc = { ...(currentDoc || {}), mediaReady: false, wmPending: nextPending };
     }
 
-    const totalBytes = plans.reduce((sum, p) => sum + (p.f?.size || 0), 0) || plans.length || 1;
+    // 逐檔上傳（帶百分比進度）
+    const totalBytes = plans.reduce((sum, pl) => sum + ((pl.f && pl.f.size) ? pl.f.size : 0), 0) || 1;
     let uploadedBase = 0;
-
     for (const pl of plans) {
       const r = sRef(storage, pl.path);
-
+      const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
       await new Promise((resolve, reject) => {
-        const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
         task.on(
-          "state_changed",
+          'state_changed',
           (snap) => {
-            const pct = ((uploadedBase + (snap.bytesTransferred || 0)) / totalBytes) * 100;
-            prog.set(pct);
+            const pct = ((uploadedBase + snap.bytesTransferred) / totalBytes) * 100;
+            prog.update(pct);
           },
           (err) => reject(err),
-          () => {
-            try {
-              uploadedBase += (pl.f?.size || task.snapshot?.totalBytes || 0);
-            } catch (_) {
-              uploadedBase += (pl.f?.size || 0);
-            }
-            prog.set((uploadedBase / totalBytes) * 100);
-            resolve();
-          }
+          () => resolve()
         );
       });
-
-      urls.push(await getDownloadURL(r));
+      uploadedBase += (task.snapshot?.totalBytes || 0);
+      urls.push(await getDownloadURL(task.snapshot.ref));
     }
 
     await updateDoc(doc(db, "pets", currentDocId), {
@@ -2112,10 +2089,9 @@ async function onConfirmAdopted() {
       wmPending: pendingPaths.length ? nextPending : [],
     });
 
-    prog.stop();
+    prog.done();
+    // 後面還會等待浮水印處理/更新列表，先繼續鎖住按鈕
     btn.disabled = true;
-    btn.setAttribute("aria-busy", "true");
-    btn.textContent = "處理中...";
 
     // 先關閉 modal
     const dlg = document.getElementById("petDialog");
@@ -2183,10 +2159,8 @@ async function onConfirmAdopted() {
   } catch (err) {
     await swalInDialog({ icon: "error", title: "已送養標記失敗", text: err.message });
   } finally {
-    try { prog.stop(); } catch (_) { }
     btn.disabled = false;
-    btn.removeAttribute("aria-busy");
-    btn.textContent = "儲存領養資訊";
+    try { prog.restore(); } catch (_) { btn.textContent = "儲存領養資訊"; }
   }
 }
 
