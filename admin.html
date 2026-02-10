@@ -18,7 +18,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="icon" href="images/dogpaw-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="images/dogpaw-180.png">
-  <title>測試</title>
+  <title>1234</title>
   <meta name="description" content="TailwindCSS + Firebase Firestore 後台：登錄、管理動物資料；沿用前台 Modal/Lightbox。" />
   <meta name="theme-color" content="#fcd34d">
   <link rel="manifest" href="./manifest.webmanifest">
@@ -900,16 +900,16 @@
         thumbUrlCache.delete(file);
       }
 
-    // 清空「新增表單」已選媒體（釋放縮圖/影片 objectURL，避免記憶體累積）
-    function resetNewFormSelection() {
-      try {
-        (selectedFiles || []).forEach((f) => { try { revokeThumb(f); } catch (_) { } });
-      } catch (_) { }
-      selectedFiles = [];
-      if (imgPreview) imgPreview.innerHTML = "";
-      if (fileCount) fileCount.textContent = "已選 0 / 5 張";
-      if (imgFiles) imgFiles.value = "";
-    }
+      // 清空「新增表單」已選媒體（釋放縮圖/影片 objectURL，避免記憶體累積）
+      function resetNewFormSelection() {
+        try {
+          (selectedFiles || []).forEach((f) => { try { revokeThumb(f); } catch (_) { } });
+        } catch (_) { }
+        selectedFiles = [];
+        if (imgPreview) imgPreview.innerHTML = "";
+        if (fileCount) fileCount.textContent = "已選 0 / 5 張";
+        if (imgFiles) imgFiles.value = "";
+      }
 
       thumbPromiseCache.delete(file);
 
@@ -1332,35 +1332,18 @@
     clearBtn?.addEventListener("click", (e) => {
       e.preventDefault();
 
-      const form = document.getElementById("petForm");
       const nameInput = document.getElementById("name");
-
-      // 1) 清空表單欄位
-      try { form?.reset(); } catch (_) { }
-
-      // ★ 名字欄位：同登錄成功時的處理（清掉提示/紅框）
       if (nameInput) nameInput.value = "";
-      if (window.resetNameCheck) {
-        try { window.resetNameCheck(); } catch (_) { }
-      }
+      if (window.resetNameCheck) resetNameCheck();
 
-      // 2) 清空已選圖片/影片與預覽
+      // 重置表單與選擇圖片（先做，避免 DOM 還在變動導致 smooth scroll 卡住）
+      e.target.reset();
       resetNewFormSelection();
+      syncBreedSelectors();
 
-      // 3) 重建品種下拉（避免 reset 後狀態不同步）
-      try { syncBreedSelectors(); } catch (_) { }
-
-      // 4) 捲到登錄表單區塊
-      try {
-        (formSection || form || document.body).scrollIntoView({ behavior: "smooth", block: "start" });
-      } catch (_) {
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      }
-
-      // 5) 聚焦到名字欄位（不要再次觸發捲動）
-      setTimeout(() => {
-        try { nameInput?.focus?.({ preventScroll: true }); } catch (_) { }
-      }, 250);
+      // ★ 登錄完成 → 捲到最上方（先 smooth，最後再硬捲補正）
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      setTimeout(forceScrollTop, 250); // smooth 途中若被打斷，250ms 後硬捲補正
     });
 
 
