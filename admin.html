@@ -18,7 +18,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="icon" href="images/dogpaw-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="images/dogpaw-180.png">
-  <title>管理後台｜台中簡媽媽狗園</title>
+  <title>測試</title>
   <meta name="description" content="TailwindCSS + Firebase Firestore 後台：登錄、管理動物資料；沿用前台 Modal/Lightbox。" />
   <meta name="theme-color" content="#fcd34d">
   <link rel="manifest" href="./manifest.webmanifest">
@@ -370,8 +370,6 @@
               class="w-full px-4 py-3 rounded-xl bg-gray-900 text-white text-sm flex items-center justify-center gap-2 hover:bg-gray-800">
               登錄
             </button>
-
-            <!-- 新增：清除按鈕（清空表單並捲回登錄區） -->
             <button id="clearBtn" type="button"
               class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm flex items-center justify-center hover:bg-gray-50">
               清除
@@ -1315,6 +1313,43 @@
     });
 
     // ===============================
+    // 新增：清除表單（含圖片/影片預覽）並捲回登錄表單
+    // ===============================
+    const clearBtn = document.getElementById("clearBtn");
+    function clearPetFormAndScroll() {
+      // 1) 清空表單欄位（radio/checkbox/select/textarea 都會回到初始狀態）
+      try { document.getElementById("petForm")?.reset(); } catch (_) { }
+
+      // 2) 清空已選媒體（釋放 objectURL / 縮圖快取）
+      try {
+        selectedFiles.forEach((f) => { try { revokeThumb(f); } catch (_) { } });
+      } catch (_) { }
+      selectedFiles = [];
+
+      try { __previewTileMap.forEach((el) => el?.remove?.()); } catch (_) { }
+      try { __previewTileMap.clear(); } catch (_) { }
+      try { imgPreview.innerHTML = ""; } catch (_) { }
+      try { fileCount.textContent = `已選 0 / ${MAX_FILES} 張`; } catch (_) { }
+
+      // 3) 依預設物種重建品種選單（避免 reset 後下拉狀態不同步）
+      try { syncBreedSelectors(); } catch (_) { }
+
+      // 4) 清掉名字檢查提示（若有）
+      try { if (window.resetNameCheck) window.resetNameCheck(); } catch (_) { }
+
+      // 5) 捲到登錄表單位置
+      const sec = document.getElementById("formSection");
+      if (sec) {
+        sec.scrollIntoView({ behavior: "smooth", block: "start" });
+        // 保險：避免 mobile / focus restore 導致捲動被打斷
+        setTimeout(() => {
+          try { sec.scrollIntoView({ behavior: "auto", block: "start" }); } catch (_) { }
+        }, 200);
+      }
+    }
+    clearBtn?.addEventListener("click", clearPetFormAndScroll);
+
+    // ===============================
     // 捲到最上方（保險版）
     // ===============================
     function forceScrollTop() {
@@ -1344,49 +1379,7 @@
     // ===============================
     // 表單送出：新增動物資料
     // ===============================
-    
-    // ===============================
-    // 清除表單：清掉所有資料並捲回登錄表單區
-    // ===============================
-    const clearBtn = document.getElementById("clearBtn");
-    clearBtn?.addEventListener("click", () => {
-      try {
-        // 清空名字欄位 + 移除「已被使用」提示/紅框
-        const nameInput = document.getElementById("name");
-        if (nameInput) nameInput.value = "";
-        if (window.resetNameCheck) resetNameCheck();
-
-        // 重置表單（會回到預設 radio/checkbox/select 值）
-        const form = document.getElementById("petForm");
-        form?.reset();
-
-        // 清空圖片選取/預覽
-        try { imgFiles.value = ""; } catch (_) { }
-        imgPreview.innerHTML = "";
-        selectedFiles = [];
-        fileCount.textContent = "已選 0 / 5 張";
-
-        // 釋放縮圖快取，避免記憶體累積
-        try {
-          for (const url of thumbUrlCache.values()) {
-            try { URL.revokeObjectURL(url); } catch (_) { }
-          }
-          thumbUrlCache.clear();
-          thumbPromiseCache.clear();
-        } catch (_) { }
-
-        // 重置品種下拉（依目前物種）
-        syncBreedSelectors();
-
-        // 捲動到登錄表單區
-        const section = document.getElementById("formSection");
-        section?.scrollIntoView({ behavior: "smooth", block: "start" });
-      } catch (err) {
-        console.error("clear form error:", err);
-      }
-    });
-
-$("#petForm").addEventListener("submit", async (e) => {
+    $("#petForm").addEventListener("submit", async (e) => {
       e.preventDefault();
 
       // 讀值
