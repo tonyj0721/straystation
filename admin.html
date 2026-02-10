@@ -788,65 +788,6 @@
     // 小工具：選擇器
     const $ = (q) => document.querySelector(q);
 
-
-    // ===============================
-    // 小工具：按鈕上的「百分比進度條」
-    //  - 若你有小動物 PNG：可在任何地方先設定 window.__progressMascotPng = "images/xxx.png"
-    // ===============================
-    function startProgressBar(btn, baseText = "上傳中") {
-      const orig = { disabled: btn.disabled, html: btn.innerHTML, text: btn.textContent, ariaBusy: btn.getAttribute("aria-busy") };
-      const iconSrc = (window.__progressMascotPng || "").trim();
-
-      btn.setAttribute("aria-busy", "true");
-      btn.innerHTML = `
-        <div class="w-full flex items-center gap-3">
-          ${iconSrc ? `<img src="${iconSrc}" alt="" style="width:28px;height:28px;flex:0 0 auto;" />` : ``}
-          <div class="flex-1">
-            <div class="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
-              <div class="progress-fill h-full" style="width:0%;background:linear-gradient(90deg,#f7b267,#fef08a,#86efac);"></div>
-            </div>
-            <div class="mt-1 text-[11px] text-gray-600">${baseText}</div>
-          </div>
-          <div class="progress-text text-sm font-semibold tabular-nums" style="min-width:44px;text-align:right;">0%</div>
-        </div>
-      `.trim();
-
-      const fill = btn.querySelector(".progress-fill");
-      const txt = btn.querySelector(".progress-text");
-
-      const set = (pct) => {
-        const p = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
-        if (fill) fill.style.width = `${p}%`;
-        if (txt) txt.textContent = `${p}%`;
-      };
-
-      const stop = () => {
-        btn.removeAttribute("aria-busy");
-        btn.innerHTML = orig.html;
-        if (orig.ariaBusy == null) btn.removeAttribute("aria-busy"); else btn.setAttribute("aria-busy", orig.ariaBusy);
-        btn.disabled = orig.disabled;
-      };
-
-      return { set, stop, orig };
-    }
-
-    function uploadResumableWithOverallProgress(storageRef, file, options, completedBytes, totalBytes, onOverallPct) {
-      return new Promise((resolve, reject) => {
-        const task = uploadBytesResumable(storageRef, file, options);
-        task.on("state_changed",
-          (snap) => {
-            const overall = totalBytes > 0
-              ? ((completedBytes + snap.bytesTransferred) / totalBytes) * 100
-              : 0;
-            try { onOverallPct(overall); } catch (_) { }
-          },
-          (err) => reject(err),
-          () => resolve(task.snapshot)
-        );
-      });
-    }
-
-
     const speciesInputs = document.querySelectorAll('input[name="species"]');
     const breedTypeSel = $("#breedType");
     const breedSel = $("#breed");
@@ -1463,6 +1404,91 @@
     }
 
     // ===============================
+    // 按鈕進度條（取代「上傳中...」點點）
+    //  - 可用 window.UPLOAD_PROGRESS_ICON_URL 指定右上角小動物 PNG
+    // ===============================
+    function startPercentProgress(btn, {
+      iconUrl = window.UPLOAD_PROGRESS_ICON_URL || "images/奔跑貓咪.png",
+    } = {}) {
+      const prev = {
+        html: btn.innerHTML,
+        text: btn.textContent,
+        ariaBusy: btn.getAttribute("aria-busy"),
+      };
+
+      btn.setAttribute("aria-busy", "true");
+
+      // 小型、可塞進按鈕的進度 UI
+      const wrap = document.createElement("div");
+      wrap.style.display = "grid";
+      wrap.style.gridTemplateColumns = "1fr auto";
+      wrap.style.alignItems = "center";
+      wrap.style.gap = "10px";
+      wrap.style.width = "100%";
+
+      const barWrap = document.createElement("div");
+      barWrap.style.position = "relative";
+      barWrap.style.width = "100%";
+      barWrap.style.height = "12px";
+      barWrap.style.borderRadius = "999px";
+      barWrap.style.background = "rgba(255,255,255,0.25)";
+      barWrap.style.overflow = "hidden";
+
+      const fill = document.createElement("div");
+      fill.style.height = "100%";
+      fill.style.width = "0%";
+      fill.style.borderRadius = "999px";
+      // 類似示意圖：左橘右綠（不指定也可，但這裡做出效果）
+      fill.style.background = "linear-gradient(90deg,#fbbf24,#86efac)";
+      fill.style.transition = "width 120ms linear";
+      barWrap.appendChild(fill);
+
+      // 右上角小動物（使用者可自行替換 png）
+      if (iconUrl) {
+        const icon = document.createElement("img");
+        icon.src = iconUrl;
+        icon.alt = "";
+        icon.decoding = "async";
+        icon.loading = "eager";
+        icon.style.position = "absolute";
+        icon.style.right = "-4px";
+        icon.style.top = "-18px";
+        icon.style.width = "30px";
+        icon.style.height = "30px";
+        icon.style.objectFit = "contain";
+        icon.style.pointerEvents = "none";
+        barWrap.appendChild(icon);
+      }
+
+      const pct = document.createElement("div");
+      pct.textContent = "0%";
+      pct.style.fontVariantNumeric = "tabular-nums";
+      pct.style.fontWeight = "700";
+      pct.style.minWidth = "52px";
+      pct.style.textAlign = "right";
+
+      wrap.appendChild(barWrap);
+      wrap.appendChild(pct);
+
+      btn.innerHTML = "";
+      btn.appendChild(wrap);
+
+      const set = (p) => {
+        const n = Math.max(0, Math.min(100, Math.round(p)));
+        fill.style.width = `${n}%`;
+        pct.textContent = `${n}%`;
+      };
+
+      const stop = () => {
+        btn.innerHTML = prev.html;
+        if (prev.ariaBusy == null) btn.removeAttribute("aria-busy");
+        else btn.setAttribute("aria-busy", prev.ariaBusy);
+      };
+
+      return { set, stop };
+    }
+
+    // ===============================
     // 表單送出：新增動物資料
     // ===============================
     $("#petForm").addEventListener("submit", async (e) => {
@@ -1538,7 +1564,7 @@
       // 按鈕進度狀態
       const submitBtn = $("#submitBtn");
       submitBtn.disabled = true;
-      const prog = startProgressBar(submitBtn, "上傳中");
+      const prog = startPercentProgress(submitBtn);
       prog.set(0);
 
       try {
@@ -1569,21 +1595,35 @@
           await updateDoc(doc(db, "pets", docRef.id), { mediaReady: false, wmPending: pendingPaths });
         }
 
-        // 逐檔上傳（進度條以「總 bytes」計算）
-        const __totalBytes = plans.reduce((s, x) => s + ((x.f && x.f.size) || 0), 0);
-        let __completedBytes = 0;
+        // 逐檔上傳（顯示百分比進度）
+        const totalBytes = plans.reduce((sum, p) => sum + (p.f?.size || 0), 0) || plans.length || 1;
+        let uploadedBase = 0;
+
         for (const pl of plans) {
           const r = sRef(storage, pl.path);
-          await uploadResumableWithOverallProgress(
-            r,
-            pl.f,
-            { contentType: pl.type || 'application/octet-stream' },
-            __completedBytes,
-            __totalBytes,
-            (p) => prog.set(p)
-          );
-          __completedBytes += (pl.f.size || 0);
-          prog.set(__totalBytes ? (__completedBytes / __totalBytes) * 100 : 100);
+
+          await new Promise((resolve, reject) => {
+            const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
+            task.on(
+              "state_changed",
+              (snap) => {
+                const pct = ((uploadedBase + (snap.bytesTransferred || 0)) / totalBytes) * 100;
+                prog.set(pct);
+              },
+              (err) => reject(err),
+              () => {
+                // 這個檔案完成，累計基底
+                try {
+                  uploadedBase += (pl.f?.size || task.snapshot?.totalBytes || 0);
+                } catch (_) {
+                  uploadedBase += (pl.f?.size || 0);
+                }
+                prog.set((uploadedBase / totalBytes) * 100);
+                resolve();
+              }
+            );
+          });
+
           urls.push(await getDownloadURL(r));
         }
 
@@ -1678,6 +1718,7 @@
       } catch (err) {
         await Swal.fire({ icon: "error", title: "登錄失敗", text: err.message });
       } finally {
+        try { prog.stop(); } catch (_) { }
         submitBtn.disabled = false;
         submitBtn.textContent = "登錄";
       }
@@ -2119,9 +2160,6 @@
     loadPets();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script>
-    window.__progressMascotPng = "images/奔跑貓咪.png";
-  </script>
   <script src="assets/Modal.js"></script>
   <script src="assets/Lightbox.js"></script>
   <script>
