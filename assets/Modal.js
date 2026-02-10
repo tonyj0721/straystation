@@ -475,6 +475,59 @@ function startDots(span, base) {
   return () => clearInterval(t); // 回傳停止函式
 }
 
+// ===============================
+// 小工具：按鈕上的「百分比進度條」
+//  - iconUrl 你可以換成任何 PNG/GIF/SVG（想換別種動物就改這個路徑）
+// ===============================
+const UPLOAD_PROGRESS_ICON_URL = window.UPLOAD_PROGRESS_ICON_URL || "images/奔跑貓咪.png";
+window.UPLOAD_PROGRESS_ICON_URL = UPLOAD_PROGRESS_ICON_URL;
+
+function startUploadProgress(btn, { label = "上傳中", iconUrl = UPLOAD_PROGRESS_ICON_URL } = {}) {
+  if (!btn) return null;
+
+  const originalHTML = btn.innerHTML;
+  const originalText = btn.textContent;
+  const originalDisabled = btn.disabled;
+
+  btn.setAttribute("aria-busy", "true");
+
+  // 盡量不依賴外部 CSS：用 inline style 確保在各頁都長一樣
+  btn.innerHTML = `
+    <span class="upload-progress" style="display:block;width:100%;pointer-events:none;">
+      <span style="display:block;font-size:12px;line-height:1.1;text-align:center;opacity:.9;margin-bottom:6px;">${label}</span>
+      <span class="upload-progress-track" style="position:relative;display:block;height:10px;border-radius:999px;background:#e5e7eb;overflow:hidden;">
+        <span class="upload-progress-fill" style="position:absolute;left:0;top:0;height:100%;width:0%;background:linear-gradient(90deg,#fbbf24,#86efac);"></span>
+        <img class="upload-progress-icon" alt="" src="${iconUrl}" style="position:absolute;top:-26px;left:0;transform:translateX(-20%);width:34px;height:34px;object-fit:contain;" />
+      </span>
+      <span class="upload-progress-percent" style="display:block;margin-top:6px;font-variant-numeric:tabular-nums;font-size:14px;line-height:1;text-align:center;">0%</span>
+    </span>
+  `;
+
+  const fill = btn.querySelector(".upload-progress-fill");
+  const icon = btn.querySelector(".upload-progress-icon");
+  const txt = btn.querySelector(".upload-progress-percent");
+
+  const set = (p) => {
+    const pct = Math.max(0, Math.min(100, Math.round(Number(p) || 0)));
+    if (fill) fill.style.width = pct + "%";
+    if (icon) icon.style.left = pct + "%";
+    if (txt) txt.textContent = pct + "%";
+  };
+
+  const stop = () => {
+    // 還原（讓既有邏輯可以接著把 btn.textContent 改成「處理中...」等）
+    btn.innerHTML = originalHTML || originalText || "";
+    btn.disabled = originalDisabled;
+    btn.removeAttribute("aria-busy");
+  };
+
+  set(0);
+
+  // 也掛到 window 方便在 admin.html（module）呼叫
+  window.startUploadProgress = startUploadProgress;
+  return { set, stop };
+}
+
 // 用 nameLower / name 檢查是否重複；exceptId 表示忽略自己（編輯時用）
 async function isNameTaken(name, exceptId = null) {
   const kw = (name || "").trim().toLowerCase();
@@ -1054,7 +1107,11 @@ async function saveEdit() {
 
   // ② 確認後才開始「儲存中…」與鎖定按鈕
   btn.disabled = true;
-  const stopDots = startDots(btn, "上傳中");
+  btn.setAttribute("aria-busy", "true");
+  const prog = (typeof startUploadProgress === "function")
+    ? startUploadProgress(btn, { iconUrl: window.UPLOAD_PROGRESS_ICON_URL, label: "上傳中" })
+    : null;
+  const stopDots = !prog && (typeof startDots === "function") ? startDots(btn, "上傳中") : null;
 
   try {
     // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
@@ -1111,6 +1168,23 @@ async function saveEdit() {
     }
 
     // 依序處理（保持順序）
+    const __fileItems = (items || []).filter((it) => it && it.kind === "file" && it.file);
+    const __totalBytes = __fileItems.reduce((s, it) => s + (it.file?.size || 0), 0);
+    let __doneBytes = 0;
+
+    const __setOverallProgress = (bytesTransferredNow = 0) => {
+      if (!prog) return;
+      if (!__totalBytes) {
+        prog.set(100);
+        return;
+      }
+      const pct = ((__doneBytes + (bytesTransferredNow || 0)) / __totalBytes) * 100;
+      prog.set(pct);
+    };
+    __setOverallProgress(0);
+
+    const __uploadResumable = window.uploadBytesResumable;
+
     for (const it of items) {
       if (it.kind === "url") {
         newUrls.push(it.url);
@@ -1123,7 +1197,28 @@ async function saveEdit() {
         const type = it.__uploadType || (f && f.type) || '';
         const path = it.__uploadPath;
         const r = sRef(storage, path);
-        await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
+        if (typeof __uploadResumable === "function") {
+          await new Promise((resolve, reject) => {
+            const task = __uploadResumable(r, f, { contentType: type || 'application/octet-stream' });
+            task.on(
+              'state_changed',
+              (snap) => {
+                __setOverallProgress(snap.bytesTransferred || 0);
+              },
+              (err) => reject(err),
+              () => {
+                try { __doneBytes += task.snapshot.totalBytes || (f?.size || 0); } catch (_) { __doneBytes += (f?.size || 0); }
+                __setOverallProgress(0);
+                resolve();
+              }
+            );
+          });
+        } else {
+          // fallback：沒有 resumable 就照舊上傳，但至少把 UI 直接推到 100%
+          await uploadBytes(r, f, { contentType: type || 'application/octet-stream' });
+          __doneBytes += (f?.size || 0);
+          __setOverallProgress(0);
+        }
         newUrls.push(await getDownloadURL(r));
       }
     }
@@ -1173,7 +1268,12 @@ async function saveEdit() {
     await updateDoc(doc(db, "pets", currentDocId), __updatePayload);
 
     // ⑤ UI 收尾（無論彈窗狀態，成功提示一下）
-    stopDots();
+    if (prog) {
+      try { prog.set(100); } catch (_) { }
+      try { prog.stop(); } catch (_) { }
+    } else if (stopDots) {
+      stopDots();
+    }
     btn.disabled = true;
     btn.textContent = "處理中...";
 
@@ -1253,6 +1353,10 @@ async function saveEdit() {
       text: err.message
     });
   } finally {
+    // 保險：確保進度 UI 被清掉
+    try { prog?.stop?.(); } catch (_) { }
+    try { stopDots?.(); } catch (_) { }
+    btn.removeAttribute?.("aria-busy");
     btn.disabled = false;
     btn.textContent = "儲存";
   }
@@ -1926,10 +2030,13 @@ function resetAdoptedSelection() {
 async function onConfirmAdopted() {
   const btn = document.getElementById("btnConfirmAdopted");
 
-  // 動態點點（沿用你檔案內的 startDots）
+  // 百分比進度條
   btn.disabled = true;
   btn.setAttribute("aria-busy", "true");
-  const stopDots = startDots(btn, "上傳中");
+  const prog = (typeof startUploadProgress === "function")
+    ? startUploadProgress(btn, { iconUrl: window.UPLOAD_PROGRESS_ICON_URL, label: "上傳中" })
+    : null;
+  const stopDots = !prog && (typeof startDots === "function") ? startDots(btn, "上傳中") : null;
 
   const files = adoptedSelected.slice(0, 5);
   const urls = [];
@@ -1962,9 +2069,39 @@ async function onConfirmAdopted() {
       currentDoc = { ...(currentDoc || {}), mediaReady: false, wmPending: nextPending };
     }
 
+    const totalBytes = plans.reduce((s, x) => s + (x.f?.size || 0), 0);
+    let doneBytes = 0;
+
+    const setOverallProgress = (bytesTransferredNow = 0) => {
+      if (!prog) return;
+      if (!totalBytes) { prog.set(100); return; }
+      prog.set(((doneBytes + (bytesTransferredNow || 0)) / totalBytes) * 100);
+    };
+    setOverallProgress(0);
+
+    const uploadResumable = window.uploadBytesResumable;
+
     for (const pl of plans) {
       const r = sRef(storage, pl.path);
-      await uploadBytes(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
+      if (typeof uploadResumable === "function") {
+        await new Promise((resolve, reject) => {
+          const task = uploadResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
+          task.on(
+            'state_changed',
+            (snap) => setOverallProgress(snap.bytesTransferred || 0),
+            (err) => reject(err),
+            () => {
+              try { doneBytes += task.snapshot.totalBytes || (pl.f?.size || 0); } catch (_) { doneBytes += (pl.f?.size || 0); }
+              setOverallProgress(0);
+              resolve();
+            }
+          );
+        });
+      } else {
+        await uploadBytes(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
+        doneBytes += (pl.f?.size || 0);
+        setOverallProgress(0);
+      }
       urls.push(await getDownloadURL(r));
     }
 
@@ -1981,7 +2118,12 @@ async function onConfirmAdopted() {
       wmPending: pendingPaths.length ? nextPending : [],
     });
 
-    stopDots();
+    if (prog) {
+      try { prog.set(100); } catch (_) { }
+      try { prog.stop(); } catch (_) { }
+    } else if (stopDots) {
+      stopDots();
+    }
     btn.disabled = true;
     btn.setAttribute("aria-busy", "true");
     btn.textContent = "處理中...";
@@ -2052,6 +2194,8 @@ async function onConfirmAdopted() {
   } catch (err) {
     await swalInDialog({ icon: "error", title: "已送養標記失敗", text: err.message });
   } finally {
+    try { prog?.stop?.(); } catch (_) { }
+    try { stopDots?.(); } catch (_) { }
     btn.disabled = false;
     btn.removeAttribute("aria-busy");
     btn.textContent = "儲存領養資訊";
