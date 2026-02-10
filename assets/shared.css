@@ -405,18 +405,29 @@ video.video-preview::-webkit-media-controls-enclosure {
   padding-top: 8px;/*12*/
   padding-bottom: 8px;/*12*/
   border-radius: 22px;
-  gap: 10px;
+  gap: 6px;/*10*/
 }
 
 /* 進度條拖曳中：控制列上移、增加上方空間、隱藏左右按鈕、顯示時間 */
 #lbBottom.lb-seeking #lbControls {
-  padding-top: 30px;/*36*/
-  gap: 10px;/*12*/
+  padding-top: 31px;/*30*/
+  gap: 11px;/*10*/
 }
 
 #lbBottom.lb-seeking .lb-seek-time {
   display: flex;
 }
+
+#lbBottom.lb-seeking #lbTimeCur{
+  padding-top: 8px;
+  padding-left: 5px;
+}
+
+#lbBottom.lb-seeking #lbTimeDur{
+  padding-top: 8px;
+  padding-right: 5px;
+}
+
 
 #lbPlayBtn,
 #lbMuteBtn {
@@ -451,6 +462,12 @@ video.video-preview::-webkit-media-controls-enclosure {
   transition: opacity .5s ease;
 }
 
+#lbPlayIcon {
+  padding-bottom: 3px;
+  padding-right: 4px;
+  transform: scale(1.1);
+}
+
 /* 拖曳進度條時：避免誤觸，先把關閉鍵隱藏 */
 #lightbox.lb-seeking #lbClose {
   opacity: 0;
@@ -472,7 +489,7 @@ video.video-preview::-webkit-media-controls-enclosure {
 }
 
 #lightbox.lb-seeking #lbSeek {
-  height: 14px;
+  height: 15px;/*14*/
 }
 
 /* iOS / Chrome：range thumb */
