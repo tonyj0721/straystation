@@ -547,7 +547,7 @@ function startProgressBar(btn, opts = {}) {
   cat.style.top = "4px"; // 在進度條上方
   cat.style.left = "0%";
   cat.style.transform = "translateX(-50%)";
-  cat.style.height = "34px";
+  cat.style.height = "50px";
   cat.style.pointerEvents = "none";
 
   const label = document.createElement("div");
