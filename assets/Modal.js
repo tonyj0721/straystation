@@ -482,7 +482,7 @@ function startDots(span, base) {
 // ===============================
 function startProgressBar(btn, opts = {}) {
   const imgSrc = opts.imgSrc || "images/奔跑貓咪.png";
-  const height = opts.height || 64;
+  const height = opts.height || 80;/*容器高度: 64*/
 
   const original = {
     html: btn.innerHTML,
@@ -547,7 +547,7 @@ function startProgressBar(btn, opts = {}) {
   cat.style.top = "4px"; // 在進度條上方
   cat.style.left = "0%";
   cat.style.transform = "translateX(-50%)";
-  cat.style.height = "34px";
+  cat.style.height = "40px";/*貓咪本體 cat.style.height = "40px";*/
   cat.style.pointerEvents = "none";
 
   const label = document.createElement("div");
@@ -637,11 +637,11 @@ function showWatermarkProgressSwal(opts = {}) {
     dog.style.left = current + "%";
     label.textContent = `Loading...${current}%`;
   };
-
+  /*二哈本體 height:46px;*/
   const html = `
     <div style="text-align:left; margin-top:6px;">
       <div style="position:relative; height:86px;">
-        <img id="${uid}_dog" src="${imgSrc}" alt="" style="position:absolute; top:0; left:0; transform:translate(-50%, 0); height:46px; width:auto; pointer-events:none; user-select:none;" />
+        <img id="${uid}_dog" src="${imgSrc}" alt="" style="position:absolute; top:0; left:0; transform:translate(-50%, 0); height:60px; width:auto; pointer-events:none; user-select:none;" />
         <div style="position:absolute; left:0; right:0; bottom:16px; height:22px; border-radius:999px; background:rgba(0,0,0,0.08); overflow:hidden;">
           <div id="${uid}_fill" style="height:100%; width:0%; border-radius:999px; background:linear-gradient(90deg, #ffd2a6, #d7f2c2); transition:width 120ms linear;"></div>
         </div>
