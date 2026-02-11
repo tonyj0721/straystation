@@ -482,7 +482,7 @@ function startDots(span, base) {
 // ===============================
 function startProgressBar(btn, opts = {}) {
   const imgSrc = opts.imgSrc || "images/奔跑貓咪.png";
-  const height = opts.height || 96;/*容器本體 const height = opts.height || 64;*/
+  const height = opts.height || 100;/*容器本體 const height = opts.height || 64;*/
 
   const original = {
     html: btn.innerHTML,
@@ -639,7 +639,7 @@ function showWatermarkProgressSwal(opts = {}) {
     dog.style.left = current + "%";
     label.textContent = `Loading...${current}%`;
   };
-  /*二哈本體 top:0; height:46px;*/
+  /*二哈本體 top:0; height:46px; bottom:-6px;*/
   const html = `
     <div style="text-align:left; margin-top:6px;">
       <div style="position:relative; height:86px;">
@@ -647,7 +647,7 @@ function showWatermarkProgressSwal(opts = {}) {
           <div id="${uid}_fill" style="height:100%; width:0%; border-radius:999px; background:linear-gradient(90deg, #ffd2a6, #d7f2c2); transition:width 120ms linear;"></div>
         </div>
         <img id="${uid}_dog" src="${imgSrc}" alt="" style="position:absolute; top:-18px; left:0px; transform:translate(-50%, 0); height:92px; width:auto; pointer-events:none; user-select:none;" />
-        <div id="${uid}_label" style="position:absolute; left:0; right:0; bottom:-6px; text-align:center; font-size:14px; color:#333;">Loading...0%</div>
+        <div id="${uid}_label" style="position:absolute; left:0; right:0; bottom:-3px; text-align:center; font-size:14px; color:#333;">Loading...0%</div>
       </div>
       ${text ? `<div style="margin-top:10px; color:#555; font-size:14px;">${text}</div>` : ""}
     </div>
