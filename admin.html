@@ -1067,7 +1067,6 @@
           g.drawImage(v, 0, 0, w, h);
           return c;
         } finally {
-        try { __progress?.close?.(); } catch (_) { }
           URL.revokeObjectURL(vUrl);
         }
       }
@@ -1097,7 +1096,6 @@
         g.drawImage(img, 0, 0);
         return await createImageBitmap(c);
       } finally {
-        try { __progress?.close?.(); } catch (_) { }
         URL.revokeObjectURL(raw);
       }
     }
@@ -1478,23 +1476,12 @@
         }
       }
 
-      // 按鈕進度狀態（改為百分比進度條）
-const submitBtn = $("#submitBtn");
-submitBtn.disabled = true;
-submitBtn.setAttribute("aria-busy", "true");
+      // 按鈕進度狀態
+      const submitBtn = $("#submitBtn");
+      submitBtn.disabled = true;
+      const prog = startPercentProgress(submitBtn, "上傳中");
 
-const __progress = (typeof window.openUploadProgress === "function")
-  ? window.openUploadProgress("上傳中")
-  : null;
-
-const setPctUI = (p) => {
-  const pct = Math.max(0, Math.min(100, Math.round(p || 0)));
-  submitBtn.textContent = `上傳中 ${pct}%`;
-  try { __progress?.set?.(pct); } catch (_) { }
-};
-setPctUI(0);
-
-try {
+      try {
         // 1) 新增基本文件
         const docRef = await addDoc(collection(db, "pets"), payload);
 
@@ -1523,53 +1510,16 @@ try {
         }
 
         // 逐檔上傳（顯示百分比進度）
-const totalBytes = plans.reduce((sum, pl) => sum + (pl?.f?.size || 0), 0) || 0;
-let doneBytes = 0;
-
-for (const pl of plans) {
-  const r = sRef(storage, pl.path);
-
-  // 有支援 resumable 就用它顯示進度；否則 fallback
-  if (typeof uploadBytesResumable === "function") {
-    await new Promise((resolve, reject) => {
-      const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
-      task.on("state_changed",
-        (snap) => {
-          const loaded = doneBytes + (snap?.bytesTransferred || 0);
-          const pct = totalBytes ? (loaded / totalBytes) * 100 : 100;
-          setPctUI(pct);
-        },
-        (err) => reject(err),
-        () => resolve()
-      );
-    });
-  } else {
-    await uploadBytes(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
-    // 沒進度事件就用檔案大小推進
-    doneBytes += (pl?.f?.size || 0);
-    const pct = totalBytes ? (doneBytes / totalBytes) * 100 : 100;
-    setPctUI(pct);
-  }
-
-  // 完成一檔才算真正 done（避免 bytesTransferred 回到 0 時跳動）
-  doneBytes += (pl?.f?.size || 0);
-  const pctDone = totalBytes ? (doneBytes / totalBytes) * 100 : 100;
-  setPctUI(pctDone);
-
-  urls.push(await getDownloadURL(r));
-}
-
-// 確保到 100%
-setPctUI(100);
-try { __progress?.close?.(); } catch (_) { }
-
+        const uploadedUrls = await uploadPlansSequential(plans, (p) => { try { prog.set(p); } catch (_) { } });
+        urls.push(...uploadedUrls);
 // 3) 回寫 images 欄位
         if (urls.length) {
           await updateDoc(doc(db, "pets", docRef.id), { images: urls });
         }
 
         // UI 收尾
-        try { __progress?.close?.(); } catch (_) { }
+        prog.done();
+        prog.restore();
         submitBtn.disabled = true;
         submitBtn.textContent = "處理中...";
 
@@ -1652,10 +1602,8 @@ try { __progress?.close?.(); } catch (_) { }
         }
 
       } catch (err) {
-        try { __progress?.close?.(); } catch (_) { }
         await Swal.fire({ icon: "error", title: "登錄失敗", text: err.message });
       } finally {
-        try { __progress?.close?.(); } catch (_) { }
         submitBtn.disabled = false;
         submitBtn.textContent = "登錄";
       }
@@ -2076,7 +2024,6 @@ try { __progress?.close?.(); } catch (_) { }
           setState("idle", "檢查失敗，稍後再試");
           console.error("name check error:", e);
         } finally {
-        try { __progress?.close?.(); } catch (_) { }
           input.removeAttribute("aria-busy");
         }
       }, 100);
