@@ -467,11 +467,6 @@ video.video-preview::-webkit-media-controls-enclosure {
   transition: opacity .5s ease;
 }
 
-#lbPlayIcon,
-#lbVolumeIcon {
-  transform: scale(1.1);
-}
-
 #lbBackIcon {
   padding-bottom: 3px;
   padding-right: 4px;
