@@ -482,7 +482,7 @@ function startDots(span, base) {
 // ===============================
 function startProgressBar(btn, opts = {}) {
   const imgSrc = opts.imgSrc || "images/奔跑貓咪.png";
-  const height = opts.height || 80;/*容器高度: 64*/
+  const height = opts.height || 64;
 
   const original = {
     html: btn.innerHTML,
@@ -547,7 +547,7 @@ function startProgressBar(btn, opts = {}) {
   cat.style.top = "4px"; // 在進度條上方
   cat.style.left = "0%";
   cat.style.transform = "translateX(-50%)";
-  cat.style.height = "40px";/*貓咪本體 cat.style.height = "40px";*/
+  cat.style.height = "34px";
   cat.style.pointerEvents = "none";
 
   const label = document.createElement("div");
@@ -615,6 +615,7 @@ function startProgressBar(btn, opts = {}) {
 }
 
 function showWatermarkProgressSwal(opts = {}) {
+  const petId = opts.petId || null;
   const title = opts.title || "浮水印處理中…";
   const text = opts.text || "";
   const imgSrc = opts.imgSrc || "images/二哈.png";
@@ -623,6 +624,7 @@ function showWatermarkProgressSwal(opts = {}) {
   let alive = true;
   let current = 0;
   let intervalId = null;
+  let unsub = null;
   const startTs = Date.now();
 
   const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
@@ -637,11 +639,11 @@ function showWatermarkProgressSwal(opts = {}) {
     dog.style.left = current + "%";
     label.textContent = `Loading...${current}%`;
   };
-  /*二哈本體 height:46px;*/
+
   const html = `
     <div style="text-align:left; margin-top:6px;">
       <div style="position:relative; height:86px;">
-        <img id="${uid}_dog" src="${imgSrc}" alt="" style="position:absolute; top:0; left:0; transform:translate(-50%, 0); height:60px; width:auto; pointer-events:none; user-select:none;" />
+        <img id="${uid}_dog" src="${imgSrc}" alt="" style="position:absolute; top:0; left:0; transform:translate(-50%, 0); height:46px; width:auto; pointer-events:none; user-select:none;" />
         <div style="position:absolute; left:0; right:0; bottom:16px; height:22px; border-radius:999px; background:rgba(0,0,0,0.08); overflow:hidden;">
           <div id="${uid}_fill" style="height:100%; width:0%; border-radius:999px; background:linear-gradient(90deg, #ffd2a6, #d7f2c2); transition:width 120ms linear;"></div>
         </div>
@@ -661,10 +663,31 @@ function showWatermarkProgressSwal(opts = {}) {
     returnFocus: false,
     didOpen: () => {
       render(0);
+
+      // ✅ 真的進度：訂閱 Firestore pets/<petId> 的 wmOverall（合併總進度）
+      // 若沒有 petId / 沒有 onSnapshot（極少數），就退回假進度（不會卡 0%）。
+      try {
+        if (petId && typeof window.onSnapshot === "function" && typeof window.doc === "function" && window.db) {
+          const ref = window.doc(window.db, "pets", petId);
+          unsub = window.onSnapshot(ref, (snap) => {
+            if (!alive) return;
+            if (!snap || !snap.exists()) return;
+            const d = snap.data() || {};
+            const pct = Number(d.wmOverall);
+            if (Number.isFinite(pct)) render(pct);
+            // mediaReady 不再是 false 就視為完成
+            if (d.mediaReady !== false) render(100);
+          });
+          return;
+        }
+      } catch (e) {
+        console.warn("showWatermarkProgressSwal subscribe failed:", e);
+      }
+
+      // fallback：假進度
       intervalId = setInterval(() => {
         if (!alive) return;
         const elapsed = Date.now() - startTs;
-        // 假進度：一路跑到 95%，等真的完成後由 finish() 補到 100%
         const fake = Math.min(95, Math.floor(elapsed / 220));
         if (fake > current) render(fake);
       }, 120);
@@ -673,6 +696,11 @@ function showWatermarkProgressSwal(opts = {}) {
       alive = false;
       if (intervalId) clearInterval(intervalId);
       intervalId = null;
+
+      if (typeof unsub === "function") {
+        try { unsub(); } catch (_) { }
+      }
+      unsub = null;
     },
   });
 
@@ -1328,12 +1356,17 @@ async function saveEdit() {
     if (pendingPaths.length) {
       nextPending = Array.from(new Set([...nextPending, ...pendingPaths]));
       // 先寫回「處理中」狀態（重要：在 upload 前先寫，避免 race）
-      await updateDoc(doc(db, "pets", currentDocId), { mediaReady: false, wmPending: nextPending });
-      currentDoc = { ...(currentDoc || {}), mediaReady: false, wmPending: nextPending };
+      await updateDoc(doc(db, "pets", currentDocId), {
+        mediaReady: false,
+        wmPending: nextPending,
+        wmTotal: nextPending.length,
+        wmOverall: 0,
+      });
+      currentDoc = { ...(currentDoc || {}), mediaReady: false, wmPending: nextPending, wmTotal: nextPending.length, wmOverall: 0 };
     } else if (!items.length) {
       // 沒有任何媒體 → 直接標記 ready
-      await updateDoc(doc(db, "pets", currentDocId), { mediaReady: true, wmPending: [] });
-      currentDoc = { ...(currentDoc || {}), mediaReady: true, wmPending: [] };
+      await updateDoc(doc(db, "pets", currentDocId), { mediaReady: true, wmPending: [], wmTotal: 0, wmOverall: 100 });
+      currentDoc = { ...(currentDoc || {}), mediaReady: true, wmPending: [], wmTotal: 0, wmOverall: 100 };
       nextPending = [];
     } else if (removedPaths.length) {
       // 只有刪除 → 清掉 pending 裡對應的 path（避免卡住）
@@ -1442,7 +1475,12 @@ newUrls.push(await getDownloadURL(r));
     if (wasOpen) dlg.close();
 
     if (pendingPaths.length) {
-      const wmSwal = showWatermarkProgressSwal({ title: "浮水印處理中…", text: "處理完成後才會顯示在列表，並自動開啟詳情。", imgSrc: "images/二哈.png" });
+      const wmSwal = showWatermarkProgressSwal({
+        petId: currentDocId,
+        title: "浮水印處理中…",
+        text: "處理完成後才會顯示在列表，並自動開啟詳情。",
+        imgSrc: "images/二哈.png",
+      });
 
       try {
         await __waitPetMediaReady(currentDocId);
@@ -2214,8 +2252,13 @@ async function onConfirmAdopted() {
       : prevPending;
 
     if (pendingPaths.length) {
-      await updateDoc(doc(db, "pets", currentDocId), { mediaReady: false, wmPending: nextPending });
-      currentDoc = { ...(currentDoc || {}), mediaReady: false, wmPending: nextPending };
+      await updateDoc(doc(db, "pets", currentDocId), {
+        mediaReady: false,
+        wmPending: nextPending,
+        wmTotal: nextPending.length,
+        wmOverall: 0,
+      });
+      currentDoc = { ...(currentDoc || {}), mediaReady: false, wmPending: nextPending, wmTotal: nextPending.length, wmOverall: 0 };
     }
 
     for (const pl of plans) {
@@ -2265,7 +2308,12 @@ urls.push(await getDownloadURL(r));
     if (dlg?.open) dlg.close();
 
     if (pendingPaths.length) {
-      const wmSwal = showWatermarkProgressSwal({ title: "浮水印處理中…", text: "處理完成後才會顯示在列表。", imgSrc: "images/二哈.png" });
+      const wmSwal = showWatermarkProgressSwal({
+        petId: currentDocId,
+        title: "浮水印處理中…",
+        text: "處理完成後才會顯示在列表。",
+        imgSrc: "images/二哈.png",
+      });
 
       try {
         await __waitPetMediaReady(currentDocId);
