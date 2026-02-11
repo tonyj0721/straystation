@@ -473,153 +473,65 @@ function startDots(span, base) {
     span.textContent = base + ".".repeat(i);
   }, 350);
   return () => clearInterval(t); // 回傳停止函式
-
+}
 
 // ===============================
 // 小工具：按鈕上的「百分比進度條」
-// - 用在：新增登錄/編輯儲存/已領養合照上傳
-// - 動物圖示路徑：images/奔跑貓咪.png
+//  - iconSrc 預設：images/奔跑貓咪.png
 // ===============================
-function startPercentProgress(btn, base = "上傳中", iconSrc = "images/奔跑貓咪.png") {
-  const original = btn.innerHTML;
-  const originalText = btn.textContent;
+(function injectUploadProgressCSS() {
+  if (document.getElementById("uploadProgressCSS")) return;
+  const s = document.createElement("style");
+  s.id = "uploadProgressCSS";
+  s.textContent = `
+    .upload-progress-wrap{display:flex;flex-direction:column;align-items:center;gap:6px;width:100%;}
+    .upload-progress-icon{width:34px;height:34px;object-fit:contain;display:block;}
+    .upload-progress-bar{width:100%;max-width:260px;height:12px;border-radius:999px;background:rgba(255,255,255,.25);overflow:hidden;}
+    .upload-progress-fill{height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg,#f59e0b,#86efac);}
+    .upload-progress-text{font-size:14px;line-height:1;color:currentColor;}
+  `;
+  document.head.appendChild(s);
+})();
 
-  // 建立 DOM（用 inline style，避免 Tailwind purge）
-  const wrap = document.createElement("div");
-  wrap.style.width = "100%";
-  wrap.style.display = "flex";
-  wrap.style.flexDirection = "column";
-  wrap.style.gap = "6px";
-  wrap.style.alignItems = "center";
+function startProgressBar(btn, { base = "上傳中", iconSrc = "images/奔跑貓咪.png" } = {}) {
+  if (!btn) return { set: () => { }, stop: () => { } };
 
-  const label = document.createElement("div");
-  label.style.fontSize = "12px";
-  label.style.lineHeight = "12px";
-  label.style.opacity = "0.95";
-  label.textContent = base;
+  const prevHTML = btn.innerHTML;
+  const prevAria = btn.getAttribute("aria-label");
+  const prevTitle = btn.getAttribute("title");
 
-  const barOuter = document.createElement("div");
-  barOuter.style.position = "relative";
-  barOuter.style.width = "100%";
-  barOuter.style.maxWidth = "220px";
-  barOuter.style.height = "10px";
-  barOuter.style.borderRadius = "999px";
-  barOuter.style.overflow = "hidden";
-  barOuter.style.background = "rgba(255,255,255,0.28)";
+  btn.innerHTML = `
+    <div class="upload-progress-wrap" aria-label="${base}">
+      <img class="upload-progress-icon" src="${iconSrc}" alt="">
+      <div class="upload-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="upload-progress-fill"></div>
+      </div>
+      <div class="upload-progress-text">0%</div>
+    </div>
+  `.trim();
 
-  const barInner = document.createElement("div");
-  barInner.style.height = "100%";
-  barInner.style.width = "0%";
-  barInner.style.borderRadius = "999px";
-  barInner.style.background = "rgba(255,255,255,0.85)";
-  barInner.style.transition = "width 120ms linear";
-  barOuter.appendChild(barInner);
+  const bar = btn.querySelector(".upload-progress-bar");
+  const fill = btn.querySelector(".upload-progress-fill");
+  const txt = btn.querySelector(".upload-progress-text");
 
-  const icon = document.createElement("img");
-  icon.src = iconSrc;
-  icon.alt = "";
-  icon.decoding = "async";
-  icon.loading = "lazy";
-  icon.style.position = "absolute";
-  icon.style.top = "-18px";
-  icon.style.width = "34px";
-  icon.style.height = "34px";
-  icon.style.left = "0%";
-  icon.style.transform = "translateX(-20%)";
-  icon.style.pointerEvents = "none";
-  barOuter.appendChild(icon);
-
-  const pct = document.createElement("div");
-  pct.style.fontSize = "12px";
-  pct.style.lineHeight = "12px";
-  pct.textContent = "0%";
-
-  wrap.appendChild(label);
-  wrap.appendChild(barOuter);
-  wrap.appendChild(pct);
-
-  // 置換按鈕內容（保留原本按鈕樣式）
-  btn.innerHTML = "";
-  btn.appendChild(wrap);
-
-  const clamp = (n) => Math.max(0, Math.min(100, n));
-
-  const api = {
-    set(p) {
-      const v = clamp(Number(p) || 0);
-      barInner.style.width = v.toFixed(0) + "%";
-      icon.style.left = v.toFixed(0) + "%";
-      pct.textContent = v.toFixed(0) + "%";
-    },
-    done() {
-      this.set(100);
-    },
-    restore() {
-      // 還原原本內容（讓後續 btn.textContent/innerHTML 正常）
-      btn.innerHTML = original;
-      if (!btn.innerHTML) btn.textContent = originalText || "";
-    },
+  const set = (pct) => {
+    const p = Math.max(0, Math.min(100, Math.round(pct)));
+    if (fill) fill.style.width = p + "%";
+    if (txt) txt.textContent = p + "%";
+    if (bar) bar.setAttribute("aria-valuenow", String(p));
   };
 
-  // 讓外部也能拿到（admin.html 會用）
-  return api;
-}
-
-// ===============================
-// 上傳小工具：依序上傳 plans（可顯示 0~100%）
-// plans: [{ f: File, type: string, path: string }]
-// ===============================
-async function uploadPlansSequential(plans, onProgress = null) {
-  const list = Array.isArray(plans) ? plans : [];
-  const total = list.reduce((s, pl) => s + (pl?.f?.size || 0), 0) || 0;
-  let done = 0;
-
-  const report = (currentBytes = 0) => {
-    if (typeof onProgress !== "function") return;
-    if (!total) return onProgress(100);
-    const pct = ((done + currentBytes) / total) * 100;
-    onProgress(Math.max(0, Math.min(100, pct)));
+  const stop = () => {
+    btn.innerHTML = prevHTML;
+    if (prevAria != null) btn.setAttribute("aria-label", prevAria); else btn.removeAttribute("aria-label");
+    if (prevTitle != null) btn.setAttribute("title", prevTitle); else btn.removeAttribute("title");
   };
 
-  const urls = [];
-  for (const pl of list) {
-    const f = pl.f;
-    const type = pl.type || (f && f.type) || "application/octet-stream";
-    const r = sRef(storage, pl.path);
-
-    // 若沒有 resumable（理論上不會），就退回原本 uploadBytes（無法算中途進度）
-    if (typeof uploadBytesResumable !== "function") {
-      await uploadBytes(r, f, { contentType: type });
-      done += (f && f.size) || 0;
-      report(0);
-      urls.push(await getDownloadURL(r));
-      continue;
-    }
-
-    const task = uploadBytesResumable(r, f, { contentType: type });
-
-    await new Promise((resolve, reject) => {
-      task.on(
-        "state_changed",
-        (snap) => {
-          try { report(snap.bytesTransferred || 0); } catch (_) { }
-        },
-        (err) => reject(err),
-        () => resolve()
-      );
-    });
-
-    done += (f && f.size) || 0;
-    report(0);
-    urls.push(await getDownloadURL(task.snapshot.ref));
-  }
-
-  // 收尾保險：補到 100%
-  report(0);
-  return urls;
+  return { set, stop };
 }
 
-}
+// 給 admin.html / 其他腳本呼叫
+window.startProgressBar = startProgressBar;
 
 // 用 nameLower / name 檢查是否重複；exceptId 表示忽略自己（編輯時用）
 async function isNameTaken(name, exceptId = null) {
@@ -1200,7 +1112,8 @@ async function saveEdit() {
 
   // ② 確認後才開始「儲存中…」與鎖定按鈕
   btn.disabled = true;
-  const prog = startPercentProgress(btn, "上傳中");
+  const __prog = (typeof startProgressBar === "function") ? startProgressBar(btn, { base: "上傳中", iconSrc: "images/奔跑貓咪.png" }) : null;
+const stopDots = __prog ? null : startDots(btn, "上傳中");
 
   try {
     // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
@@ -1256,33 +1169,48 @@ async function saveEdit() {
       currentDoc = { ...(currentDoc || {}), wmPending: nextPending };
     }
 
-    // 依序處理（保持順序）
-    // 先把要上傳的檔案收集起來（維持 items 內的順序）
-    const uploadPlans = [];
-    for (const it of items) {
-      if (it.kind !== "file") continue;
-      const f = it.file;
-      const type = it.__uploadType || (f && f.type) || '';
-      const path = it.__uploadPath;
-      uploadPlans.push({ f, type, path });
+    
+// 依序處理（保持順序）— 有上傳時顯示整體百分比
+const __fileItems = (items || []).filter((it) => it && it.kind === "file");
+const __totalBytes = __fileItems.reduce((s, it) => s + ((it.file && it.file.size) || 0), 0) || 1;
+let __doneBytes = 0;
+
+for (const it of items) {
+  if (it.kind === "url") {
+    newUrls.push(it.url);
+    continue;
+  }
+
+  if (it.kind === "file") {
+    const f = it.file;
+    // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
+    const type = it.__uploadType || (f && f.type) || "";
+    const path = it.__uploadPath;
+    const r = sRef(storage, path);
+
+    if (typeof uploadBytesResumable === "function" && __prog) {
+      await new Promise((resolve, reject) => {
+        const task = uploadBytesResumable(r, f, { contentType: type || "application/octet-stream" });
+        task.on("state_changed",
+          (snap) => {
+            const cur = __doneBytes + (snap.bytesTransferred || 0);
+            const pct = Math.max(0, Math.min(100, Math.floor((cur / __totalBytes) * 100)));
+            __prog.set(pct);
+          },
+          (err) => reject(err),
+          () => resolve()
+        );
+      });
+    } else {
+      await uploadBytes(r, f, { contentType: type || "application/octet-stream" });
     }
 
-    const uploadedUrls = uploadPlans.length
-      ? await uploadPlansSequential(uploadPlans, (p) => { try { prog.set(p); } catch (_) { } })
-      : [];
+    __doneBytes += (f && f.size) || 0;
+    if (__prog) __prog.set(Math.max(0, Math.min(100, Math.floor((__doneBytes / __totalBytes) * 100))));
+    newUrls.push(await getDownloadURL(r));
+  }
+}
 
-    // 再按畫面順序組回 newUrls（url 原樣保留；file 以 uploadedUrls 依序填入）
-    let uidx = 0;
-    for (const it of items) {
-      if (it.kind === "url") {
-        newUrls.push(it.url);
-        continue;
-      }
-      if (it.kind === "file") {
-        newUrls.push(uploadedUrls[uidx++]);
-        continue;
-      }
-    }
 
     // 刪除被移除的舊圖（忽略刪失敗）
     // 同步刪掉後端產生的縮圖：thumbs/<原路徑去副檔名>.jpg
@@ -1327,8 +1255,7 @@ async function saveEdit() {
     await updateDoc(doc(db, "pets", currentDocId), __updatePayload);
 
     // ⑤ UI 收尾（無論彈窗狀態，成功提示一下）
-    prog.done();
-    prog.restore();
+    if (__prog) __prog.stop(); else stopDots();
     btn.disabled = true;
     btn.textContent = "處理中...";
 
@@ -2084,7 +2011,8 @@ async function onConfirmAdopted() {
   // 動態點點（沿用你檔案內的 startDots）
   btn.disabled = true;
   btn.setAttribute("aria-busy", "true");
-  const prog = startPercentProgress(btn, "上傳中");
+  const __prog = (typeof startProgressBar === "function") ? startProgressBar(btn, { base: "上傳中", iconSrc: "images/奔跑貓咪.png" }) : null;
+  const stopDots = __prog ? null : startDots(btn, "上傳中");
 
   const files = adoptedSelected.slice(0, 5);
   const urls = [];
@@ -2117,10 +2045,36 @@ async function onConfirmAdopted() {
       currentDoc = { ...(currentDoc || {}), mediaReady: false, wmPending: nextPending };
     }
 
-    const uploadedUrls = await uploadPlansSequential(plans, (p) => { try { prog.set(p); } catch (_) { } });
-    urls.push(...uploadedUrls);
+    
+const __totalBytes = plans.reduce((s, p) => s + ((p.f && p.f.size) || 0), 0) || 1;
+let __doneBytes = 0;
 
-    await updateDoc(doc(db, "pets", currentDocId), {
+for (const pl of plans) {
+  const r = sRef(storage, pl.path);
+
+  if (typeof uploadBytesResumable === "function" && __prog) {
+    await new Promise((resolve, reject) => {
+      const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || "application/octet-stream" });
+      task.on("state_changed",
+        (snap) => {
+          const cur = __doneBytes + (snap.bytesTransferred || 0);
+          const pct = Math.max(0, Math.min(100, Math.floor((cur / __totalBytes) * 100)));
+          __prog.set(pct);
+        },
+        (err) => reject(err),
+        () => resolve()
+      );
+    });
+  } else {
+    await uploadBytes(r, pl.f, { contentType: pl.type || "application/octet-stream" });
+  }
+
+  __doneBytes += (pl.f && pl.f.size) || 0;
+  if (__prog) __prog.set(Math.max(0, Math.min(100, Math.floor((__doneBytes / __totalBytes) * 100))));
+  urls.push(await getDownloadURL(r));
+}
+
+await updateDoc(doc(db, "pets", currentDocId), {
       status: "adopted",
       adoptedAt: serverTimestamp(),
       adoptedPhotos: urls,
@@ -2133,8 +2087,7 @@ async function onConfirmAdopted() {
       wmPending: pendingPaths.length ? nextPending : [],
     });
 
-    prog.done();
-    prog.restore();
+    if (__prog) __prog.stop(); else stopDots();
     btn.disabled = true;
     btn.setAttribute("aria-busy", "true");
     btn.textContent = "處理中...";
