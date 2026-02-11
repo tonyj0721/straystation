@@ -482,7 +482,7 @@ function startDots(span, base) {
 // ===============================
 function startProgressBar(btn, opts = {}) {
   const imgSrc = opts.imgSrc || "images/奔跑貓咪.png";
-  const height = opts.height || 128;
+  const height = opts.height || 64;
 
   const original = {
     html: btn.innerHTML,
@@ -613,6 +613,79 @@ function startProgressBar(btn, opts = {}) {
 
   return { update, stop };
 }
+
+function showWatermarkProgressSwal(opts = {}) {
+  const title = opts.title || "浮水印處理中…";
+  const text = opts.text || "";
+  const imgSrc = opts.imgSrc || "images/二哈.png";
+
+  const uid = "wmprog_" + Math.random().toString(36).slice(2);
+  let alive = true;
+  let current = 0;
+  let intervalId = null;
+  const startTs = Date.now();
+
+  const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+
+  const render = (pct) => {
+    current = clamp(Math.round(pct), 0, 100);
+    const fill = document.getElementById(uid + "_fill");
+    const dog = document.getElementById(uid + "_dog");
+    const label = document.getElementById(uid + "_label");
+    if (!fill || !dog || !label) return;
+    fill.style.width = current + "%";
+    dog.style.left = current + "%";
+    label.textContent = `Loading...${current}%`;
+  };
+
+  const html = `
+    <div style="text-align:left; margin-top:6px;">
+      <div style="position:relative; height:86px;">
+        <img id="${uid}_dog" src="${imgSrc}" alt="" style="position:absolute; top:0; left:0; transform:translate(-50%, 0); height:46px; width:auto; pointer-events:none; user-select:none;" />
+        <div style="position:absolute; left:0; right:0; bottom:16px; height:22px; border-radius:999px; background:rgba(0,0,0,0.08); overflow:hidden;">
+          <div id="${uid}_fill" style="height:100%; width:0%; border-radius:999px; background:linear-gradient(90deg, #ffd2a6, #d7f2c2); transition:width 120ms linear;"></div>
+        </div>
+        <div id="${uid}_label" style="position:absolute; left:0; right:0; bottom:-6px; text-align:center; font-size:14px; color:#333;">Loading...0%</div>
+      </div>
+      ${text ? `<div style="margin-top:10px; color:#555; font-size:14px;">${text}</div>` : ""}
+    </div>
+  `;
+
+  Swal.fire({
+    icon: "info",
+    title,
+    html,
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    showConfirmButton: false,
+    returnFocus: false,
+    didOpen: () => {
+      render(0);
+      intervalId = setInterval(() => {
+        if (!alive) return;
+        const elapsed = Date.now() - startTs;
+        // 假進度：一路跑到 95%，等真的完成後由 finish() 補到 100%
+        const fake = Math.min(95, Math.floor(elapsed / 220));
+        if (fake > current) render(fake);
+      }, 120);
+    },
+    willClose: () => {
+      alive = false;
+      if (intervalId) clearInterval(intervalId);
+      intervalId = null;
+    },
+  });
+
+  return {
+    update: (pct) => render(pct),
+    finish: () => {
+      render(100);
+      setTimeout(() => Swal.close(), 180);
+    },
+    close: () => Swal.close(),
+  };
+}
+
 
 // 用 nameLower / name 檢查是否重複；exceptId 表示忽略自己（編輯時用） / name 檢查是否重複；exceptId 表示忽略自己（編輯時用）
 async function isNameTaken(name, exceptId = null) {
@@ -1369,18 +1442,7 @@ newUrls.push(await getDownloadURL(r));
     if (wasOpen) dlg.close();
 
     if (pendingPaths.length) {
-      Swal.fire({
-        icon: "info",
-        title: "浮水印處理中…",
-        text: "處理完成後才會顯示在列表，並自動開啟詳情。",
-        allowOutsideClick: false,
-        allowEscapeKey: false,
-        showConfirmButton: false,
-        didOpen: () => {
-          Swal.showLoading();
-        },
-        returnFocus: false,
-      });
+      const wmSwal = showWatermarkProgressSwal({ title: "浮水印處理中…", text: "處理完成後才會顯示在列表，並自動開啟詳情。", imgSrc: "images/二哈.png" });
 
       try {
         await __waitPetMediaReady(currentDocId);
@@ -1397,7 +1459,7 @@ newUrls.push(await getDownloadURL(r));
 
       currentDoc = { ...currentDoc, ...newData, mediaReady: (__updatePayload.mediaReady ?? currentDoc?.mediaReady), wmPending: (__updatePayload.wmPending ?? currentDoc?.wmPending) };
 
-      Swal.close();
+      wmSwal.finish();
 
       await Swal.fire({
         icon: "success",
@@ -2203,18 +2265,7 @@ urls.push(await getDownloadURL(r));
     if (dlg?.open) dlg.close();
 
     if (pendingPaths.length) {
-      Swal.fire({
-        icon: "info",
-        title: "浮水印處理中…",
-        text: "處理完成後才會顯示在列表。",
-        allowOutsideClick: false,
-        allowEscapeKey: false,
-        showConfirmButton: false,
-        didOpen: () => {
-          Swal.showLoading();
-        },
-        returnFocus: false,
-      });
+      const wmSwal = showWatermarkProgressSwal({ title: "浮水印處理中…", text: "處理完成後才會顯示在列表。", imgSrc: "images/二哈.png" });
 
       try {
         await __waitPetMediaReady(currentDocId);
@@ -2229,7 +2280,7 @@ urls.push(await getDownloadURL(r));
         console.error("loadPets error:", e);
       }
 
-      Swal.close();
+      wmSwal.finish();
 
       await Swal.fire({
         icon: "success",
