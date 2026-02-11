@@ -544,7 +544,7 @@ function startProgressBar(btn, opts = {}) {
   cat.alt = "";
   cat.decoding = "async";
   cat.style.position = "absolute";
-  cat.style.top = "8px"; // 在進度條上方 cat.style.top = "4px";
+  cat.style.top = "0px"; // 在進度條上方 cat.style.top = "4px";
   cat.style.left = "0%";
   cat.style.transform = "translateX(-50%)";
   cat.style.height = "68px";/*貓咪本體 cat.style.height = "34px";*/
