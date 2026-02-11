@@ -482,7 +482,7 @@ function startDots(span, base) {
 // ===============================
 function startProgressBar(btn, opts = {}) {
   const imgSrc = opts.imgSrc || "images/奔跑貓咪.png";
-  const height = opts.height || 98;/*容器本體 const height = opts.height || 64;*/
+  const height = opts.height || 80;/*容器本體 const height = opts.height || 64;*/
 
   const original = {
     html: btn.innerHTML,
@@ -544,7 +544,7 @@ function startProgressBar(btn, opts = {}) {
   cat.alt = "";
   cat.decoding = "async";
   cat.style.position = "absolute";
-  cat.style.top = "4px"; // 在進度條上方
+  cat.style.top = "8px"; // 在進度條上方 cat.style.top = "4px";
   cat.style.left = "0%";
   cat.style.transform = "translateX(-50%)";
   cat.style.height = "68px";/*貓咪本體 cat.style.height = "34px";*/
