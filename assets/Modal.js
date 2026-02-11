@@ -482,7 +482,7 @@ function startDots(span, base) {
 // ===============================
 function startProgressBar(btn, opts = {}) {
   const imgSrc = opts.imgSrc || "images/奔跑貓咪.png";
-  const height = opts.height || 64;
+  const height = opts.height || 64;/*容器本體 const height = opts.height || 64;*/
 
   const original = {
     html: btn.innerHTML,
@@ -547,7 +547,7 @@ function startProgressBar(btn, opts = {}) {
   cat.style.top = "4px"; // 在進度條上方
   cat.style.left = "0%";
   cat.style.transform = "translateX(-50%)";
-  cat.style.height = "34px";
+  cat.style.height = "68px";/*貓咪本體 cat.style.height = "34px";*/
   cat.style.pointerEvents = "none";
 
   const label = document.createElement("div");
@@ -639,11 +639,11 @@ function showWatermarkProgressSwal(opts = {}) {
     dog.style.left = current + "%";
     label.textContent = `Loading...${current}%`;
   };
-
+  /*二哈本體 height:46px;*/
   const html = `
     <div style="text-align:left; margin-top:6px;">
       <div style="position:relative; height:86px;">
-        <img id="${uid}_dog" src="${imgSrc}" alt="" style="position:absolute; top:0; left:0; transform:translate(-50%, 0); height:46px; width:auto; pointer-events:none; user-select:none;" />
+        <img id="${uid}_dog" src="${imgSrc}" alt="" style="position:absolute; top:0; left:0; transform:translate(-50%, 0); height:92px; width:auto; pointer-events:none; user-select:none;" />
         <div style="position:absolute; left:0; right:0; bottom:16px; height:22px; border-radius:999px; background:rgba(0,0,0,0.08); overflow:hidden;">
           <div id="${uid}_fill" style="height:100%; width:0%; border-radius:999px; background:linear-gradient(90deg, #ffd2a6, #d7f2c2); transition:width 120ms linear;"></div>
         </div>
@@ -1388,36 +1388,36 @@ async function saveEdit() {
         const path = it.__uploadPath;
         const r = sRef(storage, path);
 
-// 進度：只計算本次新增的 file
-// 若 totalBytes 無法取得（極少數情況），用 1 避免除以 0
-if (typeof __progressTotalBytes === "number" && __progressTotalBytes > 0) {
-  // noop
-}
+        // 進度：只計算本次新增的 file
+        // 若 totalBytes 無法取得（極少數情況），用 1 避免除以 0
+        if (typeof __progressTotalBytes === "number" && __progressTotalBytes > 0) {
+          // noop
+        }
 
-await new Promise((resolve, reject) => {
-  const task = uploadBytesResumable(r, f, { contentType: type || 'application/octet-stream' });
-  task.on("state_changed",
-    (snap) => {
-      const base = __progressUploadedBytes || 0;
-      const now = base + (snap?.bytesTransferred || 0);
-      const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
-      prog.update(pct);
-    },
-    (err) => reject(err),
-    async () => {
-      try {
-        // 完成一檔：累加已完成 bytes
-        __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || f.size || 0);
-        prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
-        resolve();
-      } catch (e) {
-        reject(e);
-      }
-    }
-  );
-});
+        await new Promise((resolve, reject) => {
+          const task = uploadBytesResumable(r, f, { contentType: type || 'application/octet-stream' });
+          task.on("state_changed",
+            (snap) => {
+              const base = __progressUploadedBytes || 0;
+              const now = base + (snap?.bytesTransferred || 0);
+              const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
+              prog.update(pct);
+            },
+            (err) => reject(err),
+            async () => {
+              try {
+                // 完成一檔：累加已完成 bytes
+                __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || f.size || 0);
+                prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
+                resolve();
+              } catch (e) {
+                reject(e);
+              }
+            }
+          );
+        });
 
-newUrls.push(await getDownloadURL(r));
+        newUrls.push(await getDownloadURL(r));
       }
     }
 
@@ -2264,24 +2264,24 @@ async function onConfirmAdopted() {
     for (const pl of plans) {
       const r = sRef(storage, pl.path);
       await new Promise((resolve, reject) => {
-  const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
-  task.on("state_changed",
-    (snap) => {
-      const base = __progressUploadedBytes || 0;
-      const now = base + (snap?.bytesTransferred || 0);
-      const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
-      prog.update(pct);
-    },
-    (err) => reject(err),
-    () => {
-      __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || pl.f?.size || 0);
-      prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
-      resolve();
-    }
-  );
-});
+        const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
+        task.on("state_changed",
+          (snap) => {
+            const base = __progressUploadedBytes || 0;
+            const now = base + (snap?.bytesTransferred || 0);
+            const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
+            prog.update(pct);
+          },
+          (err) => reject(err),
+          () => {
+            __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || pl.f?.size || 0);
+            prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
+            resolve();
+          }
+        );
+      });
 
-urls.push(await getDownloadURL(r));
+      urls.push(await getDownloadURL(r));
     }
 
     await updateDoc(doc(db, "pets", currentDocId), {
