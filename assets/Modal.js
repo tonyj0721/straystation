@@ -482,7 +482,7 @@ function startDots(span, base) {
 // ===============================
 function startProgressBar(btn, opts = {}) {
   const imgSrc = opts.imgSrc || "images/奔跑貓咪.png";
-  const height = opts.height || 80;/*容器本體 const height = opts.height || 64;*/
+  const height = opts.height || 96;/*容器本體 const height = opts.height || 64;*/
 
   const original = {
     html: btn.innerHTML,
@@ -526,7 +526,7 @@ function startProgressBar(btn, opts = {}) {
   barWrap.style.position = "absolute";
   barWrap.style.left = "14px";
   barWrap.style.right = "14px";
-  barWrap.style.top = "39px";
+  barWrap.style.top = "52px";
   barWrap.style.height = "14px";
   barWrap.style.background = "rgba(255,255,255,0.22)";
   barWrap.style.borderRadius = "9999px";
@@ -544,7 +544,7 @@ function startProgressBar(btn, opts = {}) {
   cat.alt = "";
   cat.decoding = "async";
   cat.style.position = "absolute";
-  cat.style.top = "-20px"; // 在進度條上方 cat.style.top = "4px";
+  cat.style.top = "-10px"; // 在進度條上方 cat.style.top = "4px";
   cat.style.left = "0%";
   cat.style.transform = "translateX(-50%)";
   cat.style.height = "85px";/*貓咪本體 cat.style.height = "34px";*/
@@ -1478,7 +1478,7 @@ async function saveEdit() {
       const wmSwal = showWatermarkProgressSwal({
         petId: currentDocId,
         title: "浮水印處理中…",
-        text: "處理完成後才會顯示在列表，並自動開啟詳情。",
+        /*text: "處理完成後才會顯示在列表，並自動開啟詳情。",*/
         imgSrc: "images/二哈.png",
       });
 
@@ -2311,7 +2311,7 @@ async function onConfirmAdopted() {
       const wmSwal = showWatermarkProgressSwal({
         petId: currentDocId,
         title: "浮水印處理中…",
-        text: "處理完成後才會顯示在列表。",
+        /*text: "處理完成後才會顯示在列表。",*/
         imgSrc: "images/二哈.png",
       });
 
