@@ -544,7 +544,7 @@ function startProgressBar(btn, opts = {}) {
   cat.alt = "";
   cat.decoding = "async";
   cat.style.position = "absolute";
-  cat.style.top = "-9px"; // 在進度條上方 cat.style.top = "4px";
+  cat.style.top = "-15px"; // 在進度條上方 cat.style.top = "4px";
   cat.style.left = "0%";
   cat.style.transform = "translateX(-50%)";
   cat.style.height = "85px";/*貓咪本體 cat.style.height = "34px";*/
@@ -636,9 +636,7 @@ function showWatermarkProgressSwal(opts = {}) {
     const label = document.getElementById(uid + "_label");
     if (!fill || !dog || !label) return;
     fill.style.width = current + "%";
-    const offsetX = -6; // px，正數往右，負數往左
-    /*dog.style.left = current + "%";*/
-    dog.style.left = `calc(${current}% + ${offsetX}px)`;
+    dog.style.left = current + "%";
     label.textContent = `Loading...${current}%`;
   };
   /*二哈本體 top:0; height:46px;*/
