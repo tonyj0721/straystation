@@ -1479,9 +1479,7 @@
       // 按鈕進度狀態
       const submitBtn = $("#submitBtn");
       submitBtn.disabled = true;
-      const prog = (typeof startPercentProgress === "function")
-            ? startPercentProgress(submitBtn, "上傳中", { iconSrc: "images/奔跑貓咪.png" })
-            : { update: () => {}, stop: () => {} };
+      const prog = startProgressBar(submitBtn, { initial: 0, imgSrc: "images/奔跑貓咪.png" });
 
       try {
         // 1) 新增基本文件
@@ -1511,29 +1509,30 @@
           await updateDoc(doc(db, "pets", docRef.id), { mediaReady: false, wmPending: pendingPaths });
         }
 
-        // 逐檔上傳（含百分比進度）
-const __totalBytes = plans.reduce((s, p) => s + ((p?.f && p.f.size) || 0), 0) || 1;
-let __doneBytes = 0;
-for (const pl of plans) {
-  const r = sRef(storage, pl.path);
-  await new Promise((resolve, reject) => {
-    const task = (typeof uploadBytesResumable === "function")
-            ? uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' })
-            : null;
-          if (!task) { uploadBytes(r, pl.f, { contentType: pl.type || 'application/octet-stream' }).then(resolve).catch(reject); return; }
-    task.on("state_changed",
-      (snap) => {
-        const pct = Math.min(100, Math.floor(((__doneBytes + snap.bytesTransferred) / __totalBytes) * 100));
-        prog.update(pct);
-      },
-      (err) => reject(err),
-      () => resolve()
-    );
-  });
-  __doneBytes += (pl?.f && pl.f.size) || 0;
-  prog.update(Math.min(100, Math.floor((__doneBytes / __totalBytes) * 100)));
-  urls.push(await getDownloadURL(r));
-}
+        // 逐檔上傳（帶百分比進度）
+        const totalBytes = plans.reduce((sum, pl) => sum + ((pl.f && pl.f.size) ? pl.f.size : 0), 0) || 1;
+        let uploadedBase = 0;
+
+        for (const pl of plans) {
+          const r = sRef(storage, pl.path);
+          const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
+
+          await new Promise((resolve, reject) => {
+            task.on(
+              'state_changed',
+              (snap) => {
+                // overall progress = 已完成 + 目前檔案進度
+                const pct = ((uploadedBase + snap.bytesTransferred) / totalBytes) * 100;
+                prog.update(pct);
+              },
+              (err) => reject(err),
+              () => resolve()
+            );
+          });
+
+          uploadedBase += (task.snapshot?.totalBytes || 0);
+          urls.push(await getDownloadURL(task.snapshot.ref));
+        }
 
         // 3) 回寫 images 欄位
         if (urls.length) {
@@ -1541,9 +1540,9 @@ for (const pl of plans) {
         }
 
         // UI 收尾
-        prog.stop();
+        prog.done();
+        // （後面還會等待浮水印處理/更新列表，先繼續鎖住按鈕）
         submitBtn.disabled = true;
-        submitBtn.textContent = "處理中...";
 
         // ★ 清空名字欄位 + 把「已被使用」提示/紅框移除
         const nameInput = document.getElementById("name");
@@ -1627,7 +1626,7 @@ for (const pl of plans) {
         await Swal.fire({ icon: "error", title: "登錄失敗", text: err.message });
       } finally {
         submitBtn.disabled = false;
-        submitBtn.textContent = "登錄";
+        try { prog.restore(); } catch (_) { submitBtn.textContent = "登錄"; }
       }
     });
 
