@@ -1479,9 +1479,8 @@
       // 按鈕進度狀態
       const submitBtn = $("#submitBtn");
       submitBtn.disabled = true;
-      const prog = (typeof startPercentProgress === "function")
-            ? startPercentProgress(submitBtn, "上傳中", { iconSrc: "images/奔跑貓咪.png" })
-            : { update: () => {}, stop: () => {} };
+      const prog = startProgressBar(submitBtn, { imgSrc: "images/奔跑貓咪.png" });
+      prog.update(0);
 
       try {
         // 1) 新增基本文件
@@ -1491,6 +1490,10 @@
         const urls = [];
         const plans = [];
         const pendingPaths = [];
+
+        const __progressTotalBytes = selectedFiles.reduce((s, f) => s + (f?.size || 0), 0) || 1;
+        let __progressUploadedBytes = 0;
+
 
         // 先算出這批上傳會用到的 Storage paths，並先寫回 Firestore（避免後端處理比 images 更新更早完成）
         for (const f of selectedFiles) {
@@ -1511,29 +1514,29 @@
           await updateDoc(doc(db, "pets", docRef.id), { mediaReady: false, wmPending: pendingPaths });
         }
 
-        // 逐檔上傳（含百分比進度）
-const __totalBytes = plans.reduce((s, p) => s + ((p?.f && p.f.size) || 0), 0) || 1;
-let __doneBytes = 0;
-for (const pl of plans) {
-  const r = sRef(storage, pl.path);
-  await new Promise((resolve, reject) => {
-    const task = (typeof uploadBytesResumable === "function")
-            ? uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' })
-            : null;
-          if (!task) { uploadBytes(r, pl.f, { contentType: pl.type || 'application/octet-stream' }).then(resolve).catch(reject); return; }
-    task.on("state_changed",
-      (snap) => {
-        const pct = Math.min(100, Math.floor(((__doneBytes + snap.bytesTransferred) / __totalBytes) * 100));
-        prog.update(pct);
-      },
-      (err) => reject(err),
-      () => resolve()
-    );
-  });
-  __doneBytes += (pl?.f && pl.f.size) || 0;
-  prog.update(Math.min(100, Math.floor((__doneBytes / __totalBytes) * 100)));
-  urls.push(await getDownloadURL(r));
-}
+        // 逐檔上傳
+        for (const pl of plans) {
+          const r = sRef(storage, pl.path);
+          await new Promise((resolve, reject) => {
+            const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
+            task.on("state_changed",
+              (snap) => {
+                const base = __progressUploadedBytes || 0;
+                const now = base + (snap?.bytesTransferred || 0);
+                const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
+                prog.update(pct);
+              },
+              (err) => reject(err),
+              () => {
+                __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || pl.f?.size || 0);
+                prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
+                resolve();
+              }
+            );
+          });
+
+          urls.push(await getDownloadURL(r));
+        }
 
         // 3) 回寫 images 欄位
         if (urls.length) {
@@ -1541,7 +1544,8 @@ for (const pl of plans) {
         }
 
         // UI 收尾
-        prog.stop();
+        prog.update(100);
+        prog.stop({ text: "處理中...", keepDisabled: true });
         submitBtn.disabled = true;
         submitBtn.textContent = "處理中...";
 
@@ -1626,6 +1630,8 @@ for (const pl of plans) {
       } catch (err) {
         await Swal.fire({ icon: "error", title: "登錄失敗", text: err.message });
       } finally {
+        // 收回進度條並恢復排版
+        try { prog.stop({ restore: true, text: "登錄", keepDisabled: false }); } catch (_) { }
         submitBtn.disabled = false;
         submitBtn.textContent = "登錄";
       }
