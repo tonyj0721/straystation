@@ -526,7 +526,7 @@ function startProgressBar(btn, opts = {}) {
   barWrap.style.position = "absolute";
   barWrap.style.left = "14px";
   barWrap.style.right = "14px";
-  barWrap.style.top = "52px";
+  barWrap.style.top = "50px";
   barWrap.style.height = "14px";
   barWrap.style.background = "rgba(255,255,255,0.22)";
   barWrap.style.borderRadius = "9999px";
@@ -544,7 +544,7 @@ function startProgressBar(btn, opts = {}) {
   cat.alt = "";
   cat.decoding = "async";
   cat.style.position = "absolute";
-  cat.style.top = "-10px"; // 在進度條上方 cat.style.top = "4px";
+  cat.style.top = "-12px"; // 在進度條上方 cat.style.top = "4px";
   cat.style.left = "0%";
   cat.style.transform = "translateX(-50%)";
   cat.style.height = "85px";/*貓咪本體 cat.style.height = "34px";*/
@@ -642,7 +642,7 @@ function showWatermarkProgressSwal(opts = {}) {
   /*二哈本體 top:0; height:46px; bottom:-6px;*/
   const html = `
     <div style="text-align:left; margin-top:6px;">
-      <div style="position:relative; height:86px;">
+      <div style="position:relative; height:100px;">
         <div style="position:absolute; left:0; right:0; bottom:16px; height:22px; border-radius:999px; background:rgba(0,0,0,0.08); overflow:hidden;">
           <div id="${uid}_fill" style="height:100%; width:0%; border-radius:999px; background:linear-gradient(90deg, #ffd2a6, #d7f2c2); transition:width 120ms linear;"></div>
         </div>
