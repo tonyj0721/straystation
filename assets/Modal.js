@@ -526,7 +526,7 @@ function startProgressBar(btn, opts = {}) {
   barWrap.style.position = "absolute";
   barWrap.style.left = "14px";
   barWrap.style.right = "14px";
-  barWrap.style.top = "26px";
+  barWrap.bottom = "0px";
   barWrap.style.height = "14px";
   barWrap.style.background = "rgba(255,255,255,0.22)";
   barWrap.style.borderRadius = "9999px";
@@ -544,7 +544,7 @@ function startProgressBar(btn, opts = {}) {
   cat.alt = "";
   cat.decoding = "async";
   cat.style.position = "absolute";
-  cat.style.top = "-44px"; // 在進度條上方
+  cat.bottom = "0px";
   cat.style.left = "0%";
   cat.style.transform = "translateX(-50%)";
   cat.style.height = "102px";
@@ -641,15 +641,14 @@ function showWatermarkProgressSwal(opts = {}) {
   };
 
   const html = `
-    <div style="text-align:left; margin-top:6px; border:1px solid #333;">
-      <div style="position:relative; height:86px; border:1px solid #fa0000;">
+    <div style="text-align:left; margin-top:6px;">
+      <div style="position:relative; height:86px;">
         <div style="position:absolute; left:0; right:0; bottom:16px; height:22px; border-radius:999px; background:rgba(0,0,0,0.08); overflow:hidden;">
           <div id="${uid}_fill" style="height:100%; width:0%; border-radius:999px; background:linear-gradient(90deg, #ffd2a6, #d7f2c2); transition:width 120ms linear;"></div>
         </div>
         <img id="${uid}_dog" src="${imgSrc}" alt="" style="position:absolute; bottom:11px;; left:0; transform:translate(-50%, 0); height:92px; width:auto; pointer-events:none; user-select:none;" />
         <div id="${uid}_label" style="position:absolute; left:0; right:0; bottom:-12px; text-align:center; font-size:14px; color:#333;">Loading...0%</div>
       </div>
-      ${text ? `<div style="margin-top:10px; color:#555; font-size:14px;">${text}</div>` : ""}
     </div>
   `;
 
