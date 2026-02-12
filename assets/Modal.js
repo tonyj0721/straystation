@@ -526,8 +526,7 @@ function startProgressBar(btn, opts = {}) {
   barWrap.style.position = "absolute";
   barWrap.style.left = "14px";
   barWrap.style.right = "14px";
-  barWrap.style.top = "";
-  barWrap.style.bottom = "0px";
+
   barWrap.style.height = "14px";
   barWrap.style.background = "rgba(255,255,255,0.22)";
   barWrap.style.borderRadius = "9999px";
@@ -545,8 +544,7 @@ function startProgressBar(btn, opts = {}) {
   cat.alt = "";
   cat.decoding = "async";
   cat.style.position = "absolute";
-  cat.style.top = "";
-  cat.style.bottom = "0px";
+
   cat.style.left = "0%";
   cat.style.transform = "translateX(-50%)";
   cat.style.height = "102px";
@@ -556,8 +554,7 @@ function startProgressBar(btn, opts = {}) {
   label.style.position = "absolute";
   label.style.left = "0";
   label.style.right = "0";
-  label.style.bottom = "0px";
-  label.style.lineHeight = "1";
+
   label.style.fontSize = "12px";
   label.style.fontWeight = "600";
   label.style.color = "#fff";
