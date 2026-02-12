@@ -482,7 +482,7 @@ function startDots(span, base) {
 // ===============================
 function startProgressBar(btn, opts = {}) {
   const imgSrc = opts.imgSrc || "images/奔跑貓咪.png";
-  const height = opts.height || 100;/*容器本體 const height = opts.height || 64;*/
+  const height = opts.height || 64;
 
   const original = {
     html: btn.innerHTML,
@@ -526,7 +526,7 @@ function startProgressBar(btn, opts = {}) {
   barWrap.style.position = "absolute";
   barWrap.style.left = "14px";
   barWrap.style.right = "14px";
-  barWrap.style.top = "50px";
+  barWrap.style.top = "26px";
   barWrap.style.height = "14px";
   barWrap.style.background = "rgba(255,255,255,0.22)";
   barWrap.style.borderRadius = "9999px";
@@ -544,10 +544,10 @@ function startProgressBar(btn, opts = {}) {
   cat.alt = "";
   cat.decoding = "async";
   cat.style.position = "absolute";
-  cat.style.top = "-12px"; // 在進度條上方 cat.style.top = "4px";
+  cat.style.top = "4px"; // 在進度條上方
   cat.style.left = "0%";
   cat.style.transform = "translateX(-50%)";
-  cat.style.height = "85px";/*貓咪本體 cat.style.height = "34px";*/
+  cat.style.height = "34px";
   cat.style.pointerEvents = "none";
 
   const label = document.createElement("div");
@@ -641,13 +641,13 @@ function showWatermarkProgressSwal(opts = {}) {
   };
 
   const html = `
-    <div style="text-align:left; border:#333;">
-      <div style="position:relative; height:86px; border:#fa0000;">
+    <div style="text-align:left; margin-top:6px;">
+      <div style="position:relative; height:86px;">
+        <img id="${uid}_dog" src="${imgSrc}" alt="" style="position:absolute; top:0; left:0; transform:translate(-50%, 0); height:46px; width:auto; pointer-events:none; user-select:none;" />
         <div style="position:absolute; left:0; right:0; bottom:16px; height:22px; border-radius:999px; background:rgba(0,0,0,0.08); overflow:hidden;">
           <div id="${uid}_fill" style="height:100%; width:0%; border-radius:999px; background:linear-gradient(90deg, #ffd2a6, #d7f2c2); transition:width 120ms linear;"></div>
         </div>
-        <img id="${uid}_dog" src="${imgSrc}" alt="" style="position:absolute; top:0; left:0; transform:translate(-50%, 0); height:92px; width:auto; pointer-events:none; user-select:none;" />
-        <div id="${uid}_label" style="position:absolute; left:0; right:0; bottom:-10px; text-align:center; font-size:14px; color:#333;">Loading...0%</div>
+        <div id="${uid}_label" style="position:absolute; left:0; right:0; bottom:-6px; text-align:center; font-size:14px; color:#333;">Loading...0%</div>
       </div>
       ${text ? `<div style="margin-top:10px; color:#555; font-size:14px;">${text}</div>` : ""}
     </div>
@@ -1478,7 +1478,7 @@ async function saveEdit() {
       const wmSwal = showWatermarkProgressSwal({
         petId: currentDocId,
         title: "浮水印處理中…",
-        /*text: "處理完成後才會顯示在列表，並自動開啟詳情。",*/
+        text: "處理完成後才會顯示在列表，並自動開啟詳情。",
         imgSrc: "images/二哈.png",
       });
 
@@ -2311,7 +2311,7 @@ async function onConfirmAdopted() {
       const wmSwal = showWatermarkProgressSwal({
         petId: currentDocId,
         title: "浮水印處理中…",
-        /*text: "處理完成後才會顯示在列表。",*/
+        text: "處理完成後才會顯示在列表。",
         imgSrc: "images/二哈.png",
       });
 
