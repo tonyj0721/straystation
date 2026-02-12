@@ -642,7 +642,7 @@ function showWatermarkProgressSwal(opts = {}) {
 
   const html = `
     <div style="text-align:left; margin-top:6px;">
-      <div style="position:relative; height:auto;">
+      <div style="position:relative; height:86px;">
         <div style="position:absolute; left:0; right:0; bottom:-4px; height:22px; border-radius:999px; background:rgba(0,0,0,0.08); overflow:hidden;">
           <div id="${uid}_fill" style="height:100%; width:0%; border-radius:999px; background:linear-gradient(90deg, #ffd2a6, #d7f2c2); transition:width 120ms linear;"></div>
         </div>
