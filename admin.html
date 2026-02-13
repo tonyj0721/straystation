@@ -683,7 +683,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
     import {
       getFirestore, collection, getDocs, query, orderBy, where,
-      doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp, limit as fbLimit, deleteField, onSnapshot,
+      doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp, limit as fbLimit, deleteField,
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
     import { getStorage, ref as sRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject, listAll, } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
     import {
@@ -700,7 +700,7 @@
     Object.assign(window, {
       db, storage,
       collection, getDocs, query, orderBy, where,
-      doc, getDoc, updateDoc, deleteDoc, serverTimestamp, fbLimit, onSnapshot,
+      doc, getDoc, updateDoc, deleteDoc, serverTimestamp, fbLimit,
       deleteField,
       sRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject, listAll,
     });
@@ -1448,9 +1448,6 @@
         // 浮水印處理狀態（有上傳媒體就先設為未就緒）
         mediaReady: (selectedFiles.length === 0),
         wmPending: [],
-        // 合併總進度（給前端進度條用）
-        wmTotal: selectedFiles.length || 0,
-        wmOverall: (selectedFiles.length === 0) ? 100 : 0,
         createdAt: serverTimestamp(), // Firestore 伺服器時間
       };
 
@@ -1514,12 +1511,7 @@
         }
 
         if (pendingPaths.length) {
-          await updateDoc(doc(db, "pets", docRef.id), {
-            mediaReady: false,
-            wmPending: pendingPaths,
-            wmTotal: pendingPaths.length,
-            wmOverall: 0,
-          });
+          await updateDoc(doc(db, "pets", docRef.id), { mediaReady: false, wmPending: pendingPaths });
         }
 
         // 逐檔上傳
@@ -1575,12 +1567,7 @@
 
         // 若有媒體：等待後端完成浮水印後才「顯示登錄完成」並把資料放進列表（避免空窗被點開）
         if (pendingPaths.length) {
-          const wmSwal = showWatermarkProgressSwal({
-            petId: docRef.id,
-            title: "浮水印處理中…",
-            text: "處理完成後才會顯示在列表，並自動開啟詳情。",
-            imgSrc: "images/二哈.png",
-          });
+          const wmSwal = showWatermarkProgressSwal({ title: "浮水印處理中…", text: "處理完成後才會顯示在列表，並自動開啟詳情。", imgSrc: "images/二哈.png" });
 
           try {
             await __waitPetMediaReady(docRef.id);
