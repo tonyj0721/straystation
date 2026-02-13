@@ -1567,7 +1567,18 @@
 
         // 若有媒體：等待後端完成浮水印後才「顯示登錄完成」並把資料放進列表（避免空窗被點開）
         if (pendingPaths.length) {
-          const wmSwal = showWatermarkProgressSwal({ title: "浮水印處理中…", text: "處理完成後才會顯示在列表，並自動開啟詳情。", imgSrc: "images/二哈.png" });
+          Swal.fire({
+            icon: "info",
+            title: "浮水印處理中…",
+            text: "處理完成後才會顯示在列表，並自動開啟詳情。",
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            showConfirmButton: false,
+            didOpen: () => {
+              Swal.showLoading();
+            },
+            returnFocus: false,
+          });
 
           try {
             await __waitPetMediaReady(docRef.id);
@@ -1582,7 +1593,7 @@
             console.error("loadPets error:", e);
           }
 
-          wmSwal.finish();
+          Swal.close();
 
           await Swal.fire({
             icon: "success",
