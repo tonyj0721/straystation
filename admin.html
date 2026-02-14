@@ -1644,7 +1644,8 @@
       const q = query(collection(db, "pets"), orderBy("createdAt", "desc"));
       const snap = await getDocs(q);
       pets.length = 0;
-      pets.push(...snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p && p.mediaReady !== false));
+      pets.push(...snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      /*pets.push(...snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p && p.mediaReady !== false));看不見*/
       applyFilterAndRender();
     }
 
@@ -1756,7 +1757,8 @@
             fbLimit(100)
           );
           const snapPrefix = await getDocs(qPrefix);
-          prefix = snapPrefix.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p && p.mediaReady !== false);
+          prefix = snapPrefix.docs.map(d => ({ id: d.id, ...d.data() }));
+          /*prefix = snapPrefix.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p && p.mediaReady !== false);看不見*/
         } catch (e) {
           console.warn("prefix search skipped:", e);
         }
@@ -1782,7 +1784,7 @@
 
         const contains = recentDocs
           .map(d => ({ id: d.id, ...d.data() }))
-          .filter(p => p && p.mediaReady !== false)
+          /*.filter(p => p && p.mediaReady !== false)看不見*/
           .filter(p => {
             const nm = String(p.name || "");
             const nmLower = String(p.nameLower || nm).toLowerCase();
