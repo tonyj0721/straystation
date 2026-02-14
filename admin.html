@@ -1561,8 +1561,8 @@
         syncBreedSelectors();
 
         // ★ 登錄完成 → 捲到最上方（先 smooth，最後再硬捲補正）
-        window.scrollTo({ top: 0, behavior: "smooth" });
-        setTimeout(forceScrollTop, 250); // smooth 途中若被打斷，250ms 後硬捲補正
+        /*window.scrollTo({ top: 0, behavior: "smooth" });
+        setTimeout(forceScrollTop, 250); // smooth 途中若被打斷，250ms 後硬捲補正*/
 
         // 若有媒體：等待後端完成浮水印後才「顯示登錄完成」並把資料放進列表（避免空窗被點開）
         if (pendingPaths.length) {
