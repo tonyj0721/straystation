@@ -1566,8 +1566,8 @@ async function __convertHeicToJpegIfNeeded(file, { quality = 0.9 } = {}) {
         // 逐檔上傳
         for (const pl of plans) {
           const r = sRef(storage, pl.path);
+          const upFile = await __convertHeicToJpegIfNeeded(pl.f).catch((e) => { console.warn('HEIC 轉檔失敗：', e); return pl.f; });
           await new Promise((resolve, reject) => {
-            const upFile = await __convertHeicToJpegIfNeeded(pl.f).catch((e) => { console.warn('HEIC 轉檔失敗：', e); return pl.f; });
               const upType = (upFile && upFile.type) || pl.type || 'application/octet-stream';
               const task = uploadBytesResumable(r, upFile, { contentType: upType });
             task.on("state_changed",
