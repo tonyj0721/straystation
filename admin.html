@@ -704,6 +704,28 @@
       deleteField,
       sRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject, listAll,
     });
+    // ===== iOS / contentType 補救：有些裝置上傳時 file.type 會是空字串，導致 Storage 物件 contentType 變成 application/octet-stream
+    // 進而讓後端浮水印 function 判斷不到 image/* 而跳過處理。
+    function __guessContentType(file, filePath = "") {
+      const t = (file && file.type) ? String(file.type) : "";
+      if (t) return t;
+      const name = (filePath || (file && file.name) || "").toLowerCase();
+      const ext = name.split(".").pop();
+      switch (ext) {
+        case "jpg":
+        case "jpeg": return "image/jpeg";
+        case "png": return "image/png";
+        case "webp": return "image/webp";
+        case "gif": return "image/gif";
+        case "heic":
+        case "heif": return "image/heic";
+        case "mp4": return "video/mp4";
+        case "mov": return "video/quicktime";
+        case "m4v": return "video/x-m4v";
+        default: return "application/octet-stream";
+      }
+    }
+
 
     const auth = getAuth(app);
 
@@ -1403,51 +1425,6 @@
       }, 80);
     }
 
-
-    // ===============================
-    // iPhone HEIC/HEIF：上傳前先轉成 JPEG（避免後端浮水印處理失敗而卡住）
-    // ===============================
-    function __isHeicLike(file) {
-      const t = (file && file.type) ? String(file.type).toLowerCase() : "";
-      const n = (file && file.name) ? String(file.name).toLowerCase() : "";
-      return t === "image/heic" || t === "image/heif" || n.endsWith(".heic") || n.endsWith(".heif");
-    }
-
-    async function __normalizeIOSImageFile(file) {
-      if (!file) return file;
-      if (!__isHeicLike(file)) return file;
-
-      const url = URL.createObjectURL(file);
-      try {
-        const img = await new Promise((res, rej) => {
-          const im = new Image();
-          im.onload = () => res(im);
-          im.onerror = rej;
-          im.src = url;
-        });
-
-        const W = img.naturalWidth || img.width || 0;
-        const H = img.naturalHeight || img.height || 0;
-        if (!W || !H) return file;
-
-        const c = document.createElement("canvas");
-        c.width = W;
-        c.height = H;
-        const g = c.getContext("2d");
-        g.drawImage(img, 0, 0, W, H);
-
-        const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.9));
-        if (!blob) return file;
-
-        const name = (file.name || "image").replace(/\.(heic|heif)$/i, "") + ".jpg";
-        return new File([blob], name, { type: "image/jpeg" });
-      } catch (_) {
-        return file;
-      } finally {
-        URL.revokeObjectURL(url);
-      }
-    }
-
     // ===============================
     // 表單送出：新增動物資料
     // ===============================
@@ -1562,14 +1539,8 @@
         // 逐檔上傳
         for (const pl of plans) {
           const r = sRef(storage, pl.path);
-
-          // iPhone HEIC/HEIF 先轉 JPEG
-          const upFile0 = pl.f;
-          const upFile = await __normalizeIOSImageFile(upFile0);
-          const upType = (upFile && upFile.type) || pl.type || (upFile0 && upFile0.type) || 'application/octet-stream';
-
           await new Promise((resolve, reject) => {
-            const task = uploadBytesResumable(r, upFile, { contentType: upType || 'application/octet-stream' });
+            const task = uploadBytesResumable(r, pl.f, { contentType: __guessContentType(pl.f, pl.path) });
             task.on("state_changed",
               (snap) => {
                 const base = __progressUploadedBytes || 0;
