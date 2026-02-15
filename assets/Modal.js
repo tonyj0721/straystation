@@ -25,69 +25,6 @@ function thumbPathFromMediaPath(mediaPath) {
 }
 
 // ===============================
-// iPhone HEIC/HEIF：轉成 JPEG 再上傳（避免後端 sharp 無法解碼導致浮水印流程失敗）
-// ===============================
-function __isHeicFile(file) {
-  try {
-    const t = String(file?.type || "").toLowerCase();
-    const n = String(file?.name || "").toLowerCase();
-    return t === "image/heic" || t === "image/heif" || /\.hei(c|f)$/i.test(n);
-  } catch (_) {
-    return false;
-  }
-}
-
-async function __decodeToCanvasBlob(file, mime = "image/jpeg", quality = 0.85) {
-  // 優先用 createImageBitmap（iOS Safari 多數可用）
-  if (typeof createImageBitmap === "function") {
-    const bmp = await createImageBitmap(file);
-    const c = document.createElement("canvas");
-    c.width = bmp.width;
-    c.height = bmp.height;
-    const g = c.getContext("2d");
-    g.drawImage(bmp, 0, 0);
-    try { bmp.close?.(); } catch (_) { }
-    const blob = await new Promise((r) => c.toBlob(r, mime, quality));
-    if (!blob) throw new Error("toBlob returned null");
-    return blob;
-  }
-
-  // fallback：用 <img> + objectURL
-  const url = URL.createObjectURL(file);
-  try {
-    const img = new Image();
-    img.decoding = "async";
-    img.src = url;
-    await new Promise((res, rej) => {
-      img.onload = () => res();
-      img.onerror = () => rej(new Error("image decode failed"));
-    });
-    const c = document.createElement("canvas");
-    c.width = img.naturalWidth || img.width;
-    c.height = img.naturalHeight || img.height;
-    const g = c.getContext("2d");
-    g.drawImage(img, 0, 0);
-    const blob = await new Promise((r) => c.toBlob(r, mime, quality));
-    if (!blob) throw new Error("toBlob returned null");
-    return blob;
-  } finally {
-    try { URL.revokeObjectURL(url); } catch (_) { }
-  }
-}
-
-async function normalizeUploadFile(file) {
-  if (!file || !__isHeicFile(file)) return file;
-  try {
-    const blob = await __decodeToCanvasBlob(file, "image/jpeg", 0.85);
-    const base = String(file.name || "image").replace(/\.[^.]+$/, "");
-    return new File([blob], `${base}.jpg`, { type: "image/jpeg" });
-  } catch (_) {
-    // 轉檔失敗就退回原檔，至少不影響其他流程
-    return file;
-  }
-}
-
-// ===============================
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
 // ===============================
 function __primeThumbVideoFrame(v) {
@@ -1273,16 +1210,30 @@ async function saveEdit() {
 
   try {
     // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
-    const { items, removeUrls } = editImagesState;
-    const newUrls = [];
+const { items, removeUrls } = editImagesState;
+const newUrls = [];
 
-    // iPhone HEIC/HEIF 先轉 JPEG（會直接覆寫 it.file，後續流程與進度條都會用轉後的檔案）
-    if (Array.isArray(items)) {
-      for (const it of items) {
-        if (!it || it.kind !== "file" || !it.file) continue;
-        it.file = await normalizeUploadFile(it.file);
+// 先把 HEIF/HEIC（iPhone 照片）轉成 JPEG，避免後端無法解碼而浮水印失敗
+if (Array.isArray(items)) {
+  for (const it of items) {
+    if (it && it.kind === "file" && it.file) {
+      const t = (it.file.type || "");
+      const maybeImage = t.startsWith("image/") || __isHeifLike(it.file);
+      if (maybeImage) {
+        try {
+          const jf = await __heifToJpeg(it.file);
+          if (jf && jf !== it.file) {
+            it.file = jf;
+            it.__uploadType = "image/jpeg";
+          }
+        } catch (e) {
+          console.warn("HEIF→JPEG 轉檔失敗，將照原檔上傳：", e);
+        }
       }
     }
+  }
+}
+
 
     // 進度條：只計算本次要上傳的檔案（kind === 'file'）
     const __filesForProgress = (items || []).filter((it) => it && it.kind === "file" && it.file);
@@ -1306,7 +1257,7 @@ async function saveEdit() {
     for (const it of items) {
       if (it.kind !== "file") continue;
       const f = it.file;
-      const type = (f && f.type) || "";
+      const type = it.__uploadType || (f && f.type) || "";
       let ext = "bin";
       if (type.startsWith("image/")) ext = "jpg";
       else if (type.startsWith("video/")) ext = "mp4";
@@ -2193,12 +2144,7 @@ async function onConfirmAdopted() {
   const prog = startProgressBar(btn, { imgSrc: "images/奔跑貓咪.png" });
   prog.update(0);
 
-  // iPhone HEIC/HEIF 先轉 JPEG
-  const files0 = adoptedSelected.slice(0, 5);
-  const files = [];
-  for (const f of files0) {
-    files.push(await normalizeUploadFile(f));
-  }
+  const files = adoptedSelected.slice(0, 5);
   const urls = [];
   const __progressTotalBytes = files.reduce((s, f) => s + (f?.size || 0), 0) || 1;
   let __progressUploadedBytes = 0;
