@@ -24,53 +24,6 @@ function thumbPathFromMediaPath(mediaPath) {
   }
 }
 
-
-// ===============================
-// iPhone HEIC/HEIF：上傳前先轉成 JPEG（避免後端浮水印處理失敗而卡住）
-//  - 症狀：iPhone 照片卡在「浮水印處理中…」，最後圖片無浮水印；影片正常
-// ===============================
-function __isHeicLike(file) {
-  const t = (file && file.type) ? String(file.type).toLowerCase() : "";
-  const n = (file && file.name) ? String(file.name).toLowerCase() : "";
-  return t === "image/heic" || t === "image/heif" || n.endsWith(".heic") || n.endsWith(".heif");
-}
-
-async function __normalizeIOSImageFile(file) {
-  if (!file) return file;
-  if (!__isHeicLike(file)) return file;
-
-  // 以 <img> 解碼再轉 JPEG（iOS 對 HEIC 顯示通常沒問題）
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise((res, rej) => {
-      const im = new Image();
-      im.onload = () => res(im);
-      im.onerror = rej;
-      im.src = url;
-    });
-
-    const W = img.naturalWidth || img.width || 0;
-    const H = img.naturalHeight || img.height || 0;
-    if (!W || !H) return file;
-
-    const c = document.createElement("canvas");
-    c.width = W;
-    c.height = H;
-    const g = c.getContext("2d");
-    g.drawImage(img, 0, 0, W, H);
-
-    const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.9));
-    if (!blob) return file;
-
-    const name = (file.name || "image").replace(/\.(heic|heif)$/i, "") + ".jpg";
-    return new File([blob], name, { type: "image/jpeg" });
-  } catch (_) {
-    return file;
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
 // ===============================
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
 // ===============================
@@ -690,6 +643,30 @@ async function isNameTaken(name, exceptId = null) {
 // ===============================
 let currentDocId = null;
 let currentDoc = null;
+
+
+// ===== contentType 補救：某些 iPhone / iOS Safari 會讓 File.type 變空字串，導致上傳物件 contentType 不是 image/* 而讓後端浮水印跳過
+function __guessContentType(file, filePath = "") {
+  const t = (file && file.type) ? String(file.type) : "";
+  if (t) return t;
+  const name = (filePath || (file && file.name) || "").toLowerCase();
+  const ext = name.split(".").pop();
+  switch (ext) {
+    case "jpg":
+    case "jpeg": return "image/jpeg";
+    case "png": return "image/png";
+    case "webp": return "image/webp";
+    case "gif": return "image/gif";
+    case "heic":
+    case "heif": return "image/heic";
+    case "mp4": return "video/mp4";
+    case "mov": return "video/quicktime";
+    case "m4v": return "video/x-m4v";
+    default: return "application/octet-stream";
+  }
+}
+
+
 
 
 // ===============================
@@ -1323,11 +1300,9 @@ async function saveEdit() {
       }
 
       if (it.kind === "file") {
-        const f0 = it.file;
-        // iPhone HEIC/HEIF 先轉 JPEG，避免後端處理失敗
-        const f = await __normalizeIOSImageFile(f0);
+        const f = it.file;
         // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
-        const type = (f && f.type) || it.__uploadType || (f0 && f0.type) || '';
+        const type = it.__uploadType || (f && f.type) || '';
         const path = it.__uploadPath;
         const r = sRef(storage, path);
 
@@ -1338,7 +1313,7 @@ async function saveEdit() {
         }
 
         await new Promise((resolve, reject) => {
-          const task = uploadBytesResumable(r, f, { contentType: type || 'application/octet-stream' });
+          const task = uploadBytesResumable(r, f, { contentType: __guessContentType(f, path) });
           task.on("state_changed",
             (snap) => {
               const base = __progressUploadedBytes || 0;
@@ -2207,14 +2182,8 @@ async function onConfirmAdopted() {
 
     for (const pl of plans) {
       const r = sRef(storage, pl.path);
-
-      // iPhone HEIC/HEIF 合照也先轉 JPEG
-      const upFile0 = pl.f;
-      const upFile = await __normalizeIOSImageFile(upFile0);
-      const upType = (upFile && upFile.type) || pl.type || (upFile0 && upFile0.type) || 'application/octet-stream';
-
       await new Promise((resolve, reject) => {
-        const task = uploadBytesResumable(r, upFile, { contentType: upType || 'application/octet-stream' });
+        const task = uploadBytesResumable(r, pl.f, { contentType: __guessContentType(pl.f, pl.path) });
         task.on("state_changed",
           (snap) => {
             const base = __progressUploadedBytes || 0;
