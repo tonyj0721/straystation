@@ -120,6 +120,60 @@ const BREEDS = {
   },
 };
 
+
+// iPhone 常見：照片是 HEIC/HEIF，後端 sharp 可能無法解碼，會導致浮水印處理卡住。
+// 這裡在上傳前先把 HEIC/HEIF 轉成 JPEG（不加浮水印；浮水印仍由後端做）。
+async function __convertHeicToJpegIfNeeded(file, { quality = 0.9 } = {}) {
+  if (!file) return file;
+  const type = (file.type || "").toLowerCase();
+  const name = (file.name || "").toLowerCase();
+  const isHeic = type === "image/heic" || type === "image/heif" || name.endsWith(".heic") || name.endsWith(".heif");
+  if (!isHeic) return file;
+
+  // 盡量用 createImageBitmap（較不會卡主執行緒）
+  let bmp = null;
+  try {
+    if (window.createImageBitmap) bmp = await createImageBitmap(file);
+  } catch (_) { /* fallback */ }
+
+  // fallback：用 <img> 解碼
+  if (!bmp) {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((res, rej) => {
+        const im = new Image();
+        im.onload = () => res(im);
+        im.onerror = rej;
+        im.src = url;
+      });
+      const c = document.createElement("canvas");
+      c.width = img.naturalWidth || img.width || 0;
+      c.height = img.naturalHeight || img.height || 0;
+      const g = c.getContext("2d");
+      g.drawImage(img, 0, 0);
+      try { bmp = await createImageBitmap(c); } catch (_) { bmp = c; }
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  const W = bmp.width || 0;
+  const H = bmp.height || 0;
+  if (!W || !H) return file;
+
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const g = c.getContext("2d");
+  g.drawImage(bmp, 0, 0, W, H);
+  bmp.close?.();
+
+  const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", quality));
+  if (!blob) throw new Error("HEIC 轉 JPEG 失敗（toBlob 回傳空值）");
+
+  const newName = (file.name || "photo").replace(/\.[^.]+$/i, ".jpg");
+  return new File([blob], newName, { type: "image/jpeg" });
+}
+
 // 產生帶浮水印的 Blob（細字、無外框、疏一點）
 function __drawWatermarkPattern(g, W, H, text) {
   const ANG = -33 * Math.PI / 180;   // 斜角
@@ -166,6 +220,7 @@ async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {})
     __drawWatermarkPattern(g, W, H, text);
 
     const out = await new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
+    if (!out) throw new Error("圖片轉檔失敗（toBlob 回傳空值）");
     return new File([out], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
   } finally {
     URL.revokeObjectURL(url);
@@ -1276,11 +1331,9 @@ async function saveEdit() {
       }
 
       if (it.kind === "file") {
-        const f0 = it.file;
-        const norm = await __normalizeUploadFile(f0);
-        const f = norm.file;
+        const f = it.file;
         // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
-        const type = it.__uploadType || norm.type || (f && f.type) || '';
+        const type = it.__uploadType || (f && f.type) || '';
         const path = it.__uploadPath;
         const r = sRef(storage, path);
 
@@ -1291,7 +1344,9 @@ async function saveEdit() {
         }
 
         await new Promise((resolve, reject) => {
-          const task = uploadBytesResumable(r, f, { contentType: type || 'application/octet-stream' });
+          const upFile = await __convertHeicToJpegIfNeeded(f).catch((e) => { console.warn('HEIC 轉檔失敗：', e); return f; });
+          const upType = (upFile && upFile.type) || type || 'application/octet-stream';
+          const task = uploadBytesResumable(r, upFile, { contentType: upType });
           task.on("state_changed",
             (snap) => {
               const base = __progressUploadedBytes || 0;
@@ -2135,10 +2190,8 @@ async function onConfirmAdopted() {
     const pendingPaths = [];
 
     // 先算出這次要上傳的 Storage paths，並先寫回 Firestore（避免 race）
-    for (const f0 of files) {
-      const norm = await __normalizeUploadFile(f0);
-      const f = norm.file;
-      const type = norm.type || '';
+    for (const f of files) {
+      const type = (f && f.type) || '';
       let ext = 'bin';
       if (type.startsWith('image/')) ext = 'jpg';
       else if (type.startsWith('video/')) ext = 'mp4';
@@ -2340,67 +2393,6 @@ function swalInDialog(opts) {
     document.head.appendChild(s);
   }
 })();
-
-
-// ===============================
-// iPhone HEIC/HEIF：先轉成 JPEG 再上傳（後端 sharp 才能正常加浮水印）
-// ===============================
-function __isHeicLike(file, type) {
-  const t = (type || file?.type || "").toLowerCase();
-  const n = (file?.name || "").toLowerCase();
-  return t === "image/heic" || t === "image/heif" || n.endsWith(".heic") || n.endsWith(".heif");
-}
-
-async function __convertToJpeg(file, { quality = 0.9, maxDim = 4096 } = {}) {
-  const bmp = await (async () => {
-    if (window.createImageBitmap) {
-      try { return await createImageBitmap(file, { imageOrientation: "from-image" }); } catch (_) { }
-      try { return await createImageBitmap(file); } catch (_) { }
-    }
-    const url = URL.createObjectURL(file);
-    try {
-      const img = await new Promise((resolve, reject) => {
-        const el = new Image();
-        el.onload = () => resolve(el);
-        el.onerror = reject;
-        el.src = url;
-      });
-      return img;
-    } finally {
-      try { URL.revokeObjectURL(url); } catch (_) { }
-    }
-  })();
-
-  const w0 = bmp.width || bmp.naturalWidth || 0;
-  const h0 = bmp.height || bmp.naturalHeight || 0;
-  if (!w0 || !h0) throw new Error("無法讀取圖片尺寸（轉檔失敗）");
-  const scale = Math.min(1, maxDim / Math.max(w0, h0));
-  const W = Math.max(1, Math.round(w0 * scale));
-  const H = Math.max(1, Math.round(h0 * scale));
-
-  const canvas = document.createElement("canvas");
-  canvas.width = W;
-  canvas.height = H;
-  const ctx = canvas.getContext("2d", { alpha: false });
-  ctx.drawImage(bmp, 0, 0, W, H);
-  try { if (typeof bmp.close === "function") bmp.close(); } catch (_) { }
-
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
-  if (!blob) throw new Error("iPhone 轉 JPEG 失敗（canvas.toBlob 回傳空值）");
-
-  const base = (file?.name ? file.name.replace(/\.[^.]+$/, "") : "image") || "image";
-  return new File([blob], `${base}.jpg`, { type: "image/jpeg", lastModified: Date.now() });
-}
-
-async function __normalizeUploadFile(file) {
-  const type = (file && file.type) || "";
-  if (type && type.startsWith("video/")) return { file, type };
-  if (__isHeicLike(file, type)) {
-    const jpg = await __convertToJpeg(file);
-    return { file: jpg, type: "image/jpeg" };
-  }
-  return { file, type };
-}
 
 // --- 關閉對話框時自動清空「已領養合照」選取 ---
 // 這段會在：按右上角關閉、點 backdrop、按 Esc、程式呼叫 close()、甚至手動移除 open 屬性時，都清乾淨。
