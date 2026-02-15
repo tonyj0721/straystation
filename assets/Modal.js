@@ -1,5 +1,61 @@
 const q = (sel) => document.querySelector(sel);
 
+// ===============================
+// iOS HEIC/HEIF：轉成 JPEG 再上傳（避免後端浮水印/解碼失敗）
+//  - 用 heic2any（WASM）在瀏覽器端轉檔
+// ===============================
+function __isHeicLike(file) {
+  const name = (file && file.name ? String(file.name) : "").toLowerCase();
+  const type = (file && file.type ? String(file.type) : "").toLowerCase();
+  return name.endsWith(".heic") || name.endsWith(".heif") || type.includes("heic") || type.includes("heif");
+}
+
+function __guessImageTypeByName(file) {
+  const name = (file && file.name ? String(file.name) : "").toLowerCase();
+  if (name.endsWith(".png")) return "image/png";
+  if (name.endsWith(".webp")) return "image/webp";
+  if (name.endsWith(".gif")) return "image/gif";
+  // default
+  return "image/jpeg";
+}
+
+function __loadHeic2Any() {
+  if (window.heic2any) return Promise.resolve();
+  if (window.__heic2anyLoading) return window.__heic2anyLoading;
+  window.__heic2anyLoading = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/heic2any/dist/heic2any.min.js";
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("failed to load heic2any"));
+    document.head.appendChild(s);
+  });
+  return window.__heic2anyLoading;
+}
+
+async function __normalizeUploadFile(file) {
+  if (!file) return { file, type: "" };
+
+  // iOS 有時 file.type 會是空字串：先用副檔名推測
+  const fallbackType = __guessImageTypeByName(file);
+  const originalType = (file.type || "").trim();
+  const type = originalType || fallbackType;
+
+  // 只有 HEIC/HEIF 才轉檔
+  if (!__isHeicLike(file)) return { file, type };
+
+  try {
+    await __loadHeic2Any();
+    const blob = await window.heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
+    const base = (file.name ? file.name : "image").replace(/\.[^.]+$/, "");
+    const jpegFile = new File([blob], `${base}.jpg`, { type: "image/jpeg" });
+    return { file: jpegFile, type: "image/jpeg" };
+  } catch (e) {
+    console.warn("heic2any convert failed, fallback to original", e);
+    return { file, type };
+  }
+}
+
 function isVideoUrl(url) {
   if (!url) return false;
   const u = String(url).split("?", 1)[0];
@@ -645,30 +701,6 @@ let currentDocId = null;
 let currentDoc = null;
 
 
-// ===== contentType 補救：某些 iPhone / iOS Safari 會讓 File.type 變空字串，導致上傳物件 contentType 不是 image/* 而讓後端浮水印跳過
-function __guessContentType(file, filePath = "") {
-  const t = (file && file.type) ? String(file.type) : "";
-  if (t) return t;
-  const name = (filePath || (file && file.name) || "").toLowerCase();
-  const ext = name.split(".").pop();
-  switch (ext) {
-    case "jpg":
-    case "jpeg": return "image/jpeg";
-    case "png": return "image/png";
-    case "webp": return "image/webp";
-    case "gif": return "image/gif";
-    case "heic":
-    case "heif": return "image/heic";
-    case "mp4": return "video/mp4";
-    case "mov": return "video/quicktime";
-    case "m4v": return "video/x-m4v";
-    default: return "application/octet-stream";
-  }
-}
-
-
-
-
 // ===============================
 // 浮水印處理：避免短時間看到「未浮水印」
 //  - mediaReady: false 表示後端還在覆蓋浮水印檔
@@ -1259,7 +1291,9 @@ async function saveEdit() {
     for (const it of items) {
       if (it.kind !== "file") continue;
       const f = it.file;
-      const type = (f && f.type) || "";
+      let type = (f && f.type) || "";
+      if (!type) type = __guessImageTypeByName(f);
+      if (__isHeicLike(f)) type = "image/jpeg";
       let ext = "bin";
       if (type.startsWith("image/")) ext = "jpg";
       else if (type.startsWith("video/")) ext = "mp4";
@@ -1302,7 +1336,10 @@ async function saveEdit() {
       if (it.kind === "file") {
         const f = it.file;
         // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
-        const type = it.__uploadType || (f && f.type) || '';
+        const norm = await __normalizeUploadFile(f);
+        const nf = norm.file;
+        const type = it.__uploadType || norm.type || (nf && nf.type) || '';
+        it.__normalizedFile = nf;
         const path = it.__uploadPath;
         const r = sRef(storage, path);
 
@@ -1313,7 +1350,7 @@ async function saveEdit() {
         }
 
         await new Promise((resolve, reject) => {
-          const task = uploadBytesResumable(r, f, { contentType: __guessContentType(f, path) });
+          const task = uploadBytesResumable(r, f, { contentType: type || 'application/octet-stream' });
           task.on("state_changed",
             (snap) => {
               const base = __progressUploadedBytes || 0;
@@ -2183,7 +2220,7 @@ async function onConfirmAdopted() {
     for (const pl of plans) {
       const r = sRef(storage, pl.path);
       await new Promise((resolve, reject) => {
-        const task = uploadBytesResumable(r, pl.f, { contentType: __guessContentType(pl.f, pl.path) });
+        const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
         task.on("state_changed",
           (snap) => {
             const base = __progressUploadedBytes || 0;
