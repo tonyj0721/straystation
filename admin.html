@@ -662,6 +662,52 @@
 
   <script src="./assets/firebase-config.js"></script>
   <script type="module">
+
+    // ===============================
+    // iOS HEIC/HEIF：轉成 JPEG 再上傳（避免後端浮水印/解碼失敗）
+    // ===============================
+    function __isHeicLike(file) {
+      const name = (file && file.name ? String(file.name) : "").toLowerCase();
+      const type = (file && file.type ? String(file.type) : "").toLowerCase();
+      return name.endsWith(".heic") || name.endsWith(".heif") || type.includes("heic") || type.includes("heif");
+    }
+    function __guessImageTypeByName(file) {
+      const name = (file && file.name ? String(file.name) : "").toLowerCase();
+      if (name.endsWith(".png")) return "image/png";
+      if (name.endsWith(".webp")) return "image/webp";
+      if (name.endsWith(".gif")) return "image/gif";
+      return "image/jpeg";
+    }
+    function __loadHeic2Any() {
+      if (window.heic2any) return Promise.resolve();
+      if (window.__heic2anyLoading) return window.__heic2anyLoading;
+      window.__heic2anyLoading = new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = "https://cdn.jsdelivr.net/npm/heic2any/dist/heic2any.min.js";
+        s.async = true;
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error("failed to load heic2any"));
+        document.head.appendChild(s);
+      });
+      return window.__heic2anyLoading;
+    }
+    async function __normalizeUploadFile(file) {
+      if (!file) return { file, type: "" };
+      const fallbackType = __guessImageTypeByName(file);
+      const originalType = (file.type || "").trim();
+      const type = originalType || fallbackType;
+      if (!__isHeicLike(file)) return { file, type };
+      try {
+        await __loadHeic2Any();
+        const blob = await window.heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
+        const base = (file.name ? file.name : "image").replace(/\.[^.]+$/, "");
+        const jpegFile = new File([blob], `${base}.jpg`, { type: "image/jpeg" });
+        return { file: jpegFile, type: "image/jpeg" };
+      } catch (e) {
+        console.warn("heic2any convert failed, fallback to original", e);
+        return { file, type };
+      }
+    }
     // 如果 withStableSearchRender 沒定義，就退成「直接渲染」
     const renderStable = (typeof withStableSearchRender === 'function')
       ? withStableSearchRender
@@ -704,28 +750,6 @@
       deleteField,
       sRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject, listAll,
     });
-    // ===== iOS / contentType 補救：有些裝置上傳時 file.type 會是空字串，導致 Storage 物件 contentType 變成 application/octet-stream
-    // 進而讓後端浮水印 function 判斷不到 image/* 而跳過處理。
-    function __guessContentType(file, filePath = "") {
-      const t = (file && file.type) ? String(file.type) : "";
-      if (t) return t;
-      const name = (filePath || (file && file.name) || "").toLowerCase();
-      const ext = name.split(".").pop();
-      switch (ext) {
-        case "jpg":
-        case "jpeg": return "image/jpeg";
-        case "png": return "image/png";
-        case "webp": return "image/webp";
-        case "gif": return "image/gif";
-        case "heic":
-        case "heif": return "image/heic";
-        case "mp4": return "video/mp4";
-        case "mov": return "video/quicktime";
-        case "m4v": return "video/x-m4v";
-        default: return "application/octet-stream";
-      }
-    }
-
 
     const auth = getAuth(app);
 
@@ -1520,7 +1544,9 @@
         // 先算出這批上傳會用到的 Storage paths，並先寫回 Firestore（避免後端處理比 images 更新更早完成）
         for (const f of selectedFiles) {
           // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
-          const type = (f && f.type) || '';
+          const norm = await __normalizeUploadFile(f);
+          const nf = norm.file;
+          let type = norm.type || (nf && nf.type) || '';
           // 路徑副檔名固定用 jpg/mp4，讓後端覆蓋後檔名/格式一致（避免 iPhone/WebM 問題）
           let ext = 'bin';
           if (type.startsWith('image/')) ext = 'jpg';
@@ -1528,7 +1554,7 @@
 
           const base = f.name.replace(/\.[^.]+$/, '');
           const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
-          plans.push({ f, type, path });
+          plans.push({ f: nf, type, path });
           pendingPaths.push(path);
         }
 
@@ -1540,7 +1566,7 @@
         for (const pl of plans) {
           const r = sRef(storage, pl.path);
           await new Promise((resolve, reject) => {
-            const task = uploadBytesResumable(r, pl.f, { contentType: __guessContentType(pl.f, pl.path) });
+            const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
             task.on("state_changed",
               (snap) => {
                 const base = __progressUploadedBytes || 0;
