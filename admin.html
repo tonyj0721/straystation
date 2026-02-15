@@ -705,6 +705,66 @@
       sRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject, listAll,
     });
 
+    // ===============================
+    // iPhone HEIC/HEIF：轉成 JPEG 再上傳（避免後端 sharp 無法解碼導致浮水印流程失敗）
+    // ===============================
+    const __isHeicFile = (file) => {
+      try {
+        const t = String(file?.type || '').toLowerCase();
+        const n = String(file?.name || '').toLowerCase();
+        return t === 'image/heic' || t === 'image/heif' || /\.hei(c|f)$/i.test(n);
+      } catch (_) {
+        return false;
+      }
+    };
+
+    async function __decodeToCanvasBlob(file, mime = 'image/jpeg', quality = 0.85) {
+      if (typeof createImageBitmap === 'function') {
+        const bmp = await createImageBitmap(file);
+        const c = document.createElement('canvas');
+        c.width = bmp.width;
+        c.height = bmp.height;
+        const g = c.getContext('2d');
+        g.drawImage(bmp, 0, 0);
+        try { bmp.close?.(); } catch (_) { }
+        const blob = await new Promise((r) => c.toBlob(r, mime, quality));
+        if (!blob) throw new Error('toBlob returned null');
+        return blob;
+      }
+
+      const url = URL.createObjectURL(file);
+      try {
+        const img = new Image();
+        img.decoding = 'async';
+        img.src = url;
+        await new Promise((res, rej) => {
+          img.onload = () => res();
+          img.onerror = () => rej(new Error('image decode failed'));
+        });
+        const c = document.createElement('canvas');
+        c.width = img.naturalWidth || img.width;
+        c.height = img.naturalHeight || img.height;
+        const g = c.getContext('2d');
+        g.drawImage(img, 0, 0);
+        const blob = await new Promise((r) => c.toBlob(r, mime, quality));
+        if (!blob) throw new Error('toBlob returned null');
+        return blob;
+      } finally {
+        try { URL.revokeObjectURL(url); } catch (_) { }
+      }
+    }
+
+    async function normalizeUploadFile(file) {
+      if (!file || !__isHeicFile(file)) return file;
+      try {
+        const blob = await __decodeToCanvasBlob(file, 'image/jpeg', 0.85);
+        const base = String(file.name || 'image').replace(/\.[^.]+$/, '');
+        return new File([blob], `${base}.jpg`, { type: 'image/jpeg' });
+      } catch (_) {
+        return file;
+      }
+    }
+
     const auth = getAuth(app);
 
     // ===============================
@@ -1491,13 +1551,15 @@
         const plans = [];
         const pendingPaths = [];
 
-        const __progressTotalBytes = selectedFiles.reduce((s, f) => s + (f?.size || 0), 0) || 1;
+        let __progressTotalBytes = 0;
         let __progressUploadedBytes = 0;
 
 
         // 先算出這批上傳會用到的 Storage paths，並先寫回 Firestore（避免後端處理比 images 更新更早完成）
-        for (const f of selectedFiles) {
+        for (const f0 of selectedFiles) {
           // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
+          // 但 iPhone 可能上傳 HEIC/HEIF：先轉成 JPEG，避免後端無法解碼而沒浮水印
+          const f = await normalizeUploadFile(f0);
           const type = (f && f.type) || '';
           // 路徑副檔名固定用 jpg/mp4，讓後端覆蓋後檔名/格式一致（避免 iPhone/WebM 問題）
           let ext = 'bin';
@@ -1508,7 +1570,11 @@
           const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
           plans.push({ f, type, path });
           pendingPaths.push(path);
+
+          __progressTotalBytes += (f?.size || 0);
         }
+
+        __progressTotalBytes = __progressTotalBytes || 1;
 
         if (pendingPaths.length) {
           await updateDoc(doc(db, "pets", docRef.id), { mediaReady: false, wmPending: pendingPaths });
