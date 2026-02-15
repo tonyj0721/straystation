@@ -705,66 +705,6 @@
       sRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject, listAll,
     });
 
-    // ===============================
-    // iPhone HEIC/HEIF：轉成 JPEG 再上傳（避免後端 sharp 無法解碼導致浮水印流程失敗）
-    // ===============================
-    const __isHeicFile = (file) => {
-      try {
-        const t = String(file?.type || '').toLowerCase();
-        const n = String(file?.name || '').toLowerCase();
-        return t === 'image/heic' || t === 'image/heif' || /\.hei(c|f)$/i.test(n);
-      } catch (_) {
-        return false;
-      }
-    };
-
-    async function __decodeToCanvasBlob(file, mime = 'image/jpeg', quality = 0.85) {
-      if (typeof createImageBitmap === 'function') {
-        const bmp = await createImageBitmap(file);
-        const c = document.createElement('canvas');
-        c.width = bmp.width;
-        c.height = bmp.height;
-        const g = c.getContext('2d');
-        g.drawImage(bmp, 0, 0);
-        try { bmp.close?.(); } catch (_) { }
-        const blob = await new Promise((r) => c.toBlob(r, mime, quality));
-        if (!blob) throw new Error('toBlob returned null');
-        return blob;
-      }
-
-      const url = URL.createObjectURL(file);
-      try {
-        const img = new Image();
-        img.decoding = 'async';
-        img.src = url;
-        await new Promise((res, rej) => {
-          img.onload = () => res();
-          img.onerror = () => rej(new Error('image decode failed'));
-        });
-        const c = document.createElement('canvas');
-        c.width = img.naturalWidth || img.width;
-        c.height = img.naturalHeight || img.height;
-        const g = c.getContext('2d');
-        g.drawImage(img, 0, 0);
-        const blob = await new Promise((r) => c.toBlob(r, mime, quality));
-        if (!blob) throw new Error('toBlob returned null');
-        return blob;
-      } finally {
-        try { URL.revokeObjectURL(url); } catch (_) { }
-      }
-    }
-
-    async function normalizeUploadFile(file) {
-      if (!file || !__isHeicFile(file)) return file;
-      try {
-        const blob = await __decodeToCanvasBlob(file, 'image/jpeg', 0.85);
-        const base = String(file.name || 'image').replace(/\.[^.]+$/, '');
-        return new File([blob], `${base}.jpg`, { type: 'image/jpeg' });
-      } catch (_) {
-        return file;
-      }
-    }
-
     const auth = getAuth(app);
 
     // ===============================
@@ -1543,6 +1483,44 @@
       prog.update(0);
 
       try {
+
+// iPhone 常見：照片是 HEIF/HEIC，後端 sharp 可能無法解碼 → 浮水印流程失敗
+// 因此前端遇到 HEIF/HEIC 先轉成 JPEG 再上傳（影片不處理）
+function __isHeifLike(file) {
+  const t = (file && file.type) ? String(file.type).toLowerCase() : "";
+  const n = (file && file.name) ? String(file.name).toLowerCase() : "";
+  return t.includes("heic") || t.includes("heif") || n.endsWith(".heic") || n.endsWith(".heif");
+}
+
+async function __heifToJpeg(file, quality = 0.9) {
+  // 只處理影像
+  if (!file || !__isHeifLike(file)) return file;
+
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => {
+      const im = new Image();
+      im.onload = () => res(im);
+      im.onerror = () => rej(new Error("HEIF 圖片載入失敗（可能瀏覽器不支援）"));
+      im.src = url;
+    });
+
+    const c = document.createElement("canvas");
+    c.width = img.naturalWidth || img.width || 1;
+    c.height = img.naturalHeight || img.height || 1;
+    const g = c.getContext("2d", { alpha: false });
+    g.drawImage(img, 0, 0);
+
+    const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", quality));
+    if (!blob) throw new Error("HEIF 轉 JPEG 失敗（toBlob 回傳 null）");
+
+    const base = (file.name || "image").replace(/\.[^.]+$/, "");
+    return new File([blob], base + ".jpg", { type: "image/jpeg" });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
         // 1) 新增基本文件
         const docRef = await addDoc(collection(db, "pets"), payload);
 
@@ -1551,15 +1529,16 @@
         const plans = [];
         const pendingPaths = [];
 
-        let __progressTotalBytes = 0;
+        let __progressTotalBytes = selectedFiles.reduce((s, f) => s + (f?.size || 0), 0) || 1; // 先用原檔估算，稍後會用 plans 校正
         let __progressUploadedBytes = 0;
 
 
         // 先算出這批上傳會用到的 Storage paths，並先寫回 Firestore（避免後端處理比 images 更新更早完成）
         for (const f0 of selectedFiles) {
+          // HEIF/HEIC（iPhone 照片）先轉 JPEG，再交給後端浮水印
+          let f = f0;
+          try { f = await __heifToJpeg(f0); } catch (e) { console.warn('HEIF→JPEG 轉檔失敗，改用原檔上傳：', e); f = f0; }
           // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
-          // 但 iPhone 可能上傳 HEIC/HEIF：先轉成 JPEG，避免後端無法解碼而沒浮水印
-          const f = await normalizeUploadFile(f0);
           const type = (f && f.type) || '';
           // 路徑副檔名固定用 jpg/mp4，讓後端覆蓋後檔名/格式一致（避免 iPhone/WebM 問題）
           let ext = 'bin';
@@ -1570,11 +1549,10 @@
           const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
           plans.push({ f, type, path });
           pendingPaths.push(path);
-
-          __progressTotalBytes += (f?.size || 0);
         }
 
-        __progressTotalBytes = __progressTotalBytes || 1;
+        // 校正總 bytes（含 HEIF→JPEG 後的實際大小）
+        __progressTotalBytes = plans.reduce((s, p) => s + (p.f?.size || 0), 0) || 1;
 
         if (pendingPaths.length) {
           await updateDoc(doc(db, "pets", docRef.id), { mediaReady: false, wmPending: pendingPaths });
