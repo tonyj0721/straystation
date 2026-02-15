@@ -662,56 +662,7 @@
 
   <script src="./assets/firebase-config.js"></script>
   <script type="module">
-    
-// iPhone 常見：照片是 HEIC/HEIF；後端轉檔/浮水印可能會失敗，導致「浮水印處理中」卡住。
-// 上傳前先把 HEIC/HEIF 轉成 JPEG（浮水印仍由後端做）。
-async function __convertHeicToJpegIfNeeded(file, { quality = 0.9 } = {}) {
-  if (!file) return file;
-  const type = (file.type || "").toLowerCase();
-  const name = (file.name || "").toLowerCase();
-  const isHeic = type === "image/heic" || type === "image/heif" || name.endsWith(".heic") || name.endsWith(".heif");
-  if (!isHeic) return file;
-
-  let bmp = null;
-  try { if (window.createImageBitmap) bmp = await createImageBitmap(file); } catch (_) { }
-  if (!bmp) {
-    const url = URL.createObjectURL(file);
-    try {
-      const img = await new Promise((res, rej) => {
-        const im = new Image();
-        im.onload = () => res(im);
-        im.onerror = rej;
-        im.src = url;
-      });
-      const c = document.createElement("canvas");
-      c.width = img.naturalWidth || img.width || 0;
-      c.height = img.naturalHeight || img.height || 0;
-      const g = c.getContext("2d");
-      g.drawImage(img, 0, 0);
-      try { bmp = await createImageBitmap(c); } catch (_) { bmp = c; }
-    } finally {
-      URL.revokeObjectURL(url);
-    }
-  }
-
-  const W = bmp.width || 0;
-  const H = bmp.height || 0;
-  if (!W || !H) return file;
-
-  const c = document.createElement("canvas");
-  c.width = W; c.height = H;
-  const g = c.getContext("2d");
-  g.drawImage(bmp, 0, 0, W, H);
-  bmp.close?.();
-
-  const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", quality));
-  if (!blob) throw new Error("HEIC 轉 JPEG 失敗（toBlob 回傳空值）");
-
-  const newName = (file.name || "photo").replace(/\.[^.]+$/i, ".jpg");
-  return new File([blob], newName, { type: "image/jpeg" });
-}
-
-// 如果 withStableSearchRender 沒定義，就退成「直接渲染」
+    // 如果 withStableSearchRender 沒定義，就退成「直接渲染」
     const renderStable = (typeof withStableSearchRender === 'function')
       ? withStableSearchRender
       : (fn) => fn();
@@ -1452,6 +1403,51 @@ async function __convertHeicToJpegIfNeeded(file, { quality = 0.9 } = {}) {
       }, 80);
     }
 
+
+    // ===============================
+    // iPhone HEIC/HEIF：上傳前先轉成 JPEG（避免後端浮水印處理失敗而卡住）
+    // ===============================
+    function __isHeicLike(file) {
+      const t = (file && file.type) ? String(file.type).toLowerCase() : "";
+      const n = (file && file.name) ? String(file.name).toLowerCase() : "";
+      return t === "image/heic" || t === "image/heif" || n.endsWith(".heic") || n.endsWith(".heif");
+    }
+
+    async function __normalizeIOSImageFile(file) {
+      if (!file) return file;
+      if (!__isHeicLike(file)) return file;
+
+      const url = URL.createObjectURL(file);
+      try {
+        const img = await new Promise((res, rej) => {
+          const im = new Image();
+          im.onload = () => res(im);
+          im.onerror = rej;
+          im.src = url;
+        });
+
+        const W = img.naturalWidth || img.width || 0;
+        const H = img.naturalHeight || img.height || 0;
+        if (!W || !H) return file;
+
+        const c = document.createElement("canvas");
+        c.width = W;
+        c.height = H;
+        const g = c.getContext("2d");
+        g.drawImage(img, 0, 0, W, H);
+
+        const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.9));
+        if (!blob) return file;
+
+        const name = (file.name || "image").replace(/\.(heic|heif)$/i, "") + ".jpg";
+        return new File([blob], name, { type: "image/jpeg" });
+      } catch (_) {
+        return file;
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }
+
     // ===============================
     // 表單送出：新增動物資料
     // ===============================
@@ -1566,10 +1562,14 @@ async function __convertHeicToJpegIfNeeded(file, { quality = 0.9 } = {}) {
         // 逐檔上傳
         for (const pl of plans) {
           const r = sRef(storage, pl.path);
-          const upFile = await __convertHeicToJpegIfNeeded(pl.f).catch((e) => { console.warn('HEIC 轉檔失敗：', e); return pl.f; });
+
+          // iPhone HEIC/HEIF 先轉 JPEG
+          const upFile0 = pl.f;
+          const upFile = await __normalizeIOSImageFile(upFile0);
+          const upType = (upFile && upFile.type) || pl.type || (upFile0 && upFile0.type) || 'application/octet-stream';
+
           await new Promise((resolve, reject) => {
-              const upType = (upFile && upFile.type) || pl.type || 'application/octet-stream';
-              const task = uploadBytesResumable(r, upFile, { contentType: upType });
+            const task = uploadBytesResumable(r, upFile, { contentType: upType || 'application/octet-stream' });
             task.on("state_changed",
               (snap) => {
                 const base = __progressUploadedBytes || 0;
