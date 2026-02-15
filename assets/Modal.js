@@ -24,6 +24,53 @@ function thumbPathFromMediaPath(mediaPath) {
   }
 }
 
+
+// ===============================
+// iPhone HEIC/HEIF：上傳前先轉成 JPEG（避免後端浮水印處理失敗而卡住）
+//  - 症狀：iPhone 照片卡在「浮水印處理中…」，最後圖片無浮水印；影片正常
+// ===============================
+function __isHeicLike(file) {
+  const t = (file && file.type) ? String(file.type).toLowerCase() : "";
+  const n = (file && file.name) ? String(file.name).toLowerCase() : "";
+  return t === "image/heic" || t === "image/heif" || n.endsWith(".heic") || n.endsWith(".heif");
+}
+
+async function __normalizeIOSImageFile(file) {
+  if (!file) return file;
+  if (!__isHeicLike(file)) return file;
+
+  // 以 <img> 解碼再轉 JPEG（iOS 對 HEIC 顯示通常沒問題）
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => {
+      const im = new Image();
+      im.onload = () => res(im);
+      im.onerror = rej;
+      im.src = url;
+    });
+
+    const W = img.naturalWidth || img.width || 0;
+    const H = img.naturalHeight || img.height || 0;
+    if (!W || !H) return file;
+
+    const c = document.createElement("canvas");
+    c.width = W;
+    c.height = H;
+    const g = c.getContext("2d");
+    g.drawImage(img, 0, 0, W, H);
+
+    const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.9));
+    if (!blob) return file;
+
+    const name = (file.name || "image").replace(/\.(heic|heif)$/i, "") + ".jpg";
+    return new File([blob], name, { type: "image/jpeg" });
+  } catch (_) {
+    return file;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 // ===============================
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
 // ===============================
@@ -120,60 +167,6 @@ const BREEDS = {
   },
 };
 
-
-// iPhone 常見：照片是 HEIC/HEIF，後端 sharp 可能無法解碼，會導致浮水印處理卡住。
-// 這裡在上傳前先把 HEIC/HEIF 轉成 JPEG（不加浮水印；浮水印仍由後端做）。
-async function __convertHeicToJpegIfNeeded(file, { quality = 0.9 } = {}) {
-  if (!file) return file;
-  const type = (file.type || "").toLowerCase();
-  const name = (file.name || "").toLowerCase();
-  const isHeic = type === "image/heic" || type === "image/heif" || name.endsWith(".heic") || name.endsWith(".heif");
-  if (!isHeic) return file;
-
-  // 盡量用 createImageBitmap（較不會卡主執行緒）
-  let bmp = null;
-  try {
-    if (window.createImageBitmap) bmp = await createImageBitmap(file);
-  } catch (_) { /* fallback */ }
-
-  // fallback：用 <img> 解碼
-  if (!bmp) {
-    const url = URL.createObjectURL(file);
-    try {
-      const img = await new Promise((res, rej) => {
-        const im = new Image();
-        im.onload = () => res(im);
-        im.onerror = rej;
-        im.src = url;
-      });
-      const c = document.createElement("canvas");
-      c.width = img.naturalWidth || img.width || 0;
-      c.height = img.naturalHeight || img.height || 0;
-      const g = c.getContext("2d");
-      g.drawImage(img, 0, 0);
-      try { bmp = await createImageBitmap(c); } catch (_) { bmp = c; }
-    } finally {
-      URL.revokeObjectURL(url);
-    }
-  }
-
-  const W = bmp.width || 0;
-  const H = bmp.height || 0;
-  if (!W || !H) return file;
-
-  const c = document.createElement("canvas");
-  c.width = W; c.height = H;
-  const g = c.getContext("2d");
-  g.drawImage(bmp, 0, 0, W, H);
-  bmp.close?.();
-
-  const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", quality));
-  if (!blob) throw new Error("HEIC 轉 JPEG 失敗（toBlob 回傳空值）");
-
-  const newName = (file.name || "photo").replace(/\.[^.]+$/i, ".jpg");
-  return new File([blob], newName, { type: "image/jpeg" });
-}
-
 // 產生帶浮水印的 Blob（細字、無外框、疏一點）
 function __drawWatermarkPattern(g, W, H, text) {
   const ANG = -33 * Math.PI / 180;   // 斜角
@@ -220,7 +213,6 @@ async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {})
     __drawWatermarkPattern(g, W, H, text);
 
     const out = await new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
-    if (!out) throw new Error("圖片轉檔失敗（toBlob 回傳空值）");
     return new File([out], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
   } finally {
     URL.revokeObjectURL(url);
@@ -1331,9 +1323,11 @@ async function saveEdit() {
       }
 
       if (it.kind === "file") {
-        const f = it.file;
+        const f0 = it.file;
+        // iPhone HEIC/HEIF 先轉 JPEG，避免後端處理失敗
+        const f = await __normalizeIOSImageFile(f0);
         // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
-        const type = it.__uploadType || (f && f.type) || '';
+        const type = (f && f.type) || it.__uploadType || (f0 && f0.type) || '';
         const path = it.__uploadPath;
         const r = sRef(storage, path);
 
@@ -1343,10 +1337,8 @@ async function saveEdit() {
           // noop
         }
 
-        const upFile = await __convertHeicToJpegIfNeeded(f).catch((e) => { console.warn('HEIC 轉檔失敗：', e); return f; });
         await new Promise((resolve, reject) => {
-          const upType = (upFile && upFile.type) || type || 'application/octet-stream';
-          const task = uploadBytesResumable(r, upFile, { contentType: upType });
+          const task = uploadBytesResumable(r, f, { contentType: type || 'application/octet-stream' });
           task.on("state_changed",
             (snap) => {
               const base = __progressUploadedBytes || 0;
@@ -2215,8 +2207,14 @@ async function onConfirmAdopted() {
 
     for (const pl of plans) {
       const r = sRef(storage, pl.path);
+
+      // iPhone HEIC/HEIF 合照也先轉 JPEG
+      const upFile0 = pl.f;
+      const upFile = await __normalizeIOSImageFile(upFile0);
+      const upType = (upFile && upFile.type) || pl.type || (upFile0 && upFile0.type) || 'application/octet-stream';
+
       await new Promise((resolve, reject) => {
-        const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
+        const task = uploadBytesResumable(r, upFile, { contentType: upType || 'application/octet-stream' });
         task.on("state_changed",
           (snap) => {
             const base = __progressUploadedBytes || 0;
