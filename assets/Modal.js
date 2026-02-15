@@ -1343,8 +1343,8 @@ async function saveEdit() {
           // noop
         }
 
+        const upFile = await __convertHeicToJpegIfNeeded(f).catch((e) => { console.warn('HEIC 轉檔失敗：', e); return f; });
         await new Promise((resolve, reject) => {
-          const upFile = await __convertHeicToJpegIfNeeded(f).catch((e) => { console.warn('HEIC 轉檔失敗：', e); return f; });
           const upType = (upFile && upFile.type) || type || 'application/octet-stream';
           const task = uploadBytesResumable(r, upFile, { contentType: upType });
           task.on("state_changed",
