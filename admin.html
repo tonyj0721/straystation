@@ -916,6 +916,63 @@
 
     let selectedFiles = []; // 待上傳檔案（順序 = 上傳順序）
 
+    // ===============================
+    // iPhone HEIC/HEIF → JPEG（避免後端/前端處理卡住）
+    // ===============================
+    function __isHeicLike(file) {
+      const t = String((file && file.type) || "").toLowerCase();
+      const n = String((file && file.name) || "").toLowerCase();
+      return t === "image/heic" || t === "image/heif" || n.endsWith(".heic") || n.endsWith(".heif");
+    }
+
+    async function __heicToJpeg(file, quality = 0.85) {
+      let bmp = null;
+      if (window.createImageBitmap) {
+        try { bmp = await createImageBitmap(file); } catch (_) { bmp = null; }
+      }
+
+      if (bmp) {
+        const c = document.createElement("canvas");
+        c.width = bmp.width; c.height = bmp.height;
+        const g = c.getContext("2d");
+        g.drawImage(bmp, 0, 0);
+        try { bmp.close?.(); } catch (_) { }
+        const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", quality));
+        if (!blob) throw new Error("HEIC 轉 JPEG 失敗（toBlob 回傳空值）");
+        return new File([blob], String(file.name || "image").replace(/\.[^.]+$/i, ".jpg"), { type: "image/jpeg" });
+      }
+
+      const url = URL.createObjectURL(file);
+      try {
+        const img = await new Promise((res, rej) => {
+          const im = new Image();
+          im.onload = () => res(im);
+          im.onerror = rej;
+          im.src = url;
+        });
+        const c = document.createElement("canvas");
+        c.width = img.naturalWidth || img.width;
+        c.height = img.naturalHeight || img.height;
+        const g = c.getContext("2d");
+        g.drawImage(img, 0, 0);
+        const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", quality));
+        if (!blob) throw new Error("HEIC 轉 JPEG 失敗（toBlob 回傳空值）");
+        return new File([blob], String(file.name || "image").replace(/\.[^.]+$/i, ".jpg"), { type: "image/jpeg" });
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }
+
+    async function normalizeUploadFile(file) {
+      const type = (file && file.type) || "";
+      if ((type.startsWith("image/") || !type) && __isHeicLike(file)) {
+        const jpg = await __heicToJpeg(file);
+        return { file: jpg, type: "image/jpeg" };
+      }
+      return { file, type };
+    }
+
+
     // File → 縮圖 objectURL（避免每次重畫都重新解碼）
     const thumbUrlCache = new Map();
     const thumbPromiseCache = new Map();
@@ -1403,49 +1460,7 @@
       }, 80);
     }
 
-    
     // ===============================
-    // iPhone HEIC/HEIF：先在前端轉成 JPEG
-    // （因為後端 sharp 在 Cloud Functions 常見不支援 HEIC，會導致 wmPending 永遠清不掉）
-    // ===============================
-    async function __normalizeUploadFile(file) {
-      const f = file;
-      if (!f) return { file: f, type: "" };
-
-      const t = (f.type || "").toLowerCase();
-      const n = (f.name || "").toLowerCase();
-      const isHeic = t.includes("image/heic") || t.includes("image/heif") || n.endsWith(".heic") || n.endsWith(".heif");
-      if (!isHeic) return { file: f, type: f.type || "" };
-
-      const url = URL.createObjectURL(f);
-      try {
-        const img = await new Promise((res, rej) => {
-          const im = new Image();
-          im.onload = () => res(im);
-          im.onerror = () => rej(new Error("HEIC 轉檔失敗：無法載入圖片"));
-          im.src = url;
-        });
-
-        const W = img.naturalWidth || img.width || 0;
-        const H = img.naturalHeight || img.height || 0;
-        if (!W || !H) throw new Error("HEIC 轉檔失敗：無法讀取圖片尺寸");
-
-        const c = document.createElement("canvas");
-        c.width = W; c.height = H;
-        const g = c.getContext("2d");
-        g.drawImage(img, 0, 0, W, H);
-
-        const blob = await new Promise((resolve) => c.toBlob(resolve, "image/jpeg", 0.92));
-        if (!blob) throw new Error("HEIC 轉檔失敗：瀏覽器無法輸出 JPEG（toBlob 回傳空值）");
-
-        const base = (f.name || "photo").replace(/\.[^.]+$/, "");
-        return { file: new File([blob], `${base}.jpg`, { type: "image/jpeg" }), type: "image/jpeg" };
-      } finally {
-        URL.revokeObjectURL(url);
-      }
-    }
-
-// ===============================
     // 表單送出：新增動物資料
     // ===============================
     $("#petForm").addEventListener("submit", async (e) => {
@@ -1533,30 +1548,27 @@
         const plans = [];
         const pendingPaths = [];
 
-        // iPhone HEIC/HEIF 先轉 JPEG，避免後端浮水印流程卡住
-        const uploadFiles = [];
-        for (const f of selectedFiles) {
-          uploadFiles.push(await __normalizeUploadFile(f));
-        }
-
-        const __progressTotalBytes = uploadFiles.reduce((s, u) => s + (u?.file?.size || 0), 0) || 1;
+        const __progressTotalBytes = plans.reduce((s, p) => s + (p?.f?.size || 0), 0) || 1;
         let __progressUploadedBytes = 0;
 
 
         // 先算出這批上傳會用到的 Storage paths，並先寫回 Firestore（避免後端處理比 images 更新更早完成）
-        for (const u of uploadFiles) {
-          const f = u.file;
-          // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔（但 HEIC 會先被轉成 JPEG）
-          const type = (u.type || (f && f.type) || '').toLowerCase();
+        for (const f of selectedFiles) {
+          // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
+          const type = (f && f.type) || '';
+                    // 只允許上傳圖片/影片：如果 type 取不到（iOS 有機會是空字串），就用副檔名推斷
+          const nameLower = String((f && f.name) || '').toLowerCase();
+          const looksVideo = type.startsWith('video/') || /\.(mp4|mov|m4v|webm)$/i.test(nameLower);
 
-          // 路徑副檔名固定用 jpg/mp4，讓後端覆蓋後檔名/格式一致（避免 iPhone/WebM 問題）
-          let ext = 'bin';
-          if (type.startsWith('image/')) ext = 'jpg';
-          else if (type.startsWith('video/')) ext = 'mp4';
+          // 路徑副檔名固定用 jpg/mp4，讓後端覆蓋後檔名/格式一致
+          const ext = looksVideo ? 'mp4' : 'jpg';
 
-          const base = (f.name || 'file').replace(/\.[^.]+$/, '');
+          // contentType 也要給對，避免 Firebase Storage 顯示成 application/octet-stream
+          const finalType = looksVideo ? 'video/mp4' : (type || 'image/jpeg');
+
+          const base = f.name.replace(/\.[^.]+$/, '');
           const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
-          plans.push({ f, type, path });
+          plans.push({ f, type: finalType, path });
           pendingPaths.push(path);
         }
 
