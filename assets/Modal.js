@@ -120,6 +120,47 @@ const BREEDS = {
   },
 };
 
+
+// ===============================
+// iPhone HEIC/HEIF：先在前端轉成 JPEG（避免後端 sharp 讀不到而卡住）
+// ===============================
+async function __normalizeUploadFile(file) {
+  const f = file;
+  if (!f) return { file: f, type: "" };
+
+  const t = (f.type || "").toLowerCase();
+  const n = (f.name || "").toLowerCase();
+  const isHeic = t.includes("image/heic") || t.includes("image/heif") || n.endsWith(".heic") || n.endsWith(".heif");
+  if (!isHeic) return { file: f, type: f.type || "" };
+
+  const url = URL.createObjectURL(f);
+  try {
+    const img = await new Promise((res, rej) => {
+      const im = new Image();
+      im.onload = () => res(im);
+      im.onerror = () => rej(new Error("HEIC 轉檔失敗：無法載入圖片"));
+      im.src = url;
+    });
+
+    const W = img.naturalWidth || img.width || 0;
+    const H = img.naturalHeight || img.height || 0;
+    if (!W || !H) throw new Error("HEIC 轉檔失敗：無法讀取圖片尺寸");
+
+    const c = document.createElement("canvas");
+    c.width = W; c.height = H;
+    const g = c.getContext("2d");
+    g.drawImage(img, 0, 0, W, H);
+
+    const blob = await new Promise((resolve) => c.toBlob(resolve, "image/jpeg", 0.92));
+    if (!blob) throw new Error("HEIC 轉檔失敗：瀏覽器無法輸出 JPEG（toBlob 回傳空值）");
+
+    const base = (f.name || "photo").replace(/\.[^.]+$/, "");
+    return { file: new File([blob], `${base}.jpg`, { type: "image/jpeg" }), type: "image/jpeg" };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 // 產生帶浮水印的 Blob（細字、無外框、疏一點）
 function __drawWatermarkPattern(g, W, H, text) {
   const ANG = -33 * Math.PI / 180;   // 斜角
@@ -166,6 +207,7 @@ async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {})
     __drawWatermarkPattern(g, W, H, text);
 
     const out = await new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
+    if (!out) throw new Error("圖片轉檔失敗：瀏覽器無法輸出 JPEG（toBlob 回傳空值）");
     return new File([out], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
   } finally {
     URL.revokeObjectURL(url);
@@ -544,7 +586,7 @@ function startProgressBar(btn, opts = {}) {
   cat.alt = "";
   cat.decoding = "async";
   cat.style.position = "absolute";
-  cat.style.top = "-25px"; // 在進度條上方
+  cat.style.top = "9px"; // 在進度條上方
   cat.style.left = "0%";
   cat.style.transform = "translateX(-50%)";
   cat.style.height = "68px";
@@ -1277,8 +1319,11 @@ async function saveEdit() {
 
       if (it.kind === "file") {
         const f = it.file;
-        // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
-        const type = it.__uploadType || (f && f.type) || '';
+        // iPhone HEIC/HEIF 先轉 JPEG（避免後端浮水印流程卡住）
+        const nf = await __normalizeUploadFile(f);
+        const upFile = nf.file;
+        // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔（HEIC 會先轉成 JPEG）
+        const type = nf.type || it.__uploadType || (upFile && upFile.type) || '';
         const path = it.__uploadPath;
         const r = sRef(storage, path);
 
@@ -1289,7 +1334,7 @@ async function saveEdit() {
         }
 
         await new Promise((resolve, reject) => {
-          const task = uploadBytesResumable(r, f, { contentType: type || 'application/octet-stream' });
+          const task = uploadBytesResumable(r, upFile, { contentType: type || 'application/octet-stream' });
           task.on("state_changed",
             (snap) => {
               const base = __progressUploadedBytes || 0;
@@ -1301,7 +1346,7 @@ async function saveEdit() {
             async () => {
               try {
                 // 完成一檔：累加已完成 bytes
-                __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || f.size || 0);
+                __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || upFile.size || 0);
                 prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
                 resolve();
               } catch (e) {
