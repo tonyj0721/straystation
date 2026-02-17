@@ -1254,7 +1254,7 @@ async function saveEdit() {
     });
   } finally {
     btn.disabled = false;
-    btn.textContent = "儲存";
+    btn.textContent = "更新";
   }
 }
 
