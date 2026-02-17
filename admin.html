@@ -916,63 +916,6 @@
 
     let selectedFiles = []; // 待上傳檔案（順序 = 上傳順序）
 
-    // ===============================
-    // iPhone HEIC/HEIF → JPEG（避免後端/前端處理卡住）
-    // ===============================
-    function __isHeicLike(file) {
-      const t = String((file && file.type) || "").toLowerCase();
-      const n = String((file && file.name) || "").toLowerCase();
-      return t === "image/heic" || t === "image/heif" || n.endsWith(".heic") || n.endsWith(".heif");
-    }
-
-    async function __heicToJpeg(file, quality = 0.85) {
-      let bmp = null;
-      if (window.createImageBitmap) {
-        try { bmp = await createImageBitmap(file); } catch (_) { bmp = null; }
-      }
-
-      if (bmp) {
-        const c = document.createElement("canvas");
-        c.width = bmp.width; c.height = bmp.height;
-        const g = c.getContext("2d");
-        g.drawImage(bmp, 0, 0);
-        try { bmp.close?.(); } catch (_) { }
-        const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", quality));
-        if (!blob) throw new Error("HEIC 轉 JPEG 失敗（toBlob 回傳空值）");
-        return new File([blob], String(file.name || "image").replace(/\.[^.]+$/i, ".jpg"), { type: "image/jpeg" });
-      }
-
-      const url = URL.createObjectURL(file);
-      try {
-        const img = await new Promise((res, rej) => {
-          const im = new Image();
-          im.onload = () => res(im);
-          im.onerror = rej;
-          im.src = url;
-        });
-        const c = document.createElement("canvas");
-        c.width = img.naturalWidth || img.width;
-        c.height = img.naturalHeight || img.height;
-        const g = c.getContext("2d");
-        g.drawImage(img, 0, 0);
-        const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", quality));
-        if (!blob) throw new Error("HEIC 轉 JPEG 失敗（toBlob 回傳空值）");
-        return new File([blob], String(file.name || "image").replace(/\.[^.]+$/i, ".jpg"), { type: "image/jpeg" });
-      } finally {
-        URL.revokeObjectURL(url);
-      }
-    }
-
-    async function normalizeUploadFile(file) {
-      const type = (file && file.type) || "";
-      if ((type.startsWith("image/") || !type) && __isHeicLike(file)) {
-        const jpg = await __heicToJpeg(file);
-        return { file: jpg, type: "image/jpeg" };
-      }
-      return { file, type };
-    }
-
-
     // File → 縮圖 objectURL（避免每次重畫都重新解碼）
     const thumbUrlCache = new Map();
     const thumbPromiseCache = new Map();
@@ -1548,7 +1491,7 @@
         const plans = [];
         const pendingPaths = [];
 
-        const __progressTotalBytes = plans.reduce((s, p) => s + (p?.f?.size || 0), 0) || 1;
+        const __progressTotalBytes = selectedFiles.reduce((s, f) => s + (f?.size || 0), 0) || 1;
         let __progressUploadedBytes = 0;
 
 
@@ -1556,19 +1499,14 @@
         for (const f of selectedFiles) {
           // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
           const type = (f && f.type) || '';
-                    // 只允許上傳圖片/影片：如果 type 取不到（iOS 有機會是空字串），就用副檔名推斷
-          const nameLower = String((f && f.name) || '').toLowerCase();
-          const looksVideo = type.startsWith('video/') || /\.(mp4|mov|m4v|webm)$/i.test(nameLower);
-
-          // 路徑副檔名固定用 jpg/mp4，讓後端覆蓋後檔名/格式一致
-          const ext = looksVideo ? 'mp4' : 'jpg';
-
-          // contentType 也要給對，避免 Firebase Storage 顯示成 application/octet-stream
-          const finalType = looksVideo ? 'video/mp4' : (type || 'image/jpeg');
+          // 路徑副檔名固定用 jpg/mp4，讓後端覆蓋後檔名/格式一致（避免 iPhone/WebM 問題）
+          let ext = 'bin';
+          if (type.startsWith('image/')) ext = 'jpg';
+          else if (type.startsWith('video/')) ext = 'mp4';
 
           const base = f.name.replace(/\.[^.]+$/, '');
           const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
-          plans.push({ f, type: finalType, path });
+          plans.push({ f, type, path });
           pendingPaths.push(path);
         }
 

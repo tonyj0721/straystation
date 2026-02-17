@@ -6,64 +6,6 @@ function isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
 }
 
-
-
-// ===============================
-// iPhone HEIC/HEIF → JPEG（避免後端 sharp/浮水印流程失敗導致一直卡在「處理中」）
-// ===============================
-function __isHeicLike(file) {
-  const t = String((file && file.type) || "").toLowerCase();
-  const n = String((file && file.name) || "").toLowerCase();
-  return t === "image/heic" || t === "image/heif" || n.endsWith(".heic") || n.endsWith(".heif");
-}
-
-async function __heicToJpeg(file, quality = 0.85) {
-  let bmp = null;
-  if (window.createImageBitmap) {
-    try { bmp = await createImageBitmap(file); } catch (_) { bmp = null; }
-  }
-  if (bmp) {
-    const c = document.createElement("canvas");
-    c.width = bmp.width; c.height = bmp.height;
-    const g = c.getContext("2d");
-    g.drawImage(bmp, 0, 0);
-    try { bmp.close?.(); } catch (_) { }
-    const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", quality));
-    if (!blob) throw new Error("HEIC 轉 JPEG 失敗（toBlob 回傳空值）");
-    return new File([blob], String(file.name || "image").replace(/\.[^.]+$/i, ".jpg"), { type: "image/jpeg" });
-  }
-
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise((res, rej) => {
-      const im = new Image();
-      im.onload = () => res(im);
-      im.onerror = rej;
-      im.src = url;
-    });
-    const c = document.createElement("canvas");
-    c.width = img.naturalWidth || img.width;
-    c.height = img.naturalHeight || img.height;
-    const g = c.getContext("2d");
-    g.drawImage(img, 0, 0);
-    const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", quality));
-    if (!blob) throw new Error("HEIC 轉 JPEG 失敗（toBlob 回傳空值）");
-    return new File([blob], String(file.name || "image").replace(/\.[^.]+$/i, ".jpg"), { type: "image/jpeg" });
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
-async function normalizeUploadFile(file) {
-  const type = (file && file.type) || "";
-  if ((type.startsWith("image/") || !type) && __isHeicLike(file)) {
-    const jpg = await __heicToJpeg(file);
-    return { file: jpg, type: "image/jpeg" };
-  }
-  return { file, type };
-}
-
-
 function storagePathFromDownloadUrl(url) {
   try {
     const p = String(url).split("/o/")[1].split("?")[0];
@@ -1340,13 +1282,6 @@ async function saveEdit() {
         const path = it.__uploadPath;
         const r = sRef(storage, path);
 
-        // iPhone HEIC/HEIF：先轉 JPG 再上傳，避免後端處理失敗造成一直卡在「浮水印處理中」
-        const __norm = await normalizeUploadFile(f);
-        const __upFile = __norm.file;
-        const __nameLower = String((__upFile && __upFile.name) || '').toLowerCase();
-        const __looksVideo = String(__norm.type || type || (__upFile && __upFile.type) || '').startsWith('video/') || /\.(mp4|mov|m4v|webm)$/i.test(__nameLower);
-        const __upType = __looksVideo ? 'video/mp4' : (String(__norm.type || type || (__upFile && __upFile.type) || '') || 'image/jpeg');
-
         // 進度：只計算本次新增的 file
         // 若 totalBytes 無法取得（極少數情況），用 1 避免除以 0
         if (typeof __progressTotalBytes === "number" && __progressTotalBytes > 0) {
@@ -1354,7 +1289,7 @@ async function saveEdit() {
         }
 
         await new Promise((resolve, reject) => {
-          const task = uploadBytesResumable(r, __upFile, { contentType: __upType || 'application/octet-stream' });
+          const task = uploadBytesResumable(r, f, { contentType: type || 'application/octet-stream' });
           task.on("state_changed",
             (snap) => {
               const base = __progressUploadedBytes || 0;
@@ -1366,7 +1301,7 @@ async function saveEdit() {
             async () => {
               try {
                 // 完成一檔：累加已完成 bytes
-                __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || __upFile.size || 0);
+                __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || f.size || 0);
                 prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
                 resolve();
               } catch (e) {
