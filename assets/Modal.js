@@ -520,7 +520,10 @@ function startProgressBar(btn, opts = {}) {
   // 建 UI
   const host = document.createElement("div");
   host.className = "w-full relative flex items-center justify-center";
-  host.style.height = height + "px";
+  /*host.style.height = height + "px";*/
+  btn.style.paddingTop = "0";
+  btn.style.paddingBottom = "0";
+  host.style.height = "100%";
 
   const barWrap = document.createElement("div");
   barWrap.style.position = "absolute";
