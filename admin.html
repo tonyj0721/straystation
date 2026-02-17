@@ -578,8 +578,9 @@
           <div>
             <input id="editFiles" type="file" accept="image/*,video/*" multiple class="sr-only" />
             <div class="flex items-center gap-3">
-              <button id="btnPickEdit" type="button"
-                class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增照片／影片</button>
+              <button id="btnPickEdit" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
+                新增照片／影片
+              </button>
               <span id="editCount" class="text-xs text-gray-500"></span>
               <span class="text-sm text-gray-400">最多 5 張</span>
             </div>
@@ -616,18 +617,17 @@
         </div>
 
         <!-- 已領養合照上傳 -->
-        <div id="adoptedUpload" class="hidden space-y-4">
+        <div id="adoptedUpload" class="hidden">
           <div>
             <input id="adoptedFiles" type="file" accept="image/*" multiple class="sr-only" />
-            <div class="flex items-center gap-3 mb-2">
-              <button id="btnPickAdopted" type="button"
-                class="px-3 py-2 rounded-lg border border-gray-300 bg-brand-600 text-white text-sm">
+            <div class="flex items-center gap-3">
+              <button id="btnPickAdopted" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
                 選擇合照
               </button>
               <span id="adoptedCount" class="text-xs text-gray-500"></span>
               <span class="text-sm text-gray-400">最多 5 張</span>
             </div>
-            <div id="adoptedPreview" class="mt-3 grid grid-cols-2 gap-3"></div>
+            <div id="adoptedPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
           </div>
           <div class="grid grid-cols-2 gap-3">
             <button id="btnConfirmAdopted" type="button"
@@ -641,7 +641,6 @@
           </div>
         </div>
       </div>
-    </div>
     </div>
   </dialog>
 
