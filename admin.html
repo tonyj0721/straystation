@@ -266,7 +266,7 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- 左：登錄表單 -->
-      <section class="lg:col-span-1 bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
+      <section id="formSection" class="lg:col-span-1 bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
         <h2 class="text-lg font-semibold mb-6">登錄表單</h2>
         <form id="petForm" class="space-y-4">
           <div>
@@ -369,6 +369,12 @@
             <button id="submitBtn" type="submit"
               class="px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-gray-800 flex items-center gap-2">
               <span id="submitText">登錄</span>
+            </button>
+
+            <!-- 清除表單 -->
+            <button id="clearBtn" type="button"
+              class="px-4 py-2 rounded-xl border border-gray-300 text-gray-800 hover:bg-gray-50">
+              清除
             </button>
           </div>
         </form>
@@ -838,6 +844,68 @@
     const btnPick = $("#btnPick");
     const fileCount = $("#fileCount");
     const imgPreview = $("#imgPreview");
+
+    // ===============================
+    // 清除按鈕：清空表單 + 清空已選媒體 + 捲到登錄表單位置
+    // ===============================
+    const clearBtn = document.getElementById("clearBtn");
+    const formSection = document.getElementById("formSection");
+
+    function clearSelectedMedia() {
+      try {
+        // 釋放 objectURL（縮圖/影片）
+        for (const f of selectedFiles) revokeThumb(f);
+      } catch (_) { }
+      selectedFiles = [];
+      try { imgFiles.value = ""; } catch (_) { }
+
+      // 清空預覽 DOM / 計數
+      try { imgPreview.innerHTML = ""; } catch (_) { }
+      try { fileCount.textContent = `已選 0 / ${MAX_FILES} 張`; } catch (_) { }
+
+      // 清空 tile map（避免殘留）
+      try { __previewTileMap.clear(); } catch (_) { }
+
+      // 清空縮圖佇列（避免清除後還在跑縮圖）
+      try { thumbJobQueue.length = 0; } catch (_) { }
+    }
+
+    function clearPetFormAndScroll() {
+      const form = document.getElementById("petForm");
+      if (form) form.reset();
+
+      // 確保預設回到「貓」
+      const catRadio = form?.querySelector('input[name="species"][value="貓"]');
+      if (catRadio) catRadio.checked = true;
+
+      // 清空文字欄位（保險）
+      const nameInput = document.getElementById("name");
+      if (nameInput) nameInput.value = "";
+      const ageInput = document.getElementById("age");
+      if (ageInput) ageInput.value = "";
+      const genderSel = document.getElementById("gender");
+      if (genderSel) genderSel.value = "";
+      const descTa = document.getElementById("desc");
+      if (descTa) descTa.value = "";
+      const neutered = document.getElementById("neutered");
+      if (neutered) neutered.checked = false;
+      const vaccinated = document.getElementById("vaccinated");
+      if (vaccinated) vaccinated.checked = false;
+
+      // 清空「名字已存在」提示/紅框（若有）
+      try { if (window.resetNameCheck) resetNameCheck(); } catch (_) { }
+
+      // 重新同步品種下拉（會把右側下拉清回 disabled + 預設 label）
+      try { syncBreedSelectors(); } catch (_) { }
+
+      // 清空媒體
+      clearSelectedMedia();
+
+      // 捲到登錄表單位置
+      (formSection || form)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    clearBtn?.addEventListener("click", clearPetFormAndScroll);
 
     const MAX_FILES = 5;
     const PREVIEW_MAX = 720;      // 預覽縮圖長邊上限（越小越順）
