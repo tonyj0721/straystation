@@ -916,6 +916,54 @@
 
     let selectedFiles = []; // 待上傳檔案（順序 = 上傳順序）
 
+    // ===============================
+    // iPhone HEIC/HEIF 圖片相容：先轉成 JPEG 再上傳（避免後端 sharp 不支援而卡在「浮水印處理中」）
+    // ===============================
+    function __isHeicLike(file) {
+      const t = (file && file.type) ? String(file.type).toLowerCase() : "";
+      const n = (file && file.name) ? String(file.name).toLowerCase() : "";
+      return t.includes("image/heic") || t.includes("image/heif") || n.endsWith(".heic") || n.endsWith(".heif");
+    }
+    
+    async function __heicToJpeg(file, { maxSide = 4096, quality = 0.85 } = {}) {
+      // 只處理 HEIC/HEIF，其它直接回傳原檔
+      if (!__isHeicLike(file)) return file;
+    
+      // 讓 UI 先喘口氣，避免 iOS 卡頓
+      await new Promise((r) => requestAnimationFrame(r));
+    
+      // Safari/iOS 通常支援 createImageBitmap 讀 HEIC；若不支援就直接回傳原檔（不阻塞）
+      let bmp;
+      try {
+        if (window.createImageBitmap) bmp = await createImageBitmap(file);
+      } catch (_) { bmp = null; }
+      if (!bmp) return file;
+    
+      const W = bmp.width || 0;
+      const H = bmp.height || 0;
+      const scale = (W && H) ? Math.min(1, maxSide / Math.max(W, H)) : 1;
+      const w = Math.max(1, Math.round(W * scale));
+      const h = Math.max(1, Math.round(H * scale));
+    
+      const c = document.createElement("canvas");
+      c.width = w; c.height = h;
+      const g = c.getContext("2d", { alpha: false, desynchronized: true });
+      g.drawImage(bmp, 0, 0, w, h);
+      bmp.close?.();
+    
+      const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", quality));
+      if (!blob) return file;
+    
+      const base = (file.name || "image").replace(/\.[^.]+$/, "");
+      return new File([blob], `${base}.jpg`, { type: "image/jpeg" });
+    }
+    
+    async function __normalizeUploadFile(file) {
+      // 目前只針對 HEIC/HEIF 做轉檔；其它原樣上傳
+      const fixed = await __heicToJpeg(file);
+      return fixed;
+    }
+    
     // File → 縮圖 objectURL（避免每次重畫都重新解碼）
     const thumbUrlCache = new Map();
     const thumbPromiseCache = new Map();
@@ -1498,15 +1546,16 @@
         // 先算出這批上傳會用到的 Storage paths，並先寫回 Firestore（避免後端處理比 images 更新更早完成）
         for (const f of selectedFiles) {
           // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
-          const type = (f && f.type) || '';
+          const fixedFile = await __normalizeUploadFile(f); // HEIC/HEIF -> JPEG
+          const type = (fixedFile && fixedFile.type) || (f && f.type) || '';
           // 路徑副檔名固定用 jpg/mp4，讓後端覆蓋後檔名/格式一致（避免 iPhone/WebM 問題）
           let ext = 'bin';
           if (type.startsWith('image/')) ext = 'jpg';
           else if (type.startsWith('video/')) ext = 'mp4';
 
-          const base = f.name.replace(/\.[^.]+$/, '');
+          const base = (fixedFile?.name || f?.name || 'file').replace(/\.[^.]+$/, '');
           const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
-          plans.push({ f, type, path });
+          plans.push({ f: fixedFile || f, type, path });
           pendingPaths.push(path);
         }
 
