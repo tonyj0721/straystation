@@ -98,6 +98,56 @@ function __unlockDialogScroll() {
   try { if (typeof unlockScroll === "function") unlockScroll(); } catch { }
 }
 
+
+// ===============================
+// iPhone HEIC/HEIF 圖片相容：先轉成 JPEG 再上傳（避免後端 sharp 不支援而卡在「浮水印處理中」）
+// ===============================
+function __isHeicLike(file) {
+  const t = (file && file.type) ? String(file.type).toLowerCase() : "";
+  const n = (file && file.name) ? String(file.name).toLowerCase() : "";
+  return t.includes("image/heic") || t.includes("image/heif") || n.endsWith(".heic") || n.endsWith(".heif");
+}
+
+async function __heicToJpeg(file, { maxSide = 4096, quality = 0.85 } = {}) {
+  // 只處理 HEIC/HEIF，其它直接回傳原檔
+  if (!__isHeicLike(file)) return file;
+
+  // 讓 UI 先喘口氣，避免 iOS 卡頓
+  await new Promise((r) => requestAnimationFrame(r));
+
+  // Safari/iOS 通常支援 createImageBitmap 讀 HEIC；若不支援就直接回傳原檔（不阻塞）
+  let bmp;
+  try {
+    if (window.createImageBitmap) bmp = await createImageBitmap(file);
+  } catch (_) { bmp = null; }
+  if (!bmp) return file;
+
+  const W = bmp.width || 0;
+  const H = bmp.height || 0;
+  const scale = (W && H) ? Math.min(1, maxSide / Math.max(W, H)) : 1;
+  const w = Math.max(1, Math.round(W * scale));
+  const h = Math.max(1, Math.round(H * scale));
+
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const g = c.getContext("2d", { alpha: false, desynchronized: true });
+  g.drawImage(bmp, 0, 0, w, h);
+  bmp.close?.();
+
+  const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", quality));
+  if (!blob) return file;
+
+  const base = (file.name || "image").replace(/\.[^.]+$/, "");
+  return new File([blob], `${base}.jpg`, { type: "image/jpeg" });
+}
+
+async function __normalizeUploadFile(file) {
+  // 目前只針對 HEIC/HEIF 做轉檔；其它原樣上傳
+  const fixed = await __heicToJpeg(file);
+  return fixed;
+}
+
+
 // ===============================
 // 品種資料與「品種/毛色」連動邏輯
 // ===============================
@@ -482,7 +532,7 @@ function startDots(span, base) {
 // ===============================
 function startProgressBar(btn, opts = {}) {
   const imgSrc = opts.imgSrc || "images/奔跑貓咪.png";
-  const height = opts.height || 130;
+  const height = opts.height || 74;
 
   const original = {
     html: btn.innerHTML,
@@ -526,7 +576,7 @@ function startProgressBar(btn, opts = {}) {
   barWrap.style.position = "absolute";
   barWrap.style.left = "14px";
   barWrap.style.right = "14px";
-  barWrap.style.bottom = "36px";
+  barWrap.style.top = "31px";
   barWrap.style.height = "14px";
   barWrap.style.background = "rgba(255,255,255,0.22)";
   barWrap.style.borderRadius = "9999px";
@@ -544,7 +594,7 @@ function startProgressBar(btn, opts = {}) {
   cat.alt = "";
   cat.decoding = "async";
   cat.style.position = "absolute";
-  cat.style.bottom = "50px"; // 在進度條上方
+  cat.style.top = "-16px"; // 在進度條上方
   cat.style.left = "0%";
   cat.style.transform = "translateX(-50%)";
   cat.style.height = "68px";
@@ -554,7 +604,7 @@ function startProgressBar(btn, opts = {}) {
   label.style.position = "absolute";
   label.style.left = "0";
   label.style.right = "0";
-  label.style.bottom = "12px";
+  label.style.top = "57px";
   label.style.fontSize = "12px";
   label.style.fontWeight = "600";
   label.style.color = "#fff";
@@ -1234,6 +1284,12 @@ async function saveEdit() {
     const pendingPaths = [];
     for (const it of items) {
       if (it.kind !== "file") continue;
+
+      // iPhone 照片常見 HEIC/HEIF：先轉成 JPEG（不做浮水印，僅確保後端能處理）
+      const orig = it.file;
+      const fixedFile = await __normalizeUploadFile(orig);
+      if (fixedFile && fixedFile !== orig) it.file = fixedFile;
+
       const f = it.file;
       const type = (f && f.type) || "";
       let ext = "bin";
