@@ -1,5 +1,65 @@
 const q = (sel) => document.querySelector(sel);
 
+// ===============================
+// iPhone / HEIC 支援：把 HEIC/HEIF 轉成 JPEG 再上傳
+//  - 避免後端（sharp / libvips）無法解 HEIC，造成 wmPending 永遠不會清空
+//  - 症狀：卡在「浮水印處理中…」或列表/詳情一直顯示處理中，Storage 看到原始照片沒有浮水印
+// ===============================
+function __isHeicLike(file) {
+  const t = String(file?.type || '').toLowerCase();
+  const n = String(file?.name || '').toLowerCase();
+  return t === 'image/heic' || t === 'image/heif' || n.endsWith('.heic') || n.endsWith('.heif');
+}
+
+async function __convertImageToJpeg(file, { quality = 0.9 } = {}) {
+  let bmp = null;
+  if (window.createImageBitmap) {
+    try { bmp = await createImageBitmap(file); } catch (_) { bmp = null; }
+  }
+
+  let img = null;
+  let revokeUrl = null;
+  if (!bmp) {
+    const url = URL.createObjectURL(file);
+    revokeUrl = () => URL.revokeObjectURL(url);
+    img = await new Promise((res, rej) => {
+      const im = new Image();
+      im.onload = () => res(im);
+      im.onerror = rej;
+      im.src = url;
+    });
+  }
+
+  const W = bmp ? bmp.width : (img?.naturalWidth || img?.width || 0);
+  const H = bmp ? bmp.height : (img?.naturalHeight || img?.height || 0);
+  if (!W || !H) {
+    revokeUrl?.();
+    throw new Error('無法讀取照片尺寸（可能是不支援的格式）');
+  }
+
+  const c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  const g = c.getContext('2d', { alpha: false, desynchronized: true });
+  if (bmp) g.drawImage(bmp, 0, 0, W, H);
+  else g.drawImage(img, 0, 0, W, H);
+
+  try { bmp?.close?.(); } catch (_) { }
+  revokeUrl?.();
+
+  const blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', quality));
+  const baseName = String(file?.name || 'image')
+    .replace(/\.(heic|heif)$/i, '')
+    .replace(/\.[^.]+$/i, '');
+  return new File([blob], `${baseName}.jpg`, { type: 'image/jpeg' });
+}
+
+async function __normalizeUploadFile(file) {
+  if (!file) return file;
+  if (__isHeicLike(file)) return await __convertImageToJpeg(file);
+  return file;
+}
+
 function isVideoUrl(url) {
   if (!url) return false;
   const u = String(url).split("?", 1)[0];
@@ -97,56 +157,6 @@ function __lockDialogScroll() {
 function __unlockDialogScroll() {
   try { if (typeof unlockScroll === "function") unlockScroll(); } catch { }
 }
-
-
-// ===============================
-// iPhone HEIC/HEIF 圖片相容：先轉成 JPEG 再上傳（避免後端 sharp 不支援而卡在「浮水印處理中」）
-// ===============================
-function __isHeicLike(file) {
-  const t = (file && file.type) ? String(file.type).toLowerCase() : "";
-  const n = (file && file.name) ? String(file.name).toLowerCase() : "";
-  return t.includes("image/heic") || t.includes("image/heif") || n.endsWith(".heic") || n.endsWith(".heif");
-}
-
-async function __heicToJpeg(file, { maxSide = 4096, quality = 0.85 } = {}) {
-  // 只處理 HEIC/HEIF，其它直接回傳原檔
-  if (!__isHeicLike(file)) return file;
-
-  // 讓 UI 先喘口氣，避免 iOS 卡頓
-  await new Promise((r) => requestAnimationFrame(r));
-
-  // Safari/iOS 通常支援 createImageBitmap 讀 HEIC；若不支援就直接回傳原檔（不阻塞）
-  let bmp;
-  try {
-    if (window.createImageBitmap) bmp = await createImageBitmap(file);
-  } catch (_) { bmp = null; }
-  if (!bmp) return file;
-
-  const W = bmp.width || 0;
-  const H = bmp.height || 0;
-  const scale = (W && H) ? Math.min(1, maxSide / Math.max(W, H)) : 1;
-  const w = Math.max(1, Math.round(W * scale));
-  const h = Math.max(1, Math.round(H * scale));
-
-  const c = document.createElement("canvas");
-  c.width = w; c.height = h;
-  const g = c.getContext("2d", { alpha: false, desynchronized: true });
-  g.drawImage(bmp, 0, 0, w, h);
-  bmp.close?.();
-
-  const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", quality));
-  if (!blob) return file;
-
-  const base = (file.name || "image").replace(/\.[^.]+$/, "");
-  return new File([blob], `${base}.jpg`, { type: "image/jpeg" });
-}
-
-async function __normalizeUploadFile(file) {
-  // 目前只針對 HEIC/HEIF 做轉檔；其它原樣上傳
-  const fixed = await __heicToJpeg(file);
-  return fixed;
-}
-
 
 // ===============================
 // 品種資料與「品種/毛色」連動邏輯
@@ -1264,8 +1274,8 @@ async function saveEdit() {
     const newUrls = [];
 
     // 進度條：只計算本次要上傳的檔案（kind === 'file'）
-    const __filesForProgress = (items || []).filter((it) => it && it.kind === "file" && it.file);
-    const __progressTotalBytes = __filesForProgress.reduce((s, it) => s + (it.file?.size || 0), 0) || 1;
+    // 注意：iPhone 可能把 HEIC 轉成 JPEG，因此 totalBytes 需要在 normalize 後再算
+    let __progressTotalBytes = 1;
     let __progressUploadedBytes = 0;
 
 
@@ -1281,16 +1291,14 @@ async function saveEdit() {
     }
 
     // 先把本次新增檔案的 Storage path 算好，並先寫回 Firestore（避免後端處理比 images 更新更早完成）
+    // iPhone 可能會選到 HEIC：先轉成 JPEG 再上傳（避免後端解不開而卡住）
     const pendingPaths = [];
     for (const it of items) {
       if (it.kind !== "file") continue;
+      let f = it.file;
+      f = await __normalizeUploadFile(f);
+      it.file = f;
 
-      // iPhone 照片常見 HEIC/HEIF：先轉成 JPEG（不做浮水印，僅確保後端能處理）
-      const orig = it.file;
-      const fixedFile = await __normalizeUploadFile(orig);
-      if (fixedFile && fixedFile !== orig) it.file = fixedFile;
-
-      const f = it.file;
       const type = (f && f.type) || "";
       let ext = "bin";
       if (type.startsWith("image/")) ext = "jpg";
@@ -1301,6 +1309,12 @@ async function saveEdit() {
       it.__uploadPath = pth;
       it.__uploadType = type;
       pendingPaths.push(pth);
+    }
+
+    // ✅ normalize 後再算一次 progress 的 totalBytes
+    {
+      const __filesForProgress = (items || []).filter((it) => it && it.kind === "file" && it.file);
+      __progressTotalBytes = __filesForProgress.reduce((s, it) => s + (it.file?.size || 0), 0) || 1;
     }
 
     // 同步計算下一版 wmPending（移除被刪除的舊圖 + 加入本次新增的檔案）
@@ -2179,8 +2193,14 @@ async function onConfirmAdopted() {
   prog.update(0);
 
   const files = adoptedSelected.slice(0, 5);
+  // iPhone 可能會選到 HEIC：先轉成 JPEG 再上傳（避免後端解不開而卡住）
+  const normalizedFiles = [];
+  for (const f of files) {
+    normalizedFiles.push(await __normalizeUploadFile(f));
+  }
+
   const urls = [];
-  const __progressTotalBytes = files.reduce((s, f) => s + (f?.size || 0), 0) || 1;
+  const __progressTotalBytes = normalizedFiles.reduce((s, f) => s + (f?.size || 0), 0) || 1;
   let __progressUploadedBytes = 0;
 
   try {
@@ -2189,7 +2209,7 @@ async function onConfirmAdopted() {
     const pendingPaths = [];
 
     // 先算出這次要上傳的 Storage paths，並先寫回 Firestore（避免 race）
-    for (const f of files) {
+    for (const f of normalizedFiles) {
       const type = (f && f.type) || '';
       let ext = 'bin';
       if (type.startsWith('image/')) ext = 'jpg';
