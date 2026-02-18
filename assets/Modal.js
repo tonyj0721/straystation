@@ -24,59 +24,6 @@ function thumbPathFromMediaPath(mediaPath) {
   }
 }
 
-
-/**
- * iPhone 常見：照片 HEIC/HEIF（Safari 可解碼，但後端 sharp/libvips 未必支援）
- * 這裡在「上傳前」把 HEIC/HEIF 轉成 JPEG，避免後端浮水印流程卡住 wmPending。
- * - 只處理 image/heic、image/heif，以及副檔名 .heic/.heif
- * - 影片不在前端轉檔（成本太高），交給後端 ffmpeg 轉 mp4
- */
-function __isHeicHeif(file) {
-  if (!file) return false;
-  const t = (file.type || "").toLowerCase();
-  const n = (file.name || "").toLowerCase();
-  return t === "image/heic" || t === "image/heif" || /\.(heic|heif)$/i.test(n);
-}
-
-async function __convertHeicHeifToJpeg(file, { quality = 0.92 } = {}) {
-  // 用 <img> 走 Safari 的內建解碼，成功率最高
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise((res, rej) => {
-      const im = new Image();
-      im.onload = () => res(im);
-      im.onerror = (e) => rej(e || new Error("HEIC/HEIF 解碼失敗"));
-      im.src = url;
-    });
-
-    const W = img.naturalWidth || img.width || 0;
-    const H = img.naturalHeight || img.height || 0;
-    if (!W || !H) throw new Error("無法取得圖片尺寸");
-
-    const c = document.createElement("canvas");
-    c.width = W;
-    c.height = H;
-    const g = c.getContext("2d");
-    g.drawImage(img, 0, 0, W, H);
-
-    const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", quality));
-    if (!blob) throw new Error("JPEG 轉檔失敗");
-
-    const base = (file.name || "photo").replace(/\.[^.]+$/i, "");
-    return new File([blob], `${base}.jpg`, { type: "image/jpeg" });
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
-async function __normalizeUploadFile(file) {
-  if (__isHeicHeif(file)) {
-    try { return await __convertHeicHeifToJpeg(file); } catch (e) { console.warn("HEIC/HEIF -> JPEG failed, fallback to original:", e); }
-  }
-  return file;
-}
-
-
 // ===============================
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
 // ===============================
@@ -1266,8 +1213,54 @@ async function saveEdit() {
     const { items, removeUrls } = editImagesState;
     const newUrls = [];
 
+    // ===============================
+    // iPhone (HEIF/HEIC) 兼容：先在前端轉成 JPEG 再上傳
+    //  - 後端 sharp 在部分環境不一定能讀 HEIF，會導致 wmPending 永遠清不掉、卡在「浮水印處理中」
+    // ===============================
+    async function normalizeUploadFile(f) {
+      if (!f) return f;
+      const type = (f.type || '').toLowerCase();
+      const name = (f.name || 'file');
+      const ext = name.split('.').pop().toLowerCase();
+      const isHeif = type === 'image/heic' || type === 'image/heif' || ext === 'heic' || ext === 'heif';
+      if (!isHeif) return f;
+
+      const url = URL.createObjectURL(f);
+      try {
+        const img = await new Promise((res, rej) => {
+          const im = new Image();
+          im.onload = () => res(im);
+          im.onerror = (e) => rej(e || new Error('HEIF 讀取失敗'));
+          im.src = url;
+        });
+        const W = img.naturalWidth || img.width || 0;
+        const H = img.naturalHeight || img.height || 0;
+        if (!W || !H) return f;
+        const c = document.createElement('canvas');
+        c.width = W; c.height = H;
+        const g = c.getContext('2d');
+        g.drawImage(img, 0, 0, W, H);
+        const blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.92));
+        if (!blob) return f;
+        const base = name.replace(/\.[^.]+$/, '');
+        return new File([blob], `${base}.jpg`, { type: 'image/jpeg' });
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }
+
     // 進度條：只計算本次要上傳的檔案（kind === 'file'）
+    // 並先把 HEIF/HEIC 轉成 JPEG（size 會變，進度條也要用轉完的 size）
     const __filesForProgress = (items || []).filter((it) => it && it.kind === "file" && it.file);
+    for (const it of __filesForProgress) {
+      try {
+        const converted = await normalizeUploadFile(it.file);
+        if (converted !== it.file) it.file = converted;
+      } catch (e) {
+        // 轉檔失敗就沿用原檔，讓後端或使用者自行處理
+        console.warn('normalizeUploadFile failed:', e);
+      }
+    }
     const __progressTotalBytes = __filesForProgress.reduce((s, it) => s + (it.file?.size || 0), 0) || 1;
     let __progressUploadedBytes = 0;
 
@@ -1329,11 +1322,9 @@ async function saveEdit() {
       }
 
       if (it.kind === "file") {
-
-        let f = it.file;
-        f = await __normalizeUploadFile(f);
+        const f = it.file;
         // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
-        const type = (f && f.type) || it.__uploadType || '';
+        const type = it.__uploadType || (f && f.type) || '';
         const path = it.__uploadPath;
         const r = sRef(storage, path);
 
