@@ -521,7 +521,6 @@ function startProgressBar(btn, opts = {}) {
   const host = document.createElement("div");
   host.className = "w-full relative flex items-center justify-center";
   host.style.height = height + "px";
-  host.style.outline = "1px dashed rgba(255,0,0,0.8)";
 
   const barWrap = document.createElement("div");
   barWrap.style.position = "absolute";
@@ -532,7 +531,6 @@ function startProgressBar(btn, opts = {}) {
   barWrap.style.background = "rgba(255,255,255,0.22)";
   barWrap.style.borderRadius = "9999px";
   barWrap.style.overflow = "hidden";
-  barWrap.style.outline = "1px dashed rgba(255,0,0,0.8)";
 
   const fill = document.createElement("div");
   fill.style.height = "100%";
@@ -551,7 +549,6 @@ function startProgressBar(btn, opts = {}) {
   cat.style.transform = "translateX(-50%)";
   cat.style.height = "68px";
   cat.style.pointerEvents = "none";
-  cat.style.outline = "1px dashed rgba(255,0,0,0.8)";
 
   const label = document.createElement("div");
   label.style.position = "absolute";
@@ -563,7 +560,6 @@ function startProgressBar(btn, opts = {}) {
   label.style.color = "#fff";
   label.style.textAlign = "center";
   label.textContent = "Loading...0%";
-  label.style.outline = "1px dashed rgba(255,0,0,0.8)";
 
   host.appendChild(barWrap);
   host.appendChild(cat);
