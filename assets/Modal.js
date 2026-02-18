@@ -1,42 +1,5 @@
 const q = (sel) => document.querySelector(sel);
 
-// ===============================
-// iPhone HEIF/HEVC：Safari / iOS WebView 常會回傳空的 file.type
-// 這會導致：
-//  - 上傳時 contentType 變成 application/octet-stream
-//  - 路徑副檔名被判成 .bin
-//  - 後端浮水印 Function 依 contentType 判斷而「完全不處理」
-//  - Firestore 的 mediaReady 永遠停在 false → 卡在「浮水印處理中…」
-//
-// 這裡用副檔名做 fallback，確保 iPhone 的 .heif/.heic/.hevc 也能被歸類成 image/video。
-// ===============================
-function __guessMediaKindByName(name = "") {
-  const ext = String(name).trim().toLowerCase().split(".").pop();
-  if (!ext) return "";
-  if (["jpg", "jpeg", "png", "gif", "webp", "bmp", "heic", "heif", "avif"].includes(ext)) return "image";
-  if (["mp4", "mov", "m4v", "webm", "ogg", "hevc"].includes(ext)) return "video";
-  return "";
-}
-
-function __guessContentType(file) {
-  const t = (file && file.type) ? String(file.type) : "";
-  if (t) return t;
-  const kind = __guessMediaKindByName(file?.name || "");
-  if (kind === "image") {
-    const n = String(file?.name || "").toLowerCase();
-    if (n.endsWith(".heic")) return "image/heic";
-    if (n.endsWith(".heif")) return "image/heif";
-    return "image/*"; // 只要讓後端走 image 分支即可
-  }
-  if (kind === "video") {
-    const n = String(file?.name || "").toLowerCase();
-    if (n.endsWith(".mov")) return "video/quicktime";
-    if (n.endsWith(".hevc")) return "video/hevc";
-    return "video/*";
-  }
-  return "";
-}
-
 function isVideoUrl(url) {
   if (!url) return false;
   const u = String(url).split("?", 1)[0];
@@ -60,6 +23,59 @@ function thumbPathFromMediaPath(mediaPath) {
     return "";
   }
 }
+
+
+/**
+ * iPhone 常見：照片 HEIC/HEIF（Safari 可解碼，但後端 sharp/libvips 未必支援）
+ * 這裡在「上傳前」把 HEIC/HEIF 轉成 JPEG，避免後端浮水印流程卡住 wmPending。
+ * - 只處理 image/heic、image/heif，以及副檔名 .heic/.heif
+ * - 影片不在前端轉檔（成本太高），交給後端 ffmpeg 轉 mp4
+ */
+function __isHeicHeif(file) {
+  if (!file) return false;
+  const t = (file.type || "").toLowerCase();
+  const n = (file.name || "").toLowerCase();
+  return t === "image/heic" || t === "image/heif" || /\.(heic|heif)$/i.test(n);
+}
+
+async function __convertHeicHeifToJpeg(file, { quality = 0.92 } = {}) {
+  // 用 <img> 走 Safari 的內建解碼，成功率最高
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => {
+      const im = new Image();
+      im.onload = () => res(im);
+      im.onerror = (e) => rej(e || new Error("HEIC/HEIF 解碼失敗"));
+      im.src = url;
+    });
+
+    const W = img.naturalWidth || img.width || 0;
+    const H = img.naturalHeight || img.height || 0;
+    if (!W || !H) throw new Error("無法取得圖片尺寸");
+
+    const c = document.createElement("canvas");
+    c.width = W;
+    c.height = H;
+    const g = c.getContext("2d");
+    g.drawImage(img, 0, 0, W, H);
+
+    const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", quality));
+    if (!blob) throw new Error("JPEG 轉檔失敗");
+
+    const base = (file.name || "photo").replace(/\.[^.]+$/i, "");
+    return new File([blob], `${base}.jpg`, { type: "image/jpeg" });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+async function __normalizeUploadFile(file) {
+  if (__isHeicHeif(file)) {
+    try { return await __convertHeicHeifToJpeg(file); } catch (e) { console.warn("HEIC/HEIF -> JPEG failed, fallback to original:", e); }
+  }
+  return file;
+}
+
 
 // ===============================
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
@@ -1272,12 +1288,10 @@ async function saveEdit() {
     for (const it of items) {
       if (it.kind !== "file") continue;
       const f = it.file;
-      // iPhone 的 .heif/.hevc 常會回傳空 type，所以這裡要靠副檔名補判斷
-      const type = __guessContentType(f) || "";
-      const kind = type.startsWith("image/") ? "image" : (type.startsWith("video/") ? "video" : __guessMediaKindByName(f?.name || ""));
+      const type = (f && f.type) || "";
       let ext = "bin";
-      if (kind === "image") ext = "jpg";
-      else if (kind === "video") ext = "mp4";
+      if (type.startsWith("image/")) ext = "jpg";
+      else if (type.startsWith("video/")) ext = "mp4";
 
       const base = (f && f.name ? f.name : "file").replace(/\.[^.]+$/, "");
       const pth = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
@@ -1315,9 +1329,11 @@ async function saveEdit() {
       }
 
       if (it.kind === "file") {
-        const f = it.file;
+
+        let f = it.file;
+        f = await __normalizeUploadFile(f);
         // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
-        const type = it.__uploadType || (f && f.type) || '';
+        const type = (f && f.type) || it.__uploadType || '';
         const path = it.__uploadPath;
         const r = sRef(storage, path);
 
