@@ -482,7 +482,7 @@ function startDots(span, base) {
 // ===============================
 function startProgressBar(btn, opts = {}) {
   const imgSrc = opts.imgSrc || "images/奔跑貓咪.png";
-  const height = opts.height || 93;
+  const height = opts.height || 59;
 
   const original = {
     html: btn.innerHTML,
@@ -521,6 +521,7 @@ function startProgressBar(btn, opts = {}) {
   const host = document.createElement("div");
   host.className = "w-full relative flex items-center justify-center";
   host.style.height = height + "px";
+  host.style.outline = "1px dashed rgba(255,0,0,0.8)";
 
   const barWrap = document.createElement("div");
   barWrap.style.position = "absolute";
