@@ -203,6 +203,39 @@
     const clickArea = document.getElementById('overlayClickArea');
     const panel = document.getElementById('menuPanel');
 
+    // ===============================
+    // iPhone HEIF/HEVC：Safari / iOS WebView 常會回傳空的 file.type
+    // 這會導致 uploadBytesResumable 用 application/octet-stream，上傳路徑變成 .bin
+    // 後端浮水印 Function 依 contentType 判斷而「完全不處理」→ 卡在「浮水印處理中…」
+    // 這裡用副檔名做 fallback。
+    // ===============================
+    function __guessMediaKindByName(name = "") {
+      const ext = String(name).trim().toLowerCase().split('.').pop();
+      if (!ext) return "";
+      if (["jpg", "jpeg", "png", "gif", "webp", "bmp", "heic", "heif", "avif"].includes(ext)) return "image";
+      if (["mp4", "mov", "m4v", "webm", "ogg", "hevc"].includes(ext)) return "video";
+      return "";
+    }
+
+    function __guessContentType(file) {
+      const t = (file && file.type) ? String(file.type) : "";
+      if (t) return t;
+      const kind = __guessMediaKindByName(file?.name || "");
+      if (kind === "image") {
+        const n = String(file?.name || "").toLowerCase();
+        if (n.endsWith('.heic')) return 'image/heic';
+        if (n.endsWith('.heif')) return 'image/heif';
+        return 'image/*';
+      }
+      if (kind === "video") {
+        const n = String(file?.name || "").toLowerCase();
+        if (n.endsWith('.mov')) return 'video/quicktime';
+        if (n.endsWith('.hevc')) return 'video/hevc';
+        return 'video/*';
+      }
+      return '';
+    }
+
     function positionPanel() {
       const r = menuBtn.getBoundingClientRect();
       const gap = 8;
@@ -1493,32 +1526,29 @@
         const plans = [];
         const pendingPaths = [];
 
-        // 進度條總量：以「實際要上傳的檔案」計算（HEIF/HEIC 轉成 JPEG 後 size 會變）
-        let __progressTotalBytes = 1;
+        const __progressTotalBytes = selectedFiles.reduce((s, f) => s + (f?.size || 0), 0) || 1;
         let __progressUploadedBytes = 0;
 
 
         // 先算出這批上傳會用到的 Storage paths，並先寫回 Firestore（避免後端處理比 images 更新更早完成）
-        for (const f of selectedFiles) {
+          for (const f of selectedFiles) {
           // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
-          const type = (f && f.type) || '';
+            const type = __guessContentType(f) || '';
           // 路徑副檔名固定用 jpg/mp4，讓後端覆蓋後檔名/格式一致（避免 iPhone/WebM 問題）
           let ext = 'bin';
-          if (type.startsWith('image/')) ext = 'jpg';
-          else if (type.startsWith('video/')) ext = 'mp4';
+            const kind = type.startsWith('image/') ? 'image' : (type.startsWith('video/') ? 'video' : __guessMediaKindByName(f?.name || ''));
+            if (kind === 'image') ext = 'jpg';
+            else if (kind === 'video') ext = 'mp4';
 
           const base = f.name.replace(/\.[^.]+$/, '');
           const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
-          plans.push({ f, type, path });
+            plans.push({ f, type, path });
           pendingPaths.push(path);
         }
 
         if (pendingPaths.length) {
           await updateDoc(doc(db, "pets", docRef.id), { mediaReady: false, wmPending: pendingPaths });
         }
-
-        // 用 plans（已做 HEIF/HEIC → JPEG 的檔案）重新計算總 bytes
-        __progressTotalBytes = plans.reduce((s, pl) => s + (pl?.f?.size || 0), 0) || 1;
 
         // 逐檔上傳
         for (const pl of plans) {

@@ -1,5 +1,42 @@
 const q = (sel) => document.querySelector(sel);
 
+// ===============================
+// iPhone HEIF/HEVC：Safari / iOS WebView 常會回傳空的 file.type
+// 這會導致：
+//  - 上傳時 contentType 變成 application/octet-stream
+//  - 路徑副檔名被判成 .bin
+//  - 後端浮水印 Function 依 contentType 判斷而「完全不處理」
+//  - Firestore 的 mediaReady 永遠停在 false → 卡在「浮水印處理中…」
+//
+// 這裡用副檔名做 fallback，確保 iPhone 的 .heif/.heic/.hevc 也能被歸類成 image/video。
+// ===============================
+function __guessMediaKindByName(name = "") {
+  const ext = String(name).trim().toLowerCase().split(".").pop();
+  if (!ext) return "";
+  if (["jpg", "jpeg", "png", "gif", "webp", "bmp", "heic", "heif", "avif"].includes(ext)) return "image";
+  if (["mp4", "mov", "m4v", "webm", "ogg", "hevc"].includes(ext)) return "video";
+  return "";
+}
+
+function __guessContentType(file) {
+  const t = (file && file.type) ? String(file.type) : "";
+  if (t) return t;
+  const kind = __guessMediaKindByName(file?.name || "");
+  if (kind === "image") {
+    const n = String(file?.name || "").toLowerCase();
+    if (n.endsWith(".heic")) return "image/heic";
+    if (n.endsWith(".heif")) return "image/heif";
+    return "image/*"; // 只要讓後端走 image 分支即可
+  }
+  if (kind === "video") {
+    const n = String(file?.name || "").toLowerCase();
+    if (n.endsWith(".mov")) return "video/quicktime";
+    if (n.endsWith(".hevc")) return "video/hevc";
+    return "video/*";
+  }
+  return "";
+}
+
 function isVideoUrl(url) {
   if (!url) return false;
   const u = String(url).split("?", 1)[0];
@@ -1213,54 +1250,8 @@ async function saveEdit() {
     const { items, removeUrls } = editImagesState;
     const newUrls = [];
 
-    // ===============================
-    // iPhone (HEIF/HEIC) 兼容：先在前端轉成 JPEG 再上傳
-    //  - 後端 sharp 在部分環境不一定能讀 HEIF，會導致 wmPending 永遠清不掉、卡在「浮水印處理中」
-    // ===============================
-    async function normalizeUploadFile(f) {
-      if (!f) return f;
-      const type = (f.type || '').toLowerCase();
-      const name = (f.name || 'file');
-      const ext = name.split('.').pop().toLowerCase();
-      const isHeif = type === 'image/heic' || type === 'image/heif' || ext === 'heic' || ext === 'heif';
-      if (!isHeif) return f;
-
-      const url = URL.createObjectURL(f);
-      try {
-        const img = await new Promise((res, rej) => {
-          const im = new Image();
-          im.onload = () => res(im);
-          im.onerror = (e) => rej(e || new Error('HEIF 讀取失敗'));
-          im.src = url;
-        });
-        const W = img.naturalWidth || img.width || 0;
-        const H = img.naturalHeight || img.height || 0;
-        if (!W || !H) return f;
-        const c = document.createElement('canvas');
-        c.width = W; c.height = H;
-        const g = c.getContext('2d');
-        g.drawImage(img, 0, 0, W, H);
-        const blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.92));
-        if (!blob) return f;
-        const base = name.replace(/\.[^.]+$/, '');
-        return new File([blob], `${base}.jpg`, { type: 'image/jpeg' });
-      } finally {
-        URL.revokeObjectURL(url);
-      }
-    }
-
     // 進度條：只計算本次要上傳的檔案（kind === 'file'）
-    // 並先把 HEIF/HEIC 轉成 JPEG（size 會變，進度條也要用轉完的 size）
     const __filesForProgress = (items || []).filter((it) => it && it.kind === "file" && it.file);
-    for (const it of __filesForProgress) {
-      try {
-        const converted = await normalizeUploadFile(it.file);
-        if (converted !== it.file) it.file = converted;
-      } catch (e) {
-        // 轉檔失敗就沿用原檔，讓後端或使用者自行處理
-        console.warn('normalizeUploadFile failed:', e);
-      }
-    }
     const __progressTotalBytes = __filesForProgress.reduce((s, it) => s + (it.file?.size || 0), 0) || 1;
     let __progressUploadedBytes = 0;
 
@@ -1281,10 +1272,12 @@ async function saveEdit() {
     for (const it of items) {
       if (it.kind !== "file") continue;
       const f = it.file;
-      const type = (f && f.type) || "";
+      // iPhone 的 .heif/.hevc 常會回傳空 type，所以這裡要靠副檔名補判斷
+      const type = __guessContentType(f) || "";
+      const kind = type.startsWith("image/") ? "image" : (type.startsWith("video/") ? "video" : __guessMediaKindByName(f?.name || ""));
       let ext = "bin";
-      if (type.startsWith("image/")) ext = "jpg";
-      else if (type.startsWith("video/")) ext = "mp4";
+      if (kind === "image") ext = "jpg";
+      else if (kind === "video") ext = "mp4";
 
       const base = (f && f.name ? f.name : "file").replace(/\.[^.]+$/, "");
       const pth = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
