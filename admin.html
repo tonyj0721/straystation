@@ -1488,64 +1488,13 @@
         // 1) 新增基本文件
         const docRef = await addDoc(collection(db, "pets"), payload);
 
-        /**
- * iPhone 常見：照片 HEIC/HEIF（Safari 可解碼，但後端 sharp/libvips 未必支援）
- * 這裡在「上傳前」把 HEIC/HEIF 轉成 JPEG，避免後端浮水印流程卡住 wmPending。
- * - 只處理 image/heic、image/heif，以及副檔名 .heic/.heif
- * - 影片不在前端轉檔（成本太高），交給後端 ffmpeg 轉 mp4
- */
-function __isHeicHeif(file) {
-  if (!file) return false;
-  const t = (file.type || "").toLowerCase();
-  const n = (file.name || "").toLowerCase();
-  return t === "image/heic" || t === "image/heif" || /\.(heic|heif)$/i.test(n);
-}
-
-async function __convertHeicHeifToJpeg(file, { quality = 0.92 } = {}) {
-  // 用 <img> 走 Safari 的內建解碼，成功率最高
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise((res, rej) => {
-      const im = new Image();
-      im.onload = () => res(im);
-      im.onerror = (e) => rej(e || new Error("HEIC/HEIF 解碼失敗"));
-      im.src = url;
-    });
-
-    const W = img.naturalWidth || img.width || 0;
-    const H = img.naturalHeight || img.height || 0;
-    if (!W || !H) throw new Error("無法取得圖片尺寸");
-
-    const c = document.createElement("canvas");
-    c.width = W;
-    c.height = H;
-    const g = c.getContext("2d");
-    g.drawImage(img, 0, 0, W, H);
-
-    const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", quality));
-    if (!blob) throw new Error("JPEG 轉檔失敗");
-
-    const base = (file.name || "photo").replace(/\.[^.]+$/i, "");
-    return new File([blob], `${base}.jpg`, { type: "image/jpeg" });
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
-async function __normalizeUploadFile(file) {
-  if (__isHeicHeif(file)) {
-    try { return await __convertHeicHeifToJpeg(file); } catch (e) { console.warn("HEIC/HEIF -> JPEG failed, fallback to original:", e); }
-  }
-  return file;
-}
-
-
-// 2) 逐張上傳圖片，取得 Storage URL
+        // 2) 逐張上傳圖片，取得 Storage URL
         const urls = [];
         const plans = [];
         const pendingPaths = [];
 
-        const __progressTotalBytes = selectedFiles.reduce((s, f) => s + (f?.size || 0), 0) || 1;
+        // 進度條總量：以「實際要上傳的檔案」計算（HEIF/HEIC 轉成 JPEG 後 size 會變）
+        let __progressTotalBytes = 1;
         let __progressUploadedBytes = 0;
 
 
@@ -1568,13 +1517,14 @@ async function __normalizeUploadFile(file) {
           await updateDoc(doc(db, "pets", docRef.id), { mediaReady: false, wmPending: pendingPaths });
         }
 
+        // 用 plans（已做 HEIF/HEIC → JPEG 的檔案）重新計算總 bytes
+        __progressTotalBytes = plans.reduce((s, pl) => s + (pl?.f?.size || 0), 0) || 1;
+
         // 逐檔上傳
         for (const pl of plans) {
-          let upFile = pl.f;
-          upFile = await __normalizeUploadFile(upFile);
           const r = sRef(storage, pl.path);
           await new Promise((resolve, reject) => {
-            const task = uploadBytesResumable(r, upFile, { contentType: (upFile && upFile.type) || pl.type || 'application/octet-stream' });
+            const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
             task.on("state_changed",
               (snap) => {
                 const base = __progressUploadedBytes || 0;
