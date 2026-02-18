@@ -370,6 +370,8 @@
               class="w-full px-4 py-3 rounded-xl bg-gray-900 text-white text-sm flex items-center justify-center gap-2 hover:bg-gray-800">
               登錄
             </button>
+
+            <!-- 清除表單 -->
             <button id="clearBtn" type="button"
               class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm flex items-center justify-center hover:bg-gray-50">
               清除
@@ -584,7 +586,6 @@
               <span id="editCount" class="text-xs text-gray-500"></span>
               <span class="text-sm text-gray-400">最多 5 張</span>
             </div>
-            <!-- 和新增模式一致：三欄縮圖 + 上方間距 -->
             <div id="editPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
           </div>
         </div>
@@ -686,7 +687,7 @@
       getFirestore, collection, getDocs, query, orderBy, where,
       doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp, limit as fbLimit, deleteField,
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
-    import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject, listAll, } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
+    import { getStorage, ref as sRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject, listAll, } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
     import {
       getAuth,
       signOut,
@@ -703,7 +704,7 @@
       collection, getDocs, query, orderBy, where,
       doc, getDoc, updateDoc, deleteDoc, serverTimestamp, fbLimit,
       deleteField,
-      sRef, uploadBytes, getDownloadURL, deleteObject, listAll,
+      sRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject, listAll,
     });
 
     const auth = getAuth(app);
@@ -1480,7 +1481,8 @@
       // 按鈕進度狀態
       const submitBtn = $("#submitBtn");
       submitBtn.disabled = true;
-      const stopDots = startDots(submitBtn, "上傳中");
+      const prog = startProgressBar(submitBtn, { imgSrc: "images/奔跑貓咪.png" });
+      prog.update(0);
 
       try {
         // 1) 新增基本文件
@@ -1490,6 +1492,10 @@
         const urls = [];
         const plans = [];
         const pendingPaths = [];
+
+        const __progressTotalBytes = selectedFiles.reduce((s, f) => s + (f?.size || 0), 0) || 1;
+        let __progressUploadedBytes = 0;
+
 
         // 先算出這批上傳會用到的 Storage paths，並先寫回 Firestore（避免後端處理比 images 更新更早完成）
         for (const f of selectedFiles) {
@@ -1513,7 +1519,24 @@
         // 逐檔上傳
         for (const pl of plans) {
           const r = sRef(storage, pl.path);
-          await uploadBytes(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
+          await new Promise((resolve, reject) => {
+            const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
+            task.on("state_changed",
+              (snap) => {
+                const base = __progressUploadedBytes || 0;
+                const now = base + (snap?.bytesTransferred || 0);
+                const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
+                prog.update(pct);
+              },
+              (err) => reject(err),
+              () => {
+                __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || pl.f?.size || 0);
+                prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
+                resolve();
+              }
+            );
+          });
+
           urls.push(await getDownloadURL(r));
         }
 
@@ -1523,7 +1546,8 @@
         }
 
         // UI 收尾
-        stopDots();
+        prog.update(100);
+        prog.stop({ text: "處理中...", keepDisabled: true });
         submitBtn.disabled = true;
         submitBtn.textContent = "處理中...";
 
@@ -1608,6 +1632,8 @@
       } catch (err) {
         await Swal.fire({ icon: "error", title: "登錄失敗", text: err.message });
       } finally {
+        // 收回進度條並恢復排版
+        try { prog.stop({ restore: true, text: "登錄", keepDisabled: false }); } catch (_) { }
         submitBtn.disabled = false;
         submitBtn.textContent = "登錄";
       }
@@ -1620,7 +1646,8 @@
       const q = query(collection(db, "pets"), orderBy("createdAt", "desc"));
       const snap = await getDocs(q);
       pets.length = 0;
-      pets.push(...snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p && p.mediaReady !== false));
+      pets.push(...snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      /*pets.push(...snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p && p.mediaReady !== false));看不見*/
       applyFilterAndRender();
     }
 
@@ -1732,7 +1759,8 @@
             fbLimit(100)
           );
           const snapPrefix = await getDocs(qPrefix);
-          prefix = snapPrefix.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p && p.mediaReady !== false);
+          prefix = snapPrefix.docs.map(d => ({ id: d.id, ...d.data() }));
+          /*prefix = snapPrefix.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p && p.mediaReady !== false);看不見*/
         } catch (e) {
           console.warn("prefix search skipped:", e);
         }
@@ -1758,7 +1786,7 @@
 
         const contains = recentDocs
           .map(d => ({ id: d.id, ...d.data() }))
-          .filter(p => p && p.mediaReady !== false)
+          /*.filter(p => p && p.mediaReady !== false)看不見*/
           .filter(p => {
             const nm = String(p.name || "");
             const nmLower = String(p.nameLower || nm).toLowerCase();
