@@ -408,10 +408,6 @@ video.video-preview::-webkit-media-controls-enclosure {
   pointer-events: none;
 }
 
-#lbPlayIcon {
-  transform: scale(0.9);
-}
-
 /* 讓縮圖列在拖曳時淡出（更接近 iPhone 相簿） */
 #lbThumbs {
   transition: opacity .5s ease;
