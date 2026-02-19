@@ -386,7 +386,7 @@ video.video-preview::-webkit-media-controls-enclosure {
   background: rgba(18, 18, 18);
   bottom: -38px;
   border-radius: 23px;
-  width: 334px;
+  width: 338px;
 }
 
 /* 進度條拖曳中：控制列上移、增加上方空間、隱藏左右按鈕、顯示時間 */
@@ -420,8 +420,8 @@ video.video-preview::-webkit-media-controls-enclosure {
 
 /* 拖曳進度條時：避免誤觸，先把返回鍵隱藏 */
 #lbBackBtn {
-  top: 3px;
-  left: 3px;
+  top: 4px;
+  left: 13px;
   transition: opacity .5s ease;
   background: rgba(24, 24, 24);
   border-radius: 9999px;
