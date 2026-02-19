@@ -1,42 +1,5 @@
 const q = (sel) => document.querySelector(sel);
 
-// ===============================
-// iPhone HEIF/HEVC：Safari / iOS WebView 常會回傳空的 file.type
-// 這會導致：
-//  - 上傳時 contentType 變成 application/octet-stream
-//  - 路徑副檔名被判成 .bin
-//  - 後端浮水印 Function 依 contentType 判斷而「完全不處理」
-//  - Firestore 的 mediaReady 永遠停在 false → 卡在「浮水印處理中…」
-//
-// 這裡用副檔名做 fallback，確保 iPhone 的 .heif/.heic/.hevc 也能被歸類成 image/video。
-// ===============================
-function __guessMediaKindByName(name = "") {
-  const ext = String(name).trim().toLowerCase().split(".").pop();
-  if (!ext) return "";
-  if (["jpg", "jpeg", "png", "gif", "webp", "bmp", "heic", "heif", "avif"].includes(ext)) return "image";
-  if (["mp4", "mov", "m4v", "webm", "ogg", "hevc"].includes(ext)) return "video";
-  return "";
-}
-
-function __guessContentType(file) {
-  const t = (file && file.type) ? String(file.type) : "";
-  if (t) return t;
-  const kind = __guessMediaKindByName(file?.name || "");
-  if (kind === "image") {
-    const n = String(file?.name || "").toLowerCase();
-    if (n.endsWith(".heic")) return "image/heic";
-    if (n.endsWith(".heif")) return "image/heif";
-    return "image/*"; // 只要讓後端走 image 分支即可
-  }
-  if (kind === "video") {
-    const n = String(file?.name || "").toLowerCase();
-    if (n.endsWith(".mov")) return "video/quicktime";
-    if (n.endsWith(".hevc")) return "video/hevc";
-    return "video/*";
-  }
-  return "";
-}
-
 function isVideoUrl(url) {
   if (!url) return false;
   const u = String(url).split("?", 1)[0];
@@ -1272,12 +1235,10 @@ async function saveEdit() {
     for (const it of items) {
       if (it.kind !== "file") continue;
       const f = it.file;
-      // iPhone 的 .heif/.hevc 常會回傳空 type，所以這裡要靠副檔名補判斷
-      const type = __guessContentType(f) || "";
-      const kind = type.startsWith("image/") ? "image" : (type.startsWith("video/") ? "video" : __guessMediaKindByName(f?.name || ""));
+      const type = (f && f.type) || "";
       let ext = "bin";
-      if (kind === "image") ext = "jpg";
-      else if (kind === "video") ext = "mp4";
+      if (type.startsWith("image/")) ext = "jpg";
+      else if (type.startsWith("video/")) ext = "mp4";
 
       const base = (f && f.name ? f.name : "file").replace(/\.[^.]+$/, "");
       const pth = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
