@@ -24,60 +24,83 @@ function thumbPathFromMediaPath(mediaPath) {
   }
 }
 
-// ===============================
-// iPhone HEIC/HEIF：先在前端轉成 JPEG 再上傳
-// - 後端（sharp/libvips）在某些環境可能沒有 libheif，會導致浮水印處理失敗、wmPending 一直清不掉。
-// - 我們仍維持後端做浮水印；前端只做「格式轉換」，確保後端一定吃得下。
-// ===============================
-async function __normalizeUploadFile(file) {
-  const f = file;
-  const type = (f && f.type) || "";
-  const name = (f && f.name) || "image";
-  const isHeif = /^image\/(heic|heif)$/i.test(type) || /\.(heic|heif)$/i.test(name);
 
-  if (!isHeif) return { file: f, contentType: type || "application/octet-stream" };
+// ===============================
+// iPhone HEIC/HEIF 轉 JPEG（讓後端 sharp 一定吃得到）
+// 也補齊某些瀏覽器 file.type 為空的情況（用副檔名推 contentType）
+// ===============================
+function __guessContentTypeByName(name) {
+  const n = String(name || "").toLowerCase();
+  if (n.endsWith(".heic") || n.endsWith(".heif")) return "image/heic";
+  if (n.endsWith(".jpg") || n.endsWith(".jpeg")) return "image/jpeg";
+  if (n.endsWith(".png")) return "image/png";
+  if (n.endsWith(".webp")) return "image/webp";
+  if (n.endsWith(".mp4")) return "video/mp4";
+  if (n.endsWith(".mov")) return "video/quicktime";
+  if (n.endsWith(".m4v")) return "video/x-m4v";
+  if (n.endsWith(".hevc") || n.endsWith(".h265")) return "video/hevc";
+  return "";
+}
 
-  const url = URL.createObjectURL(f);
+async function __heicToJpegFile(file, quality = 0.88) {
+  // iOS Safari / Chrome(iOS) 通常可直接 decode HEIC/HEIF
+  const url = URL.createObjectURL(file);
   try {
-    // 優先用 createImageBitmap（較不阻塞），不行就 fallback 用 <img>
     let bmp = null;
-    if (window.createImageBitmap) {
-      try { bmp = await createImageBitmap(f); } catch (_) { bmp = null; }
+    if (typeof createImageBitmap === "function") {
+      try { bmp = await createImageBitmap(file); } catch (_) { bmp = null; }
     }
 
-    let W = 0, H = 0;
-    let draw = null;
+    let w = 0, h = 0;
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
 
     if (bmp) {
-      W = bmp.width; H = bmp.height;
-      draw = (g) => { g.drawImage(bmp, 0, 0, W, H); };
+      w = bmp.width; h = bmp.height;
+      canvas.width = w; canvas.height = h;
+      ctx.drawImage(bmp, 0, 0);
+      try { bmp.close && bmp.close(); } catch (_) { }
     } else {
-      const img = await new Promise((res, rej) => {
+      // fallback: <img> decode
+      const img = await new Promise((resolve, reject) => {
         const im = new Image();
-        im.onload = () => res(im);
-        im.onerror = rej;
+        im.onload = () => resolve(im);
+        im.onerror = () => reject(new Error("HEIC decode failed"));
         im.src = url;
       });
-      W = img.naturalWidth; H = img.naturalHeight;
-      draw = (g) => { g.drawImage(img, 0, 0, W, H); };
+      w = img.naturalWidth || img.width;
+      h = img.naturalHeight || img.height;
+      canvas.width = w; canvas.height = h;
+      ctx.drawImage(img, 0, 0);
     }
 
-    const c = document.createElement("canvas");
-    c.width = Math.max(1, W);
-    c.height = Math.max(1, H);
-    const g = c.getContext("2d");
-    draw(g);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+    if (!blob) throw new Error("canvas.toBlob failed");
 
-    const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.92));
-    if (!blob) throw new Error("HEIC/HEIF 轉檔失敗（toBlob 回傳空）");
-
-    const outName = name.replace(/\.[^.]+$/i, ".jpg");
-    const outFile = new File([blob], outName, { type: "image/jpeg" });
-    try { bmp && bmp.close && bmp.close(); } catch (_) { }
-    return { file: outFile, contentType: "image/jpeg" };
+    const base = String(file.name || "image").replace(/\.[^.]+$/i, "");
+    return new File([blob], `${base}.jpg`, { type: "image/jpeg" });
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+// 針對上傳檔案做 normalize：
+// - HEIC/HEIF -> 轉成 JPEG (file + contentType 都變成 image/jpeg)
+// - 若 file.type 空白 -> 用副檔名補 contentType
+async function __normalizeUploadFile(file) {
+  const name = file?.name || "";
+  let type = (file && file.type) || "";
+  if (!type) type = __guessContentTypeByName(name) || "application/octet-stream";
+
+  const lower = String(name).toLowerCase();
+  const isHeic = lower.endsWith(".heic") || lower.endsWith(".heif") || type === "image/heic" || type === "image/heif";
+
+  if (isHeic) {
+    const jpg = await __heicToJpegFile(file);
+    return { file: jpg, type: "image/jpeg" };
+  }
+
+  return { file, type };
 }
 
 // ===============================
@@ -1290,20 +1313,28 @@ async function saveEdit() {
     const pendingPaths = [];
     for (const it of items) {
       if (it.kind !== "file") continue;
-      const f = it.file;
-      const type = (f && f.type) || "";
+
+      // normalize（iPhone HEIC/HEIF 先轉 JPEG；type 空白就用副檔名補）
+      const norm = await __normalizeUploadFile(it.file);
+      it.file = norm.file;
+      it.__uploadType = norm.type;
+
+      const type = it.__uploadType || "";
       let ext = "bin";
       if (type.startsWith("image/")) ext = "jpg";
-      else if (type.startsWith("video/")) ext = "mp4";
+      else if (type.startsWith("video/")) {
+        // 影片保持原本副檔名（避免 type 空白時被錯誤當成 mp4）
+        const n = String(it.file?.name || "").toLowerCase();
+        const m = n.match(/\.([a-z0-9]+)$/i);
+        ext = (m && m[1]) ? m[1] : "mp4";
+      }
 
-      const base = (f && f.name ? f.name : "file").replace(/\.[^.]+$/, "");
+      const base = (it.file && it.file.name ? it.file.name : "file").replace(/\.[^.]+$/, "");
       const pth = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
       it.__uploadPath = pth;
-      it.__uploadType = type;
       pendingPaths.push(pth);
     }
-
-    // 同步計算下一版 wmPending（移除被刪除的舊圖 + 加入本次新增的檔案）
+// 同步計算下一版 wmPending（移除被刪除的舊圖 + 加入本次新增的檔案）
     let nextPending = Array.isArray(currentDoc?.wmPending) ? currentDoc.wmPending.slice() : [];
     if (removedPaths.length && nextPending.length) {
       nextPending = nextPending.filter((p) => !removedPaths.includes(p));
@@ -1344,13 +1375,8 @@ async function saveEdit() {
           // noop
         }
 
-        // iPhone HEIC/HEIF 先轉 JPEG（避免後端缺 libheif 造成浮水印處理失敗）
-        const normalized = await __normalizeUploadFile(f);
-        const uploadFile = normalized.file;
-        const uploadType = normalized.contentType || type || 'application/octet-stream';
-
         await new Promise((resolve, reject) => {
-          const task = uploadBytesResumable(r, uploadFile, { contentType: uploadType });
+          const task = uploadBytesResumable(r, f, { contentType: type || 'application/octet-stream' });
           task.on("state_changed",
             (snap) => {
               const base = __progressUploadedBytes || 0;
@@ -1362,7 +1388,7 @@ async function saveEdit() {
             async () => {
               try {
                 // 完成一檔：累加已完成 bytes
-                __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || uploadFile.size || 0);
+                __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || f.size || 0);
                 prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
                 resolve();
               } catch (e) {
@@ -2194,11 +2220,18 @@ async function onConfirmAdopted() {
     const pendingPaths = [];
 
     // 先算出這次要上傳的 Storage paths，並先寫回 Firestore（避免 race）
-    for (const f of files) {
-      const type = (f && f.type) || '';
+    for (const f0 of files) {
+      const norm = await __normalizeUploadFile(f0);
+      const f = norm.file;
+      const type = norm.type || '';
+
       let ext = 'bin';
       if (type.startsWith('image/')) ext = 'jpg';
-      else if (type.startsWith('video/')) ext = 'mp4';
+      else if (type.startsWith('video/')) {
+        const n = String(f?.name || '').toLowerCase();
+        const m = n.match(/\.([a-z0-9]+)$/i);
+        ext = (m && m[1]) ? m[1] : 'mp4';
+      }
 
       const base = (f && f.name ? f.name : 'file').replace(/\.[^.]+$/, '');
       const path = `adopted/${currentDocId}/${Date.now()}_${base}.${ext}`;
@@ -2207,7 +2240,7 @@ async function onConfirmAdopted() {
       pendingPaths.push(path);
     }
 
-    const prevPending = Array.isArray(currentDoc?.wmPending) ? currentDoc.wmPending : [];
+const prevPending = Array.isArray(currentDoc?.wmPending) ? currentDoc.wmPending : [];
     const nextPending = pendingPaths.length
       ? Array.from(new Set([...prevPending, ...pendingPaths]))
       : prevPending;
@@ -2219,14 +2252,8 @@ async function onConfirmAdopted() {
 
     for (const pl of plans) {
       const r = sRef(storage, pl.path);
-
-      // iPhone HEIC/HEIF 先轉 JPEG（避免後端缺 libheif 造成浮水印處理失敗）
-      const normalized = await __normalizeUploadFile(pl.f);
-      const uploadFile = normalized.file;
-      const uploadType = normalized.contentType || pl.type || 'application/octet-stream';
-
       await new Promise((resolve, reject) => {
-        const task = uploadBytesResumable(r, uploadFile, { contentType: uploadType });
+        const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
         task.on("state_changed",
           (snap) => {
             const base = __progressUploadedBytes || 0;
@@ -2236,7 +2263,7 @@ async function onConfirmAdopted() {
           },
           (err) => reject(err),
           () => {
-            __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || uploadFile?.size || 0);
+            __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || pl.f?.size || 0);
             prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
             resolve();
           }
