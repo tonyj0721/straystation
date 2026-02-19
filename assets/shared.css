@@ -384,6 +384,9 @@ video.video-preview::-webkit-media-controls-enclosure {
   position: relative;
   transition: padding .5s ease, gap .5s ease;
   background: rgba(18, 18, 18);
+  bottom: -34px;
+  border-radius: 23px;
+  width: 364px;
 }
 
 /* 進度條拖曳中：控制列上移、增加上方空間、隱藏左右按鈕、顯示時間 */
@@ -403,6 +406,10 @@ video.video-preview::-webkit-media-controls-enclosure {
   margin: 0;
   padding: 0;
   pointer-events: none;
+}
+
+#lbPlayIcon {
+  transform: scale(0.9);
 }
 
 /* 讓縮圖列在拖曳時淡出（更接近 iPhone 相簿） */
