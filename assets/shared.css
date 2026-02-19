@@ -420,11 +420,11 @@ video.video-preview::-webkit-media-controls-enclosure {
 
 /* 拖曳進度條時：避免誤觸，先把返回鍵隱藏 */
 #lbBackBtn {
-  height: 44px;
-  width: 44px;
+  height: 45px;
+  width: 45px;
   border-radius: 9999px;
-  top: 4px;
-  left: 13px;
+  top: 1px;
+  left: 15px;
   transition: opacity .5s ease;
   background: rgba(24, 24, 24);
   border-radius: 9999px;
