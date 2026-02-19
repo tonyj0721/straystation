@@ -72,7 +72,7 @@ dialog::backdrop {
   padding-top: 36px;
   padding-bottom: 86px;
   box-sizing: border-box;
-
+  background: rgba(0, 0, 0);
   --stageW: 100vw;
 }
 
@@ -383,6 +383,7 @@ video.video-preview::-webkit-media-controls-enclosure {
 #lbControls {
   position: relative;
   transition: padding .5s ease, gap .5s ease;
+  background: rgba(18, 18, 18);
 }
 
 /* 進度條拖曳中：控制列上移、增加上方空間、隱藏左右按鈕、顯示時間 */
@@ -419,6 +420,7 @@ video.video-preview::-webkit-media-controls-enclosure {
   top: 3px;
   left: 3px;
   transition: opacity .5s ease;
+  background: rgba(24, 24, 24);
 }
 
 #lightbox.lb-seeking #lbBackBtn {
@@ -433,10 +435,10 @@ video.video-preview::-webkit-media-controls-enclosure {
   height: 6px;
   border-radius: 9999px;
   background: linear-gradient(to right,
-      rgba(255, 255, 255, 0.75) 0%,
-      rgba(255, 255, 255, 0.75) var(--p, 0%),
-      rgba(0, 0, 0, 0.45) var(--p, 0%),
-      rgba(0, 0, 0, 0.45) 100%);
+      rgba(255, 255, 255) 0%,
+      rgba(255, 255, 255) var(--p, 0%),
+      rgba(100, 100, 100) var(--p, 0%),
+      rgba(100, 100, 100) 100%);
   outline: none;
 }
 
