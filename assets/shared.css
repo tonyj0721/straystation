@@ -384,15 +384,15 @@ video.video-preview::-webkit-media-controls-enclosure {
   position: relative;
   transition: padding .5s ease, gap .5s ease;
   background: rgba(18, 18, 18);
-  bottom: -34px;
+  bottom: -38px;
   border-radius: 23px;
-  width: 364px;
+  width: 370px;
 }
 
 /* 進度條拖曳中：控制列上移、增加上方空間、隱藏左右按鈕、顯示時間 */
 #lbBottom.lb-seeking #lbControls {
-  padding-top: 36px;
-  gap: 12px;
+  padding-top: 24px;
+  gap: 2px;
 }
 
 #lbBottom.lb-seeking .lb-seek-time {
