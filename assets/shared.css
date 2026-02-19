@@ -425,6 +425,7 @@ video.video-preview::-webkit-media-controls-enclosure {
   left: 3px;
   transition: opacity .5s ease;
   background: rgba(24, 24, 24);
+  border-radius: 9999px;
 }
 
 #lightbox.lb-seeking #lbBackBtn {
