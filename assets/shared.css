@@ -386,7 +386,7 @@ video.video-preview::-webkit-media-controls-enclosure {
   background: rgba(18, 18, 18);
   bottom: -38px;
   border-radius: 23px;
-  width: 370px;
+  width: 327px;
 }
 
 /* 進度條拖曳中：控制列上移、增加上方空間、隱藏左右按鈕、顯示時間 */
