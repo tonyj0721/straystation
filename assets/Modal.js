@@ -25,6 +25,62 @@ function thumbPathFromMediaPath(mediaPath) {
 }
 
 // ===============================
+// iPhone HEIC/HEIF：先在前端轉成 JPEG 再上傳
+// - 後端（sharp/libvips）在某些環境可能沒有 libheif，會導致浮水印處理失敗、wmPending 一直清不掉。
+// - 我們仍維持後端做浮水印；前端只做「格式轉換」，確保後端一定吃得下。
+// ===============================
+async function __normalizeUploadFile(file) {
+  const f = file;
+  const type = (f && f.type) || "";
+  const name = (f && f.name) || "image";
+  const isHeif = /^image\/(heic|heif)$/i.test(type) || /\.(heic|heif)$/i.test(name);
+
+  if (!isHeif) return { file: f, contentType: type || "application/octet-stream" };
+
+  const url = URL.createObjectURL(f);
+  try {
+    // 優先用 createImageBitmap（較不阻塞），不行就 fallback 用 <img>
+    let bmp = null;
+    if (window.createImageBitmap) {
+      try { bmp = await createImageBitmap(f); } catch (_) { bmp = null; }
+    }
+
+    let W = 0, H = 0;
+    let draw = null;
+
+    if (bmp) {
+      W = bmp.width; H = bmp.height;
+      draw = (g) => { g.drawImage(bmp, 0, 0, W, H); };
+    } else {
+      const img = await new Promise((res, rej) => {
+        const im = new Image();
+        im.onload = () => res(im);
+        im.onerror = rej;
+        im.src = url;
+      });
+      W = img.naturalWidth; H = img.naturalHeight;
+      draw = (g) => { g.drawImage(img, 0, 0, W, H); };
+    }
+
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, W);
+    c.height = Math.max(1, H);
+    const g = c.getContext("2d");
+    draw(g);
+
+    const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.92));
+    if (!blob) throw new Error("HEIC/HEIF 轉檔失敗（toBlob 回傳空）");
+
+    const outName = name.replace(/\.[^.]+$/i, ".jpg");
+    const outFile = new File([blob], outName, { type: "image/jpeg" });
+    try { bmp && bmp.close && bmp.close(); } catch (_) { }
+    return { file: outFile, contentType: "image/jpeg" };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+// ===============================
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
 // ===============================
 function __primeThumbVideoFrame(v) {
@@ -1288,8 +1344,13 @@ async function saveEdit() {
           // noop
         }
 
+        // iPhone HEIC/HEIF 先轉 JPEG（避免後端缺 libheif 造成浮水印處理失敗）
+        const normalized = await __normalizeUploadFile(f);
+        const uploadFile = normalized.file;
+        const uploadType = normalized.contentType || type || 'application/octet-stream';
+
         await new Promise((resolve, reject) => {
-          const task = uploadBytesResumable(r, f, { contentType: type || 'application/octet-stream' });
+          const task = uploadBytesResumable(r, uploadFile, { contentType: uploadType });
           task.on("state_changed",
             (snap) => {
               const base = __progressUploadedBytes || 0;
@@ -1301,7 +1362,7 @@ async function saveEdit() {
             async () => {
               try {
                 // 完成一檔：累加已完成 bytes
-                __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || f.size || 0);
+                __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || uploadFile.size || 0);
                 prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
                 resolve();
               } catch (e) {
@@ -2158,8 +2219,14 @@ async function onConfirmAdopted() {
 
     for (const pl of plans) {
       const r = sRef(storage, pl.path);
+
+      // iPhone HEIC/HEIF 先轉 JPEG（避免後端缺 libheif 造成浮水印處理失敗）
+      const normalized = await __normalizeUploadFile(pl.f);
+      const uploadFile = normalized.file;
+      const uploadType = normalized.contentType || pl.type || 'application/octet-stream';
+
       await new Promise((resolve, reject) => {
-        const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
+        const task = uploadBytesResumable(r, uploadFile, { contentType: uploadType });
         task.on("state_changed",
           (snap) => {
             const base = __progressUploadedBytes || 0;
@@ -2169,7 +2236,7 @@ async function onConfirmAdopted() {
           },
           (err) => reject(err),
           () => {
-            __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || pl.f?.size || 0);
+            __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || uploadFile?.size || 0);
             prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
             resolve();
           }
