@@ -383,7 +383,7 @@ video.video-preview::-webkit-media-controls-enclosure {
 #lbControls {
   position: relative;
   transition: padding .5s ease, gap .5s ease;
-  background: rgba(18, 18, 18);
+  background: rgba(0, 0, 0);
   bottom: -38px;
   border-radius: 23px;
   width: 346px;
