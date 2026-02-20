@@ -383,7 +383,7 @@ video.video-preview::-webkit-media-controls-enclosure {
 #lbControls {
   position: relative;
   transition: padding .5s ease, gap .5s ease;
-  background: rgba(0, 0, 0);
+  background: rgba(18, 18, 18);
   bottom: -38px;
   border-radius: 23px;
   width: 346px;
@@ -423,10 +423,10 @@ video.video-preview::-webkit-media-controls-enclosure {
   height: 44px;
   width: 44px;
   border-radius: 9999px;
-  top: 2px;
-  left: 14px;
+  top: 1px;
+  left: 15px;
   transition: opacity .5s ease;
-  background: rgba(24, 24, 24);
+  background: rgba(255, 255, 255);
   border-radius: 9999px;
 }
 
@@ -447,6 +447,8 @@ video.video-preview::-webkit-media-controls-enclosure {
       rgba(100, 100, 100) var(--p, 0%),
       rgba(100, 100, 100) 100%);
   outline: none;
+  margin-left: -5px;
+  margin-right: -5px;
 }
 
 /* iOS / Chrome：range thumb */
