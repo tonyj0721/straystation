@@ -396,23 +396,23 @@ video.video-preview::-webkit-media-controls-enclosure {
 }
 
 #lbPlayIcon[src$="pause.png"] {
-  width: 31px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
 }
 
 #lbPlayIcon[src$="play.png"] {
-  width: 31px;
-  height: 31px;
+  width: 32px;
+  height: 32px;
 }
 
 #lbVolumeIcon[src$="mute.png"] {
-  width: 16px;
-  height: 16px;
+  width: 32px;
+  height: 32px;
 }
 
 #lbVolumeIcon[src$="volume.png"] {
-  width: 10px;
-  height: 10px;
+  width: 32px;
+  height: 32px;
 }
 
 #lbBottom.lb-seeking #lbPlayBtn,
