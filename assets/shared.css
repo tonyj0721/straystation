@@ -406,13 +406,13 @@ video.video-preview::-webkit-media-controls-enclosure {
 }
 
 #lbVolumeIcon[src$="mute.png"] {
-  width: 32px;
-  height: 31px;
+  width: 16px;
+  height: 16px;
 }
 
 #lbVolumeIcon[src$="volume.png"] {
-  width: 31px;
-  height: 31px;
+  width: 10px;
+  height: 10px;
 }
 
 #lbBottom.lb-seeking #lbPlayBtn,
