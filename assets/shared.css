@@ -391,23 +391,27 @@ video.video-preview::-webkit-media-controls-enclosure {
 
 /* 進度條拖曳中：控制列上移、增加上方空間、隱藏左右按鈕、顯示時間 */
 #lbBottom.lb-seeking #lbControls {
-  padding-top: 32px;
-  gap: 4px;
+  padding-top: 31px;
+  gap: 12px;
 }
 
 #lbPlayIcon[src$="pause.png"] {
   width: 32px;
   height: 32px;
+  margin-left: 1px;
+  margin-top: 1px;
 }
 
 #lbPlayIcon[src$="play.png"] {
   width: 32px;
   height: 32px;
+  margin-left: 1px;
 }
 
 #lbVolumeIcon[src$="mute.png"] {
   width: 32px;
   height: 32px;
+  margin-top: 1px;
 }
 
 #lbVolumeIcon[src$="volume.png"] {
@@ -442,7 +446,7 @@ video.video-preview::-webkit-media-controls-enclosure {
   top: 0px;
   left: 16px;
   transition: opacity .5s ease;
-  background: rgba(255, 255, 255);
+  background: rgba(18, 18, 18);
   border-radius: 9999px;
 }
 
@@ -455,7 +459,7 @@ video.video-preview::-webkit-media-controls-enclosure {
 .lb-seek {
   -webkit-appearance: none;
   appearance: none;
-  height: 6px;
+  height: 5px;
   border-radius: 9999px;
   background: linear-gradient(to right,
       rgba(255, 255, 255) 0%,
@@ -468,7 +472,7 @@ video.video-preview::-webkit-media-controls-enclosure {
 }
 
 #lightbox.lb-seeking #lb-seek {
-  height: 12px;
+  height: 20px;
 }
 
 /* iOS / Chrome：range thumb */
@@ -515,6 +519,16 @@ video.video-preview::-webkit-media-controls-enclosure {
 
 #lbBottom.lb-seeking .lb-seek-time {
   display: flex;
+}
+
+#lbBottom.lb-seeking #lbTimeCur {
+  margin-top: 4px;
+  margin-left: 2px;
+}
+
+#lbBottom.lb-seeking #lbTimeDur {
+  margin-top: 4px;
+  margin-right: 2px;
 }
 
 /* Lightbox 主影片：不顯示原生控制列（避免播放時跑出一套） */
