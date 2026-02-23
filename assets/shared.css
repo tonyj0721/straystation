@@ -395,7 +395,7 @@ video.video-preview::-webkit-media-controls-enclosure {
   gap: 12px;
 }
 
-#lbPlayIcon[src$="pause.png"] {
+/*#lbPlayIcon[src$="pause.png"] {
   width: 32px;
   height: 32px;
   margin-left: 1px;
@@ -417,7 +417,7 @@ video.video-preview::-webkit-media-controls-enclosure {
 #lbVolumeIcon[src$="volume.png"] {
   width: 32px;
   height: 32px;
-}
+}*/
 
 #lbBottom.lb-seeking #lbPlayBtn,
 #lbBottom.lb-seeking #lbMuteBtn {
