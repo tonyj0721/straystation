@@ -210,15 +210,7 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
     }
 
     const chunks = [];
-    const canUseVP9 = typeof MediaRecorder !== "undefined" &&
-      MediaRecorder.isTypeSupported("video/webm;codecs=vp9");
-    const canUseVP8 = typeof MediaRecorder !== "undefined" &&
-      MediaRecorder.isTypeSupported("video/webm;codecs=vp8");
-
-    const mime = canUseVP9
-      ? "video/webm;codecs=vp9"
-      : (canUseVP8 ? "video/webm;codecs=vp8" : "video/webm");
-
+    const mime = "video/mp4";
     const recorder = new MediaRecorder(stream, { mimeType: mime });
     recorder.ondataavailable = (e) => {
       if (e.data && e.data.size > 0) chunks.push(e.data);
@@ -261,7 +253,7 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
     await finished;
 
     const blob = new Blob(chunks, { type: mime });
-    const ext = ".webm";
+    const ext = ".mp4";
     const name = (file.name || "video").replace(/\.[^.]+$/, ext);
     return new File([blob], name, { type: mime });
   } finally {
