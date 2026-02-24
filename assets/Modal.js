@@ -182,7 +182,7 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
   try {
     const video = document.createElement("video");
     video.src = src;
-    video.muted = false;
+    video.muted = true;
     video.playsInline = true;
     video.crossOrigin = "anonymous";
 
