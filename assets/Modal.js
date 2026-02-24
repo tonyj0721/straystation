@@ -191,9 +191,13 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
       video.onerror = (e) => rej(e || new Error("載入影片失敗"));
     });
 
-    // 建議：降低輸出解析度可顯著減少卡頓（這裡保留原解析度）
-    const W = video.videoWidth || 1280;
-    const H = video.videoHeight || 720;
+    // 固定降解析度（降低編碼負載，改善播放卡頓）
+    const inW = video.videoWidth || 1280;
+    const inH = video.videoHeight || 720;
+    const MAX_W = 1280; // 單一路徑：一律限制輸出長邊
+    const scale = Math.min(1, MAX_W / inW);
+    const W = Math.max(2, Math.round(inW * scale));
+    const H = Math.max(2, Math.round(inH * scale));
 
     const canvas = document.createElement("canvas");
     canvas.width = W;
@@ -235,23 +239,24 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
       __drawWatermarkPattern(g, W, H, text);
     }
 
-    let rafId = 0;
-    const loop = () => {
-      if (video.paused || video.ended) return;
+    // 單一路徑：用 requestVideoFrameCallback 跟著「實際解碼出的影格」畫，避免時間軸抖動
+    let __stopped = false;
+    const __onFrame = () => {
+      if (__stopped) return;
       drawFrame();
-      rafId = requestAnimationFrame(loop);
+      video.requestVideoFrameCallback(__onFrame);
     };
 
     recorder.start();
 
     await video.play();
-    loop();
+    video.requestVideoFrameCallback(__onFrame);
 
     await new Promise((res) => {
       video.onended = () => res();
     });
 
-    if (rafId) cancelAnimationFrame(rafId);
+    __stopped = true;
 
     recorder.stop();
     await finished;
