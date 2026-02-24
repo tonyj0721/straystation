@@ -1,5 +1,29 @@
 const q = (sel) => document.querySelector(sel);
 
+// ===============================
+// Video upload flow (NEW)
+//  - Videos: upload original to Storage upload/ (with dstPath + token in metadata)
+//            backend watermarks, writes to pets/ (or adopted/), then deletes original
+//  - Photos: unchanged
+// ===============================
+function __wmToken() {
+  try { return crypto.randomUUID(); } catch (_) { return String(Date.now()) + '_' + Math.random().toString(16).slice(2); }
+}
+
+function __bucketName() {
+  try {
+    return (window.firebaseConfig && window.firebaseConfig.storageBucket) ? window.firebaseConfig.storageBucket : "";
+  } catch (_) {
+    return "";
+  }
+}
+
+function __buildDownloadUrl(path, token) {
+  const b = __bucketName();
+  const enc = encodeURIComponent(path);
+  return `https://firebasestorage.googleapis.com/v0/b/${b}/o/${enc}?alt=media&token=${token}`;
+}
+
 function isVideoUrl(url) {
   if (!url) return false;
   const u = String(url).split("?", 1)[0];
@@ -1231,19 +1255,50 @@ async function saveEdit() {
     }
 
     // 先把本次新增檔案的 Storage path 算好，並先寫回 Firestore（避免後端處理比 images 更新更早完成）
+    // NEW: videos upload to upload/ (original), but wmPending tracks the FINAL path under pets/
     const pendingPaths = [];
     for (const it of items) {
       if (it.kind !== "file") continue;
       const f = it.file;
       const type = (f && f.type) || "";
-      let ext = "bin";
-      if (type.startsWith("image/")) ext = "jpg";
-      else if (type.startsWith("video/")) ext = "mp4";
 
       const base = (f && f.name ? f.name : "file").replace(/\.[^.]+$/, "");
-      const pth = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
+      const ts = Date.now();
+
+      // Photos: unchanged (upload directly to pets/)
+      if (type.startsWith("image/")) {
+        const pth = `pets/${currentDocId}/${ts}_${base}.jpg`;
+        it.__uploadPath = pth;
+        it.__finalPath = pth;
+        it.__uploadType = type;
+        it.__isVideo = false;
+        pendingPaths.push(pth);
+        continue;
+      }
+
+      // Videos: upload original to upload/; backend writes watermarked mp4 to pets/
+      if (type.startsWith("video/")) {
+        const tok = __wmToken();
+        const finalPath = `pets/${currentDocId}/${ts}_${base}.mp4`;
+        const origExt = (f && f.name && f.name.includes('.')) ? f.name.slice(f.name.lastIndexOf('.')) : '';
+        const uploadPath = `upload/${currentDocId}/${ts}_${base}${origExt || '.bin'}`;
+
+        it.__uploadPath = uploadPath;
+        it.__finalPath = finalPath;
+        it.__uploadType = type;
+        it.__isVideo = true;
+        it.__dlToken = tok;
+
+        pendingPaths.push(finalPath);
+        continue;
+      }
+
+      // Fallback
+      const pth = `pets/${currentDocId}/${ts}_${base}.bin`;
       it.__uploadPath = pth;
+      it.__finalPath = pth;
       it.__uploadType = type;
+      it.__isVideo = false;
       pendingPaths.push(pth);
     }
 
@@ -1289,7 +1344,11 @@ async function saveEdit() {
         }
 
         await new Promise((resolve, reject) => {
-          const task = uploadBytesResumable(r, f, { contentType: type || 'application/octet-stream' });
+          const meta = {
+            contentType: type || 'application/octet-stream',
+            ...(it.__isVideo ? { customMetadata: { firebaseStorageDownloadTokens: it.__dlToken, dstPath: it.__finalPath } } : {}),
+          };
+          const task = uploadBytesResumable(r, f, meta);
           task.on("state_changed",
             (snap) => {
               const base = __progressUploadedBytes || 0;
@@ -1311,7 +1370,12 @@ async function saveEdit() {
           );
         });
 
-        newUrls.push(await getDownloadURL(r));
+        // Photos: keep original behavior; Videos: point to FINAL path (backend will create it using same token)
+        if (it.__isVideo) {
+          newUrls.push(__buildDownloadUrl(it.__finalPath, it.__dlToken));
+        } else {
+          newUrls.push(await getDownloadURL(r));
+        }
       }
     }
 
@@ -2133,17 +2197,36 @@ async function onConfirmAdopted() {
     const pendingPaths = [];
 
     // 先算出這次要上傳的 Storage paths，並先寫回 Firestore（避免 race）
+    // NEW: videos upload to upload/ (original), but wmPending tracks the FINAL path under adopted/
     for (const f of files) {
       const type = (f && f.type) || '';
-      let ext = 'bin';
-      if (type.startsWith('image/')) ext = 'jpg';
-      else if (type.startsWith('video/')) ext = 'mp4';
-
       const base = (f && f.name ? f.name : 'file').replace(/\.[^.]+$/, '');
-      const path = `adopted/${currentDocId}/${Date.now()}_${base}.${ext}`;
 
-      plans.push({ f, type, path });
-      pendingPaths.push(path);
+      const ts = Date.now();
+
+      // Photos: unchanged (upload directly to adopted/)
+      if (type.startsWith('image/')) {
+        const finalPath = `adopted/${currentDocId}/${ts}_${base}.jpg`;
+        plans.push({ f, type, uploadPath: finalPath, finalPath, token: null, isVideo: false });
+        pendingPaths.push(finalPath);
+        continue;
+      }
+
+      // Videos: upload original to upload/; backend writes watermarked mp4 to adopted/
+      if (type.startsWith('video/')) {
+        const tok = __wmToken();
+        const finalPath = `adopted/${currentDocId}/${ts}_${base}.mp4`;
+        const origExt = (f && f.name && f.name.includes('.')) ? f.name.slice(f.name.lastIndexOf('.')) : '';
+        const uploadPath = `upload/${currentDocId}/${ts}_${base}${origExt || '.bin'}`;
+        plans.push({ f, type, uploadPath, finalPath, token: tok, isVideo: true });
+        pendingPaths.push(finalPath);
+        continue;
+      }
+
+      // Fallback
+      const finalPath = `adopted/${currentDocId}/${ts}_${base}.bin`;
+      plans.push({ f, type, uploadPath: finalPath, finalPath, token: null, isVideo: false });
+      pendingPaths.push(finalPath);
     }
 
     const prevPending = Array.isArray(currentDoc?.wmPending) ? currentDoc.wmPending : [];
@@ -2157,9 +2240,13 @@ async function onConfirmAdopted() {
     }
 
     for (const pl of plans) {
-      const r = sRef(storage, pl.path);
+      const r = sRef(storage, pl.uploadPath);
       await new Promise((resolve, reject) => {
-        const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
+        const meta = {
+          contentType: pl.type || 'application/octet-stream',
+          ...(pl.isVideo ? { customMetadata: { firebaseStorageDownloadTokens: pl.token, dstPath: pl.finalPath } } : {}),
+        };
+        const task = uploadBytesResumable(r, pl.f, meta);
         task.on("state_changed",
           (snap) => {
             const base = __progressUploadedBytes || 0;
@@ -2176,7 +2263,12 @@ async function onConfirmAdopted() {
         );
       });
 
-      urls.push(await getDownloadURL(r));
+      // Photos: keep original behavior; Videos: point to FINAL path (backend will create it using same token)
+      if (pl.isVideo) {
+        urls.push(__buildDownloadUrl(pl.finalPath, pl.token));
+      } else {
+        urls.push(await getDownloadURL(r));
+      }
     }
 
     await updateDoc(doc(db, "pets", currentDocId), {

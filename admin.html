@@ -1518,19 +1518,44 @@
         let __progressUploadedBytes = 0;
 
 
+        const __bucketName = (window.firebaseConfig && window.firebaseConfig.storageBucket) ? window.firebaseConfig.storageBucket : '';
+        const __token = () => {
+          try { return crypto.randomUUID(); } catch (_) { return String(Date.now()) + '_' + Math.random().toString(16).slice(2); }
+        };
+        const __buildDlUrl = (pth, token) => {
+          const enc = encodeURIComponent(pth);
+          return `https://firebasestorage.googleapis.com/v0/b/${__bucketName}/o/${enc}?alt=media&token=${token}`;
+        };
+
         // 先算出這批上傳會用到的 Storage paths，並先寫回 Firestore（避免後端處理比 images 更新更早完成）
         for (const f of selectedFiles) {
-          // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
           const type = (f && f.type) || '';
-          // 路徑副檔名固定用 jpg/mp4，讓後端覆蓋後檔名/格式一致（避免 iPhone/WebM 問題）
-          let ext = 'bin';
-          if (type.startsWith('image/')) ext = 'jpg';
-          else if (type.startsWith('video/')) ext = 'mp4';
-
           const base = f.name.replace(/\.[^.]+$/, '');
-          const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
-          plans.push({ f, type, path });
-          pendingPaths.push(path);
+          const ts = Date.now();
+
+          // 照片：維持原邏輯（仍寫入 pets/）
+          if (type.startsWith('image/')) {
+            const dstPath = `pets/${docRef.id}/${ts}_${base}.jpg`;
+            plans.push({ f, type, uploadPath: dstPath, finalPath: dstPath, token: null, isVideo: false });
+            pendingPaths.push(dstPath);
+            continue;
+          }
+
+          // 影片：原檔先上傳到 upload/，後端加浮水印後寫回 pets/，並刪掉 upload/ 原檔
+          if (type.startsWith('video/')) {
+            const tok = __token();
+            const finalPath = `pets/${docRef.id}/${ts}_${base}.mp4`;
+            const origExt = (f && f.name && f.name.includes('.')) ? f.name.slice(f.name.lastIndexOf('.')) : '';
+            const uploadPath = `upload/${docRef.id}/${ts}_${base}${origExt || '.bin'}`;
+            plans.push({ f, type, uploadPath, finalPath, token: tok, isVideo: true });
+            pendingPaths.push(finalPath);
+            continue;
+          }
+
+          // 其他不支援類型（保險）
+          const fallbackPath = `pets/${docRef.id}/${ts}_${base}.bin`;
+          plans.push({ f, type, uploadPath: fallbackPath, finalPath: fallbackPath, token: null, isVideo: false });
+          pendingPaths.push(fallbackPath);
         }
 
         if (pendingPaths.length) {
@@ -1539,9 +1564,13 @@
 
         // 逐檔上傳
         for (const pl of plans) {
-          const r = sRef(storage, pl.path);
+          const r = sRef(storage, pl.uploadPath);
           await new Promise((resolve, reject) => {
-            const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
+            const meta = {
+              contentType: pl.type || 'application/octet-stream',
+              ...(pl.isVideo ? { customMetadata: { firebaseStorageDownloadTokens: pl.token, dstPath: pl.finalPath } } : {}),
+            };
+            const task = uploadBytesResumable(r, pl.f, meta);
             task.on("state_changed",
               (snap) => {
                 const base = __progressUploadedBytes || 0;
@@ -1558,7 +1587,12 @@
             );
           });
 
-          urls.push(await getDownloadURL(r));
+          // 照片：用 Storage 產生的 download URL；影片：直接用「最終 pets/」的 URL（token 由前端指定，後端會沿用）
+          if (pl.isVideo) {
+            urls.push(__buildDlUrl(pl.finalPath, pl.token));
+          } else {
+            urls.push(await getDownloadURL(r));
+          }
         }
 
         // 3) 回寫 images 欄位
