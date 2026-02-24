@@ -19,7 +19,7 @@
   <link rel="icon" href="images/dogpaw-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="images/dogpaw-180.png">
   <title>管理後台｜台中簡媽媽狗園</title>
-  <meta name="description" content="TailwindCSS + Firebase Firestore 後台：登錄、管理動物資料；沿用前台 Modal/Lightbox。" />
+  <meta name="description" content="TailwindCSS + Firebase Firestore 後台：建檔、管理動物資料；沿用前台 Modal/Lightbox。" />
   <meta name="theme-color" content="#fcd34d">
   <link rel="manifest" href="./manifest.webmanifest">
   <meta name="mobile-web-app-capable" content="yes">
@@ -265,9 +265,9 @@
     <h1 class="text-xl sm:text-2xl font-bold mb-4">新增／管理動物資料</h1>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- 左：登錄表單 -->
-      <section class="lg:col-span-1 bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
-        <h2 class="text-lg font-semibold mb-6">登錄表單</h2>
+      <!-- 左：建檔表單 -->
+      <section id="formSection" class="lg:col-span-1 bg-white rounded-2xl ring-1 ring-gray-200 shadow-soft p-5">
+        <h2 class="text-lg font-semibold mb-6">建檔表單</h2>
         <form id="petForm" class="space-y-4">
           <div>
             <label id="namelabel" class="block text-sm font-medium mb-1">名字 </label>
@@ -365,10 +365,16 @@
             </div>
             <div id="imgPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
           </div>
-          <div class="flex gap-3 pt-2">
+          <div class="grid grid-cols-2 gap-3">
             <button id="submitBtn" type="submit"
-              class="px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-gray-800 flex items-center gap-2">
-              <span id="submitText">登錄</span>
+              class="w-full px-4 py-3 rounded-xl bg-gray-900 text-white text-sm flex items-center justify-center gap-2 hover:bg-gray-800">
+              建檔
+            </button>
+
+            <!-- 清除表單 -->
+            <button id="clearBtn" type="button"
+              class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm flex items-center justify-center hover:bg-gray-50">
+              清除
             </button>
           </div>
         </form>
@@ -574,12 +580,12 @@
           <div>
             <input id="editFiles" type="file" accept="image/*,video/*" multiple class="sr-only" />
             <div class="flex items-center gap-3">
-              <button id="btnPickEdit" type="button"
-                class="px-3 py-2 rounded-lg border border-gray-300 text-sm">新增照片／影片</button>
+              <button id="btnPickEdit" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
+                新增照片／影片
+              </button>
               <span id="editCount" class="text-xs text-gray-500"></span>
               <span class="text-sm text-gray-400">最多 5 張</span>
             </div>
-            <!-- 和新增模式一致：三欄縮圖 + 上方間距 -->
             <div id="editPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
           </div>
         </div>
@@ -600,35 +606,40 @@
             刪除
           </button>
         </div>
-        <div id="editActionBar" class="hidden pt-2 grid grid-cols-2 gap-3">
-          <button id="btnSave"
-            class="w-full px-4 py-3 rounded-xl bg-gray-900 text-white text-sm flex items-center justify-center gap-2">
-            <span id="saveText">儲存</span>
+        <div id="editActionBar" class="hidden grid grid-cols-2 gap-3">
+          <button id="btnSave" type="button"
+            class="w-full px-4 py-3 rounded-xl bg-gray-900 text-white text-sm flex items-center justify-center gap-2 hover:bg-gray-800">
+            更新
           </button>
-          <button id="btnCancel" type="button" class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm">
+          <button id="btnCancel" type="button"
+            class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm flex items-center justify-center hover:bg-gray-50">
             取消
           </button>
         </div>
 
         <!-- 已領養合照上傳 -->
-        <div id="adoptedUpload" class="hidden">
-          <input id="adoptedFiles" type="file" accept="image/*" multiple class="sr-only" />
-          <div class="flex items-center gap-3 mb-2">
-            <button id="btnPickAdopted" type="button"
-              class="px-3 py-2 rounded-lg border border-gray-300 bg-brand-600 text-white text-sm">
-              選擇合照
-            </button>
-            <span id="adoptedCount" class="text-xs text-gray-500"></span>
-            <span class="text-sm text-gray-400">最多 5 張</span>
+        <div id="adoptedUpload" class="hidden space-y-4">
+          <div>
+            <input id="adoptedFiles" type="file" accept="image/*" multiple class="sr-only" />
+            <div class="flex items-center gap-3">
+              <button id="btnPickAdopted" type="button" class="px-3 py-2 rounded-lg border border-gray-300 text-sm">
+                選擇合照
+              </button>
+              <span id="adoptedCount" class="text-xs text-gray-500"></span>
+              <span class="text-sm text-gray-400">最多 5 張</span>
+            </div>
+            <div id="adoptedPreview" class="mt-3 grid grid-cols-3 gap-2"></div>
           </div>
-          <div id="adoptedPreview" class="mt-1 grid grid-cols-3 gap-2"></div>
-          <button id="btnConfirmAdopted" class="mt-3 px-3 py-2 rounded-lg bg-gray-900 text-white text-sm">
-            儲存領養資訊
-          </button>
-          <button id="btnCancelAdopted" type="button"
-            class="px-3 py-2 rounded-lg bg-gray-200 text-gray-900 hover:bg-gray-300 text-sm">
-            取消
-          </button>
+          <div class="grid grid-cols-2 gap-3">
+            <button id="btnConfirmAdopted" type="button"
+              class="w-full px-4 py-3 rounded-xl bg-gray-900 text-white text-sm flex items-center justify-center gap-2 hover:bg-gray-800">
+              儲存領養資訊
+            </button>
+            <button id="btnCancelAdopted" type="button"
+              class="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm flex items-center justify-center hover:bg-gray-50">
+              取消
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -638,16 +649,37 @@
   <div id="lightbox" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[9999]">
     <div id="lbWrap" class="relative inline-block">
       <img id="lbImg" class="object-contain rounded-lg" />
-      <video id="lbVideo" playsinline controls class="object-contain rounded-lg hidden"></video>
-      <button id="lbClose" class="ui-close-btn absolute top-1 right-1 z-10" aria-label="關閉"><svg viewBox="0 0 24 24"
-          aria-hidden="true" focusable="false" class="ui-close-icon">
-          <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
-        </svg></button>
+      <video id="lbVideo" playsinline class="object-contain rounded-lg hidden"></video>
       <button id="lbPrev" class="absolute text-white text-4xl select-none">❮</button>
       <button id="lbNext" class="absolute text-white text-4xl select-none">❯</button>
     </div>
-    <div id="lbThumbs" class="absolute w-full flex justify-center px-4 py-2">
-      <div id="lbThumbsInner" class="flex gap-2"></div>
+    <button id="lbBackBtn" class="w-8 h-8 absolute items-center justify-center" aria-label="返回">
+      <img id="lbBackIcon" src="images/icons/back.png" alt="" class="w-6 h-6 object-contain pointer-events-none">
+    </button>
+    <div id="lbBottom" class="absolute left-0 w-full flex flex-col items-center px-4">
+      <!-- iPhone 相簿風格：影片控制列（固定顯示、不自動隱藏；貼齊縮圖列上方） -->
+      <div id="lbControls"
+        class="w-full max-w-[720px] px-4 py-3 rounded-2xl bg-white/15 backdrop-blur flex items-center gap-3 hidden">
+        <!-- 拖曳進度條時顯示時間（圖 2 效果） -->
+        <div id="lbSeekTime" class="lb-seek-time" aria-hidden="true">
+          <span id="lbTimeCur">00:00</span>
+          <span id="lbTimeDur">00:00</span>
+        </div>
+        <button id="lbPlayBtn" class="w-8 h-8 flex items-center justify-center" aria-label="播放/暫停">
+          <img id="lbPlayIcon" src="images/icons/play.png" alt="" class="w-6 h-6 object-contain pointer-events-none">
+        </button>
+
+        <input id="lbSeek" type="range" min="0" max="1000" value="0" aria-label="播放進度" class="lb-seek flex-1">
+
+        <button id="lbMuteBtn" class="w-8 h-8 flex items-center justify-center" aria-label="音量/靜音">
+          <img id="lbVolumeIcon" src="images/icons/volume.png" alt=""
+            class="w-6 h-6 object-contain pointer-events-none">
+        </button>
+      </div>
+
+      <div id="lbThumbs" class="w-full flex justify-center px-4 py-2">
+        <div id="lbThumbsInner" class="flex gap-2"></div>
+      </div>
     </div>
   </div>
 
@@ -676,7 +708,7 @@
       getFirestore, collection, getDocs, query, orderBy, where,
       doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp, limit as fbLimit, deleteField,
     } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
-    import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject, listAll, } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
+    import { getStorage, ref as sRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject, listAll, } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
     import {
       getAuth,
       signOut,
@@ -693,7 +725,7 @@
       collection, getDocs, query, orderBy, where,
       doc, getDoc, updateDoc, deleteDoc, serverTimestamp, fbLimit,
       deleteField,
-      sRef, uploadBytes, getDownloadURL, deleteObject, listAll,
+      sRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject, listAll,
     });
 
     const auth = getAuth(app);
@@ -838,6 +870,68 @@
     const btnPick = $("#btnPick");
     const fileCount = $("#fileCount");
     const imgPreview = $("#imgPreview");
+
+    // ===============================
+    // 清除按鈕：清空表單 + 清空已選媒體 + 捲到建檔表單位置
+    // ===============================
+    const clearBtn = document.getElementById("clearBtn");
+    const formSection = document.getElementById("formSection");
+
+    function clearSelectedMedia() {
+      try {
+        // 釋放 objectURL（縮圖/影片）
+        for (const f of selectedFiles) revokeThumb(f);
+      } catch (_) { }
+      selectedFiles = [];
+      try { imgFiles.value = ""; } catch (_) { }
+
+      // 清空預覽 DOM / 計數
+      try { imgPreview.innerHTML = ""; } catch (_) { }
+      try { fileCount.textContent = `已選 0 / ${MAX_FILES} 張`; } catch (_) { }
+
+      // 清空 tile map（避免殘留）
+      try { __previewTileMap.clear(); } catch (_) { }
+
+      // 清空縮圖佇列（避免清除後還在跑縮圖）
+      try { thumbJobQueue.length = 0; } catch (_) { }
+    }
+
+    function clearPetFormAndScroll() {
+      const form = document.getElementById("petForm");
+      if (form) form.reset();
+
+      // 確保預設回到「貓」
+      const catRadio = form?.querySelector('input[name="species"][value="貓"]');
+      if (catRadio) catRadio.checked = true;
+
+      // 清空文字欄位（保險）
+      const nameInput = document.getElementById("name");
+      if (nameInput) nameInput.value = "";
+      const ageInput = document.getElementById("age");
+      if (ageInput) ageInput.value = "";
+      const genderSel = document.getElementById("gender");
+      if (genderSel) genderSel.value = "";
+      const descTa = document.getElementById("desc");
+      if (descTa) descTa.value = "";
+      const neutered = document.getElementById("neutered");
+      if (neutered) neutered.checked = false;
+      const vaccinated = document.getElementById("vaccinated");
+      if (vaccinated) vaccinated.checked = false;
+
+      // 清空「名字已存在」提示/紅框（若有）
+      try { if (window.resetNameCheck) resetNameCheck(); } catch (_) { }
+
+      // 重新同步品種下拉（會把右側下拉清回 disabled + 預設 label）
+      try { syncBreedSelectors(); } catch (_) { }
+
+      // 清空媒體
+      clearSelectedMedia();
+
+      // 捲到建檔表單位置
+      (formSection || form)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    clearBtn?.addEventListener("click", clearPetFormAndScroll);
 
     const MAX_FILES = 5;
     const PREVIEW_MAX = 720;      // 預覽縮圖長邊上限（越小越順）
@@ -1374,6 +1468,9 @@
         showOnCats: true,
         showOnDogs: true,
         showOnIndex: true,
+        // 浮水印處理狀態（有上傳媒體就先設為未就緒）
+        mediaReady: (selectedFiles.length === 0),
+        wmPending: [],
         createdAt: serverTimestamp(), // Firestore 伺服器時間
       };
 
@@ -1386,7 +1483,7 @@
             const r = await Swal.fire({
               icon: "question",
               title: `名字「${name}」已存在`,
-              text: "確定繼續登錄？",
+              text: "確定繼續建檔？",
               showCancelButton: true,
               confirmButtonText: "確定",
               cancelButtonText: "取消",
@@ -1404,9 +1501,9 @@
 
       // 按鈕進度狀態
       const submitBtn = $("#submitBtn");
-      const submitText = $("#submitText");
       submitBtn.disabled = true;
-      const stopDots = startDots(submitText, "登錄中");
+      const prog = startProgressBar(submitBtn, { imgSrc: "images/奔跑貓咪.png" });
+      prog.update(0);
 
       try {
         // 1) 新增基本文件
@@ -1414,22 +1511,53 @@
 
         // 2) 逐張上傳圖片，取得 Storage URL
         const urls = [];
+        const plans = [];
+        const pendingPaths = [];
+
+        const __progressTotalBytes = selectedFiles.reduce((s, f) => s + (f?.size || 0), 0) || 1;
+        let __progressUploadedBytes = 0;
+
+
+        // 先算出這批上傳會用到的 Storage paths，並先寫回 Firestore（避免後端處理比 images 更新更早完成）
         for (const f of selectedFiles) {
-          const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
-          const type = wmBlob.type || '';
+          // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
+          const type = (f && f.type) || '';
+          // 路徑副檔名固定用 jpg/mp4，讓後端覆蓋後檔名/格式一致（避免 iPhone/WebM 問題）
           let ext = 'bin';
-          if (type.startsWith('image/')) {
-            ext = type === 'image/png' ? 'png' : 'jpg';
-          } else if (type.startsWith('video/')) {
-            if (type.includes('webm')) ext = 'webm';
-            else if (type.includes('ogg')) ext = 'ogg';
-            else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
-            else ext = 'mp4';
-          }
+          if (type.startsWith('image/')) ext = 'jpg';
+          else if (type.startsWith('video/')) ext = 'mp4';
+
           const base = f.name.replace(/\.[^.]+$/, '');
           const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
-          const r = sRef(storage, path);
-          await uploadBytes(r, wmBlob, { contentType: wmBlob.type });
+          plans.push({ f, type, path });
+          pendingPaths.push(path);
+        }
+
+        if (pendingPaths.length) {
+          await updateDoc(doc(db, "pets", docRef.id), { mediaReady: false, wmPending: pendingPaths });
+        }
+
+        // 逐檔上傳
+        for (const pl of plans) {
+          const r = sRef(storage, pl.path);
+          await new Promise((resolve, reject) => {
+            const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
+            task.on("state_changed",
+              (snap) => {
+                const base = __progressUploadedBytes || 0;
+                const now = base + (snap?.bytesTransferred || 0);
+                const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
+                prog.update(pct);
+              },
+              (err) => reject(err),
+              () => {
+                __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || pl.f?.size || 0);
+                prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
+                resolve();
+              }
+            );
+          });
+
           urls.push(await getDownloadURL(r));
         }
 
@@ -1439,9 +1567,10 @@
         }
 
         // UI 收尾
-        stopDots();
-        submitBtn.disabled = false;
-        submitText.textContent = "登錄";
+        prog.update(100);
+        prog.stop({ text: "處理中...", keepDisabled: true });
+        submitBtn.disabled = true;
+        submitBtn.textContent = "處理中...";
 
         // ★ 清空名字欄位 + 把「已被使用」提示/紅框移除
         const nameInput = document.getElementById("name");
@@ -1455,22 +1584,62 @@
         fileCount.textContent = "已選 0 / 5 張";
         syncBreedSelectors();
 
-        // 先啟動重新載入列表（避免等到提示結束才開始抓資料）
-        const reloadPromise = loadPets();
-
-        // ★ 登錄完成 → 捲到最上方（先 smooth，最後再硬捲補正）
+        // ★ 建檔完成 → 捲到最上方（先 smooth，最後再硬捲補正）
         window.scrollTo({ top: 0, behavior: "smooth" });
         setTimeout(forceScrollTop, 250); // smooth 途中若被打斷，250ms 後硬捲補正
 
+        // 若有媒體：等待後端完成浮水印後才「顯示建檔完成」並把資料放進列表（避免空窗被點開）
+        if (pendingPaths.length) {
+          Swal.fire({
+            icon: "info",
+            title: "浮水印處理中…",
+            text: "處理完成後才會顯示在列表，並自動開啟詳情。",
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            showConfirmButton: false,
+            didOpen: () => {
+              Swal.showLoading();
+            },
+            returnFocus: false,
+          });
 
-        // 成功提示後直接打開詳情
-        Swal.fire({
-          icon: "success",
-          title: "已成功登錄！",
-          showConfirmButton: false,
-          timer: 1500,
-          returnFocus: false, // 避免關閉後把焦點還給原 input 而導致捲動回彈
-        }).then(async () => {
+          try {
+            await __waitPetMediaReady(docRef.id);
+          } catch (e) {
+            console.error("waitPetMediaReady error:", e);
+          }
+
+          // 完成後才載入列表
+          try {
+            await loadPets();
+          } catch (e) {
+            console.error("loadPets error:", e);
+          }
+
+          Swal.close();
+
+          await Swal.fire({
+            icon: "success",
+            title: "已建檔！",
+            showConfirmButton: false,
+            timer: 1500,
+            returnFocus: false,
+          });
+          forceScrollTop();
+          openDialog(docRef.id);
+
+
+        } else {
+          // 沒有媒體：直接更新列表與提示
+          const reloadPromise = loadPets();
+
+          await Swal.fire({
+            icon: "success",
+            title: "已建檔！",
+            showConfirmButton: false,
+            timer: 1500,
+            returnFocus: false, // 避免關閉後把焦點還給原 input 而導致捲動回彈
+          });
           try {
             await reloadPromise;
           } catch (e) {
@@ -1478,13 +1647,16 @@
           }
           forceScrollTop(); // ✅ 保證捲到最上面（不會卡在一半）
           openDialog(docRef.id);
-        });
+
+        }
 
       } catch (err) {
-        stopDots();
+        await Swal.fire({ icon: "error", title: "建檔失敗", text: err.message });
+      } finally {
+        // 收回進度條並恢復排版
+        try { prog.stop({ restore: true, text: "建檔", keepDisabled: false }); } catch (_) { }
         submitBtn.disabled = false;
-        submitText.textContent = "登錄";
-        Swal.fire({ icon: "error", title: "登錄失敗", text: err.message });
+        submitBtn.textContent = "建檔";
       }
     });
 
@@ -1496,6 +1668,7 @@
       const snap = await getDocs(q);
       pets.length = 0;
       pets.push(...snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      /*pets.push(...snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p && p.mediaReady !== false));看不見*/
       applyFilterAndRender();
     }
 
@@ -1608,6 +1781,7 @@
           );
           const snapPrefix = await getDocs(qPrefix);
           prefix = snapPrefix.docs.map(d => ({ id: d.id, ...d.data() }));
+          /*prefix = snapPrefix.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p && p.mediaReady !== false);看不見*/
         } catch (e) {
           console.warn("prefix search skipped:", e);
         }
@@ -1633,6 +1807,7 @@
 
         const contains = recentDocs
           .map(d => ({ id: d.id, ...d.data() }))
+          /*.filter(p => p && p.mediaReady !== false)看不見*/
           .filter(p => {
             const nm = String(p.name || "");
             const nmLower = String(p.nameLower || nm).toLowerCase();
@@ -1908,7 +2083,7 @@
 
       input.addEventListener("input", runCheck);
 
-      // 讓外部可在「登錄成功」後重置提示與樣式
+      // 讓外部可在「建檔成功」後重置提示與樣式
       window.resetNameCheck = () => {
         // 把最新檢查版本往前推，避免舊請求回來覆蓋
         lastVer++;
