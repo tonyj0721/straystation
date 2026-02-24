@@ -1415,7 +1415,8 @@
         // 2) 逐張上傳圖片，取得 Storage URL
         const urls = [];
         for (const f of selectedFiles) {
-          const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+          const wmBlob = f;
+          /*const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印*/
           const type = wmBlob.type || '';
           let ext = 'bin';
           if (type.startsWith('image/')) {
