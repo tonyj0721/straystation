@@ -191,6 +191,7 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
       video.onerror = (e) => rej(e || new Error("載入影片失敗"));
     });
 
+    // 建議：降低輸出解析度可顯著減少卡頓（這裡保留原解析度）
     const W = video.videoWidth || 1280;
     const H = video.videoHeight || 720;
 
@@ -199,19 +200,28 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
     canvas.height = H;
     const g = canvas.getContext("2d");
 
-    const stream = canvas.captureStream();
+    // 固定 30fps，避免不穩定幀率導致播放抖動
+    const stream = canvas.captureStream(30);
+
+    // 盡可能把原影片音軌帶進來（失敗也不影響畫面）
     try {
       if (video.captureStream) {
         const vStream = video.captureStream();
         vStream.getAudioTracks().forEach((track) => stream.addTrack(track));
       }
     } catch (_) {
-      // audio 失敗可以忽略，至少保留畫面
+      // ignore
     }
 
     const chunks = [];
+
+    // 單一路徑：強制輸出 MP4
     const mime = "video/mp4";
-    const recorder = new MediaRecorder(stream, { mimeType: mime });
+    const recorder = new MediaRecorder(stream, {
+      mimeType: mime,
+      videoBitsPerSecond: 6_000_000,
+    });
+
     recorder.ondataavailable = (e) => {
       if (e.data && e.data.size > 0) chunks.push(e.data);
     };
@@ -219,35 +229,29 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
       recorder.onstop = () => resolve();
     });
 
-    recorder.start();
-
-    const useRVFC = typeof video.requestVideoFrameCallback === "function";
-
     function drawFrame() {
       g.clearRect(0, 0, W, H);
       g.drawImage(video, 0, 0, W, H);
       __drawWatermarkPattern(g, W, H, text);
     }
 
-    if (useRVFC) {
-      const cb = () => {
-        if (video.paused || video.ended) return;
-        drawFrame();
-        video.requestVideoFrameCallback(cb);
-      };
-      video.requestVideoFrameCallback(cb);
-    } else {
-      const t = setInterval(() => {
-        if (video.paused || video.ended) {
-          clearInterval(t);
-          return;
-        }
-        drawFrame();
-      }, 40);
-    }
+    let rafId = 0;
+    const loop = () => {
+      if (video.paused || video.ended) return;
+      drawFrame();
+      rafId = requestAnimationFrame(loop);
+    };
+
+    recorder.start();
 
     await video.play();
-    await new Promise((res) => { video.onended = () => res(); });
+    loop();
+
+    await new Promise((res) => {
+      video.onended = () => res();
+    });
+
+    if (rafId) cancelAnimationFrame(rafId);
 
     recorder.stop();
     await finished;
@@ -262,6 +266,7 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
 }
 
 // ===============================
+
 // 預覽縮圖：避免大圖解碼造成卡頓（支援手機）
 // ===============================
 const PREVIEW_EMPTY_GIF = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
