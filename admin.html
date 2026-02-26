@@ -742,6 +742,65 @@ const __makeDownloadUrl = (objectPath, token) => {
   return `https://firebasestorage.googleapis.com/v0/b/${b}/o/${enc}?alt=media&token=${token}`;
 };
 
+    // ===============================
+    // 前端浮水印（照片）+ 按鈕進度條（避免依賴 assets/Modal.js 的全域函式）
+    // ===============================
+    function startProgressBar(btn, opts = {}) {
+      const original = { text: btn.textContent, disabled: btn.disabled };
+      const label = document.createElement('span');
+      label.textContent = original.text || '送出';
+      btn.textContent = '';
+      btn.appendChild(label);
+      btn.disabled = true;
+      let lastPct = 0;
+      return {
+        update(pct) {
+          lastPct = Math.max(0, Math.min(100, Math.round(pct)));
+          label.textContent = `${original.text || '處理中'}... ${lastPct}%`;
+        },
+        stop({ restore = true, text = original.text, keepDisabled = false } = {}) {
+          if (restore) {
+            btn.textContent = text || original.text || '完成';
+            btn.disabled = keepDisabled ? true : original.disabled;
+          }
+        }
+      };
+    }
+
+    const __loadImageFromFile = (file) => new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
+    });
+
+    async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {}) {
+      const img = await __loadImageFromFile(file);
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth || img.width;
+      canvas.height = img.naturalHeight || img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      // 右下角浮水印（半透明）
+      const pad = Math.max(12, Math.round(Math.min(canvas.width, canvas.height) * 0.015));
+      const fontSize = Math.max(18, Math.round(Math.min(canvas.width, canvas.height) * 0.04));
+      ctx.font = `700 ${fontSize}px sans-serif`;
+      ctx.textBaseline = 'bottom';
+      ctx.textAlign = 'right';
+      ctx.fillStyle = 'rgba(255,255,255,0.65)';
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+      ctx.lineWidth = Math.max(2, Math.round(fontSize * 0.12));
+      const x = canvas.width - pad;
+      const y = canvas.height - pad;
+      ctx.strokeText(text, x, y);
+      ctx.fillText(text, x, y);
+
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+      URL.revokeObjectURL(img.src);
+      return new File([blob], (file.name || 'image').replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
+    }
+
 
     const auth = getAuth(app);
 

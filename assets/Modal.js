@@ -1224,6 +1224,9 @@ async function saveEdit() {
   const prog = startProgressBar(btn, { imgSrc: "images/奔跑貓咪.png" });
   prog.update(0);
 
+  // ⬇️ 重要：下面會用到 catch/finally，必須先包一層 try
+  try {
+
   try {
     // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
     const { items, removeUrls } = editImagesState;
