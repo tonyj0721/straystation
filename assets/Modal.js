@@ -1226,8 +1226,6 @@ async function saveEdit() {
 
   // ⬇️ 重要：下面會用到 catch/finally，必須先包一層 try
   try {
-
-  try {
     // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
     const { items, removeUrls } = editImagesState;
     const newUrls = [];
@@ -1383,7 +1381,7 @@ async function saveEdit() {
         newUrls.push(await getDownloadURL(r));
       }
 
-
+    }
 
     // 刪除被移除的舊圖（忽略刪失敗）
     // 同步刪掉後端產生的縮圖：thumbs/<原路徑去副檔名>.jpg
