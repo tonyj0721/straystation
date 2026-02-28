@@ -185,6 +185,7 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
     video.muted = true;
     video.playsInline = true;
     video.crossOrigin = "anonymous";
+    video.preload = "auto";
 
     await new Promise((res, rej) => {
       video.onloadedmetadata = () => res();
@@ -197,72 +198,95 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
     const canvas = document.createElement("canvas");
     canvas.width = W;
     canvas.height = H;
-    const g = canvas.getContext("2d");
 
-    const stream = canvas.captureStream();
+    // 盡量降低卡頓/掉幀（瀏覽器支援就吃到）
+    const g = canvas.getContext("2d", { alpha: false, desynchronized: true });
+
+    // ✅ 固定輸出 fps：關鍵
+    const FPS = 30;
+    const stream = canvas.captureStream(FPS);
+
+    // 音軌：能加就加（不影響畫面穩定）
     try {
       if (video.captureStream) {
         const vStream = video.captureStream();
         vStream.getAudioTracks().forEach((track) => stream.addTrack(track));
       }
-    } catch (_) {
-      // audio 失敗可以忽略，至少保留畫面
-    }
+    } catch (_) { }
 
+    // MediaRecorder：維持你原本的 webm vp9/vp8 選擇策略
     const chunks = [];
-    const canUseVP9 = typeof MediaRecorder !== "undefined" &&
-      MediaRecorder.isTypeSupported("video/webm;codecs=vp9");
-    const canUseVP8 = typeof MediaRecorder !== "undefined" &&
-      MediaRecorder.isTypeSupported("video/webm;codecs=vp8");
-
-    const mime = canUseVP9
-      ? "video/webm;codecs=vp9"
-      : (canUseVP8 ? "video/webm;codecs=vp8" : "video/webm");
+    const canUseVP9 = MediaRecorder.isTypeSupported("video/webm;codecs=vp9");
+    const canUseVP8 = MediaRecorder.isTypeSupported("video/webm;codecs=vp8");
+    const mime = canUseVP9 ? "video/webm;codecs=vp9" : (canUseVP8 ? "video/webm;codecs=vp8" : "video/webm");
 
     const recorder = new MediaRecorder(stream, { mimeType: mime });
-    recorder.ondataavailable = (e) => {
-      if (e.data && e.data.size > 0) chunks.push(e.data);
-    };
-    const finished = new Promise((resolve) => {
-      recorder.onstop = () => resolve();
-    });
+    recorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunks.push(e.data); };
+    const finished = new Promise((resolve) => { recorder.onstop = () => resolve(); });
 
-    recorder.start();
+    // 可選：給 timeslice 讓資料穩定吐出（避免某些環境最後才吐一大包）
+    recorder.start(1000);
 
-    const useRVFC = typeof video.requestVideoFrameCallback === "function";
+    // -----------------------------
+    // ✅ 關鍵：把「畫圖節奏」鎖定在固定 FPS
+    // -----------------------------
+    let hasNewFrame = true;   // 先讓第一張一定會畫
+    let drawing = false;
 
     function drawFrame() {
+      // 你若想“即使沒新影格也畫”，就不要用 hasNewFrame gate
+      // 但這裡採「有新影格才更新畫面，沒新影格就維持上一張」以降低不必要的重畫負擔
+      if (!hasNewFrame) return;
+      hasNewFrame = false;
+
       g.clearRect(0, 0, W, H);
       g.drawImage(video, 0, 0, W, H);
       __drawWatermarkPattern(g, W, H, text);
     }
 
-    if (useRVFC) {
+    // RVFC：只負責告訴我們「有新影格可以拿」
+    const useRVFC = typeof video.requestVideoFrameCallback === "function";
+    let rvfcId = null;
+
+    function startFrameNotifier() {
+      if (!useRVFC) return;
       const cb = () => {
         if (video.paused || video.ended) return;
-        drawFrame();
-        video.requestVideoFrameCallback(cb);
+        hasNewFrame = true;
+        rvfcId = video.requestVideoFrameCallback(cb);
       };
-      video.requestVideoFrameCallback(cb);
-    } else {
-      const t = setInterval(() => {
-        if (video.paused || video.ended) {
-          clearInterval(t);
-          return;
-        }
-        drawFrame();
-      }, 40);
+      rvfcId = video.requestVideoFrameCallback(cb);
     }
 
+    // 固定節奏繪製：時間戳會跟著 captureStream(FPS) 穩定
+    const intervalMs = Math.round(1000 / FPS);
+    const timer = setInterval(() => {
+      if (video.ended) return;
+      if (video.paused) return;
+      drawFrame();
+    }, intervalMs);
+
+    // 播放
+    startFrameNotifier();
     await video.play();
+
+    // 等播完
     await new Promise((res) => { video.onended = () => res(); });
+
+    // 收尾：再畫最後一張（避免尾端缺幀）
+    try {
+      hasNewFrame = true;
+      drawFrame();
+    } catch (_) { }
+
+    clearInterval(timer);
+    try { if (useRVFC && rvfcId != null) { /* 沒有 cancel API，忽略即可 */ } } catch (_) { }
 
     recorder.stop();
     await finished;
 
     const blob = new Blob(chunks, { type: mime });
-    const ext = ".webm";
-    const name = (file.name || "video").replace(/\.[^.]+$/, ext);
+    const name = (file.name || "video").replace(/\.[^.]+$/, ".webm");
     return new File([blob], name, { type: mime });
   } finally {
     URL.revokeObjectURL(src);
@@ -1131,23 +1155,22 @@ async function saveEdit() {
 
       if (it.kind === "file") {
         const f = it.file;
-        const fType = (f && f.type) ? f.type : '';
-        const isVideo = fType.startsWith('video/');
-        const base = (f.name || 'file').replace(/\.[^.]+$/, '');
-        const ext = (() => {
-          const m = String(f.name || '').match(/\.([^.]+)$/);
-          if (m && m[1]) return m[1].toLowerCase();
-          if (fType.startsWith('image/')) return (fType.split('/')[1] || 'jpg').toLowerCase();
-          if (fType.startsWith('video/')) return (fType.split('/')[1] || 'mp4').toLowerCase();
-          return 'bin';
-        })();
-        // ✅ 圖片：維持原樣直接寫入 pets/
-        // ✅ 影片：原檔先上傳到 upload/，由後端加浮水印後寫入 pets/，並刪除原檔
-        const folder = isVideo ? 'upload' : 'pets';
-        const path = `${folder}/currentDocId/${Date.now()}_${base}.${ext}`;
+        const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+        const type = wmBlob.type || '';
+        let ext = 'bin';
+        if (type.startsWith('image/')) {
+          ext = type === 'image/png' ? 'png' : 'jpg';
+        } else if (type.startsWith('video/')) {
+          if (type.includes('webm')) ext = 'webm';
+          else if (type.includes('ogg')) ext = 'ogg';
+          else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
+          else ext = 'mp4';
+        }
+        const base = f.name.replace(/\.[^.]+$/, '');
+        const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
         const r = sRef(storage, path);
         await new Promise((resolve, reject) => {
-          const task = uploadBytesResumable(r, f, { contentType: fType || 'application/octet-stream' });
+          const task = uploadBytesResumable(r, wmBlob, { contentType: wmBlob.type || 'application/octet-stream' });
           task.on("state_changed",
             (snap) => {
               const base = __progressUploadedBytes || 0;
@@ -1158,7 +1181,8 @@ async function saveEdit() {
             (err) => reject(err),
             async () => {
               try {
-                __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || f?.size || 0);
+                // 完成一檔：累加已完成 bytes
+                __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || wmBlob?.size || 0);
                 prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
                 resolve();
               } catch (e) {
@@ -1928,43 +1952,38 @@ async function onConfirmAdopted() {
 
   try {
     for (const f of files) {
-      const fType = (f && f.type) ? f.type : '';
-        const isVideo = fType.startsWith('video/');
-        const base = (f.name || 'file').replace(/\.[^.]+$/, '');
-        const ext = (() => {
-          const m = String(f.name || '').match(/\.([^.]+)$/);
-          if (m && m[1]) return m[1].toLowerCase();
-          if (fType.startsWith('image/')) return (fType.split('/')[1] || 'jpg').toLowerCase();
-          if (fType.startsWith('video/')) return (fType.split('/')[1] || 'mp4').toLowerCase();
-          return 'bin';
-        })();
-        // ✅ 圖片：維持原樣直接寫入 pets/
-        // ✅ 影片：原檔先上傳到 upload/，由後端加浮水印後寫入 pets/，並刪除原檔
-        const folder = isVideo ? 'upload' : 'pets';
-        const path = `${folder}/currentDocId/${Date.now()}_${base}.${ext}`;
-        const r = sRef(storage, path);
-        await new Promise((resolve, reject) => {
-          const task = uploadBytesResumable(r, f, { contentType: fType || 'application/octet-stream' });
-          task.on("state_changed",
-            (snap) => {
-              const base = __progressUploadedBytes || 0;
-              const now = base + (snap?.bytesTransferred || 0);
-              const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
-              prog.update(pct);
-            },
-            (err) => reject(err),
-            async () => {
-              try {
-                __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || f?.size || 0);
-                prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
-                resolve();
-              } catch (e) {
-                reject(e);
-              }
-            }
-          );
-        });
-        urls.push(await getDownloadURL(r));
+      const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+      const type = wmBlob.type || '';
+      let ext = 'bin';
+      if (type.startsWith('image/')) {
+        ext = type === 'image/png' ? 'png' : 'jpg';
+      } else if (type.startsWith('video/')) {
+        if (type.includes('webm')) ext = 'webm';
+        else if (type.includes('ogg')) ext = 'ogg';
+        else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
+        else ext = 'mp4';
+      }
+      const base = f.name.replace(/\.[^.]+$/, '');
+      const path = `adopted/${currentDocId}/${Date.now()}_${base}.${ext}`;
+      const r = sRef(storage, path);
+      await new Promise((resolve, reject) => {
+        const task = uploadBytesResumable(r, wmBlob, { contentType: wmBlob.type || 'application/octet-stream' });
+        task.on("state_changed",
+          (snap) => {
+            const base = __progressUploadedBytes || 0;
+            const now = base + (snap?.bytesTransferred || 0);
+            const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
+            prog.update(pct);
+          },
+          (err) => reject(err),
+          () => {
+            __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || wmBlob?.size || 0);
+            prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
+            resolve();
+          }
+        );
+      });
+      urls.push(await getDownloadURL(r));
     }
 
     await updateDoc(doc(db, "pets", currentDocId), {
