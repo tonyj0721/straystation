@@ -1518,19 +1518,26 @@
         let __progressUploadedBytes = 0;
 
 
-        // 先算出這批上傳會用到的 Storage paths，並先寫回 Firestore（避免後端處理比 images 更新更早完成）
+        // 先算出這批上傳會用到的 Storage paths，並先寫回 Firestore
+        // 照片：前端做浮水印，直接存到 pets/
+        // 影片：原始檔先存到 upload/，後端再轉檔＋浮水印後搬到 pets/
         for (const f of selectedFiles) {
-          // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
           const type = (f && f.type) || '';
+          const isImage = type.startsWith('image/');
+          const isVideo = type.startsWith('video/');
           // 路徑副檔名固定用 jpg/mp4，讓後端覆蓋後檔名/格式一致（避免 iPhone/WebM 問題）
           let ext = 'bin';
-          if (type.startsWith('image/')) ext = 'jpg';
-          else if (type.startsWith('video/')) ext = 'mp4';
+          if (isImage) ext = 'jpg';
+          else if (isVideo) ext = 'mp4';
 
           const base = f.name.replace(/\.[^.]+$/, '');
-          const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
+          const path = isVideo
+            ? `upload/${docRef.id}/${Date.now()}_${base}.${ext}`
+            : `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
           plans.push({ f, type, path });
-          pendingPaths.push(path);
+          if (isVideo) {
+            pendingPaths.push(path);
+          }
         }
 
         if (pendingPaths.length) {
@@ -1540,9 +1547,29 @@
         // 逐檔上傳
         for (const pl of plans) {
           const r = sRef(storage, pl.path);
+          const type = pl.type || '';
+          const isImage = type.startsWith('image/');
+          const isVideo = type.startsWith('video/');
+          let fileToUpload = pl.f;
+
+          // 照片：在前端先套用浮水印
+          if (isImage && window.addWatermarkToFile) {
+            try {
+              fileToUpload = await window.addWatermarkToFile(pl.f);
+            } catch (err) {
+              console.error('前端浮水印失敗，改上傳原圖', err);
+              fileToUpload = pl.f;
+            }
+          }
+
+          const meta = {
+            contentType: type || 'application/octet-stream',
+          };
+
           await new Promise((resolve, reject) => {
-            const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
-            task.on("state_changed",
+            const task = uploadBytesResumable(r, fileToUpload, meta);
+            task.on(
+              'state_changed',
               (snap) => {
                 const base = __progressUploadedBytes || 0;
                 const now = base + (snap?.bytesTransferred || 0);
@@ -1551,14 +1578,19 @@
               },
               (err) => reject(err),
               () => {
-                __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || pl.f?.size || 0);
+                __progressUploadedBytes =
+                  (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || fileToUpload?.size || 0);
                 prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
                 resolve();
               }
             );
           });
 
-          urls.push(await getDownloadURL(r));
+          // 照片：直接記錄 pets/ 底下的下載網址
+          if (isImage) {
+            urls.push(await getDownloadURL(r));
+          }
+          // 影片：由後端處理＋搬到 pets/，完成後再由雲端函式補上 images 陣列
         }
 
         // 3) 回寫 images 欄位
