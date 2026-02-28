@@ -1518,94 +1518,55 @@
         let __progressUploadedBytes = 0;
 
 
-        // 先算出這批上傳會用到的 Storage paths
-//  - 照片：前端先做浮水印，直接存到 pets/
-//  - 影片：先上傳到 upload/，後端用 watermark.png 覆蓋後搬到 pets/，並刪掉原檔
-for (const f of selectedFiles) {
-  const type = (f && f.type) || '';
-  const base = f.name.replace(/\.[^.]+$/, '');
-  const ts = Date.now();
+        // 先算出這批上傳會用到的 Storage paths，並先寫回 Firestore（避免後端處理比 images 更新更早完成）
+        for (const f of selectedFiles) {
+          // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
+          const type = (f && f.type) || '';
+          // 路徑副檔名固定用 jpg/mp4，讓後端覆蓋後檔名/格式一致（避免 iPhone/WebM 問題）
+          let ext = 'bin';
+          if (type.startsWith('image/')) ext = 'jpg';
+          else if (type.startsWith('video/')) ext = 'mp4';
 
-  if (type.startsWith('image/')) {
-    const dstPath = `pets/${docRef.id}/${ts}_${base}.jpg`;
-    plans.push({ kind: 'image', f, type, dstPath });
-    // 圖片不需要後端處理 → 不進 pendingPaths
-  } else if (type.startsWith('video/')) {
-    // 影片一律走後端處理：先丟 upload/，完成後會搬到 pets/
-    const srcPath = `upload/${docRef.id}/${ts}_${base}.mp4`;
-    const dstPath = `pets/${docRef.id}/${ts}_${base}.mp4`;
-    plans.push({ kind: 'video', f, type, srcPath, dstPath });
-    pendingPaths.push(srcPath); // pending 追蹤「原始上傳檔」
-  }
-}
-
-// 有影片要後端處理 → 先標記 processing（避免被點開看到未完成媒體）
-if (pendingPaths.length) {
-  await updateDoc(doc(db, "pets", docRef.id), { mediaReady: false, wmPending: pendingPaths });
-}
-
-// 逐檔上傳
-for (const pl of plans) {
-  if (pl.kind === 'image') {
-    // 前端浮水印（輸出 jpg）
-    const wmFile = await window.addWatermarkToFile(pl.f, { text: "台中簡媽媽狗園" });
-    const r = sRef(storage, pl.dstPath);
-
-    await new Promise((resolve, reject) => {
-      const task = uploadBytesResumable(r, wmFile, { contentType: "image/jpeg" });
-      task.on("state_changed",
-        (snap) => {
-          const base = __progressUploadedBytes || 0;
-          const now = base + (snap?.bytesTransferred || 0);
-          const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
-          prog.update(pct);
-        },
-        (err) => reject(err),
-        () => {
-          __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || wmFile?.size || 0);
-          prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
-          resolve();
+          const base = f.name.replace(/\.[^.]+$/, '');
+          const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
+          plans.push({ f, type, path });
+          pendingPaths.push(path);
         }
-      );
-    });
 
-    urls.push(await getDownloadURL(r));
-  } else if (pl.kind === 'video') {
-    const r = sRef(storage, pl.srcPath);
-
-    // 把目標 pets/ 路徑交給後端（customMetadata）
-    const meta = {
-      contentType: "video/mp4",
-      customMetadata: { wmDst: pl.dstPath },
-    };
-
-    await new Promise((resolve, reject) => {
-      const task = uploadBytesResumable(r, pl.f, meta);
-      task.on("state_changed",
-        (snap) => {
-          const base = __progressUploadedBytes || 0;
-          const now = base + (snap?.bytesTransferred || 0);
-          const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
-          prog.update(pct);
-        },
-        (err) => reject(err),
-        () => {
-          __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || pl.f?.size || 0);
-          prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
-          resolve();
+        if (pendingPaths.length) {
+          await updateDoc(doc(db, "pets", docRef.id), { mediaReady: false, wmPending: pendingPaths });
         }
-      );
-    });
 
-    // 影片 URL 由後端處理完成後寫回 Firestore（避免先存 upload/ 連結）
-  }
-}
+        // 逐檔上傳
+        for (const pl of plans) {
+          const r = sRef(storage, pl.path);
+          await new Promise((resolve, reject) => {
+            const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
+            task.on("state_changed",
+              (snap) => {
+                const base = __progressUploadedBytes || 0;
+                const now = base + (snap?.bytesTransferred || 0);
+                const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
+                prog.update(pct);
+              },
+              (err) => reject(err),
+              () => {
+                __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || pl.f?.size || 0);
+                prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
+                resolve();
+              }
+            );
+          });
 
-// 3) 回寫 images 欄位（只包含「已完成」的照片；影片會由後端完成後 append）
-if (urls.length) {
-  await updateDoc(doc(db, "pets", docRef.id), { images: urls });
-}
-// UI 收尾
+          urls.push(await getDownloadURL(r));
+        }
+
+        // 3) 回寫 images 欄位
+        if (urls.length) {
+          await updateDoc(doc(db, "pets", docRef.id), { images: urls });
+        }
+
+        // UI 收尾
         prog.update(100);
         prog.stop({ text: "處理中...", keepDisabled: true });
         submitBtn.disabled = true;

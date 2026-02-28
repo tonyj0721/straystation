@@ -148,7 +148,7 @@ function __drawWatermarkPattern(g, W, H, text) {
 async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {}) {
   const type = (file && file.type) || "";
   if (type.startsWith("video/")) {
-    return file; // 影片改由後端處理浮水印
+    return await addWatermarkToVideo(file, { text });
   }
 
   const url = URL.createObjectURL(file);
@@ -1230,34 +1230,22 @@ async function saveEdit() {
       } catch (_) { }
     }
 
-    // 先把本次新增檔案的 Storage path 算好，並先寫回 Firestore（避免 race）
-//  - 圖片：前端浮水印後直接存 pets/
-//  - 影片：先上傳到 upload/，後端完成後搬到 pets/（並刪掉 upload 原檔）
-const pendingPaths = [];
-for (const it of items) {
-  if (it.kind !== "file") continue;
-  const f = it.file;
-  const type = (f && f.type) || "";
+    // 先把本次新增檔案的 Storage path 算好，並先寫回 Firestore（避免後端處理比 images 更新更早完成）
+    const pendingPaths = [];
+    for (const it of items) {
+      if (it.kind !== "file") continue;
+      const f = it.file;
+      const type = (f && f.type) || "";
+      let ext = "bin";
+      if (type.startsWith("image/")) ext = "jpg";
+      else if (type.startsWith("video/")) ext = "mp4";
 
-  const base = (f && f.name ? f.name : "file").replace(/\.[^.]+$/, "");
-  const ts = Date.now();
-
-  if (type.startsWith("image/")) {
-    const dst = `pets/${currentDocId}/${ts}_${base}.jpg`;
-    it.__uploadPath = dst;
-    it.__uploadType = "image/jpeg";
-    // 圖片不需要後端 → 不進 pendingPaths
-  } else if (type.startsWith("video/")) {
-    const src = `upload/${currentDocId}/${ts}_${base}.mp4`;
-    const dst = `pets/${currentDocId}/${ts}_${base}.mp4`;
-    it.__uploadPath = src;       // 先上傳到 upload/
-    it.__wmDstPath = dst;        // 交給後端搬運到 pets/
-    it.__uploadType = "video/mp4";
-    pendingPaths.push(src);
-  } else {
-    // 其他類型略過
-  }
-}
+      const base = (f && f.name ? f.name : "file").replace(/\.[^.]+$/, "");
+      const pth = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
+      it.__uploadPath = pth;
+      it.__uploadType = type;
+      pendingPaths.push(pth);
+    }
 
     // 同步計算下一版 wmPending（移除被刪除的舊圖 + 加入本次新增的檔案）
     let nextPending = Array.isArray(currentDoc?.wmPending) ? currentDoc.wmPending.slice() : [];
@@ -1288,61 +1276,43 @@ for (const it of items) {
       }
 
       if (it.kind === "file") {
-  const f = it.file;
-  const type = it.__uploadType || (f && f.type) || '';
-  const path = it.__uploadPath;
+        const f = it.file;
+        // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
+        const type = it.__uploadType || (f && f.type) || '';
+        const path = it.__uploadPath;
+        const r = sRef(storage, path);
 
-  // 圖片：前端先加浮水印再上傳到 pets/
-  // 影片：先上傳到 upload/，由後端處理完成後寫回 Firestore（不在這裡塞 URL）
-  const r = sRef(storage, path);
-
-  let uploadFile = f;
-  let uploadMeta = { contentType: type || 'application/octet-stream' };
-
-  if (String(type).startsWith("image/")) {
-    uploadFile = await addWatermarkToFile(f, { text: "台中簡媽媽狗園" });
-    uploadMeta = { contentType: "image/jpeg" };
-  } else if (String(type).startsWith("video/")) {
-    uploadMeta = {
-      contentType: "video/mp4",
-      customMetadata: { wmDst: it.__wmDstPath || "" },
-    };
-  }
-
-  // 進度：只計算本次新增的 file
-  // 若 totalBytes 無法取得（極少數情況），用 1 避免除以 0
-  if (typeof __progressTotalBytes === "number" && __progressTotalBytes > 0) {
-    // noop
-  }
-
-  await new Promise((resolve, reject) => {
-    const task = uploadBytesResumable(r, uploadFile, uploadMeta);
-    task.on("state_changed",
-      (snap) => {
-        const base = __progressUploadedBytes || 0;
-        const now = base + (snap?.bytesTransferred || 0);
-        const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
-        prog.update(pct);
-      },
-      (err) => reject(err),
-      async () => {
-        try {
-          // 完成一檔：累加已完成 bytes
-          __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || uploadFile.size || 0);
-          prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
-          resolve();
-        } catch (e) {
-          reject(e);
+        // 進度：只計算本次新增的 file
+        // 若 totalBytes 無法取得（極少數情況），用 1 避免除以 0
+        if (typeof __progressTotalBytes === "number" && __progressTotalBytes > 0) {
+          // noop
         }
-      }
-    );
-  });
 
-  // 只有圖片：這裡就有最終 URL；影片要等後端搬到 pets/ 後才會寫回
-  if (String(type).startsWith("image/")) {
-    newUrls.push(await getDownloadURL(r));
-  }
-}
+        await new Promise((resolve, reject) => {
+          const task = uploadBytesResumable(r, f, { contentType: type || 'application/octet-stream' });
+          task.on("state_changed",
+            (snap) => {
+              const base = __progressUploadedBytes || 0;
+              const now = base + (snap?.bytesTransferred || 0);
+              const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
+              prog.update(pct);
+            },
+            (err) => reject(err),
+            async () => {
+              try {
+                // 完成一檔：累加已完成 bytes
+                __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || f.size || 0);
+                prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
+                resolve();
+              } catch (e) {
+                reject(e);
+              }
+            }
+          );
+        });
+
+        newUrls.push(await getDownloadURL(r));
+      }
     }
 
 
@@ -2187,19 +2157,9 @@ async function onConfirmAdopted() {
     }
 
     for (const pl of plans) {
-  const r = sRef(storage, pl.path);
-
-  let uploadFile = pl.f;
-  let uploadMeta = { contentType: pl.type || 'application/octet-stream' };
-
-  if (String(pl.type || '').startsWith('image/')) {
-    uploadFile = await addWatermarkToFile(pl.f, { text: "台中簡媽媽狗園" });
-    uploadMeta = { contentType: "image/jpeg" };
-  }
-
-  await new Promise((resolve, reject) => {
-    const task = uploadBytesResumable(r, uploadFile, uploadMeta);
-
+      const r = sRef(storage, pl.path);
+      await new Promise((resolve, reject) => {
+        const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
         task.on("state_changed",
           (snap) => {
             const base = __progressUploadedBytes || 0;
