@@ -1241,26 +1241,7 @@ async function saveEdit() {
       else if (type.startsWith("video/")) ext = "mp4";
 
       const base = (f && f.name ? f.name : "file").replace(/\.[^.]+$/, "");
-
-      // 依需求：
-      // - 圖片：前端加浮水印後直接存 pets/<docId>/
-      // - 影片：先存 upload/<docId>/，後端寫浮水印後搬到 pets/<docId>/ 並刪掉原檔
-      const ts = Date.now();
-      const fileName = `${ts}_${base}.${ext}`;
-      const isVideo = type.startsWith("video/");
-
-      const uploadPth = isVideo
-        ? `upload/${currentDocId}/${fileName}`
-        : `pets/${currentDocId}/${fileName}`;
-
-      const finalPth = isVideo
-        ? `pets/${currentDocId}/${fileName}`
-        : uploadPth;
-
-      it.__uploadPath = uploadPth;
-      it.__finalPath = finalPth;
-      it.__uploadType = type;
-      pendingPaths.push(uploadPth);
+      const pth = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
       it.__uploadPath = pth;
       it.__uploadType = type;
       pendingPaths.push(pth);
@@ -1296,28 +1277,10 @@ async function saveEdit() {
 
       if (it.kind === "file") {
         const f = it.file;
-
-        const origType = it.__uploadType || (f && f.type) || '';
+        // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
+        const type = it.__uploadType || (f && f.type) || '';
         const path = it.__uploadPath;
         const r = sRef(storage, path);
-
-        // 依需求：
-        // - 圖片：前端先畫浮水印後再上傳到 pets/
-        // - 影片：直接上傳原檔到 upload/（後端再寫浮水印並搬到 pets/）
-        let fileToUpload = f;
-        let contentType = origType || 'application/octet-stream';
-
-        if (origType.startsWith("image/")) {
-          try {
-            fileToUpload = await addWatermarkToFile(f, { text: "台中簡媽媽狗園" });
-            contentType = (fileToUpload && fileToUpload.type) || "image/jpeg";
-          } catch (e) {
-            // 若前端浮水印失敗：至少不要整個流程掛掉，改上傳原圖
-            console.warn("front watermark failed, upload original image", e);
-            fileToUpload = f;
-            contentType = origType || 'application/octet-stream';
-          }
-        }
 
         // 進度：只計算本次新增的 file
         // 若 totalBytes 無法取得（極少數情況），用 1 避免除以 0
@@ -1326,7 +1289,7 @@ async function saveEdit() {
         }
 
         await new Promise((resolve, reject) => {
-          const task = uploadBytesResumable(r, fileToUpload, { contentType });
+          const task = uploadBytesResumable(r, f, { contentType: type || 'application/octet-stream' });
           task.on("state_changed",
             (snap) => {
               const base = __progressUploadedBytes || 0;
