@@ -1119,11 +1119,8 @@ async function onDelete() {
   try {
     // 刪掉這筆的所有圖片與合照資料夾
     await deleteAllUnder(`pets/${currentDocId}`);
-    await deleteAllUnder(`upload/${currentDocId}`);
     await deleteAllUnder(`adopted/${currentDocId}`);
     await deleteAllUnder(`thumbs/pets/${currentDocId}`);
-    // 若之前有舊版產生 thumbs/upload/... 也一起清掉
-    await deleteAllUnder(`thumbs/upload/${currentDocId}`);
     // 最後刪 Firestore 文件
     await deleteDoc(doc(db, "pets", currentDocId));
     await loadPets();
@@ -1244,8 +1241,7 @@ async function saveEdit() {
       else if (type.startsWith("video/")) ext = "mp4";
 
       const base = (f && f.name ? f.name : "file").replace(/\.[^.]+$/, "");
-      const folder = type.startsWith("video/") ? "upload" : "pets";
-      const pth = `${folder}/${currentDocId}/${Date.now()}_${base}.${ext}`;
+      const pth = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
       it.__uploadPath = pth;
       it.__uploadType = type;
       pendingPaths.push(pth);
