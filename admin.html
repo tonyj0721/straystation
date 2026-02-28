@@ -696,7 +696,7 @@
 
     const app = initializeApp(window.firebaseConfig);
     const db = getFirestore(app);
-    const storage = getStorage(app);
+    const storage = getStorage(app, "gs://straystation.appspot.com");
 
     // 讓 dialog（petDialog.fixed.js / shared.js）能在「非 module」腳本中使用 Firebase 與狀態
     Object.assign(window, {
@@ -1504,45 +1504,26 @@
             else ext = 'mp4';
           }
           const base = f.name.replace(/\.[^.]+$/, '');
-          const folder = type.startsWith('video/') ? 'upload' : 'pets';
-          const path = `${folder}/${docRef.id}/${Date.now()}_${base}.${ext}`;
+          const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
           const r = sRef(storage, path);
-          const __isVideo = type.startsWith('video/');
-                    const __meta = { contentType: wmBlob.type || 'application/octet-stream' };
-                    let __dlToken = '';
-                    if (__isVideo) {
-                      __dlToken = (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + '_' + Math.random().toString(16).slice(2);
-                      __meta.customMetadata = { firebaseStorageDownloadTokens: __dlToken };
-                    }
-                    await new Promise((resolve, reject) => {
-                      const task = uploadBytesResumable(r, wmBlob, __meta);
-                      task.on("state_changed",
-                        (snap) => {
-                          const base = __progressUploadedBytes || 0;
-                          const now = base + (snap?.bytesTransferred || 0);
-                          const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
-                          prog.update(pct);
-                        },
-                        (err) => reject(err),
-                        async () => {
-                          try {
-                            __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || wmBlob?.size || 0);
-                            prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
-                            resolve();
-                          } catch (e) {
-                            reject(e);
-                          }
-                        }
-                      );
-                    });
-                    if (__isVideo) {
-                      const __bucket = (window.firebaseConfig && window.firebaseConfig.storageBucket) ? window.firebaseConfig.storageBucket : '';
-                      const __outPath = path.replace(/^upload\//, 'pets/');
-                      const __url = `https://firebasestorage.googleapis.com/v0/b/${__bucket}/o/${encodeURIComponent(__outPath)}?alt=media&token=${__dlToken}`;
-                      urls.push(__url);
-                    } else {
-                      urls.push(await getDownloadURL(r));
-                    }
+          await new Promise((resolve, reject) => {
+            const task = uploadBytesResumable(r, wmBlob, { contentType: wmBlob.type || 'application/octet-stream' });
+            task.on("state_changed",
+              (snap) => {
+                const base = __progressUploadedBytes || 0;
+                const now = base + (snap?.bytesTransferred || 0);
+                const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
+                prog.update(pct);
+              },
+              (err) => reject(err),
+              () => {
+                __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || wmBlob?.size || 0);
+                prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
+                resolve();
+              }
+            );
+          });
+          urls.push(await getDownloadURL(r));
         }
 
         // 3) 回寫 images 欄位
