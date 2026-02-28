@@ -604,37 +604,16 @@
   <div id="lightbox" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[9999]">
     <div id="lbWrap" class="relative inline-block">
       <img id="lbImg" class="object-contain rounded-lg" />
-      <video id="lbVideo" playsinline class="object-contain rounded-lg hidden"></video>
+      <video id="lbVideo" playsinline controls class="object-contain rounded-lg hidden"></video>
+      <button id="lbClose" class="ui-close-btn absolute top-1 right-1 z-10" aria-label="關閉"><svg viewBox="0 0 24 24"
+          aria-hidden="true" focusable="false" class="ui-close-icon">
+          <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
+        </svg></button>
       <button id="lbPrev" class="absolute text-white text-4xl select-none">❮</button>
       <button id="lbNext" class="absolute text-white text-4xl select-none">❯</button>
     </div>
-    <button id="lbBackBtn" class="w-8 h-8 absolute items-center justify-center" aria-label="返回">
-      <img id="lbBackIcon" src="images/icons/back.png" alt="" class="w-6 h-6 object-contain pointer-events-none">
-    </button>
-    <div id="lbBottom" class="absolute left-0 w-full flex flex-col items-center px-4">
-      <!-- iPhone 相簿風格：影片控制列（固定顯示、不自動隱藏；貼齊縮圖列上方） -->
-      <div id="lbControls"
-        class="w-full max-w-[720px] px-4 py-3 rounded-2xl bg-white/15 backdrop-blur flex items-center gap-3 hidden">
-        <!-- 拖曳進度條時顯示時間（圖 2 效果） -->
-        <div id="lbSeekTime" class="lb-seek-time" aria-hidden="true">
-          <span id="lbTimeCur">00:00</span>
-          <span id="lbTimeDur">00:00</span>
-        </div>
-        <button id="lbPlayBtn" class="w-8 h-8 flex items-center justify-center" aria-label="播放/暫停">
-          <img id="lbPlayIcon" src="images/icons/play.png" alt="" class="w-6 h-6 object-contain pointer-events-none">
-        </button>
-
-        <input id="lbSeek" type="range" min="0" max="1000" value="0" aria-label="播放進度" class="lb-seek flex-1">
-
-        <button id="lbMuteBtn" class="w-8 h-8 flex items-center justify-center" aria-label="音量/靜音">
-          <img id="lbVolumeIcon" src="images/icons/volume.png" alt=""
-            class="w-6 h-6 object-contain pointer-events-none">
-        </button>
-      </div>
-
-      <div id="lbThumbs" class="w-full flex justify-center px-4 py-2">
-        <div id="lbThumbsInner" class="flex gap-2"></div>
-      </div>
+    <div id="lbThumbs" class="absolute w-full flex justify-center px-4 py-2">
+      <div id="lbThumbsInner" class="flex gap-2"></div>
     </div>
   </div>
 
@@ -907,7 +886,6 @@
       if (hit) openDialog(hit.id);
     }
 
-
     // ===== Video thumbnail helpers (backend thumbs + play badge) =====
     const __THUMB_PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
 
@@ -1066,7 +1044,7 @@
     async function loadPets() {
       const qRef = query(collection(db, "pets"), where("status", "==", "available"), orderBy("createdAt", "desc"));
       const snap = await getDocs(qRef);
-      const all = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p && p.mediaReady !== false);
+      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
       const cats = all.filter(p => p.species === "貓").slice(0, 6);
       const dogs = all.filter(p => p.species === "狗").slice(0, 6);
