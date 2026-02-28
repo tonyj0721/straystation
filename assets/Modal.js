@@ -22,21 +22,6 @@ function thumbPathFromMediaPath(mediaPath) {
   } catch (_) {
     return "";
   }
-
-
-// ===============================
-// Storage download URL（用 token 直接組，讓「先寫入 pets/ URL、後端再生成」也能用）
-// ===============================
-function __getBucketName() {
-  try { return (storage && storage.app && storage.app.options && storage.app.options.storageBucket) || ""; }
-  catch (_) { return ""; }
-}
-function __makeDownloadUrl(objectPath, token) {
-  const bucket = __getBucketName();
-  if (!bucket || !objectPath || !token) return "";
-  const enc = encodeURIComponent(objectPath);
-  return `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${enc}?alt=media&token=${token}`;
-}
 }
 
 // ===============================
@@ -163,8 +148,7 @@ function __drawWatermarkPattern(g, W, H, text) {
 async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {}) {
   const type = (file && file.type) || "";
   if (type.startsWith("video/")) {
-    // 影片不在前端處理浮水印：直接回傳原檔（改由後端處理）
-    return file;
+    return file; // 影片改由後端處理浮水印
   }
 
   const url = URL.createObjectURL(file);
@@ -1224,7 +1208,6 @@ async function saveEdit() {
   const prog = startProgressBar(btn, { imgSrc: "images/奔跑貓咪.png" });
   prog.update(0);
 
-  // ⬇️ 重要：下面會用到 catch/finally，必須先包一層 try
   try {
     // 依照「目前畫面順序」組出最終 images：url 直接保留；file 依序上傳後插回同位置
     const { items, removeUrls } = editImagesState;
@@ -1247,36 +1230,34 @@ async function saveEdit() {
       } catch (_) { }
     }
 
-    // 先把本次新增檔案的 Storage path 算好，並先寫回 Firestore（避免後端處理比 images 更新更早完成）
-    const pendingPaths = [];
-    for (const it of items) {
-      if (it.kind !== "file") continue;
-      const f = it.file;
-      const type = (f && f.type) || "";
-      let ext = "bin";
-      if (type.startsWith("image/")) ext = "jpg";
-      else if (type.startsWith("video/")) ext = "mp4";
+    // 先把本次新增檔案的 Storage path 算好，並先寫回 Firestore（避免 race）
+//  - 圖片：前端浮水印後直接存 pets/
+//  - 影片：先上傳到 upload/，後端完成後搬到 pets/（並刪掉 upload 原檔）
+const pendingPaths = [];
+for (const it of items) {
+  if (it.kind !== "file") continue;
+  const f = it.file;
+  const type = (f && f.type) || "";
 
-      const base = (f && f.name ? f.name : "file").replace(/\.[^.]+$/, "");
-      let pth = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
-       // 影片：先上傳到 upload/，後端加浮水印後再存回 pets/
-       if (type.startsWith("video/")) {
-         const ts = Date.now();
-         const uploadPath = `upload/${currentDocId}/${ts}_${base}.mp4`;
-         const finalPath = `pets/${currentDocId}/${ts}_${base}.mp4`;
-         const token = (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Math.random()).slice(2);
-         it.__uploadPath = uploadPath;
-         it.__finalPath = finalPath;
-         it.__token = token;
-         it.__uploadType = type;
-         pendingPaths.push(finalPath);
-         continue;
-       }
-       pth = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
-      it.__uploadPath = pth;
-      it.__uploadType = type;
-      pendingPaths.push(pth);
-    }
+  const base = (f && f.name ? f.name : "file").replace(/\.[^.]+$/, "");
+  const ts = Date.now();
+
+  if (type.startsWith("image/")) {
+    const dst = `pets/${currentDocId}/${ts}_${base}.jpg`;
+    it.__uploadPath = dst;
+    it.__uploadType = "image/jpeg";
+    // 圖片不需要後端 → 不進 pendingPaths
+  } else if (type.startsWith("video/")) {
+    const src = `upload/${currentDocId}/${ts}_${base}.mp4`;
+    const dst = `pets/${currentDocId}/${ts}_${base}.mp4`;
+    it.__uploadPath = src;       // 先上傳到 upload/
+    it.__wmDstPath = dst;        // 交給後端搬運到 pets/
+    it.__uploadType = "video/mp4";
+    pendingPaths.push(src);
+  } else {
+    // 其他類型略過
+  }
+}
 
     // 同步計算下一版 wmPending（移除被刪除的舊圖 + 加入本次新增的檔案）
     let nextPending = Array.isArray(currentDoc?.wmPending) ? currentDoc.wmPending.slice() : [];
@@ -1307,81 +1288,64 @@ async function saveEdit() {
       }
 
       if (it.kind === "file") {
-        const f = it.file;
-        const type = it.__uploadType || (f && f.type) || '';
-        const isVid = String(type).startsWith("video/");
+  const f = it.file;
+  const type = it.__uploadType || (f && f.type) || '';
+  const path = it.__uploadPath;
 
-        if (isVid) {
-          // 影片：上傳到 upload/（原檔），並在 metadata 帶上 finalPath + token
-          const uploadPath = it.__uploadPath;
-          const finalPath = it.__finalPath;
-          const token = it.__token || ((crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Math.random()).slice(2));
+  // 圖片：前端先加浮水印再上傳到 pets/
+  // 影片：先上傳到 upload/，由後端處理完成後寫回 Firestore（不在這裡塞 URL）
+  const r = sRef(storage, path);
 
-          const r = sRef(storage, uploadPath);
-          await new Promise((resolve, reject) => {
-            const task = uploadBytesResumable(r, f, {
-              contentType: type || 'application/octet-stream',
-              customMetadata: {
-                firebaseStorageDownloadTokens: token,
-                finalPath: finalPath || "",
-              },
-            });
-            task.on("state_changed",
-              (snap) => {
-                const base = __progressUploadedBytes || 0;
-                const now = base + (snap?.bytesTransferred || 0);
-                const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
-                prog.update(pct);
-              },
-              (err) => reject(err),
-              async () => {
-                try {
-                  __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || f.size || 0);
-                  prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
-                  resolve();
-                } catch (e) {
-                  reject(e);
-                }
-              }
-            );
-          });
+  let uploadFile = f;
+  let uploadMeta = { contentType: type || 'application/octet-stream' };
 
-          // 這裡回寫「最終 pets/ URL」（後端處理好後才會真的可播）
-          newUrls.push(__makeDownloadUrl(finalPath, token));
-          continue;
+  if (String(type).startsWith("image/")) {
+    uploadFile = await addWatermarkToFile(f, { text: "台中簡媽媽狗園" });
+    uploadMeta = { contentType: "image/jpeg" };
+  } else if (String(type).startsWith("video/")) {
+    uploadMeta = {
+      contentType: "video/mp4",
+      customMetadata: { wmDst: it.__wmDstPath || "" },
+    };
+  }
+
+  // 進度：只計算本次新增的 file
+  // 若 totalBytes 無法取得（極少數情況），用 1 避免除以 0
+  if (typeof __progressTotalBytes === "number" && __progressTotalBytes > 0) {
+    // noop
+  }
+
+  await new Promise((resolve, reject) => {
+    const task = uploadBytesResumable(r, uploadFile, uploadMeta);
+    task.on("state_changed",
+      (snap) => {
+        const base = __progressUploadedBytes || 0;
+        const now = base + (snap?.bytesTransferred || 0);
+        const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
+        prog.update(pct);
+      },
+      (err) => reject(err),
+      async () => {
+        try {
+          // 完成一檔：累加已完成 bytes
+          __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || uploadFile.size || 0);
+          prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
+          resolve();
+        } catch (e) {
+          reject(e);
         }
-
-        // 照片：前端先做浮水印 → 存到 pets/
-        const wmFile = await addWatermarkToFile(f, { text: "台中簡媽媽狗園" });
-        const path = it.__uploadPath;
-        const r = sRef(storage, path);
-
-        await new Promise((resolve, reject) => {
-          const task = uploadBytesResumable(r, wmFile, { contentType: "image/jpeg" });
-          task.on("state_changed",
-            (snap) => {
-              const base = __progressUploadedBytes || 0;
-              const now = base + (snap?.bytesTransferred || 0);
-              const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
-              prog.update(pct);
-            },
-            (err) => reject(err),
-            async () => {
-              try {
-                __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || wmFile.size || 0);
-                prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
-                resolve();
-              } catch (e) {
-                reject(e);
-              }
-            }
-          );
-        });
-
-        newUrls.push(await getDownloadURL(r));
       }
+    );
+  });
 
+  // 只有圖片：這裡就有最終 URL；影片要等後端搬到 pets/ 後才會寫回
+  if (String(type).startsWith("image/")) {
+    newUrls.push(await getDownloadURL(r));
+  }
+}
     }
+
+
 
     // 刪除被移除的舊圖（忽略刪失敗）
     // 同步刪掉後端產生的縮圖：thumbs/<原路徑去副檔名>.jpg
@@ -2206,20 +2170,7 @@ async function onConfirmAdopted() {
       else if (type.startsWith('video/')) ext = 'mp4';
 
       const base = (f && f.name ? f.name : 'file').replace(/\.[^.]+$/, '');
-      const ts = Date.now();
-      let path = `adopted/${currentDocId}/${ts}_${base}.${ext}`;
-      // 影片：先上傳到 upload/，後端處理後再寫回 adopted/
-      if (type.startsWith("video/")) {
-        const uploadPath = `upload/${currentDocId}/${ts}_${base}.mp4`;
-        const finalPath = `adopted/${currentDocId}/${ts}_${base}.mp4`;
-        const token = (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Math.random()).slice(2);
-        plans.push({ f, type, path: uploadPath, finalPath, token, isVideo: true });
-        pendingPaths.push(finalPath);
-        continue;
-      }
-      // 照片：前端先做浮水印
-      const wmFile = await addWatermarkToFile(f, { text: "台中簡媽媽狗園" });
-      plans.push({ f: wmFile, type: "image/jpeg", path });
+      const path = `adopted/${currentDocId}/${Date.now()}_${base}.${ext}`;
 
       plans.push({ f, type, path });
       pendingPaths.push(path);
@@ -2236,20 +2187,19 @@ async function onConfirmAdopted() {
     }
 
     for (const pl of plans) {
-      const r = sRef(storage, pl.path);
-      const isVid = !!pl.isVideo;
-      const meta = isVid
-        ? {
-          contentType: pl.type || 'application/octet-stream',
-          customMetadata: {
-            firebaseStorageDownloadTokens: pl.token,
-            finalPath: pl.finalPath || "",
-          },
-        }
-        : { contentType: pl.type || 'application/octet-stream' };
+  const r = sRef(storage, pl.path);
 
-      await new Promise((resolve, reject) => {
-        const task = uploadBytesResumable(r, pl.f, meta);
+  let uploadFile = pl.f;
+  let uploadMeta = { contentType: pl.type || 'application/octet-stream' };
+
+  if (String(pl.type || '').startsWith('image/')) {
+    uploadFile = await addWatermarkToFile(pl.f, { text: "台中簡媽媽狗園" });
+    uploadMeta = { contentType: "image/jpeg" };
+  }
+
+  await new Promise((resolve, reject) => {
+    const task = uploadBytesResumable(r, uploadFile, uploadMeta);
+
         task.on("state_changed",
           (snap) => {
             const base = __progressUploadedBytes || 0;
@@ -2266,8 +2216,7 @@ async function onConfirmAdopted() {
         );
       });
 
-      if (isVid) urls.push(__makeDownloadUrl(pl.finalPath, pl.token));
-      else urls.push(await getDownloadURL(r));
+      urls.push(await getDownloadURL(r));
     }
 
     await updateDoc(doc(db, "pets", currentDocId), {

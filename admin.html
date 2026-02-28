@@ -728,80 +728,6 @@
       sRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject, listAll,
     });
 
-// ===============================
-// Storage download URL（用 token 直接組，讓「先寫入 pets/ URL、後端再生成」也能用）
-// ===============================
-const __bucketName = () => {
-  try { return (storage && storage.app && storage.app.options && storage.app.options.storageBucket) || ""; }
-  catch (_) { return ""; }
-};
-const __makeDownloadUrl = (objectPath, token) => {
-  const b = __bucketName();
-  if (!b || !objectPath || !token) return "";
-  const enc = encodeURIComponent(objectPath);
-  return `https://firebasestorage.googleapis.com/v0/b/${b}/o/${enc}?alt=media&token=${token}`;
-};
-
-    // ===============================
-    // 前端浮水印（照片）+ 按鈕進度條（避免依賴 assets/Modal.js 的全域函式）
-    // ===============================
-    function startProgressBar(btn, opts = {}) {
-      const original = { text: btn.textContent, disabled: btn.disabled };
-      const label = document.createElement('span');
-      label.textContent = original.text || '送出';
-      btn.textContent = '';
-      btn.appendChild(label);
-      btn.disabled = true;
-      let lastPct = 0;
-      return {
-        update(pct) {
-          lastPct = Math.max(0, Math.min(100, Math.round(pct)));
-          label.textContent = `${original.text || '處理中'}... ${lastPct}%`;
-        },
-        stop({ restore = true, text = original.text, keepDisabled = false } = {}) {
-          if (restore) {
-            btn.textContent = text || original.text || '完成';
-            btn.disabled = keepDisabled ? true : original.disabled;
-          }
-        }
-      };
-    }
-
-    const __loadImageFromFile = (file) => new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = reject;
-      img.src = URL.createObjectURL(file);
-    });
-
-    async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {}) {
-      const img = await __loadImageFromFile(file);
-      const canvas = document.createElement('canvas');
-      canvas.width = img.naturalWidth || img.width;
-      canvas.height = img.naturalHeight || img.height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-      // 右下角浮水印（半透明）
-      const pad = Math.max(12, Math.round(Math.min(canvas.width, canvas.height) * 0.015));
-      const fontSize = Math.max(18, Math.round(Math.min(canvas.width, canvas.height) * 0.04));
-      ctx.font = `700 ${fontSize}px sans-serif`;
-      ctx.textBaseline = 'bottom';
-      ctx.textAlign = 'right';
-      ctx.fillStyle = 'rgba(255,255,255,0.65)';
-      ctx.strokeStyle = 'rgba(0,0,0,0.35)';
-      ctx.lineWidth = Math.max(2, Math.round(fontSize * 0.12));
-      const x = canvas.width - pad;
-      const y = canvas.height - pad;
-      ctx.strokeText(text, x, y);
-      ctx.fillText(text, x, y);
-
-      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
-      URL.revokeObjectURL(img.src);
-      return new File([blob], (file.name || 'image').replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
-    }
-
-
     const auth = getAuth(app);
 
     // ===============================
@@ -1592,82 +1518,94 @@ const __makeDownloadUrl = (objectPath, token) => {
         let __progressUploadedBytes = 0;
 
 
-        // 先算出這批上傳會用到的 Storage paths，並先寫回 Firestore（避免後端處理比 images 更新更早完成）
-        for (const f of selectedFiles) {
-          const type = (f && f.type) || '';
-          const base = (f && f.name ? f.name : 'file').replace(/\.[^.]+$/, '');
-          const ts = Date.now();
+        // 先算出這批上傳會用到的 Storage paths
+//  - 照片：前端先做浮水印，直接存到 pets/
+//  - 影片：先上傳到 upload/，後端用 watermark.png 覆蓋後搬到 pets/，並刪掉原檔
+for (const f of selectedFiles) {
+  const type = (f && f.type) || '';
+  const base = f.name.replace(/\.[^.]+$/, '');
+  const ts = Date.now();
 
-          // 照片：前端先做浮水印 → 直接存到 pets/
-          if (type.startsWith('image/')) {
-            const wmFile = await addWatermarkToFile(f, { text: "台中簡媽媽狗園" });
-            const path = `pets/${docRef.id}/${ts}_${base}.jpg`;
-            plans.push({ f: wmFile, type: 'image/jpeg', path, isVideo: false });
-            continue;
-          }
-
-          // 影片：原檔上傳到 upload/，後端用 PNG overlay 做浮水印後 → 存到 pets/ 並刪掉原檔
-          if (type.startsWith('video/')) {
-            const uploadPath = `upload/${docRef.id}/${ts}_${base}.mp4`;
-            const finalPath = `pets/${docRef.id}/${ts}_${base}.mp4`;
-            const token = (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Math.random()).slice(2);
-
-            plans.push({ f, type, path: uploadPath, finalPath, token, isVideo: true });
-            // Firestore 追蹤的是「最終 pets/ 路徑」（後端完成後會從 wmPending 移除）
-            pendingPaths.push(finalPath);
-            continue;
-          }
-
-          // 其他檔案：直接略過
-        }
-
-        if (pendingPaths.length) {
-          await updateDoc(doc(db, "pets", docRef.id), { mediaReady: false, wmPending: pendingPaths });
-        }
-
-        // 逐檔上傳
-for (const pl of plans) {
-  const r = sRef(storage, pl.path);
-
-  const meta = pl.isVideo
-    ? {
-      contentType: pl.type || 'application/octet-stream',
-      customMetadata: {
-        firebaseStorageDownloadTokens: pl.token,
-        finalPath: pl.finalPath || "",
-      },
-    }
-    : { contentType: pl.type || 'application/octet-stream' };
-
-  await new Promise((resolve, reject) => {
-    const task = uploadBytesResumable(r, pl.f, meta);
-    task.on("state_changed",
-      (snap) => {
-        const base = __progressUploadedBytes || 0;
-        const now = base + (snap?.bytesTransferred || 0);
-        const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
-        prog.update(pct);
-      },
-      (err) => reject(err),
-      () => {
-        __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || pl.f?.size || 0);
-        prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
-        resolve();
-      }
-    );
-  });
-
-  // 照片：直接拿 getDownloadURL；影片：回寫「最終 pets/ URL」（等後端完成後才可播）
-  if (pl.isVideo) urls.push(__makeDownloadUrl(pl.finalPath, pl.token));
-  else urls.push(await getDownloadURL(r));
+  if (type.startsWith('image/')) {
+    const dstPath = `pets/${docRef.id}/${ts}_${base}.jpg`;
+    plans.push({ kind: 'image', f, type, dstPath });
+    // 圖片不需要後端處理 → 不進 pendingPaths
+  } else if (type.startsWith('video/')) {
+    // 影片一律走後端處理：先丟 upload/，完成後會搬到 pets/
+    const srcPath = `upload/${docRef.id}/${ts}_${base}.mp4`;
+    const dstPath = `pets/${docRef.id}/${ts}_${base}.mp4`;
+    plans.push({ kind: 'video', f, type, srcPath, dstPath });
+    pendingPaths.push(srcPath); // pending 追蹤「原始上傳檔」
+  }
 }
 
-// 3) 回寫 images 欄位
-        if (urls.length) {
-          await updateDoc(doc(db, "pets", docRef.id), { images: urls });
-        }
+// 有影片要後端處理 → 先標記 processing（避免被點開看到未完成媒體）
+if (pendingPaths.length) {
+  await updateDoc(doc(db, "pets", docRef.id), { mediaReady: false, wmPending: pendingPaths });
+}
 
-        // UI 收尾
+// 逐檔上傳
+for (const pl of plans) {
+  if (pl.kind === 'image') {
+    // 前端浮水印（輸出 jpg）
+    const wmFile = await window.addWatermarkToFile(pl.f, { text: "台中簡媽媽狗園" });
+    const r = sRef(storage, pl.dstPath);
+
+    await new Promise((resolve, reject) => {
+      const task = uploadBytesResumable(r, wmFile, { contentType: "image/jpeg" });
+      task.on("state_changed",
+        (snap) => {
+          const base = __progressUploadedBytes || 0;
+          const now = base + (snap?.bytesTransferred || 0);
+          const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
+          prog.update(pct);
+        },
+        (err) => reject(err),
+        () => {
+          __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || wmFile?.size || 0);
+          prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
+          resolve();
+        }
+      );
+    });
+
+    urls.push(await getDownloadURL(r));
+  } else if (pl.kind === 'video') {
+    const r = sRef(storage, pl.srcPath);
+
+    // 把目標 pets/ 路徑交給後端（customMetadata）
+    const meta = {
+      contentType: "video/mp4",
+      customMetadata: { wmDst: pl.dstPath },
+    };
+
+    await new Promise((resolve, reject) => {
+      const task = uploadBytesResumable(r, pl.f, meta);
+      task.on("state_changed",
+        (snap) => {
+          const base = __progressUploadedBytes || 0;
+          const now = base + (snap?.bytesTransferred || 0);
+          const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
+          prog.update(pct);
+        },
+        (err) => reject(err),
+        () => {
+          __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || pl.f?.size || 0);
+          prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
+          resolve();
+        }
+      );
+    });
+
+    // 影片 URL 由後端處理完成後寫回 Firestore（避免先存 upload/ 連結）
+  }
+}
+
+// 3) 回寫 images 欄位（只包含「已完成」的照片；影片會由後端完成後 append）
+if (urls.length) {
+  await updateDoc(doc(db, "pets", docRef.id), { images: urls });
+}
+// UI 收尾
         prog.update(100);
         prog.stop({ text: "處理中...", keepDisabled: true });
         submitBtn.disabled = true;
