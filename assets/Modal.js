@@ -148,8 +148,7 @@ function __drawWatermarkPattern(g, W, H, text) {
 async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {}) {
   const type = (file && file.type) || "";
   if (type.startsWith("video/")) {
-    // 🎥 影片改由後端加浮水印：前端不要處理
-    return file;
+    return await addWatermarkToVideo(file, { text });
   }
 
   const url = URL.createObjectURL(file);
@@ -1132,8 +1131,12 @@ async function saveEdit() {
 
       if (it.kind === "file") {
         const f = it.file;
-        const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
-        const type = wmBlob.type || '';
+        const __name = f?.name || '';
+        const __t0 = (f && f.type) ? String(f.type) : '';
+        const __isVideoFile = __t0.startsWith('video/') || /\.(mp4|mov|m4v|webm|ogg)$/i.test(__name);
+        // 🎥 影片：不上前端浮水印（維持原檔）；📸 照片：維持前端浮水印
+        const wmBlob = __isVideoFile ? f : await addWatermarkToFile(f);
+        const type = (__isVideoFile ? (__t0 || 'video/mp4') : (wmBlob.type || '')) || '';
         let ext = 'bin';
         if (type.startsWith('image/')) {
           ext = type === 'image/png' ? 'png' : 'jpg';
@@ -1144,45 +1147,31 @@ async function saveEdit() {
           else ext = 'mp4';
         }
         const base = f.name.replace(/\.[^.]+$/, '');
-        const folder = type.startsWith('video/') ? 'upload' : 'pets';
-        const path = `${folder}/${currentDocId}/${Date.now()}_${base}.${ext}`;
+        const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
         const r = sRef(storage, path);
-        const __isVideo = type.startsWith('video/');
-                const __meta = { contentType: wmBlob.type || 'application/octet-stream' };
-                let __dlToken = '';
-                if (__isVideo) {
-                  __dlToken = (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + '_' + Math.random().toString(16).slice(2);
-                  __meta.customMetadata = { firebaseStorageDownloadTokens: __dlToken };
-                }
-                await new Promise((resolve, reject) => {
-                  const task = uploadBytesResumable(r, wmBlob, __meta);
-                  task.on("state_changed",
-                    (snap) => {
-                      const base = __progressUploadedBytes || 0;
-                      const now = base + (snap?.bytesTransferred || 0);
-                      const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
-                      prog.update(pct);
-                    },
-                    (err) => reject(err),
-                    async () => {
-                      try {
-                        __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || wmBlob?.size || 0);
-                        prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
-                        resolve();
-                      } catch (e) {
-                        reject(e);
-                      }
-                    }
-                  );
-                });
-                if (__isVideo) {
-                  const __bucket = (window.firebaseConfig && window.firebaseConfig.storageBucket) ? window.firebaseConfig.storageBucket : '';
-                  const __outPath = path.replace(/^upload\//, 'pets/');
-                  const __url = `https://firebasestorage.googleapis.com/v0/b/${__bucket}/o/${encodeURIComponent(__outPath)}?alt=media&token=${__dlToken}`;
-                  newUrls.push(__url);
-                } else {
-                  newUrls.push(await getDownloadURL(r));
-                }
+        await new Promise((resolve, reject) => {
+          const task = uploadBytesResumable(r, wmBlob, { contentType: wmBlob.type || 'application/octet-stream' });
+          task.on("state_changed",
+            (snap) => {
+              const base = __progressUploadedBytes || 0;
+              const now = base + (snap?.bytesTransferred || 0);
+              const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
+              prog.update(pct);
+            },
+            (err) => reject(err),
+            async () => {
+              try {
+                // 完成一檔：累加已完成 bytes
+                __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || wmBlob?.size || 0);
+                prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
+                resolve();
+              } catch (e) {
+                reject(e);
+              }
+            }
+          );
+        });
+        newUrls.push(await getDownloadURL(r));
       }
     }
 

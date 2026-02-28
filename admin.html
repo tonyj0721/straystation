@@ -1492,8 +1492,12 @@
         let __progressUploadedBytes = 0;
 
         for (const f of selectedFiles) {
-          const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
-          const type = wmBlob.type || '';
+          const __name = f?.name || '';
+          const __t0 = (f && f.type) ? String(f.type) : '';
+          const __isVideoFile = __t0.startsWith('video/') || /\.(mp4|mov|m4v|webm|ogg)$/i.test(__name);
+          // 🎥 影片：不上前端浮水印（維持原檔）；📸 照片：維持前端浮水印
+          const wmBlob = __isVideoFile ? f : await addWatermarkToFile(f);
+          const type = (__isVideoFile ? (__t0 || 'video/mp4') : (wmBlob.type || '')) || '';
           let ext = 'bin';
           if (type.startsWith('image/')) {
             ext = type === 'image/png' ? 'png' : 'jpg';
