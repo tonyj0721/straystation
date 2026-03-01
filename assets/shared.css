@@ -357,8 +357,7 @@ video.video-preview::-webkit-media-controls-enclosure {
 
 /* ✅ 只有影片時：往上移，避開 iOS 原生控制列的右上角按鈕 */
 #dlgStageWrap.dlg-video-mode #dlgClose {
-  top: -36px;
-  /* 你可以調 -30 ~ -48 之間，看最順的距離 */
+  top: -36px;   /* 你可以調 -30 ~ -48 之間，看最順的距離 */
   right: 4px;
 }
 
