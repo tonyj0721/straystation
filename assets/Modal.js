@@ -185,7 +185,6 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
     video.muted = true;
     video.playsInline = true;
     video.crossOrigin = "anonymous";
-    video.preload = "auto";
 
     await new Promise((res, rej) => {
       video.onloadedmetadata = () => res();
@@ -198,95 +197,72 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
     const canvas = document.createElement("canvas");
     canvas.width = W;
     canvas.height = H;
+    const g = canvas.getContext("2d");
 
-    // 盡量降低卡頓/掉幀（瀏覽器支援就吃到）
-    const g = canvas.getContext("2d", { alpha: false, desynchronized: true });
-
-    // ✅ 固定輸出 fps：關鍵
-    const FPS = 30;
-    const stream = canvas.captureStream(FPS);
-
-    // 音軌：能加就加（不影響畫面穩定）
+    const stream = canvas.captureStream();
     try {
       if (video.captureStream) {
         const vStream = video.captureStream();
         vStream.getAudioTracks().forEach((track) => stream.addTrack(track));
       }
-    } catch (_) { }
+    } catch (_) {
+      // audio 失敗可以忽略，至少保留畫面
+    }
 
-    // MediaRecorder：維持你原本的 webm vp9/vp8 選擇策略
     const chunks = [];
-    const canUseVP9 = MediaRecorder.isTypeSupported("video/webm;codecs=vp9");
-    const canUseVP8 = MediaRecorder.isTypeSupported("video/webm;codecs=vp8");
-    const mime = canUseVP9 ? "video/webm;codecs=vp9" : (canUseVP8 ? "video/webm;codecs=vp8" : "video/webm");
+    const canUseVP9 = typeof MediaRecorder !== "undefined" &&
+      MediaRecorder.isTypeSupported("video/webm;codecs=vp9");
+    const canUseVP8 = typeof MediaRecorder !== "undefined" &&
+      MediaRecorder.isTypeSupported("video/webm;codecs=vp8");
+
+    const mime = canUseVP9
+      ? "video/webm;codecs=vp9"
+      : (canUseVP8 ? "video/webm;codecs=vp8" : "video/webm");
 
     const recorder = new MediaRecorder(stream, { mimeType: mime });
-    recorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunks.push(e.data); };
-    const finished = new Promise((resolve) => { recorder.onstop = () => resolve(); });
+    recorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) chunks.push(e.data);
+    };
+    const finished = new Promise((resolve) => {
+      recorder.onstop = () => resolve();
+    });
 
-    // 可選：給 timeslice 讓資料穩定吐出（避免某些環境最後才吐一大包）
-    recorder.start(1000);
+    recorder.start();
 
-    // -----------------------------
-    // ✅ 關鍵：把「畫圖節奏」鎖定在固定 FPS
-    // -----------------------------
-    let hasNewFrame = true;   // 先讓第一張一定會畫
-    let drawing = false;
+    const useRVFC = typeof video.requestVideoFrameCallback === "function";
 
     function drawFrame() {
-      // 你若想“即使沒新影格也畫”，就不要用 hasNewFrame gate
-      // 但這裡採「有新影格才更新畫面，沒新影格就維持上一張」以降低不必要的重畫負擔
-      if (!hasNewFrame) return;
-      hasNewFrame = false;
-
       g.clearRect(0, 0, W, H);
       g.drawImage(video, 0, 0, W, H);
       __drawWatermarkPattern(g, W, H, text);
     }
 
-    // RVFC：只負責告訴我們「有新影格可以拿」
-    const useRVFC = typeof video.requestVideoFrameCallback === "function";
-    let rvfcId = null;
-
-    function startFrameNotifier() {
-      if (!useRVFC) return;
+    if (useRVFC) {
       const cb = () => {
         if (video.paused || video.ended) return;
-        hasNewFrame = true;
-        rvfcId = video.requestVideoFrameCallback(cb);
+        drawFrame();
+        video.requestVideoFrameCallback(cb);
       };
-      rvfcId = video.requestVideoFrameCallback(cb);
+      video.requestVideoFrameCallback(cb);
+    } else {
+      const t = setInterval(() => {
+        if (video.paused || video.ended) {
+          clearInterval(t);
+          return;
+        }
+        drawFrame();
+      }, 40);
     }
 
-    // 固定節奏繪製：時間戳會跟著 captureStream(FPS) 穩定
-    const intervalMs = Math.round(1000 / FPS);
-    const timer = setInterval(() => {
-      if (video.ended) return;
-      if (video.paused) return;
-      drawFrame();
-    }, intervalMs);
-
-    // 播放
-    startFrameNotifier();
     await video.play();
-
-    // 等播完
     await new Promise((res) => { video.onended = () => res(); });
-
-    // 收尾：再畫最後一張（避免尾端缺幀）
-    try {
-      hasNewFrame = true;
-      drawFrame();
-    } catch (_) { }
-
-    clearInterval(timer);
-    try { if (useRVFC && rvfcId != null) { /* 沒有 cancel API，忽略即可 */ } } catch (_) { }
 
     recorder.stop();
     await finished;
 
     const blob = new Blob(chunks, { type: mime });
-    const name = (file.name || "video").replace(/\.[^.]+$/, ".webm");
+    const ext = ".webm";
+    const name = (file.name || "video").replace(/\.[^.]+$/, ext);
     return new File([blob], name, { type: mime });
   } finally {
     URL.revokeObjectURL(src);
