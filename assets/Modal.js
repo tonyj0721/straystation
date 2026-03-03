@@ -179,17 +179,20 @@ async function __getFFmpeg() {
   if (__ffmpegLoading) return __ffmpegLoading;
 
   __ffmpegLoading = (async () => {
-    if (!window.FFmpeg || !window.FFmpegUtil) {
+    const FF = window.FFmpeg || window.FFmpegWASM;
+    const U = window.FFmpegUtil;
+
+    if (!FF || !U) {
       throw new Error("缺少 FFmpeg.wasm：請確認 admin.html 已引入 @ffmpeg/ffmpeg 與 @ffmpeg/util");
     }
 
-    const { createFFmpeg } = window.FFmpeg;
-    const { fetchFile } = window.FFmpegUtil;
+    const { createFFmpeg } = FF;
+    const { fetchFile } = U;
 
     const ffmpeg = createFFmpeg({
       log: false,
       // 這個 corePath 很重要：否則 load() 會找不到 core
-      corePath: "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js",
+      corePath: "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js"
     });
 
     await ffmpeg.load();
