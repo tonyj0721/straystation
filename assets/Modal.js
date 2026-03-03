@@ -145,64 +145,6 @@ function __drawWatermarkPattern(g, W, H, text) {
   g.restore();
 }
 
-// ===============================
-// ffmpeg.wasm：初始化（單例）
-// ===============================
-let __ffmpeg = null;
-let __ffmpegReady = null;
-let __ffmpegFetchFile = null;
-
-async function __ensureFFmpegLoaded() {
-  if (!window.WebAssembly) {
-    throw new Error("此瀏覽器不支援 WebAssembly，無法處理影片浮水印");
-  }
-
-  if (__ffmpeg && __ffmpegReady) {
-    await __ffmpegReady;
-    return __ffmpeg;
-  }
-
-  if (!window.FFmpeg || typeof FFmpeg.createFFmpeg !== "function") {
-    throw new Error("ffmpeg.wasm 尚未載入（缺少 FFmpeg 全域物件）");
-  }
-
-  const { createFFmpeg, fetchFile } = FFmpeg;
-
-  __ffmpeg = createFFmpeg({
-    log: false, // 若要除錯可以改成 true 看 console
-    // 若你把 core 檔自己 host，這裡改成自己的路徑
-    corePath: "https://unpkg.com/@ffmpeg/core@0.12.10/dist/ffmpeg-core.js",
-  });
-
-  __ffmpegFetchFile = fetchFile;
-  __ffmpegReady = __ffmpeg.load();
-  await __ffmpegReady;
-  return __ffmpeg;
-}
-
-// 產生一張 PNG 浮水印圖（用你原本的 pattern）
-async function __makeWatermarkPngForVideo(text) {
-  // 固定一個適中的尺寸就好，ffmpeg 會直接疊在畫面上
-  const W = 1280;
-  const H = 720;
-
-  const c = document.createElement("canvas");
-  c.width = W;
-  c.height = H;
-  const g = c.getContext("2d");
-
-  // 背景透明，只畫字
-  g.clearRect(0, 0, W, H);
-  __drawWatermarkPattern(g, W, H, text);
-
-  const blob = await new Promise((res) => c.toBlob(res, "image/png"));
-  if (!blob) {
-    throw new Error("產生浮水印 PNG 失敗");
-  }
-  const buf = await blob.arrayBuffer();
-  return new Uint8Array(buf);
-}
-
 async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {}) {
   const type = (file && file.type) || "";
   if (type.startsWith("video/")) {
@@ -230,70 +172,119 @@ async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {})
   }
 }
 
-// 影片：改成用 ffmpeg.wasm 加浮水印＋輸出 mp4（含音軌）
 async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}) {
-  // 1. 準備 ffmpeg 實例
-  const ffmpeg = await __ensureFFmpegLoaded();
-  const fetchFile =
-    __ffmpegFetchFile ||
-    (window.FFmpeg && typeof FFmpeg.fetchFile === "function"
-      ? FFmpeg.fetchFile
-      : null);
-
-  if (!fetchFile) {
-    throw new Error("ffmpeg.wasm 的 fetchFile 不存在，無法讀取檔案");
+  const testCanvas = document.createElement("canvas");
+  if (!testCanvas.captureStream || typeof MediaRecorder === "undefined") {
+    throw new Error("目前瀏覽器不支援影片浮水印（缺少 MediaRecorder 或 captureStream）");
   }
 
-  // 2. 把原始影片寫進 ffmpeg 的虛擬檔案系統
-  const extMatch = (file.name || "").match(/\.[^.]+$/);
-  const inputExt = extMatch ? extMatch[0].toLowerCase() : ".mp4";
-  const inputName = `input${inputExt}`;
-  const outputName = "output.mp4";
-
-  ffmpeg.FS("writeFile", inputName, await fetchFile(file));
-
-  // 3. 產生一張「跟圖片一樣 pattern」的浮水印 PNG，給 overlay 用
-  ffmpeg.FS("writeFile", "wm.png", await __makeWatermarkPngForVideo(text));
-
-  // 4. ffmpeg 轉檔＋疊圖
-  //    -i input：影片
-  //    -i wm.png：浮水印圖
-  //    filter_complex overlay=10:10：左上角往右下偏 10px
-  //    movflags +faststart：讓 mp4 在網頁串流播放比較順
-  await ffmpeg.run(
-    "-i",
-    inputName,
-    "-i",
-    "wm.png",
-    "-filter_complex",
-    "overlay=10:10",
-    "-movflags",
-    "+faststart",
-    outputName
-  );
-
-  // 5. 從虛擬檔案系統讀出結果，變成真正的 File 物件給原本流程上傳
-  const data = ffmpeg.FS("readFile", outputName);
-  const outBlob = new Blob([data.buffer], { type: "video/mp4" });
-
-  const outName =
-    (file.name || "video").replace(/\.[^.]+$/, "") + "_wm.mp4";
-
-  // ✅ 最終回傳的是 mp4，有畫面也有聲音（ffmpeg 自行處理音軌）
-  const outFile = new File([outBlob], outName, { type: "video/mp4" });
-
-  // 6. 清掉虛擬檔案（不要一直佔記憶體）
+  const src = URL.createObjectURL(file);
   try {
-    ffmpeg.FS("unlink", inputName);
-  } catch (_) { }
-  try {
-    ffmpeg.FS("unlink", "wm.png");
-  } catch (_) { }
-  try {
-    ffmpeg.FS("unlink", outputName);
-  } catch (_) { }
+    const video = document.createElement("video");
+    video.src = src;
+    video.muted = true;
+    video.playsInline = true;
+    video.crossOrigin = "anonymous";
 
-  return outFile;
+    await new Promise((res, rej) => {
+      video.onloadedmetadata = () => res();
+      video.onerror = (e) => rej(e || new Error("載入影片失敗"));
+    });
+
+    const W = video.videoWidth || 1280;
+    const H = video.videoHeight || 720;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = W;
+    canvas.height = H;
+    const g = canvas.getContext("2d");
+
+    const stream = canvas.captureStream();
+    try {
+      if (video.captureStream) {
+        const vStream = video.captureStream();
+        vStream.getAudioTracks().forEach((track) => stream.addTrack(track));
+      }
+    } catch (_) {
+      // audio 失敗可以忽略，至少保留畫面
+    }
+
+    const chunks = [];
+
+    // ✅ 優先嘗試 MP4（H.264/AAC）。不支援就退回 WebM
+    const mp4Candidates = [
+      'video/mp4;codecs="avc1.42E01E,mp4a.40.2"',
+      'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+      'video/mp4;codecs="avc1.42E01E"',
+      'video/mp4;codecs=avc1.42E01E',
+      "video/mp4",
+    ];
+
+    let mime = "";
+    for (const t of mp4Candidates) {
+      try {
+        if (MediaRecorder.isTypeSupported(t)) { mime = t; break; }
+      } catch (_) { }
+    }
+
+    // mp4 不行 → 用你原本的 webm(vp9/vp8)
+    if (!mime) {
+      const canUseVP9 = MediaRecorder.isTypeSupported("video/webm;codecs=vp9");
+      const canUseVP8 = MediaRecorder.isTypeSupported("video/webm;codecs=vp8");
+      mime = canUseVP9
+        ? "video/webm;codecs=vp9"
+        : (canUseVP8 ? "video/webm;codecs=vp8" : "video/webm");
+    }
+
+    const recorder = new MediaRecorder(stream, { mimeType: mime });
+    recorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) chunks.push(e.data);
+    };
+    const finished = new Promise((resolve) => {
+      recorder.onstop = () => resolve();
+    });
+
+    recorder.start();
+
+    const useRVFC = typeof video.requestVideoFrameCallback === "function";
+
+    function drawFrame() {
+      g.clearRect(0, 0, W, H);
+      g.drawImage(video, 0, 0, W, H);
+      __drawWatermarkPattern(g, W, H, text);
+    }
+
+    if (useRVFC) {
+      const cb = () => {
+        if (video.paused || video.ended) return;
+        drawFrame();
+        video.requestVideoFrameCallback(cb);
+      };
+      video.requestVideoFrameCallback(cb);
+    } else {
+      const t = setInterval(() => {
+        if (video.paused || video.ended) {
+          clearInterval(t);
+          return;
+        }
+        drawFrame();
+      }, 40);
+    }
+
+    await video.play();
+    await new Promise((res) => { video.onended = () => res(); });
+
+    recorder.stop();
+    await finished;
+
+    const blob = new Blob(chunks, { type: mime });
+    const isMp4 = /^video\/mp4/i.test(mime);
+    const ext = isMp4 ? ".mp4" : ".webm";
+    const name = (file.name || "video").replace(/\.[^.]+$/, ext);
+    return new File([blob], name, { type: mime });
+  } finally {
+    URL.revokeObjectURL(src);
+  }
 }
 
 // ===============================
