@@ -145,6 +145,64 @@ function __drawWatermarkPattern(g, W, H, text) {
   g.restore();
 }
 
+// ===============================
+// ffmpeg.wasm：初始化（單例）
+// ===============================
+let __ffmpeg = null;
+let __ffmpegReady = null;
+let __ffmpegFetchFile = null;
+
+async function __ensureFFmpegLoaded() {
+  if (!window.WebAssembly) {
+    throw new Error("此瀏覽器不支援 WebAssembly，無法處理影片浮水印");
+  }
+
+  if (__ffmpeg && __ffmpegReady) {
+    await __ffmpegReady;
+    return __ffmpeg;
+  }
+
+  if (!window.FFmpeg || typeof FFmpeg.createFFmpeg !== "function") {
+    throw new Error("ffmpeg.wasm 尚未載入（缺少 FFmpeg 全域物件）");
+  }
+
+  const { createFFmpeg, fetchFile } = FFmpeg;
+
+  __ffmpeg = createFFmpeg({
+    log: false, // 若要除錯可以改成 true 看 console
+    // 若你把 core 檔自己 host，這裡改成自己的路徑
+    corePath: "https://unpkg.com/@ffmpeg/core@0.12.10/dist/ffmpeg-core.js",
+  });
+
+  __ffmpegFetchFile = fetchFile;
+  __ffmpegReady = __ffmpeg.load();
+  await __ffmpegReady;
+  return __ffmpeg;
+}
+
+// 產生一張 PNG 浮水印圖（用你原本的 pattern）
+async function __makeWatermarkPngForVideo(text) {
+  // 固定一個適中的尺寸就好，ffmpeg 會直接疊在畫面上
+  const W = 1280;
+  const H = 720;
+
+  const c = document.createElement("canvas");
+  c.width = W;
+  c.height = H;
+  const g = c.getContext("2d");
+
+  // 背景透明，只畫字
+  g.clearRect(0, 0, W, H);
+  __drawWatermarkPattern(g, W, H, text);
+
+  const blob = await new Promise((res) => c.toBlob(res, "image/png"));
+  if (!blob) {
+    throw new Error("產生浮水印 PNG 失敗");
+  }
+  const buf = await blob.arrayBuffer();
+  return new Uint8Array(buf);
+}
+
 async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {}) {
   const type = (file && file.type) || "";
   if (type.startsWith("video/")) {
@@ -172,163 +230,70 @@ async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {})
   }
 }
 
+// 影片：改成用 ffmpeg.wasm 加浮水印＋輸出 mp4（含音軌）
 async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}) {
-  // 使用 FFmpeg.wasm 將浮水印「燒」進影片並輸出 MP4(H264+AAC)
-  // 目的：iPhone/Safari 播放要有聲音 + 檔案本身防盜（不是播放層疊字）
-  const FF = window.FFmpeg || window.FFmpegWASM;
-  const U = window.FFmpegUtil;
+  // 1. 準備 ffmpeg 實例
+  const ffmpeg = await __ensureFFmpegLoaded();
+  const fetchFile =
+    __ffmpegFetchFile ||
+    (window.FFmpeg && typeof FFmpeg.fetchFile === "function"
+      ? FFmpeg.fetchFile
+      : null);
 
-  if (!FF || !U) {
-    throw new Error("缺少 FFmpeg.wasm：請確認 admin.html 已引入 @ffmpeg/ffmpeg 與 @ffmpeg/util");
+  if (!fetchFile) {
+    throw new Error("ffmpeg.wasm 的 fetchFile 不存在，無法讀取檔案");
   }
 
-  // ---- singleton loader ----
-  if (!window.__ss_ffmpeg_state) window.__ss_ffmpeg_state = { ff: null, loading: null, fontLoaded: false };
-  const state = window.__ss_ffmpeg_state;
+  // 2. 把原始影片寫進 ffmpeg 的虛擬檔案系統
+  const extMatch = (file.name || "").match(/\.[^.]+$/);
+  const inputExt = extMatch ? extMatch[0].toLowerCase() : ".mp4";
+  const inputName = `input${inputExt}`;
+  const outputName = "output.mp4";
 
-  async function getFF() {
-    if (state.ff) return state.ff;
-    if (state.loading) return state.loading;
+  ffmpeg.FS("writeFile", inputName, await fetchFile(file));
 
-    state.loading = (async () => {
-      // 新版 API：new FFmpeg()
-      if (FF.FFmpeg) {
-        const ff = new FF.FFmpeg();
+  // 3. 產生一張「跟圖片一樣 pattern」的浮水印 PNG，給 overlay 用
+  ffmpeg.FS("writeFile", "wm.png", await __makeWatermarkPngForVideo(text));
 
-        // core 檔案位置（UMD）
-        const base = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/";
-        await ff.load({
-          coreURL: base + "ffmpeg-core.js",
-          wasmURL: base + "ffmpeg-core.wasm",
-          workerURL: base + "ffmpeg-core.worker.js",
-        });
+  // 4. ffmpeg 轉檔＋疊圖
+  //    -i input：影片
+  //    -i wm.png：浮水印圖
+  //    filter_complex overlay=10:10：左上角往右下偏 10px
+  //    movflags +faststart：讓 mp4 在網頁串流播放比較順
+  await ffmpeg.run(
+    "-i",
+    inputName,
+    "-i",
+    "wm.png",
+    "-filter_complex",
+    "overlay=10:10",
+    "-movflags",
+    "+faststart",
+    outputName
+  );
 
-        state.ff = ff;
-        return ff;
-      }
+  // 5. 從虛擬檔案系統讀出結果，變成真正的 File 物件給原本流程上傳
+  const data = ffmpeg.FS("readFile", outputName);
+  const outBlob = new Blob([data.buffer], { type: "video/mp4" });
 
-      // 舊版 API：createFFmpeg()
-      if (typeof FF.createFFmpeg === "function") {
-        const ff = FF.createFFmpeg({
-          log: false,
-          corePath: "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js",
-        });
-        await ff.load();
-        state.ff = ff;
-        return ff;
-      }
+  const outName =
+    (file.name || "video").replace(/\.[^.]+$/, "") + "_wm.mp4";
 
-      throw new Error("FFmpeg.wasm API 不支援（找不到 FFmpeg 或 createFFmpeg）");
-    })();
+  // ✅ 最終回傳的是 mp4，有畫面也有聲音（ffmpeg 自行處理音軌）
+  const outFile = new File([outBlob], outName, { type: "video/mp4" });
 
-    return state.loading;
-  }
+  // 6. 清掉虛擬檔案（不要一直佔記憶體）
+  try {
+    ffmpeg.FS("unlink", inputName);
+  } catch (_) { }
+  try {
+    ffmpeg.FS("unlink", "wm.png");
+  } catch (_) { }
+  try {
+    ffmpeg.FS("unlink", outputName);
+  } catch (_) { }
 
-  function escDrawText(s) {
-    return String(s)
-      .replace(/\\/g, "\\\\")
-      .replace(/'/g, "\\'")
-      .replace(/:/g, "\\:")
-      .replace(/\n/g, " ");
-  }
-
-  const ff = await getFF();
-  const fetchFile = U.fetchFile || U.default?.fetchFile;
-  if (!fetchFile) throw new Error("缺少 FFmpegUtil.fetchFile");
-
-  // 讀入字型（避免中文變豆腐字）
-  // 你需要把字型放在：/assets/NotoSansTC-Regular.otf （可自行換檔名/路徑）
-  async function ensureFont() {
-    if (state.fontLoaded) return true;
-
-    const fontUrl = "/assets/TaipeiSansTCBeta-Regular.ttf";
-    try {
-      const fontData = await fetchFile(fontUrl);
-
-      // 新版：writeFile / 舊版：FS('writeFile')
-      if (ff.writeFile) {
-        await ff.writeFile("font.otf", fontData);
-      } else if (ff.FS) {
-        ff.FS("writeFile", "font.otf", fontData);
-      }
-      state.fontLoaded = true;
-      return true;
-    } catch (e) {
-      // 沒字型也可以跑，但中文可能顯示不完整
-      state.fontLoaded = false;
-      return false;
-    }
-  }
-
-  const hasFont = await ensureFont();
-
-  // 輸入輸出檔名
-  const ext = (file.name && file.name.match(/\.[^.]+$/)) ? file.name.match(/\.[^.]+$/)[0].toLowerCase() : ".mp4";
-  const inName = "in" + ext;
-  const outName = "out.mp4";
-
-  // 清舊檔，避免重複上傳卡住
-  try { ff.deleteFile ? await ff.deleteFile(inName) : ff.FS("unlink", inName); } catch (_) {}
-  try { ff.deleteFile ? await ff.deleteFile(outName) : ff.FS("unlink", outName); } catch (_) {}
-
-  // 寫入輸入檔
-  if (ff.writeFile) {
-    await ff.writeFile(inName, await fetchFile(file));
-  } else {
-    ff.FS("writeFile", inName, await fetchFile(file));
-  }
-
-  // drawtext：右下角 + 半透明 + 黑底框
-  const wmText = escDrawText(text);
-  const draw = [
-    "drawtext=",
-    hasFont ? "fontfile=font.otf" : "",
-    `:text='${wmText}'`,
-    ":x=w-tw-24",
-    ":y=h-th-24",
-    ":fontsize=28",
-    ":fontcolor=white@0.85",
-    ":box=1",
-    ":boxcolor=black@0.28",
-    ":boxborderw=12",
-  ].join("");
-
-  // 執行轉檔：輸出 MP4（iPhone 最穩）
-  if (ff.exec) {
-    await ff.exec([
-      "-i", inName,
-      "-vf", draw,
-      "-c:v", "libx264",
-      "-pix_fmt", "yuv420p",
-      "-c:a", "aac",
-      "-b:a", "128k",
-      "-movflags", "+faststart",
-      outName,
-    ]);
-  } else {
-    await ff.run(
-      "-i", inName,
-      "-vf", draw,
-      "-c:v", "libx264",
-      "-pix_fmt", "yuv420p",
-      "-c:a", "aac",
-      "-b:a", "128k",
-      "-movflags", "+faststart",
-      outName
-    );
-  }
-
-  // 讀出輸出檔並回傳 File
-  let outData;
-  if (ff.readFile) {
-    outData = await ff.readFile(outName);
-  } else {
-    outData = ff.FS("readFile", outName);
-  }
-
-  const blob = new Blob([outData.buffer || outData], { type: "video/mp4" });
-  const base = (file.name || "video").replace(/\.[^.]+$/, "");
-  return new File([blob], `${base}.mp4`, { type: "video/mp4" });
+  return outFile;
 }
 
 // ===============================
