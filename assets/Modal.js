@@ -210,31 +210,14 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
     }
 
     const chunks = [];
+    const canUseVP9 = typeof MediaRecorder !== "undefined" &&
+      MediaRecorder.isTypeSupported("video/webm;codecs=vp9");
+    const canUseVP8 = typeof MediaRecorder !== "undefined" &&
+      MediaRecorder.isTypeSupported("video/webm;codecs=vp8");
 
-    // ✅ 優先嘗試 MP4（H.264/AAC）。不支援就退回 WebM
-    const mp4Candidates = [
-      'video/mp4;codecs="avc1.42E01E,mp4a.40.2"',
-      'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
-      'video/mp4;codecs="avc1.42E01E"',
-      'video/mp4;codecs=avc1.42E01E',
-      "video/mp4",
-    ];
-
-    let mime = "";
-    for (const t of mp4Candidates) {
-      try {
-        if (MediaRecorder.isTypeSupported(t)) { mime = t; break; }
-      } catch (_) { }
-    }
-
-    // mp4 不行 → 用你原本的 webm(vp9/vp8)
-    if (!mime) {
-      const canUseVP9 = MediaRecorder.isTypeSupported("video/webm;codecs=vp9");
-      const canUseVP8 = MediaRecorder.isTypeSupported("video/webm;codecs=vp8");
-      mime = canUseVP9
-        ? "video/webm;codecs=vp9"
-        : (canUseVP8 ? "video/webm;codecs=vp8" : "video/webm");
-    }
+    const mime = canUseVP9
+      ? "video/webm;codecs=vp9"
+      : (canUseVP8 ? "video/webm;codecs=vp8" : "video/webm");
 
     const recorder = new MediaRecorder(stream, { mimeType: mime });
     recorder.ondataavailable = (e) => {
@@ -278,8 +261,7 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
     await finished;
 
     const blob = new Blob(chunks, { type: mime });
-    const isMp4 = /^video\/mp4/i.test(mime);
-    const ext = isMp4 ? ".mp4" : ".webm";
+    const ext = ".webm";
     const name = (file.name || "video").replace(/\.[^.]+$/, ext);
     return new File([blob], name, { type: mime });
   } finally {
