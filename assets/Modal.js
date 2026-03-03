@@ -189,7 +189,7 @@ async function __getFFmpeg() {
     const ffmpeg = createFFmpeg({
       log: false,
       // 這個 corePath 很重要：否則 load() 會找不到 core
-      corePath: "https://unpkg.com/@ffmpeg/core@0.12.6/dist/ffmpeg-core.js",
+      corePath: "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js",
     });
 
     await ffmpeg.load();
