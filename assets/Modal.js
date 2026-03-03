@@ -172,101 +172,96 @@ async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {})
   }
 }
 
+// ======== FFmpeg.wasm（前端燒浮水印 + 輸出 MP4 有聲）========
+let __ffmpegLoading = null;
+
+async function __getFFmpeg() {
+  if (__ffmpegLoading) return __ffmpegLoading;
+
+  __ffmpegLoading = (async () => {
+    if (!window.FFmpeg || !window.FFmpegUtil) {
+      throw new Error("缺少 FFmpeg.wasm：請確認 admin.html 已引入 @ffmpeg/ffmpeg 與 @ffmpeg/util");
+    }
+
+    const { createFFmpeg } = window.FFmpeg;
+    const { fetchFile } = window.FFmpegUtil;
+
+    const ffmpeg = createFFmpeg({
+      log: false,
+      // 這個 corePath 很重要：否則 load() 會找不到 core
+      corePath: "https://unpkg.com/@ffmpeg/core@0.12.6/dist/ffmpeg-core.js",
+    });
+
+    await ffmpeg.load();
+
+    // 載入中文字型（你要把字型放到這個路徑）
+    const fontUrl = "/assets/TaipeiSansTCBeta-Regular.ttf";
+    const fontData = await fetchFile(fontUrl);
+    ffmpeg.FS("writeFile", "font.otf", fontData);
+
+    // 把 util 掛進去，下面直接用
+    ffmpeg.__fetchFile = fetchFile;
+    return ffmpeg;
+  })();
+
+  return __ffmpegLoading;
+}
+
+function __escapeDrawtext(s) {
+  // ffmpeg drawtext 需要跳脫這些字元（至少要處理 \ ' :）
+  return String(s)
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'")
+    .replace(/:/g, "\\:")
+    .replace(/\n/g, " ");
+}
+
 async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}) {
-  const testCanvas = document.createElement("canvas");
-  if (!testCanvas.captureStream || typeof MediaRecorder === "undefined") {
-    throw new Error("目前瀏覽器不支援影片浮水印（缺少 MediaRecorder 或 captureStream）");
-  }
+  const ffmpeg = await __getFFmpeg();
+  const fetchFile = ffmpeg.__fetchFile;
 
-  const src = URL.createObjectURL(file);
-  try {
-    const video = document.createElement("video");
-    video.src = src;
-    video.muted = true;
-    video.playsInline = true;
-    video.crossOrigin = "anonymous";
+  const inExt = (file.name && file.name.match(/\.[^.]+$/)) ? file.name.match(/\.[^.]+$/)[0] : ".mp4";
+  const inName = "in" + inExt.toLowerCase();
+  const outName = "out.mp4";
 
-    await new Promise((res, rej) => {
-      video.onloadedmetadata = () => res();
-      video.onerror = (e) => rej(e || new Error("載入影片失敗"));
-    });
+  // 清理舊檔（避免重複上傳卡住）
+  try { ffmpeg.FS("unlink", inName); } catch (_) { }
+  try { ffmpeg.FS("unlink", outName); } catch (_) { }
 
-    const W = video.videoWidth || 1280;
-    const H = video.videoHeight || 720;
+  ffmpeg.FS("writeFile", inName, await fetchFile(file));
 
-    const canvas = document.createElement("canvas");
-    canvas.width = W;
-    canvas.height = H;
-    const g = canvas.getContext("2d");
+  const wmText = __escapeDrawtext(text);
 
-    const stream = canvas.captureStream();
-    try {
-      if (video.captureStream) {
-        const vStream = video.captureStream();
-        vStream.getAudioTracks().forEach((track) => stream.addTrack(track));
-      }
-    } catch (_) {
-      // audio 失敗可以忽略，至少保留畫面
-    }
+  // 右下角、半透明、加黑底框
+  const draw = [
+    "drawtext=",
+    "fontfile=font.otf",
+    `:text='${wmText}'`,
+    ":x=w-tw-24",
+    ":y=h-th-24",
+    ":fontsize=28",
+    ":fontcolor=white@0.85",
+    ":box=1",
+    ":boxcolor=black@0.28",
+    ":boxborderw=12",
+  ].join("");
 
-    const chunks = [];
-    const canUseVP9 = typeof MediaRecorder !== "undefined" &&
-      MediaRecorder.isTypeSupported("video/webm;codecs=vp9");
-    const canUseVP8 = typeof MediaRecorder !== "undefined" &&
-      MediaRecorder.isTypeSupported("video/webm;codecs=vp8");
+  await ffmpeg.run(
+    "-i", inName,
+    "-vf", draw,
+    "-c:v", "libx264",
+    "-pix_fmt", "yuv420p",
+    "-c:a", "aac",
+    "-b:a", "128k",
+    "-movflags", "+faststart",
+    outName
+  );
 
-    const mime = canUseVP9
-      ? "video/webm;codecs=vp9"
-      : (canUseVP8 ? "video/webm;codecs=vp8" : "video/webm");
+  const data = ffmpeg.FS("readFile", outName);
+  const blob = new Blob([data.buffer], { type: "video/mp4" });
 
-    const recorder = new MediaRecorder(stream, { mimeType: mime });
-    recorder.ondataavailable = (e) => {
-      if (e.data && e.data.size > 0) chunks.push(e.data);
-    };
-    const finished = new Promise((resolve) => {
-      recorder.onstop = () => resolve();
-    });
-
-    recorder.start();
-
-    const useRVFC = typeof video.requestVideoFrameCallback === "function";
-
-    function drawFrame() {
-      g.clearRect(0, 0, W, H);
-      g.drawImage(video, 0, 0, W, H);
-      __drawWatermarkPattern(g, W, H, text);
-    }
-
-    if (useRVFC) {
-      const cb = () => {
-        if (video.paused || video.ended) return;
-        drawFrame();
-        video.requestVideoFrameCallback(cb);
-      };
-      video.requestVideoFrameCallback(cb);
-    } else {
-      const t = setInterval(() => {
-        if (video.paused || video.ended) {
-          clearInterval(t);
-          return;
-        }
-        drawFrame();
-      }, 40);
-    }
-
-    await video.play();
-    await new Promise((res) => { video.onended = () => res(); });
-
-    recorder.stop();
-    await finished;
-
-    const blob = new Blob(chunks, { type: mime });
-    const ext = ".webm";
-    const name = (file.name || "video").replace(/\.[^.]+$/, ext);
-    return new File([blob], name, { type: mime });
-  } finally {
-    URL.revokeObjectURL(src);
-  }
+  const base = (file.name || "video").replace(/\.[^.]+$/, "");
+  return new File([blob], `${base}.mp4`, { type: "video/mp4" });
 }
 
 // ===============================
