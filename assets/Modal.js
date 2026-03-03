@@ -24,12 +24,49 @@ function thumbPathFromMediaPath(mediaPath) {
   }
 }
 
+function __forceMuteVideo(v) {
+  if (!v) return;
+  try {
+    // JS 屬性
+    v.muted = true;
+    v.defaultMuted = true;        // iOS 常需要
+    v.volume = 0;                 // 雙保險（避免漏音）
+
+    // attribute（關鍵：Safari 對 attribute 更「信」）
+    v.setAttribute("muted", "");
+
+    // iOS inline
+    v.playsInline = true;
+    v.setAttribute("playsinline", "");
+    v.setAttribute("webkit-playsinline", "");
+
+    // 其他保險
+    v.disablePictureInPicture = true;
+  } catch (_) { }
+}
+
+function __canvasLooksBlack(c) {
+  try {
+    const g = c.getContext("2d");
+    const x = Math.max(0, (c.width / 2) | 0);
+    const y = Math.max(0, (c.height / 2) | 0);
+    const { data } = g.getImageData(x, y, 1, 1);
+    // 只抽樣中心 1px：夠用來判斷「完全沒畫到」那種黑
+    return data[0] === 0 && data[1] === 0 && data[2] === 0;
+  } catch (_) {
+    return false;
+  }
+}
+
 // ===============================
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
 // ===============================
 function __primeThumbVideoFrame(v) {
   if (!v || v.dataset.__primed === "1") return;
   v.dataset.__primed = "1";
+
+  // ✅ 先把靜音鎖死（iOS 也認）
+  __forceMuteVideo(v);
 
   // 找一個適合當縮圖的時間點
   const seekToThumbTime = () => {
@@ -44,10 +81,13 @@ function __primeThumbVideoFrame(v) {
     } catch (_) { /* ignore */ }
   };
 
-  // 真的跑一次「靜音播放 → 暫停」來逼 Safari 解碼畫面
+  // 只在必要時才「靜音播放→暫停」逼 Safari 解碼
   const ensurePaint = () => {
     if (v.dataset.__painted === "1") return;
     v.dataset.__painted = "1";
+
+    // ✅ play 前再鎖一次（更保險）
+    __forceMuteVideo(v);
 
     try {
       const p = v.play();
@@ -72,11 +112,13 @@ function __primeThumbVideoFrame(v) {
   };
 
   v.addEventListener("loadedmetadata", () => {
+    __forceMuteVideo(v);
     seekToThumbTime();
     ensurePaint();
   }, { once: true });
 
   v.addEventListener("seeked", () => {
+    __forceMuteVideo(v);
     ensurePaint();
   }, { once: true });
 
@@ -84,6 +126,7 @@ function __primeThumbVideoFrame(v) {
   setTimeout(() => {
     try {
       if (v.readyState < 2) return;
+      __forceMuteVideo(v);
       if (v.currentTime === 0) seekToThumbTime();
       ensurePaint();
     } catch (_) { }
@@ -319,50 +362,42 @@ async function __decodeToBitmap(file) {
       const v = document.createElement("video");
       v.preload = "metadata";
       v.src = vUrl;
-      v.muted = true;
-      v.playsInline = true;
-      v.setAttribute("playsinline", "");
-      v.setAttribute("webkit-playsinline", "");
+
+      // ✅ 一次鎖死（包含 muted attribute / defaultMuted / volume=0 / playsinline）
+      __forceMuteVideo(v);
+
+      // 只留你想要的其他設定
       v.disablePictureInPicture = true;
 
-      // iOS Safari 有時不會觸發 loadeddata（不播放就不解碼畫面），所以用 loadedmetadata + seek 逼出第一張影格
       await new Promise((res, rej) => {
         v.onloadedmetadata = () => res();
         v.onerror = (e) => rej(e || new Error("載入影片失敗"));
       });
 
-      // 目標抓取時間：盡量靠前，但不要是 0（iOS 有時 seek 到 0 會拿不到 frame）
       let t = 0.05;
       try {
         if (Number.isFinite(v.duration) && v.duration > 0.2) {
           t = Math.min(0.2, v.duration / 2);
           t = Math.max(0.05, Math.min(t, v.duration - 0.05));
         }
-      } catch (_) { /* ignore */ }
+      } catch (_) { }
 
-      // 先嘗試 seek
+      // seek
+      const seekTo = async (time) => {
+        v.currentTime = time;
+        await new Promise((res) => v.addEventListener("seeked", res, { once: true }));
+      };
+
       try {
-        v.currentTime = t;
-        await new Promise((res) => {
-          const done = () => { v.removeEventListener("seeked", done); res(); };
-          v.addEventListener("seeked", done);
-        });
+        await seekTo(t);
       } catch (_) {
-        // 有些檔案/瀏覽器不給 seek，就用 0.01 退回
-        try {
-          v.currentTime = 0.01;
-          await new Promise((res) => {
-            const done = () => { v.removeEventListener("seeked", done); res(); };
-            v.addEventListener("seeked", done);
-          });
-        } catch (_) { /* ignore */ }
+        try { await seekTo(0.01); } catch (_) { }
       }
 
-      // 等待畫面真正解碼（RVFC 最可靠）
+      // 等待解碼
       if (typeof v.requestVideoFrameCallback === "function") {
         await new Promise((res) => v.requestVideoFrameCallback(() => res()));
       } else {
-        // readyState >= 2 才有 current frame data
         if (v.readyState < 2) {
           await Promise.race([
             new Promise((res) => { v.onloadeddata = () => res(); }),
@@ -372,25 +407,31 @@ async function __decodeToBitmap(file) {
         await new Promise((res) => setTimeout(res, 30));
       }
 
-      // iOS 有時仍然黑畫面：試著「靜音播放一下再暫停」逼出 frame
-      try {
-        await v.play();
-        v.pause();
-      } catch (_) { /* ignore */ }
-
       const w = v.videoWidth || 640;
       const h = v.videoHeight || 360;
       const c = document.createElement("canvas");
       c.width = w;
       c.height = h;
       const g = c.getContext("2d");
+
+      // 先畫一次
       g.drawImage(v, 0, 0, w, h);
+
+      // 黑才 fallback play
+      if (__canvasLooksBlack(c)) {
+        try {
+          __forceMuteVideo(v);     // ✅ play 前再鎖一次
+          await v.play();
+          v.pause();
+          g.drawImage(v, 0, 0, w, h);
+        } catch (_) { }
+      }
+
       return c;
     } finally {
       URL.revokeObjectURL(vUrl);
     }
   }
-
 
   // 圖片：優先用 createImageBitmap（非阻塞解碼）
   if (window.createImageBitmap && isImage) {
