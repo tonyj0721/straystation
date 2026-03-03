@@ -172,73 +172,117 @@ async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {})
   }
 }
 
-// ======== FFmpeg.wasm（前端燒浮水印 + 輸出 MP4 有聲）========
-let __ffmpegLoading = null;
-
-async function __getFFmpeg() {
-  if (__ffmpegLoading) return __ffmpegLoading;
-
-  __ffmpegLoading = (async () => {
-    const FF = window.FFmpeg || window.FFmpegWASM;
-    const U = window.FFmpegUtil;
-
-    if (!FF || !U) {
-      throw new Error("缺少 FFmpeg.wasm：請確認 admin.html 已引入 @ffmpeg/ffmpeg 與 @ffmpeg/util");
-    }
-
-    const { createFFmpeg } = FF;
-    const { fetchFile } = U;
-
-    const ffmpeg = createFFmpeg({
-      log: false,
-      // 這個 corePath 很重要：否則 load() 會找不到 core
-      corePath: "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js"
-    });
-
-    await ffmpeg.load();
-
-    // 載入中文字型（你要把字型放到這個路徑）
-    const fontUrl = "/assets/TaipeiSansTCBeta-Regular.ttf";
-    const fontData = await fetchFile(fontUrl);
-    ffmpeg.FS("writeFile", "font.otf", fontData);
-
-    // 把 util 掛進去，下面直接用
-    ffmpeg.__fetchFile = fetchFile;
-    return ffmpeg;
-  })();
-
-  return __ffmpegLoading;
-}
-
-function __escapeDrawtext(s) {
-  // ffmpeg drawtext 需要跳脫這些字元（至少要處理 \ ' :）
-  return String(s)
-    .replace(/\\/g, "\\\\")
-    .replace(/'/g, "\\'")
-    .replace(/:/g, "\\:")
-    .replace(/\n/g, " ");
-}
-
 async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}) {
-  const ffmpeg = await __getFFmpeg();
-  const fetchFile = ffmpeg.__fetchFile;
+  // 使用 FFmpeg.wasm 將浮水印「燒」進影片並輸出 MP4(H264+AAC)
+  // 目的：iPhone/Safari 播放要有聲音 + 檔案本身防盜（不是播放層疊字）
+  const FF = window.FFmpeg || window.FFmpegWASM;
+  const U = window.FFmpegUtil;
 
-  const inExt = (file.name && file.name.match(/\.[^.]+$/)) ? file.name.match(/\.[^.]+$/)[0] : ".mp4";
-  const inName = "in" + inExt.toLowerCase();
+  if (!FF || !U) {
+    throw new Error("缺少 FFmpeg.wasm：請確認 admin.html 已引入 @ffmpeg/ffmpeg 與 @ffmpeg/util");
+  }
+
+  // ---- singleton loader ----
+  if (!window.__ss_ffmpeg_state) window.__ss_ffmpeg_state = { ff: null, loading: null, fontLoaded: false };
+  const state = window.__ss_ffmpeg_state;
+
+  async function getFF() {
+    if (state.ff) return state.ff;
+    if (state.loading) return state.loading;
+
+    state.loading = (async () => {
+      // 新版 API：new FFmpeg()
+      if (FF.FFmpeg) {
+        const ff = new FF.FFmpeg();
+
+        // core 檔案位置（UMD）
+        const base = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/";
+        await ff.load({
+          coreURL: base + "ffmpeg-core.js",
+          wasmURL: base + "ffmpeg-core.wasm",
+          workerURL: base + "ffmpeg-core.worker.js",
+        });
+
+        state.ff = ff;
+        return ff;
+      }
+
+      // 舊版 API：createFFmpeg()
+      if (typeof FF.createFFmpeg === "function") {
+        const ff = FF.createFFmpeg({
+          log: false,
+          corePath: "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js",
+        });
+        await ff.load();
+        state.ff = ff;
+        return ff;
+      }
+
+      throw new Error("FFmpeg.wasm API 不支援（找不到 FFmpeg 或 createFFmpeg）");
+    })();
+
+    return state.loading;
+  }
+
+  function escDrawText(s) {
+    return String(s)
+      .replace(/\\/g, "\\\\")
+      .replace(/'/g, "\\'")
+      .replace(/:/g, "\\:")
+      .replace(/\n/g, " ");
+  }
+
+  const ff = await getFF();
+  const fetchFile = U.fetchFile || U.default?.fetchFile;
+  if (!fetchFile) throw new Error("缺少 FFmpegUtil.fetchFile");
+
+  // 讀入字型（避免中文變豆腐字）
+  // 你需要把字型放在：/assets/NotoSansTC-Regular.otf （可自行換檔名/路徑）
+  async function ensureFont() {
+    if (state.fontLoaded) return true;
+
+    const fontUrl = "/assets/TaipeiSansTCBeta-Regular.ttf";
+    try {
+      const fontData = await fetchFile(fontUrl);
+
+      // 新版：writeFile / 舊版：FS('writeFile')
+      if (ff.writeFile) {
+        await ff.writeFile("font.otf", fontData);
+      } else if (ff.FS) {
+        ff.FS("writeFile", "font.otf", fontData);
+      }
+      state.fontLoaded = true;
+      return true;
+    } catch (e) {
+      // 沒字型也可以跑，但中文可能顯示不完整
+      state.fontLoaded = false;
+      return false;
+    }
+  }
+
+  const hasFont = await ensureFont();
+
+  // 輸入輸出檔名
+  const ext = (file.name && file.name.match(/\.[^.]+$/)) ? file.name.match(/\.[^.]+$/)[0].toLowerCase() : ".mp4";
+  const inName = "in" + ext;
   const outName = "out.mp4";
 
-  // 清理舊檔（避免重複上傳卡住）
-  try { ffmpeg.FS("unlink", inName); } catch (_) { }
-  try { ffmpeg.FS("unlink", outName); } catch (_) { }
+  // 清舊檔，避免重複上傳卡住
+  try { ff.deleteFile ? await ff.deleteFile(inName) : ff.FS("unlink", inName); } catch (_) {}
+  try { ff.deleteFile ? await ff.deleteFile(outName) : ff.FS("unlink", outName); } catch (_) {}
 
-  ffmpeg.FS("writeFile", inName, await fetchFile(file));
+  // 寫入輸入檔
+  if (ff.writeFile) {
+    await ff.writeFile(inName, await fetchFile(file));
+  } else {
+    ff.FS("writeFile", inName, await fetchFile(file));
+  }
 
-  const wmText = __escapeDrawtext(text);
-
-  // 右下角、半透明、加黑底框
+  // drawtext：右下角 + 半透明 + 黑底框
+  const wmText = escDrawText(text);
   const draw = [
     "drawtext=",
-    "fontfile=font.otf",
+    hasFont ? "fontfile=font.otf" : "",
     `:text='${wmText}'`,
     ":x=w-tw-24",
     ":y=h-th-24",
@@ -249,20 +293,40 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
     ":boxborderw=12",
   ].join("");
 
-  await ffmpeg.run(
-    "-i", inName,
-    "-vf", draw,
-    "-c:v", "libx264",
-    "-pix_fmt", "yuv420p",
-    "-c:a", "aac",
-    "-b:a", "128k",
-    "-movflags", "+faststart",
-    outName
-  );
+  // 執行轉檔：輸出 MP4（iPhone 最穩）
+  if (ff.exec) {
+    await ff.exec([
+      "-i", inName,
+      "-vf", draw,
+      "-c:v", "libx264",
+      "-pix_fmt", "yuv420p",
+      "-c:a", "aac",
+      "-b:a", "128k",
+      "-movflags", "+faststart",
+      outName,
+    ]);
+  } else {
+    await ff.run(
+      "-i", inName,
+      "-vf", draw,
+      "-c:v", "libx264",
+      "-pix_fmt", "yuv420p",
+      "-c:a", "aac",
+      "-b:a", "128k",
+      "-movflags", "+faststart",
+      outName
+    );
+  }
 
-  const data = ffmpeg.FS("readFile", outName);
-  const blob = new Blob([data.buffer], { type: "video/mp4" });
+  // 讀出輸出檔並回傳 File
+  let outData;
+  if (ff.readFile) {
+    outData = await ff.readFile(outName);
+  } else {
+    outData = ff.FS("readFile", outName);
+  }
 
+  const blob = new Blob([outData.buffer || outData], { type: "video/mp4" });
   const base = (file.name || "video").replace(/\.[^.]+$/, "");
   return new File([blob], `${base}.mp4`, { type: "video/mp4" });
 }
