@@ -6,23 +6,21 @@ const PRECACHE = [
   "./cats.html",
   "./dogs.html",
   "./about.html",
-  "./adopt.html",
   "./home.html",
-  "./assets/shared.css",
+  "./adopt.html",
+  "./manifest.webmanifest",
   "./assets/tailwind.css",
+  "./assets/shared.css",
   "./assets/Modal.js",
   "./assets/Lightbox.js",
   "./assets/firebase-config.js",
-  "./images/hero-bg.jpg",
-  "./images/chienma.jpg",
-  "./images/catwithdog.jpg",
   "./images/dogpaw-32.png",
   "./images/dogpaw-180.png",
   "./images/dogpaw-192.png",
   "./images/dogpaw-512.png",
   "./images/dogpaw-512-maskable.png",
   "./images/dogpaw.png",
-  "./manifest.webmanifest",
+  "./images/hero-bg.jpg",
 ];
 
 // 讓 fetch 盡量拿到「最新」的 helper
@@ -106,5 +104,4 @@ self.addEventListener("fetch", (event) => {
 
   // 4) 其他：保守用 network-first
   event.respondWith(networkFirst(req));
-
 });
