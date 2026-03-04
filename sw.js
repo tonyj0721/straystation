@@ -7,7 +7,6 @@ const PRECACHE = [
   "./dogs.html",
   "./about.html",
   "./adopt.html",
-  "./admin.html",
   "./home.html",
   "./assets/shared.css",
   "./assets/tailwind.css",
@@ -107,4 +106,5 @@ self.addEventListener("fetch", (event) => {
 
   // 4) 其他：保守用 network-first
   event.respondWith(networkFirst(req));
+
 });
