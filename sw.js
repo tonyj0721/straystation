@@ -14,13 +14,15 @@ const PRECACHE = [
   "./assets/Modal.js",
   "./assets/Lightbox.js",
   "./assets/firebase-config.js",
+  "./images/hero-bg.jpg",
+  "./images/chienma.jpg",
+  "./images/catwithdog.png",
+  "./images/dogpaw.png",
   "./images/dogpaw-32.png",
   "./images/dogpaw-180.png",
   "./images/dogpaw-192.png",
   "./images/dogpaw-512.png",
   "./images/dogpaw-512-maskable.png",
-  "./images/dogpaw.png",
-  "./images/hero-bg.jpg",
   "./manifest.webmanifest",
 ];
 
@@ -105,5 +107,4 @@ self.addEventListener("fetch", (event) => {
 
   // 4) 其他：保守用 network-first
   event.respondWith(networkFirst(req));
-
 });
