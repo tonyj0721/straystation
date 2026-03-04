@@ -24,7 +24,6 @@ function thumbPathFromMediaPath(mediaPath) {
   }
 }
 
-
 function __forceMute(v) {
   if (!v) return;
   v.muted = true;
