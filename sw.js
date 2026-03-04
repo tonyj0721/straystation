@@ -6,21 +6,24 @@ const PRECACHE = [
   "./cats.html",
   "./dogs.html",
   "./about.html",
-  "./home.html",
   "./adopt.html",
-  "./manifest.webmanifest",
-  "./assets/tailwind.css",
+  "./admin.html",
+  "./home.html",
   "./assets/shared.css",
+  "./assets/tailwind.css",
   "./assets/Modal.js",
   "./assets/Lightbox.js",
   "./assets/firebase-config.js",
+  "./images/hero-bg.jpg",
+  "./images/chienma.jpg",
+  "./images/catwithdog.jpg",
   "./images/dogpaw-32.png",
   "./images/dogpaw-180.png",
   "./images/dogpaw-192.png",
   "./images/dogpaw-512.png",
   "./images/dogpaw-512-maskable.png",
   "./images/dogpaw.png",
-  "./images/hero-bg.jpg",
+  "./manifest.webmanifest",
 ];
 
 // 讓 fetch 盡量拿到「最新」的 helper
@@ -41,7 +44,6 @@ self.addEventListener("install", (event) => {
       c.addAll(PRECACHE.map((u) => new Request(u, { cache: "reload" })))
     )
   );
-  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
@@ -50,7 +52,6 @@ self.addEventListener("activate", (event) => {
       Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
     )
   );
-  self.clients.claim();
 });
 
 async function networkFirst(req) {

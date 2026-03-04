@@ -721,32 +721,58 @@
       window.addEventListener("load", async () => {
         const reg = await navigator.serviceWorker.register("./sw.js");
 
-        // 每次載入都主動檢查 sw.js 是否有更新
-        reg.update();
+        // 每次載入可檢查更新（不會自動刷新）
+        reg.update(); // 你原本就有 :contentReference[oaicite:7]{index=7}
 
-        // 如果已經有 waiting 的新版，直接叫它上線（更穩）
-        if (reg.waiting) {
-          reg.waiting.postMessage({ type: "SKIP_WAITING" });
+        // 只在「真的有更新」時才提示
+        let updatePromptShown = false;
+
+        async function promptUpdate() {
+          if (updatePromptShown) return;
+          updatePromptShown = true;
+
+          const result = await Swal.fire({
+            title: "有新版本可用",
+            text: "是否現在更新？（會重新整理頁面）",
+            icon: "info",
+            showCancelButton: true,
+            confirmButtonText: "更新",
+            cancelButtonText: "稍後",
+          });
+
+          if (result.isConfirmed) {
+            // 叫 waiting 的新版 SW 立刻上線
+            if (reg.waiting) {
+              reg.waiting.postMessage({ type: "SKIP_WAITING" });
+            }
+          }
         }
 
-        // 新版 SW 接手後，自動重整一次（加 guard，避免連續重整）
-        let reloaded = false;
-        navigator.serviceWorker.addEventListener("controllerchange", () => {
-          if (reloaded) return;
-          reloaded = true;
-          window.location.reload();
-        });
+        // 若已經有 waiting（例如使用者開著頁面很久後，SW 下載好了）
+        if (reg.waiting && navigator.serviceWorker.controller) {
+          // controller 存在表示不是第一次安裝，而是「更新」
+          promptUpdate();
+        }
 
-        // 若發現新版 SW：叫它直接跳過 waiting
+        // 偵測到新 SW 安裝完成時
         reg.addEventListener("updatefound", () => {
           const nw = reg.installing;
           if (!nw) return;
 
           nw.addEventListener("statechange", () => {
+            // installed + 有 controller => 代表「更新」（不是第一次安裝）
             if (nw.state === "installed" && navigator.serviceWorker.controller) {
-              (reg.waiting || nw).postMessage({ type: "SKIP_WAITING" });
+              promptUpdate();
             }
           });
+        });
+
+        // ✅ 只有在使用者按了「更新」導致 skipWaiting 生效後，才刷新一次
+        let reloaded = false;
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          if (reloaded) return;
+          reloaded = true;
+          window.location.reload();
         });
       });
     }
