@@ -1775,12 +1775,40 @@
       );
     }
 
+
+    // 強制靜音鎖（避免 iOS/Safari 在 play() 瞬間仍短暫出聲）
+    function __forceMute(v) {
+      if (!v) return;
+      v.muted = true;
+      v.defaultMuted = true;          // iOS 很重要
+      v.volume = 0;                   // 雙保險：有些情況 muted 不吃但 volume=0 會吃
+      v.setAttribute("muted", "");
+      v.playsInline = true;
+      v.setAttribute("playsinline", "");
+      v.setAttribute("webkit-playsinline", "");
+      v.disablePictureInPicture = true;
+
+      if (!v.__muteLocked) {
+        v.__muteLocked = true;
+        v.addEventListener("volumechange", () => {
+          if (!v.muted || v.volume !== 0) {
+            v.muted = true;
+            v.defaultMuted = true;
+            v.volume = 0;
+            v.setAttribute("muted", "");
+          }
+        });
+      }
+    }
+
     // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
     const __THUMB_PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
 
     function __primeThumbVideoFrameAdmin(v) {
       if (!v || v.dataset.__primed === "1") return;
       v.dataset.__primed = "1";
+
+      __forceMute(v);
 
       const seekToThumbTime = () => {
         try {
@@ -1799,6 +1827,7 @@
         v.dataset.__painted = "1";
 
         try {
+          __forceMute(v);
           const p = v.play();
           if (p && typeof p.then === "function") {
             p.then(() => {
