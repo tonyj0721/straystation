@@ -1492,40 +1492,25 @@
         let __progressUploadedBytes = 0;
 
         for (const f of selectedFiles) {
-          const origType = (f && f.type) || "";
-          const isVid = origType.startsWith("video/");
-          let blobToUpload = f;
-          let type = origType;
-          let ext = "bin";
-
-          // 圖片：仍在前端加浮水印
-          if (!isVid) {
-            blobToUpload = await addWatermarkToFile(f);       // ← 圖片才加浮水印
-            type = blobToUpload.type || "";
-            if (type.startsWith("image/")) {
-              ext = type === "image/png" ? "png" : "jpg";
-            } else {
-              // fallback
-              ext = (f.name && f.name.split(".").pop()) || "bin";
-            }
-          } else {
-            // 影片：直接上傳原檔（不在前端轉檔/浮水印）
-            const byName = (f.name && f.name.split(".").pop()) || "";
-            if (byName) ext = byName.toLowerCase();
-            else if (type.includes("webm")) ext = "webm";
-            else if (type.includes("ogg")) ext = "ogg";
-            else if (type.includes("mp4") || type.includes("mpeg")) ext = "mp4";
-            else if (type.includes("quicktime")) ext = "mov";
-            else ext = "mp4";
+          const isVideo = (f?.type || '').startsWith('video/');
+          const blobToUpload = isVideo ? f : await addWatermarkToFile(f); // 圖片：前端浮水印；影片：直接上傳原檔
+          const type = (blobToUpload?.type || f?.type || '');
+          let ext = 'bin';
+          if (type.startsWith('image/')) {
+            ext = type === 'image/png' ? 'png' : 'jpg';
+          } else if (type.startsWith('video/')) {
+            if (type.includes('webm')) ext = 'webm';
+            else if (type.includes('ogg')) ext = 'ogg';
+            else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
+            else ext = 'mp4';
           }
-
-          const base = (f.name || "file").replace(/\.[^.]+$/, "");
-          const prefix = isVid ? "upload" : "pets";
-          const path = `${prefix}/${docRef.id}/${Date.now()}_${base}.${ext}`;
+          const base = (f.name || 'file').replace(/\.[^.]+$/, '');
+          const path = isVideo
+            ? `upload/${docRef.id}/${Date.now()}_${base}.${ext}`
+            : `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
           const r = sRef(storage, path);
-
           await new Promise((resolve, reject) => {
-            const task = uploadBytesResumable(r, blobToUpload, { contentType: type || "application/octet-stream" });
+            const task = uploadBytesResumable(r, blobToUpload, { contentType: type || 'application/octet-stream' });
             task.on("state_changed",
               (snap) => {
                 const base = __progressUploadedBytes || 0;
@@ -1535,14 +1520,14 @@
               },
               (err) => reject(err),
               () => {
-                __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || blobToUpload?.size || 0);
+                __progressUploadedBytes += (blobToUpload?.size || f?.size || 0);
                 prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
                 resolve();
               }
             );
           });
-
           urls.push(await getDownloadURL(r));
+        }
         }
 
         // 3) 回寫 images 欄位
