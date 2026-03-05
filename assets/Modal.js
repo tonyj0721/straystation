@@ -1202,7 +1202,6 @@ async function saveEdit() {
         });
         continue;
       }
-      }
     }
 
     // 刪除被移除的舊圖（忽略刪失敗）
