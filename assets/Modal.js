@@ -1218,7 +1218,7 @@ async function saveEdit() {
     // 刪除被移除的舊圖（忽略刪失敗）
     // 同步刪掉後端產生的縮圖：thumbs/<原路徑去副檔名>.jpg
     // 並清理 Firestore 的 thumbByPath 對應 key（避免越積越多）
-    const __thumbFieldDeletes = {};
+    const __thumbFieldDeletes = [];
     for (const url of (removeUrls || [])) {
       try {
         const enc = String(url).split("/o/")[1].split("?")[0];
@@ -1233,7 +1233,7 @@ async function saveEdit() {
           if (tPath) {
             try { await deleteObject(sRef(storage, tPath)); } catch (_) { /* ignore */ }
           }
-          __thumbFieldDeletes[`thumbByPath.${mediaPath}`] = deleteField();
+          __thumbFieldDeletes.push(new FieldPath("thumbByPath", mediaPath), deleteField());
         }
       } catch (e) {
         // 靜默忽略
@@ -1241,12 +1241,18 @@ async function saveEdit() {
     }
 
     newData.images = newUrls;
-    const __updatePayload = { ...newData, ...__thumbFieldDeletes };
 
     // ③ 寫回 Firestore
-    await updateDoc(doc(db, "pets", currentDocId), __updatePayload);
+    const docRef = doc(db, "pets", currentDocId);
 
-    // ⑤ UI 收尾（無論彈窗狀態，成功提示一下）
+    // 先更新一般欄位（包含 images）
+    await updateDoc(docRef, { ...newData });
+
+    // 再用 FieldPath 刪掉 thumbByPath 的 key（Storage path 含 .mp4 不能用字串 field path）
+    if (__thumbFieldDeletes.length) {
+      await updateDoc(docRef, ...__thumbFieldDeletes);
+    }
+// ⑤ UI 收尾（無論彈窗狀態，成功提示一下）
     prog.update(100);
     prog.stop({ text: "處理中...", keepDisabled: true });
     btn.disabled = true;
