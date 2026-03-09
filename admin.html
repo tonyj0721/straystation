@@ -1492,15 +1492,16 @@
         let __progressUploadedBytes = 0;
 
         for (const f of selectedFiles) {
-          const wmBlob = await addWatermarkToFile(f, {
-            onVideoProgress: createWatermarkProgressBridge(prog, { basePct: 0, rangePct: 75 })
-          });       // ← 新增：影片改由 FFmpeg WASM 浮水印並輸出 mp4
+          const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
           const type = wmBlob.type || '';
           let ext = 'bin';
           if (type.startsWith('image/')) {
             ext = type === 'image/png' ? 'png' : 'jpg';
           } else if (type.startsWith('video/')) {
-            ext = 'mp4';
+            if (type.includes('webm')) ext = 'webm';
+            else if (type.includes('ogg')) ext = 'ogg';
+            else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
+            else ext = 'mp4';
           }
           const base = f.name.replace(/\.[^.]+$/, '');
           const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
@@ -1511,14 +1512,13 @@
               (snap) => {
                 const base = __progressUploadedBytes || 0;
                 const now = base + (snap?.bytesTransferred || 0);
-                const uploadRatio = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) : 0;
-                const pct = 75 + (uploadRatio * 25);
+                const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
                 prog.update(pct);
               },
               (err) => reject(err),
               () => {
                 __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || wmBlob?.size || 0);
-                prog.update(75 + (((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) : 1) * 25));
+                prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
                 resolve();
               }
             );
@@ -2043,8 +2043,6 @@
     loadPets();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
   <script src="assets/Modal.js"></script>
   <script src="assets/Lightbox.js"></script>
   <script>
