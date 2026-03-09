@@ -24,6 +24,30 @@ function thumbPathFromMediaPath(mediaPath) {
   }
 }
 
+function __forceMute(v) {
+  if (!v) return;
+  v.muted = true;
+  v.defaultMuted = true;
+  v.volume = 0;
+  v.setAttribute("muted", "");
+  v.playsInline = true;
+  v.setAttribute("playsinline", "");
+  v.setAttribute("webkit-playsinline", "");
+  v.disablePictureInPicture = true;
+
+  if (!v.__muteLocked) {
+    v.__muteLocked = true;
+    v.addEventListener("volumechange", () => {
+      if (!v.muted || v.volume !== 0) {
+        v.muted = true;
+        v.defaultMuted = true;
+        v.volume = 0;
+        v.setAttribute("muted", "");
+      }
+    });
+  }
+}
+
 // ===============================
 // 影片縮圖：抓第一幀（不走 canvas，避免 CORS）
 // ===============================
@@ -50,6 +74,7 @@ function __primeThumbVideoFrame(v) {
     v.dataset.__painted = "1";
 
     try {
+      __forceMute(v);
       const p = v.play();
       if (p && typeof p.then === "function") {
         p.then(() => {
@@ -145,15 +170,112 @@ function __drawWatermarkPattern(g, W, H, text) {
   g.restore();
 }
 
-async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {}) {
+const __FFMPEG_VERSION = "0.12.10";
+const __FFMPEG_CORE_BASE = `https://cdn.jsdelivr.net/npm/@ffmpeg/core@${__FFMPEG_VERSION}/dist/umd`;
+const __FFMPEG_OUTPUT_MP4_MIME = "video/mp4";
+let __ffmpegLoadPromise = null;
+let __ffmpegInstance = null;
+let __ffmpegLoggerBound = false;
+let __ffmpegProgressHandler = null;
+
+function __getFFmpegGlobals() {
+  const ffmpegGlobal = window.FFmpegWASM || window.FFmpeg || null;
+  const utilGlobal = window.FFmpegUtil || null;
+  const FFmpegCtor = ffmpegGlobal?.FFmpeg || ffmpegGlobal;
+  const fetchFile = utilGlobal?.fetchFile;
+  const toBlobURL = utilGlobal?.toBlobURL;
+  if (!FFmpegCtor || typeof fetchFile !== "function" || typeof toBlobURL !== "function") {
+    throw new Error("FFmpeg WASM 尚未載入，請確認 admin.html 已加入 @ffmpeg/ffmpeg 與 @ffmpeg/util 腳本");
+  }
+  return { FFmpegCtor, fetchFile, toBlobURL };
+}
+
+async function __ensureFFmpegReady() {
+  if (__ffmpegInstance?.loaded) return __ffmpegInstance;
+  if (__ffmpegLoadPromise) return __ffmpegLoadPromise;
+
+  __ffmpegLoadPromise = (async () => {
+    const { FFmpegCtor, toBlobURL } = __getFFmpegGlobals();
+    const ffmpeg = __ffmpegInstance || new FFmpegCtor();
+
+    if (!__ffmpegLoggerBound && typeof ffmpeg.on === "function") {
+      ffmpeg.on("log", ({ message }) => {
+        try {
+          if (typeof __ffmpegProgressHandler === "function") {
+            const m = String(message || "");
+            const match = m.match(/time=(\d+):(\d+):(\d+(?:\.\d+)?)/);
+            if (match && Number.isFinite(ffmpeg.__inputDurationSec) && ffmpeg.__inputDurationSec > 0) {
+              const sec = (Number(match[1]) * 3600) + (Number(match[2]) * 60) + Number(match[3]);
+              const ratio = Math.max(0, Math.min(1, sec / ffmpeg.__inputDurationSec));
+              __ffmpegProgressHandler(ratio);
+            }
+          }
+        } catch (_) { }
+      });
+      __ffmpegLoggerBound = true;
+    }
+
+    await ffmpeg.load({
+      coreURL: await toBlobURL(`${__FFMPEG_CORE_BASE}/ffmpeg-core.js`, "text/javascript"),
+      wasmURL: await toBlobURL(`${__FFMPEG_CORE_BASE}/ffmpeg-core.wasm`, "application/wasm"),
+    });
+
+    __ffmpegInstance = ffmpeg;
+    return ffmpeg;
+  })();
+
+  try {
+    return await __ffmpegLoadPromise;
+  } finally {
+    __ffmpegLoadPromise = null;
+  }
+}
+
+async function __getVideoDurationSec(file) {
+  const src = URL.createObjectURL(file);
+  try {
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.src = src;
+    video.muted = true;
+    video.playsInline = true;
+
+    await new Promise((resolve, reject) => {
+      video.onloadedmetadata = () => resolve();
+      video.onerror = (e) => reject(e || new Error("載入影片資訊失敗"));
+    });
+
+    return Number.isFinite(video.duration) ? video.duration : 0;
+  } finally {
+    URL.revokeObjectURL(src);
+  }
+}
+
+async function __buildWatermarkOverlayFile({ width, height, text }) {
+  const c = document.createElement("canvas");
+  c.width = Math.max(2, Math.round(width || 1280));
+  c.height = Math.max(2, Math.round(height || 720));
+  const g = c.getContext("2d");
+  g.clearRect(0, 0, c.width, c.height);
+  __drawWatermarkPattern(g, c.width, c.height, text);
+  const blob = await new Promise((resolve) => c.toBlob(resolve, "image/png"));
+  if (!blob) throw new Error("建立影片浮水印失敗");
+  return new File([blob], "watermark-overlay.png", { type: "image/png" });
+}
+
+function __buildOutputMp4Name(file) {
+  const base = String(file?.name || "video").replace(/\.[^.]+$/, "");
+  return `${base}.mp4`;
+}
+
+async function addWatermarkToFile(file, { text = "台中簡媽媽狗園", onVideoProgress = null } = {}) {
   const type = (file && file.type) || "";
   if (type.startsWith("video/")) {
-    return await addWatermarkToVideo(file, { text });
+    return await addWatermarkToVideo(file, { text, onProgress: onVideoProgress });
   }
 
   const url = URL.createObjectURL(file);
   try {
-    // 讀圖 & 畫原圖
     const img = await new Promise((res, rej) => {
       const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = url;
     });
@@ -162,7 +284,6 @@ async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {})
     c.width = W; c.height = H;
     const g = c.getContext("2d");
     g.drawImage(img, 0, 0, W, H);
-
     __drawWatermarkPattern(g, W, H, text);
 
     const out = await new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
@@ -172,100 +293,129 @@ async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {})
   }
 }
 
-async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}) {
-  const testCanvas = document.createElement("canvas");
-  if (!testCanvas.captureStream || typeof MediaRecorder === "undefined") {
-    throw new Error("目前瀏覽器不支援影片浮水印（缺少 MediaRecorder 或 captureStream）");
+async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園", onProgress = null } = {}) {
+  const ffmpeg = await __ensureFFmpegReady();
+  const { fetchFile } = __getFFmpegGlobals();
+
+  const inputExt = (String(file?.name || "video").match(/\.([^.]+)$/)?.[1] || "mp4").toLowerCase();
+  const inputName = `input.${inputExt}`;
+  const overlayName = "watermark.png";
+  const outputName = "output.mp4";
+
+  const infoSrc = URL.createObjectURL(file);
+  let videoWidth = 1280;
+  let videoHeight = 720;
+  try {
+    const v = document.createElement("video");
+    v.preload = "metadata";
+    v.src = infoSrc;
+    await new Promise((resolve, reject) => {
+      v.onloadedmetadata = () => resolve();
+      v.onerror = (e) => reject(e || new Error("載入影片資訊失敗"));
+    });
+    videoWidth = v.videoWidth || videoWidth;
+    videoHeight = v.videoHeight || videoHeight;
+  } finally {
+    URL.revokeObjectURL(infoSrc);
   }
 
-  const src = URL.createObjectURL(file);
+  const overlayFile = await __buildWatermarkOverlayFile({ width: videoWidth, height: videoHeight, text });
+  ffmpeg.__inputDurationSec = await __getVideoDurationSec(file);
+  __ffmpegProgressHandler = (ratio) => {
+    if (typeof onProgress === "function") onProgress(Math.max(0, Math.min(1, ratio)));
+  };
+
   try {
-    const video = document.createElement("video");
-    video.src = src;
-    video.muted = true;
-    video.playsInline = true;
-    video.crossOrigin = "anonymous";
+    if (typeof onProgress === "function") onProgress(0.02);
 
-    await new Promise((res, rej) => {
-      video.onloadedmetadata = () => res();
-      video.onerror = (e) => rej(e || new Error("載入影片失敗"));
-    });
+    for (const name of [inputName, overlayName, outputName]) {
+      try { await ffmpeg.deleteFile(name); } catch (_) { }
+    }
 
-    const W = video.videoWidth || 1280;
-    const H = video.videoHeight || 720;
+    await ffmpeg.writeFile(inputName, await fetchFile(file));
+    await ffmpeg.writeFile(overlayName, await fetchFile(overlayFile));
 
-    const canvas = document.createElement("canvas");
-    canvas.width = W;
-    canvas.height = H;
-    const g = canvas.getContext("2d");
+    if (typeof onProgress === "function") onProgress(0.08);
 
-    const stream = canvas.captureStream();
-    try {
-      if (video.captureStream) {
-        const vStream = video.captureStream();
-        vStream.getAudioTracks().forEach((track) => stream.addTrack(track));
+    const attempts = [
+      [
+        "-i", inputName,
+        "-i", overlayName,
+        "-filter_complex", "overlay=0:0:format=auto",
+        "-map", "0:v:0",
+        "-map", "0:a?",
+        "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",
+        "-preset", "veryfast",
+        "-crf", "23",
+        "-c:a", "aac",
+        "-b:a", "128k",
+        "-movflags", "+faststart",
+        "-shortest",
+        outputName,
+      ],
+      [
+        "-i", inputName,
+        "-i", overlayName,
+        "-filter_complex", "overlay=0:0:format=auto",
+        "-map", "0:v:0",
+        "-map", "0:a?",
+        "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",
+        "-preset", "veryfast",
+        "-crf", "23",
+        "-c:a", "copy",
+        "-movflags", "+faststart",
+        "-shortest",
+        outputName,
+      ],
+      [
+        "-i", inputName,
+        "-i", overlayName,
+        "-filter_complex", "overlay=0:0:format=auto",
+        "-map", "0:v:0",
+        "-map", "0:a?",
+        "-c:v", "mpeg4",
+        "-q:v", "5",
+        "-c:a", "aac",
+        "-b:a", "128k",
+        "-movflags", "+faststart",
+        "-shortest",
+        outputName,
+      ],
+    ];
+
+    let lastErr = null;
+    for (const args of attempts) {
+      try {
+        await ffmpeg.exec(args);
+        lastErr = null;
+        break;
+      } catch (err) {
+        lastErr = err;
+        try { await ffmpeg.deleteFile(outputName); } catch (_) { }
       }
-    } catch (_) {
-      // audio 失敗可以忽略，至少保留畫面
     }
+    if (lastErr) throw lastErr;
 
-    const chunks = [];
-    const canUseVP9 = typeof MediaRecorder !== "undefined" &&
-      MediaRecorder.isTypeSupported("video/webm;codecs=vp9");
-    const canUseVP8 = typeof MediaRecorder !== "undefined" &&
-      MediaRecorder.isTypeSupported("video/webm;codecs=vp8");
+    if (typeof onProgress === "function") onProgress(0.98);
 
-    const mime = canUseVP9
-      ? "video/webm;codecs=vp9"
-      : (canUseVP8 ? "video/webm;codecs=vp8" : "video/webm");
-
-    const recorder = new MediaRecorder(stream, { mimeType: mime });
-    recorder.ondataavailable = (e) => {
-      if (e.data && e.data.size > 0) chunks.push(e.data);
-    };
-    const finished = new Promise((resolve) => {
-      recorder.onstop = () => resolve();
+    const data = await ffmpeg.readFile(outputName);
+    const uint8 = data instanceof Uint8Array ? data : new Uint8Array(data?.buffer || data);
+    const copied = uint8.slice();
+    return new File([copied], __buildOutputMp4Name(file), {
+      type: __FFMPEG_OUTPUT_MP4_MIME,
+      lastModified: Date.now(),
     });
-
-    recorder.start();
-
-    const useRVFC = typeof video.requestVideoFrameCallback === "function";
-
-    function drawFrame() {
-      g.clearRect(0, 0, W, H);
-      g.drawImage(video, 0, 0, W, H);
-      __drawWatermarkPattern(g, W, H, text);
-    }
-
-    if (useRVFC) {
-      const cb = () => {
-        if (video.paused || video.ended) return;
-        drawFrame();
-        video.requestVideoFrameCallback(cb);
-      };
-      video.requestVideoFrameCallback(cb);
-    } else {
-      const t = setInterval(() => {
-        if (video.paused || video.ended) {
-          clearInterval(t);
-          return;
-        }
-        drawFrame();
-      }, 40);
-    }
-
-    await video.play();
-    await new Promise((res) => { video.onended = () => res(); });
-
-    recorder.stop();
-    await finished;
-
-    const blob = new Blob(chunks, { type: mime });
-    const ext = ".webm";
-    const name = (file.name || "video").replace(/\.[^.]+$/, ext);
-    return new File([blob], name, { type: mime });
+  } catch (err) {
+    console.error("FFmpeg WASM 影片浮水印失敗：", err);
+    throw new Error(`影片浮水印失敗：${err?.message || err}`);
   } finally {
-    URL.revokeObjectURL(src);
+    __ffmpegProgressHandler = null;
+    ffmpeg.__inputDurationSec = 0;
+    for (const name of [inputName, overlayName, outputName]) {
+      try { await ffmpeg.deleteFile(name); } catch (_) { }
+    }
   }
 }
 
@@ -317,6 +467,7 @@ async function __decodeToBitmap(file) {
     const vUrl = URL.createObjectURL(file);
     try {
       const v = document.createElement("video");
+      __forceMute(v);
       v.preload = "metadata";
       v.src = vUrl;
       v.muted = true;
@@ -374,6 +525,7 @@ async function __decodeToBitmap(file) {
 
       // iOS 有時仍然黑畫面：試著「靜音播放一下再暫停」逼出 frame
       try {
+        __forceMute(v);
         await v.play();
         v.pause();
       } catch (_) { /* ignore */ }
@@ -614,7 +766,16 @@ function startProgressBar(btn, opts = {}) {
   return { update, stop };
 }
 
-// 用 nameLower / name 檢查是否重複；exceptId 表示忽略自己（編輯時用） / name 檢查是否重複；exceptId 表示忽略自己（編輯時用）
+function createWatermarkProgressBridge(prog, { basePct = 0, rangePct = 100 } = {}) {
+  return (ratio) => {
+    if (!prog || typeof prog.update !== "function") return;
+    const r = Number.isFinite(Number(ratio)) ? Number(ratio) : 0;
+    const pct = basePct + (Math.max(0, Math.min(1, r)) * rangePct);
+    prog.update(pct);
+  };
+}
+
+// 用 nameLower / name 檢查是否重複；exceptId 表示忽略自己（編輯時用）
 async function isNameTaken(name, exceptId = null) {
   const kw = (name || "").trim().toLowerCase();
   if (!kw) return false;
@@ -644,84 +805,6 @@ async function isNameTaken(name, exceptId = null) {
 let currentDocId = null;
 let currentDoc = null;
 
-
-// ===============================
-// 浮水印處理：避免短時間看到「未浮水印」
-//  - mediaReady: false 表示後端還在覆蓋浮水印檔
-//  - wmPending:  待處理的 Storage paths（前端先寫進 Firestore；後端處理完會逐一移除）
-// ===============================
-function __hasMediaForWatermark(p) {
-  const media = (Array.isArray(p?.images) && p.images.length > 0)
-    ? p.images
-    : (p?.image ? [p.image] : []);
-  return media.length > 0;
-}
-
-function __renderProcessingState(p = null) {
-  const dlgImg = document.getElementById("dlgImg");
-  const dlgVideo = document.getElementById("dlgVideo");
-  const dlgBg = document.getElementById("dlgBg");
-  const dlgThumbs = document.getElementById("dlgThumbs");
-  const dlgHint = document.getElementById("dlgHint");
-  const dlgStageWrap = document.getElementById("dlgStageWrap");
-
-  // 媒體區先清空，避免看到未浮水印 / 也避免殘留上一筆
-  if (dlgHint) dlgHint.textContent = "浮水印處理中，請稍候…";
-  if (dlgThumbs) dlgThumbs.innerHTML = "";
-
-  if (dlgBg) dlgBg.removeAttribute("src");
-
-  if (dlgImg) {
-    dlgImg.src = "";
-    dlgImg.classList.add("hidden");
-  }
-
-  if (dlgVideo) {
-    try { dlgVideo.pause(); } catch (_) { }
-    dlgVideo.src = "";
-    dlgVideo.classList.add("hidden");
-  }
-
-  if (dlgStageWrap) dlgStageWrap.classList.remove("dlg-video-mode");
-
-  // 文字區：先把這筆的基本資料填上（避免畫面看起來「怪/全空」）
-  try {
-    if (p) {
-      document.getElementById('dlgName').textContent = p.name ?? "—";
-      document.getElementById('dlgDesc').textContent = p.desc ?? "";
-      document.getElementById('dlgTagBreed').textContent = p.breed ?? "";
-      document.getElementById('dlgTagAge').textContent = p.age ?? "";
-      document.getElementById('dlgTagGender').textContent = p.gender ?? "";
-
-      const isNeutered = !!p.neutered;
-      const isVaccinated = !!p.vaccinated;
-      document.getElementById('dlgTagNeutered').textContent = isNeutered ? '已結紮' : '未結紮';
-      document.getElementById('dlgTagVaccinated').textContent = isVaccinated ? '已注射預防針' : '未注射預防針';
-    }
-  } catch (_) { /* ignore */ }
-}
-
-async function __waitPetMediaReady(petId, { maxTries = 120, intervalMs = 800 } = {}) {
-  for (let i = 0; i < maxTries; i++) {
-    const snap = await getDoc(doc(db, "pets", petId));
-    if (!snap.exists()) return null;
-    const data = snap.data() || {};
-    const p = { id: snap.id, ...data };
-
-    // 沒有媒體 → 不用等
-    if (!__hasMediaForWatermark(p)) return p;
-
-    // mediaReady !== false 視為已就緒（包含 undefined / true）
-    if (p.mediaReady !== false) return p;
-
-    await new Promise((r) => setTimeout(r, intervalMs));
-  }
-
-  // 超時：回傳最後一次資料（避免永遠卡住）
-  const snap = await getDoc(doc(db, "pets", petId));
-  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
-}
-
 // 開啟 + 渲染 + 編輯預填，全部合併在這一支
 async function openDialog(id) {
   // 1. 先拿資料：先從 pets 找，沒有就去 Firestore 抓一次
@@ -739,24 +822,6 @@ async function openDialog(id) {
       return;
     }
   }
-
-
-  // 1.5 若媒體還在後端浮水印處理：先顯示「處理中」並等待（避免看到未浮水印）
-  if (__hasMediaForWatermark(p) && p.mediaReady === false) {
-    const dlg = document.getElementById("petDialog");
-    if (dlg && !dlg.open) {
-      __lockDialogScroll();
-      dlg.showModal();
-    }
-    __renderProcessingState(p);
-    const latest = await __waitPetMediaReady(id);
-    if (!latest) {
-      await swalInDialog({ icon: "error", title: "找不到這筆資料" });
-      return;
-    }
-    p = latest;
-  }
-
 
   // 2. 共用狀態 + URL
   currentDoc = p;
@@ -1218,56 +1283,6 @@ async function saveEdit() {
     const __progressTotalBytes = __filesForProgress.reduce((s, it) => s + (it.file?.size || 0), 0) || 1;
     let __progressUploadedBytes = 0;
 
-
-
-    // 先把「要刪除的舊圖」轉成 Storage paths（順便用於清理 wmPending）
-    const removedPaths = [];
-    for (const url of (removeUrls || [])) {
-      try {
-        const enc = String(url).split("/o/")[1].split("?")[0];
-        const mediaPath = decodeURIComponent(enc);
-        removedPaths.push(mediaPath);
-      } catch (_) { }
-    }
-
-    // 先把本次新增檔案的 Storage path 算好，並先寫回 Firestore（避免後端處理比 images 更新更早完成）
-    const pendingPaths = [];
-    for (const it of items) {
-      if (it.kind !== "file") continue;
-      const f = it.file;
-      const type = (f && f.type) || "";
-      let ext = "bin";
-      if (type.startsWith("image/")) ext = "jpg";
-      else if (type.startsWith("video/")) ext = "mp4";
-
-      const base = (f && f.name ? f.name : "file").replace(/\.[^.]+$/, "");
-      const pth = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
-      it.__uploadPath = pth;
-      it.__uploadType = type;
-      pendingPaths.push(pth);
-    }
-
-    // 同步計算下一版 wmPending（移除被刪除的舊圖 + 加入本次新增的檔案）
-    let nextPending = Array.isArray(currentDoc?.wmPending) ? currentDoc.wmPending.slice() : [];
-    if (removedPaths.length && nextPending.length) {
-      nextPending = nextPending.filter((p) => !removedPaths.includes(p));
-    }
-    if (pendingPaths.length) {
-      nextPending = Array.from(new Set([...nextPending, ...pendingPaths]));
-      // 先寫回「處理中」狀態（重要：在 upload 前先寫，避免 race）
-      await updateDoc(doc(db, "pets", currentDocId), { mediaReady: false, wmPending: nextPending });
-      currentDoc = { ...(currentDoc || {}), mediaReady: false, wmPending: nextPending };
-    } else if (!items.length) {
-      // 沒有任何媒體 → 直接標記 ready
-      await updateDoc(doc(db, "pets", currentDocId), { mediaReady: true, wmPending: [] });
-      currentDoc = { ...(currentDoc || {}), mediaReady: true, wmPending: [] };
-      nextPending = [];
-    } else if (removedPaths.length) {
-      // 只有刪除 → 清掉 pending 裡對應的 path（避免卡住）
-      await updateDoc(doc(db, "pets", currentDocId), { wmPending: nextPending });
-      currentDoc = { ...(currentDoc || {}), wmPending: nextPending };
-    }
-
     // 依序處理（保持順序）
     for (const it of items) {
       if (it.kind === "url") {
@@ -1277,32 +1292,35 @@ async function saveEdit() {
 
       if (it.kind === "file") {
         const f = it.file;
-        // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
-        const type = it.__uploadType || (f && f.type) || '';
-        const path = it.__uploadPath;
-        const r = sRef(storage, path);
-
-        // 進度：只計算本次新增的 file
-        // 若 totalBytes 無法取得（極少數情況），用 1 避免除以 0
-        if (typeof __progressTotalBytes === "number" && __progressTotalBytes > 0) {
-          // noop
+        const wmBlob = await addWatermarkToFile(f, {
+        onVideoProgress: createWatermarkProgressBridge(prog, { basePct: 0, rangePct: 75 })
+      });       // ← 新增：影片改由 FFmpeg WASM 浮水印並輸出 mp4
+        const type = wmBlob.type || '';
+        let ext = 'bin';
+        if (type.startsWith('image/')) {
+          ext = type === 'image/png' ? 'png' : 'jpg';
+        } else if (type.startsWith('video/')) {
+          ext = 'mp4';
         }
-
+        const base = f.name.replace(/\.[^.]+$/, '');
+        const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
+        const r = sRef(storage, path);
         await new Promise((resolve, reject) => {
-          const task = uploadBytesResumable(r, f, { contentType: type || 'application/octet-stream' });
+          const task = uploadBytesResumable(r, wmBlob, { contentType: wmBlob.type || 'application/octet-stream' });
           task.on("state_changed",
             (snap) => {
               const base = __progressUploadedBytes || 0;
               const now = base + (snap?.bytesTransferred || 0);
-              const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
+              const uploadRatio = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) : 0;
+              const pct = 75 + (uploadRatio * 25);
               prog.update(pct);
             },
             (err) => reject(err),
             async () => {
               try {
                 // 完成一檔：累加已完成 bytes
-                __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || f.size || 0);
-                prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
+                __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || wmBlob?.size || 0);
+                prog.update(75 + (((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) : 1) * 25));
                 resolve();
               } catch (e) {
                 reject(e);
@@ -1310,12 +1328,9 @@ async function saveEdit() {
             }
           );
         });
-
         newUrls.push(await getDownloadURL(r));
       }
     }
-
-
 
     // 刪除被移除的舊圖（忽略刪失敗）
     // 同步刪掉後端產生的縮圖：thumbs/<原路徑去副檔名>.jpg
@@ -1344,17 +1359,6 @@ async function saveEdit() {
 
     newData.images = newUrls;
     const __updatePayload = { ...newData, ...__thumbFieldDeletes };
-    // 浮水印 gating：本次有新增媒體 → mediaReady=false；若已無媒體 → mediaReady=true；其餘只同步 wmPending
-    if (typeof pendingPaths !== "undefined" && pendingPaths.length) {
-      __updatePayload.mediaReady = false;
-      __updatePayload.wmPending = nextPending;
-    } else if (newUrls.length === 0) {
-      __updatePayload.mediaReady = true;
-      __updatePayload.wmPending = [];
-    } else if (typeof removedPaths !== "undefined" && removedPaths.length) {
-      __updatePayload.wmPending = nextPending;
-    }
-
 
     // ③ 寫回 Firestore
     await updateDoc(doc(db, "pets", currentDocId), __updatePayload);
@@ -1368,71 +1372,27 @@ async function saveEdit() {
     const wasOpen = dlg.open;
     if (wasOpen) dlg.close();
 
-    if (pendingPaths.length) {
-      Swal.fire({
-        icon: "info",
-        title: "浮水印處理中…",
-        text: "處理完成後才會顯示在列表，並自動開啟詳情。",
-        allowOutsideClick: false,
-        allowEscapeKey: false,
-        showConfirmButton: false,
-        didOpen: () => {
-          Swal.showLoading();
-        },
-        returnFocus: false,
-      });
+    const reloadPromise = loadPets();
 
-      try {
-        await __waitPetMediaReady(currentDocId);
-      } catch (e) {
-        console.error("waitPetMediaReady error:", e);
-      }
-
-      // 完成後才載入列表
-      try {
-        await loadPets();
-      } catch (e) {
-        console.error("loadPets error:", e);
-      }
-
-      currentDoc = { ...currentDoc, ...newData, mediaReady: (__updatePayload.mediaReady ?? currentDoc?.mediaReady), wmPending: (__updatePayload.wmPending ?? currentDoc?.wmPending) };
-
-      Swal.close();
-
-      await Swal.fire({
-        icon: "success",
-        title: "已更新",
-        showConfirmButton: false,
-        timer: 1500,
-        returnFocus: false,
-      });
-      if (wasOpen) { __lockDialogScroll(); dlg.showModal(); }
-      setEditMode(false);
-      await openDialog(currentDocId);
-
-    } else {
-      // 沒有媒體：直接更新列表與提示
-      const reloadPromise = loadPets();
-
-      await Swal.fire({
-        icon: "success",
-        title: "已更新",
-        showConfirmButton: false,
-        timer: 1500,
-        returnFocus: false,
-      });
-      try {
-        await reloadPromise;
-      } catch (e) {
-        console.error("loadPets error:", e);
-      }
-
-      currentDoc = { ...currentDoc, ...newData, mediaReady: (__updatePayload.mediaReady ?? currentDoc?.mediaReady), wmPending: (__updatePayload.wmPending ?? currentDoc?.wmPending) };
-
-      if (wasOpen) { __lockDialogScroll(); dlg.showModal(); }
-      setEditMode(false);
-      await openDialog(currentDocId);
+    await Swal.fire({
+      icon: "success",
+      title: "已更新",
+      showConfirmButton: false,
+      timer: 1500,
+      returnFocus: false,
+    });
+    try {
+      await reloadPromise;
+    } catch (e) {
+      console.error("loadPets error:", e);
     }
+
+    currentDoc = { ...currentDoc, ...newData };
+
+    if (wasOpen) { __lockDialogScroll(); dlg.showModal(); }
+    setEditMode(false);
+    await openDialog(currentDocId);
+
   } catch (err) {
     // 失敗也要確保 UI 復原
     await swalInDialog({
@@ -1521,12 +1481,7 @@ const __PAUSE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4
 
 async function __safePlayVideo(v) {
   try {
-    await v.play();
-    return;
-  } catch (_) { }
-  // iOS / 部分瀏覽器可能需要先靜音才允許播放（至少先讓預覽能播）
-  try {
-    v.muted = true;
+    __forceMute(v);
     await v.play();
   } catch (e) {
     console.warn('video play failed:', e);
@@ -2128,54 +2083,38 @@ async function onConfirmAdopted() {
   let __progressUploadedBytes = 0;
 
   try {
-
-    const plans = [];
-    const pendingPaths = [];
-
-    // 先算出這次要上傳的 Storage paths，並先寫回 Firestore（避免 race）
     for (const f of files) {
-      const type = (f && f.type) || '';
+      const wmBlob = await addWatermarkToFile(f, {
+        onVideoProgress: createWatermarkProgressBridge(prog, { basePct: 0, rangePct: 75 })
+      });       // ← 新增：影片改由 FFmpeg WASM 浮水印並輸出 mp4
+      const type = wmBlob.type || '';
       let ext = 'bin';
-      if (type.startsWith('image/')) ext = 'jpg';
-      else if (type.startsWith('video/')) ext = 'mp4';
-
-      const base = (f && f.name ? f.name : 'file').replace(/\.[^.]+$/, '');
+      if (type.startsWith('image/')) {
+        ext = type === 'image/png' ? 'png' : 'jpg';
+      } else if (type.startsWith('video/')) {
+          ext = 'mp4';
+        }
+      const base = f.name.replace(/\.[^.]+$/, '');
       const path = `adopted/${currentDocId}/${Date.now()}_${base}.${ext}`;
-
-      plans.push({ f, type, path });
-      pendingPaths.push(path);
-    }
-
-    const prevPending = Array.isArray(currentDoc?.wmPending) ? currentDoc.wmPending : [];
-    const nextPending = pendingPaths.length
-      ? Array.from(new Set([...prevPending, ...pendingPaths]))
-      : prevPending;
-
-    if (pendingPaths.length) {
-      await updateDoc(doc(db, "pets", currentDocId), { mediaReady: false, wmPending: nextPending });
-      currentDoc = { ...(currentDoc || {}), mediaReady: false, wmPending: nextPending };
-    }
-
-    for (const pl of plans) {
-      const r = sRef(storage, pl.path);
+      const r = sRef(storage, path);
       await new Promise((resolve, reject) => {
-        const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
+        const task = uploadBytesResumable(r, wmBlob, { contentType: wmBlob.type || 'application/octet-stream' });
         task.on("state_changed",
           (snap) => {
             const base = __progressUploadedBytes || 0;
             const now = base + (snap?.bytesTransferred || 0);
-            const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
+            const uploadRatio = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) : 0;
+              const pct = 75 + (uploadRatio * 25);
             prog.update(pct);
           },
           (err) => reject(err),
           () => {
-            __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || pl.f?.size || 0);
-            prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
+            __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || wmBlob?.size || 0);
+            prog.update(75 + (((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) : 1) * 25));
             resolve();
           }
         );
       });
-
       urls.push(await getDownloadURL(r));
     }
 
@@ -2187,9 +2126,6 @@ async function onConfirmAdopted() {
       showOnCats: false,
       showOnDogs: false,
       showOnIndex: false,
-      // 浮水印處理狀態
-      mediaReady: pendingPaths.length ? false : true,
-      wmPending: pendingPaths.length ? nextPending : [],
     });
 
     prog.update(100);
@@ -2202,65 +2138,24 @@ async function onConfirmAdopted() {
     const dlg = document.getElementById("petDialog");
     if (dlg?.open) dlg.close();
 
-    if (pendingPaths.length) {
-      Swal.fire({
-        icon: "info",
-        title: "浮水印處理中…",
-        text: "處理完成後才會顯示在列表。",
-        allowOutsideClick: false,
-        allowEscapeKey: false,
-        showConfirmButton: false,
-        didOpen: () => {
-          Swal.showLoading();
-        },
-        returnFocus: false,
-      });
+    const reloadPromise = loadPets();
 
-      try {
-        await __waitPetMediaReady(currentDocId);
-      } catch (e) {
-        console.error("waitPetMediaReady error:", e);
-      }
-
-      // 完成後才載入列表
-      try {
-        await loadPets();
-      } catch (e) {
-        console.error("loadPets error:", e);
-      }
-
-      Swal.close();
-
-      await Swal.fire({
-        icon: "success",
-        title: "已標記為「已送養」",
-        showConfirmButton: false,
-        timer: 1500,
-        returnFocus: false,
-      });
-
-      resetAdoptedSelection();
-    } else {
-      // 沒有媒體：直接更新列表與提示
-      const reloadPromise = loadPets();
-
-      // 用全域 Swal（不在 dialog 裡），所以關掉 modal 也看得到
-      await Swal.fire({
-        icon: "success",
-        title: "已標記為「已送養」",
-        showConfirmButton: false,
-        timer: 1500,
-        returnFocus: false,
-      });
-      try {
-        await reloadPromise;
-      } catch (e) {
-        console.error("loadPets error:", e);
-      }
-
-      // 清空已領養選取（保險起見，關閉時通常也會清）
-      resetAdoptedSelection();
+    // 用全域 Swal（不在 dialog 裡），所以關掉 modal 也看得到
+    await Swal.fire({
+      icon: "success",
+      title: "已標記為「已送養」",
+      showConfirmButton: false,
+      timer: 1500,
+      returnFocus: false,
+    });
+    try {
+      await reloadPromise;
+    } catch (e) {
+      console.error("loadPets error:", e);
     }
+
+    // 清空已領養選取（保險起見，關閉時通常也會清）
+    resetAdoptedSelection();
   } catch (err) {
     await swalInDialog({ icon: "error", title: "已送養標記失敗", text: err.message });
   } finally {
@@ -2297,8 +2192,6 @@ async function onUnadopt() {
       status: "available",
       adoptedAt: deleteField(),
       adoptedPhotos: [],
-      mediaReady: true,
-      wmPending: [],
       showOnHome: false,
       showOnCats: true,
       showOnDogs: true,
