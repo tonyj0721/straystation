@@ -170,112 +170,15 @@ function __drawWatermarkPattern(g, W, H, text) {
   g.restore();
 }
 
-const __FFMPEG_VERSION = "0.12.10";
-const __FFMPEG_CORE_BASE = `https://cdn.jsdelivr.net/npm/@ffmpeg/core@${__FFMPEG_VERSION}/dist/umd`;
-const __FFMPEG_OUTPUT_MP4_MIME = "video/mp4";
-let __ffmpegLoadPromise = null;
-let __ffmpegInstance = null;
-let __ffmpegLoggerBound = false;
-let __ffmpegProgressHandler = null;
-
-function __getFFmpegGlobals() {
-  const ffmpegGlobal = window.FFmpegWASM || window.FFmpeg || null;
-  const utilGlobal = window.FFmpegUtil || null;
-  const FFmpegCtor = ffmpegGlobal?.FFmpeg || ffmpegGlobal;
-  const fetchFile = utilGlobal?.fetchFile;
-  const toBlobURL = utilGlobal?.toBlobURL;
-  if (!FFmpegCtor || typeof fetchFile !== "function" || typeof toBlobURL !== "function") {
-    throw new Error("FFmpeg WASM 尚未載入，請確認 admin.html 已加入 @ffmpeg/ffmpeg 與 @ffmpeg/util 腳本");
-  }
-  return { FFmpegCtor, fetchFile, toBlobURL };
-}
-
-async function __ensureFFmpegReady() {
-  if (__ffmpegInstance?.loaded) return __ffmpegInstance;
-  if (__ffmpegLoadPromise) return __ffmpegLoadPromise;
-
-  __ffmpegLoadPromise = (async () => {
-    const { FFmpegCtor, toBlobURL } = __getFFmpegGlobals();
-    const ffmpeg = __ffmpegInstance || new FFmpegCtor();
-
-    if (!__ffmpegLoggerBound && typeof ffmpeg.on === "function") {
-      ffmpeg.on("log", ({ message }) => {
-        try {
-          if (typeof __ffmpegProgressHandler === "function") {
-            const m = String(message || "");
-            const match = m.match(/time=(\d+):(\d+):(\d+(?:\.\d+)?)/);
-            if (match && Number.isFinite(ffmpeg.__inputDurationSec) && ffmpeg.__inputDurationSec > 0) {
-              const sec = (Number(match[1]) * 3600) + (Number(match[2]) * 60) + Number(match[3]);
-              const ratio = Math.max(0, Math.min(1, sec / ffmpeg.__inputDurationSec));
-              __ffmpegProgressHandler(ratio);
-            }
-          }
-        } catch (_) { }
-      });
-      __ffmpegLoggerBound = true;
-    }
-
-    await ffmpeg.load({
-      coreURL: await toBlobURL(`${__FFMPEG_CORE_BASE}/ffmpeg-core.js`, "text/javascript"),
-      wasmURL: await toBlobURL(`${__FFMPEG_CORE_BASE}/ffmpeg-core.wasm`, "application/wasm"),
-    });
-
-    __ffmpegInstance = ffmpeg;
-    return ffmpeg;
-  })();
-
-  try {
-    return await __ffmpegLoadPromise;
-  } finally {
-    __ffmpegLoadPromise = null;
-  }
-}
-
-async function __getVideoDurationSec(file) {
-  const src = URL.createObjectURL(file);
-  try {
-    const video = document.createElement("video");
-    video.preload = "metadata";
-    video.src = src;
-    video.muted = true;
-    video.playsInline = true;
-
-    await new Promise((resolve, reject) => {
-      video.onloadedmetadata = () => resolve();
-      video.onerror = (e) => reject(e || new Error("載入影片資訊失敗"));
-    });
-
-    return Number.isFinite(video.duration) ? video.duration : 0;
-  } finally {
-    URL.revokeObjectURL(src);
-  }
-}
-
-async function __buildWatermarkOverlayFile({ width, height, text }) {
-  const c = document.createElement("canvas");
-  c.width = Math.max(2, Math.round(width || 1280));
-  c.height = Math.max(2, Math.round(height || 720));
-  const g = c.getContext("2d");
-  g.clearRect(0, 0, c.width, c.height);
-  __drawWatermarkPattern(g, c.width, c.height, text);
-  const blob = await new Promise((resolve) => c.toBlob(resolve, "image/png"));
-  if (!blob) throw new Error("建立影片浮水印失敗");
-  return new File([blob], "watermark-overlay.png", { type: "image/png" });
-}
-
-function __buildOutputMp4Name(file) {
-  const base = String(file?.name || "video").replace(/\.[^.]+$/, "");
-  return `${base}.mp4`;
-}
-
-async function addWatermarkToFile(file, { text = "台中簡媽媽狗園", onVideoProgress = null } = {}) {
+async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {}) {
   const type = (file && file.type) || "";
   if (type.startsWith("video/")) {
-    return await addWatermarkToVideo(file, { text, onProgress: onVideoProgress });
+    return await addWatermarkToVideo(file, { text });
   }
 
   const url = URL.createObjectURL(file);
   try {
+    // 讀圖 & 畫原圖
     const img = await new Promise((res, rej) => {
       const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = url;
     });
@@ -284,6 +187,7 @@ async function addWatermarkToFile(file, { text = "台中簡媽媽狗園", onVide
     c.width = W; c.height = H;
     const g = c.getContext("2d");
     g.drawImage(img, 0, 0, W, H);
+
     __drawWatermarkPattern(g, W, H, text);
 
     const out = await new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
@@ -293,126 +197,133 @@ async function addWatermarkToFile(file, { text = "台中簡媽媽狗園", onVide
   }
 }
 
-async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園", onProgress = null } = {}) {
-  const ffmpeg = await __ensureFFmpegReady();
-  const { fetchFile } = __getFFmpegGlobals();
+const __FFMPEG_VERSION = "0.12.10";
+const __FFMPEG_CORE_BASE = `https://cdn.jsdelivr.net/npm/@ffmpeg/core@${__FFMPEG_VERSION}/dist/esm`;
+let __ffmpegInstance = null;
+let __ffmpegLoadPromise = null;
 
-  const inputExt = (String(file?.name || "video").match(/\.([^.]+)$/)?.[1] || "mp4").toLowerCase();
+async function __toBlobURL(url, mimeType) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`載入 FFmpeg 核心失敗：${res.status}`);
+  const buf = await res.arrayBuffer();
+  const blob = new Blob([buf], { type: mimeType });
+  return URL.createObjectURL(blob);
+}
+
+async function __ensureFFmpeg() {
+  if (__ffmpegInstance) return __ffmpegInstance;
+  if (__ffmpegLoadPromise) return __ffmpegLoadPromise;
+
+  __ffmpegLoadPromise = (async () => {
+    if (typeof SharedArrayBuffer === "undefined") {
+      throw new Error("目前環境無法使用 FFmpeg WASM，請確認站台已啟用 cross-origin isolation（COOP/COEP）。");
+    }
+
+    const mod = await import(`https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@${__FFMPEG_VERSION}/+esm`);
+    const ffmpeg = new mod.FFmpeg();
+
+    const [coreURL, wasmURL, workerURL] = await Promise.all([
+      __toBlobURL(`${__FFMPEG_CORE_BASE}/ffmpeg-core.js`, "text/javascript"),
+      __toBlobURL(`${__FFMPEG_CORE_BASE}/ffmpeg-core.wasm`, "application/wasm"),
+      __toBlobURL(`${__FFMPEG_CORE_BASE}/ffmpeg-core.worker.js`, "text/javascript"),
+    ]);
+
+    try {
+      await ffmpeg.load({ coreURL, wasmURL, workerURL });
+    } finally {
+      try { URL.revokeObjectURL(coreURL); } catch (_) { }
+      try { URL.revokeObjectURL(wasmURL); } catch (_) { }
+      try { URL.revokeObjectURL(workerURL); } catch (_) { }
+    }
+
+    __ffmpegInstance = ffmpeg;
+    return ffmpeg;
+  })();
+
+  try {
+    return await __ffmpegLoadPromise;
+  } catch (err) {
+    __ffmpegLoadPromise = null;
+    throw err;
+  }
+}
+
+async function __fileToUint8Array(file) {
+  return new Uint8Array(await file.arrayBuffer());
+}
+
+async function __makeWatermarkOverlayPng(videoFile, text) {
+  const src = URL.createObjectURL(videoFile);
+  try {
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.muted = true;
+    video.playsInline = true;
+    video.crossOrigin = "anonymous";
+    video.src = src;
+
+    await new Promise((res, rej) => {
+      video.onloadedmetadata = () => res();
+      video.onerror = (e) => rej(e || new Error("載入影片失敗"));
+    });
+
+    const W = video.videoWidth || 1280;
+    const H = video.videoHeight || 720;
+    const c = document.createElement("canvas");
+    c.width = W;
+    c.height = H;
+    const g = c.getContext("2d");
+    g.clearRect(0, 0, W, H);
+    __drawWatermarkPattern(g, W, H, text);
+
+    const blob = await new Promise((resolve) => c.toBlob(resolve, "image/png"));
+    if (!blob) throw new Error("建立浮水印圖層失敗");
+
+    return {
+      width: W,
+      height: H,
+      data: new Uint8Array(await blob.arrayBuffer()),
+    };
+  } finally {
+    URL.revokeObjectURL(src);
+  }
+}
+
+async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}) {
+  const ffmpeg = await __ensureFFmpeg();
+  const inputExt = ((file.name || "video.mp4").match(/\.([^.]+)$/)?.[1] || "mp4").toLowerCase();
   const inputName = `input.${inputExt}`;
   const overlayName = "watermark.png";
   const outputName = "output.mp4";
 
-  const infoSrc = URL.createObjectURL(file);
-  let videoWidth = 1280;
-  let videoHeight = 720;
-  try {
-    const v = document.createElement("video");
-    v.preload = "metadata";
-    v.src = infoSrc;
-    await new Promise((resolve, reject) => {
-      v.onloadedmetadata = () => resolve();
-      v.onerror = (e) => reject(e || new Error("載入影片資訊失敗"));
-    });
-    videoWidth = v.videoWidth || videoWidth;
-    videoHeight = v.videoHeight || videoHeight;
-  } finally {
-    URL.revokeObjectURL(infoSrc);
-  }
+  const { width: W, height: H, data: overlayData } = await __makeWatermarkOverlayPng(file, text);
 
-  const overlayFile = await __buildWatermarkOverlayFile({ width: videoWidth, height: videoHeight, text });
-  ffmpeg.__inputDurationSec = await __getVideoDurationSec(file);
-  __ffmpegProgressHandler = (ratio) => {
-    if (typeof onProgress === "function") onProgress(Math.max(0, Math.min(1, ratio)));
-  };
+  await ffmpeg.writeFile(inputName, await __fileToUint8Array(file));
+  await ffmpeg.writeFile(overlayName, overlayData);
 
   try {
-    if (typeof onProgress === "function") onProgress(0.02);
-
-    for (const name of [inputName, overlayName, outputName]) {
-      try { await ffmpeg.deleteFile(name); } catch (_) { }
-    }
-
-    await ffmpeg.writeFile(inputName, await fetchFile(file));
-    await ffmpeg.writeFile(overlayName, await fetchFile(overlayFile));
-
-    if (typeof onProgress === "function") onProgress(0.08);
-
-    const attempts = [
-      [
-        "-i", inputName,
-        "-i", overlayName,
-        "-filter_complex", "overlay=0:0:format=auto",
-        "-map", "0:v:0",
-        "-map", "0:a?",
-        "-c:v", "libx264",
-        "-pix_fmt", "yuv420p",
-        "-preset", "veryfast",
-        "-crf", "23",
-        "-c:a", "aac",
-        "-b:a", "128k",
-        "-movflags", "+faststart",
-        "-shortest",
-        outputName,
-      ],
-      [
-        "-i", inputName,
-        "-i", overlayName,
-        "-filter_complex", "overlay=0:0:format=auto",
-        "-map", "0:v:0",
-        "-map", "0:a?",
-        "-c:v", "libx264",
-        "-pix_fmt", "yuv420p",
-        "-preset", "veryfast",
-        "-crf", "23",
-        "-c:a", "copy",
-        "-movflags", "+faststart",
-        "-shortest",
-        outputName,
-      ],
-      [
-        "-i", inputName,
-        "-i", overlayName,
-        "-filter_complex", "overlay=0:0:format=auto",
-        "-map", "0:v:0",
-        "-map", "0:a?",
-        "-c:v", "mpeg4",
-        "-q:v", "5",
-        "-c:a", "aac",
-        "-b:a", "128k",
-        "-movflags", "+faststart",
-        "-shortest",
-        outputName,
-      ],
-    ];
-
-    let lastErr = null;
-    for (const args of attempts) {
-      try {
-        await ffmpeg.exec(args);
-        lastErr = null;
-        break;
-      } catch (err) {
-        lastErr = err;
-        try { await ffmpeg.deleteFile(outputName); } catch (_) { }
-      }
-    }
-    if (lastErr) throw lastErr;
-
-    if (typeof onProgress === "function") onProgress(0.98);
+    await ffmpeg.exec([
+      "-i", inputName,
+      "-i", overlayName,
+      "-filter_complex", "[0:v][1:v]overlay=0:0",
+      "-map", "0:v:0",
+      "-map", "0:a?",
+      "-c:v", "libx264",
+      "-preset", "veryfast",
+      "-crf", "23",
+      "-pix_fmt", "yuv420p",
+      "-c:a", "aac",
+      "-b:a", "128k",
+      "-movflags", "+faststart",
+      "-shortest",
+      outputName,
+    ]);
 
     const data = await ffmpeg.readFile(outputName);
-    const uint8 = data instanceof Uint8Array ? data : new Uint8Array(data?.buffer || data);
-    const copied = uint8.slice();
-    return new File([copied], __buildOutputMp4Name(file), {
-      type: __FFMPEG_OUTPUT_MP4_MIME,
-      lastModified: Date.now(),
-    });
-  } catch (err) {
-    console.error("FFmpeg WASM 影片浮水印失敗：", err);
-    throw new Error(`影片浮水印失敗：${err?.message || err}`);
+    const blob = new Blob([data.buffer], { type: "video/mp4" });
+    const name = (file.name || "video").replace(/\.[^.]+$/, ".mp4");
+    return new File([blob], name, { type: "video/mp4" });
   } finally {
-    __ffmpegProgressHandler = null;
-    ffmpeg.__inputDurationSec = 0;
     for (const name of [inputName, overlayName, outputName]) {
       try { await ffmpeg.deleteFile(name); } catch (_) { }
     }
@@ -764,15 +675,6 @@ function startProgressBar(btn, opts = {}) {
   }
 
   return { update, stop };
-}
-
-function createWatermarkProgressBridge(prog, { basePct = 0, rangePct = 100 } = {}) {
-  return (ratio) => {
-    if (!prog || typeof prog.update !== "function") return;
-    const r = Number.isFinite(Number(ratio)) ? Number(ratio) : 0;
-    const pct = basePct + (Math.max(0, Math.min(1, r)) * rangePct);
-    prog.update(pct);
-  };
 }
 
 // 用 nameLower / name 檢查是否重複；exceptId 表示忽略自己（編輯時用）
@@ -1292,15 +1194,16 @@ async function saveEdit() {
 
       if (it.kind === "file") {
         const f = it.file;
-        const wmBlob = await addWatermarkToFile(f, {
-        onVideoProgress: createWatermarkProgressBridge(prog, { basePct: 0, rangePct: 75 })
-      });       // ← 新增：影片改由 FFmpeg WASM 浮水印並輸出 mp4
+        const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
         const type = wmBlob.type || '';
         let ext = 'bin';
         if (type.startsWith('image/')) {
           ext = type === 'image/png' ? 'png' : 'jpg';
         } else if (type.startsWith('video/')) {
-          ext = 'mp4';
+          if (type.includes('webm')) ext = 'webm';
+          else if (type.includes('ogg')) ext = 'ogg';
+          else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
+          else ext = 'mp4';
         }
         const base = f.name.replace(/\.[^.]+$/, '');
         const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
@@ -1311,8 +1214,7 @@ async function saveEdit() {
             (snap) => {
               const base = __progressUploadedBytes || 0;
               const now = base + (snap?.bytesTransferred || 0);
-              const uploadRatio = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) : 0;
-              const pct = 75 + (uploadRatio * 25);
+              const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
               prog.update(pct);
             },
             (err) => reject(err),
@@ -1320,7 +1222,7 @@ async function saveEdit() {
               try {
                 // 完成一檔：累加已完成 bytes
                 __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || wmBlob?.size || 0);
-                prog.update(75 + (((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) : 1) * 25));
+                prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
                 resolve();
               } catch (e) {
                 reject(e);
@@ -2084,16 +1986,17 @@ async function onConfirmAdopted() {
 
   try {
     for (const f of files) {
-      const wmBlob = await addWatermarkToFile(f, {
-        onVideoProgress: createWatermarkProgressBridge(prog, { basePct: 0, rangePct: 75 })
-      });       // ← 新增：影片改由 FFmpeg WASM 浮水印並輸出 mp4
+      const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
       const type = wmBlob.type || '';
       let ext = 'bin';
       if (type.startsWith('image/')) {
         ext = type === 'image/png' ? 'png' : 'jpg';
       } else if (type.startsWith('video/')) {
-          ext = 'mp4';
-        }
+        if (type.includes('webm')) ext = 'webm';
+        else if (type.includes('ogg')) ext = 'ogg';
+        else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
+        else ext = 'mp4';
+      }
       const base = f.name.replace(/\.[^.]+$/, '');
       const path = `adopted/${currentDocId}/${Date.now()}_${base}.${ext}`;
       const r = sRef(storage, path);
@@ -2103,14 +2006,13 @@ async function onConfirmAdopted() {
           (snap) => {
             const base = __progressUploadedBytes || 0;
             const now = base + (snap?.bytesTransferred || 0);
-            const uploadRatio = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) : 0;
-              const pct = 75 + (uploadRatio * 25);
+            const pct = (__progressTotalBytes > 0) ? (now / __progressTotalBytes) * 100 : 0;
             prog.update(pct);
           },
           (err) => reject(err),
           () => {
             __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || wmBlob?.size || 0);
-            prog.update(75 + (((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) : 1) * 25));
+            prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
             resolve();
           }
         );
