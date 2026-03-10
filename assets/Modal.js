@@ -256,11 +256,11 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
   await ffmpeg.writeFile(inName, await fetchFile(file));
 
   // 3) 寫入字型（一定要有，否則中文字會掛）
-  // 你要確保這個檔案存在：assets/fonts/NotoSansTC-Regular.ttf
+  // 你要確保這個檔案存在：assets/fonts/TaipeiSansTCBeta-Regular.ttf
   const fontPathInFS = "/font.ttf";
   await ffmpeg.writeFile(
     "font.ttf",
-    await fetchFile("assets/fonts/NotoSansTC-Regular.ttf")
+    await fetchFile("assets/fonts/TaipeiSansTCBeta-Regular.ttf")
   );
 
   // 4) 濾鏡：用多個 drawtext 做「分散式浮水印」
