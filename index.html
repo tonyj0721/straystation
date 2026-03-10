@@ -629,8 +629,7 @@
     import {
       getAuth,
       GoogleAuthProvider,
-      signInWithRedirect,
-      getRedirectResult,
+      signInWithPopup,
       setPersistence,
       indexedDBLocalPersistence,
       browserLocalPersistence,
@@ -706,7 +705,6 @@
     // 先設定持久化、再接回 redirect 結果（不輸出任何提示）
     (async () => {
       try { await ensurePersistence(); } catch (_) { }
-      try { await getRedirectResult(auth); } catch (_) { }
     })();
 
     async function startGoogleLogin() {
