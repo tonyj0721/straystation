@@ -1087,6 +1087,7 @@
       try {
         const img = await new Promise((res, rej) => {
           const im = new Image();
+          im.crossOrigin = "anonymous";
           im.onload = () => res(im);
           im.onerror = rej;
           im.src = raw;
@@ -1164,6 +1165,7 @@
         v.setAttribute("webkit-playsinline", "");
         v.controls = false;
         v.disablePictureInPicture = true;
+        v.crossOrigin = "anonymous";
         v.src = getVideoObjURL(file);
 
         // ✅ 直接用影片本身抓一個 frame，避免黑畫面（特別是 iOS / Safari）
@@ -1224,11 +1226,12 @@
         img.alt = "預覽";
         img.decoding = "async";
         img.loading = "lazy";
+        img.crossOrigin = "anonymous";
         img.src = EMPTY_GIF;
 
         // 先顯示空白，再異步塞縮圖，避免解碼瞬間卡頓
         ensureThumbURL(file)
-          .then((url) => { img.src = url; })
+          .then((url) => { img.crossOrigin = "anonymous"; img.src = url; })
           .catch(() => {
             // 真的不行就退回原圖（至少有預覽）
             try {
@@ -1892,19 +1895,19 @@
             ? (videoThumb
               ? `
                <div class="media-thumb">
-                 <img src="${videoThumb}" alt="" loading="lazy" decoding="async">
+                 <img crossorigin="anonymous" src="${videoThumb}" alt="" loading="lazy" decoding="async">
                  <div class="video-badge"><div class="video-badge-inner">${__THUMB_PLAY_SVG}</div></div>
                </div>
               `
               : `
                <div class="media-thumb">
-                 <video class="thumb-video" preload="metadata" muted playsinline webkit-playsinline disablepictureinpicture src="${mediaUrl}"></video>
+                 <video crossorigin="anonymous" class="thumb-video" preload="metadata" muted playsinline webkit-playsinline disablepictureinpicture src="${mediaUrl}"></video>
                  <div class="video-badge"><div class="video-badge-inner">${__THUMB_PLAY_SVG}</div></div>
                </div>
               `)
             : `
                <div class="media-thumb">
-                 <img src="${mediaUrl}" alt="" loading="lazy" decoding="async">
+                 <img crossorigin="anonymous" src="${mediaUrl}" alt="" loading="lazy" decoding="async">
                </div>
               `;
 
