@@ -170,6 +170,99 @@ function __drawWatermarkPattern(g, W, H, text) {
   g.restore();
 }
 
+// ===============================
+// 影片浮水印：FFmpeg WASM（取代 MediaRecorder/captureStream）
+//  - 需要 @ffmpeg/ffmpeg + @ffmpeg/util
+//  - 會在第一次處理影片時才動態載入 ffmpeg core（避免首屏變慢）
+// ===============================
+let __ffmpeg = null;
+let __ffmpegLoading = null;
+
+async function __loadFFmpegWasm() {
+  if (__ffmpeg) return __ffmpeg;
+  if (__ffmpegLoading) return __ffmpegLoading;
+
+  __ffmpegLoading = (async () => {
+    // 以 dynamic import 方式載入，避免整個檔案變成 <script type="module">
+    const { FFmpeg } = await import("@ffmpeg/ffmpeg");
+    const { toBlobURL, fetchFile } = await import("@ffmpeg/util");
+
+    const ffmpeg = new FFmpeg();
+
+    // 你也可以改成自家 host，這裡用 unpkg（版本請固定，避免未來破壞性變更）
+    const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
+
+    await ffmpeg.load({
+      coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
+      wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+      workerURL: await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, "text/javascript"),
+    });
+
+    // 掛在 instance 上，方便後續使用
+    ffmpeg.__fetchFile = fetchFile;
+    __ffmpeg = ffmpeg;
+    return ffmpeg;
+  })();
+
+  return __ffmpegLoading;
+}
+
+async function __safeDeleteFF(ffmpeg, path) {
+  try { await ffmpeg.deleteFile(path); } catch (_) { }
+}
+
+function __sanitizeFsName(name) {
+  return String(name || "input").replace(/[^\w.\-]+/g, "_").slice(0, 80) || "input";
+}
+
+async function __getVideoSize(file) {
+  return new Promise((resolve) => {
+    const u = URL.createObjectURL(file);
+    const v = document.createElement("video");
+    __forceMute(v);
+    v.preload = "metadata";
+    v.src = u;
+    v.onloadedmetadata = () => {
+      const W = v.videoWidth || 1280;
+      const H = v.videoHeight || 720;
+      URL.revokeObjectURL(u);
+      resolve({ W, H });
+    };
+    v.onerror = () => {
+      URL.revokeObjectURL(u);
+      resolve({ W: 1280, H: 720 });
+    };
+  });
+}
+
+async function __watermarkCanvasToPngBytes(canvas) {
+  const blob = await new Promise((r) => canvas.toBlob(r, "image/png"));
+  if (!blob) throw new Error("建立浮水印 PNG 失敗");
+  const buf = await blob.arrayBuffer();
+  return new Uint8Array(buf);
+}
+
+// 產生「整張透明浮水印 PNG」：斜向重複文字（會依影片尺寸調整；超大影片會先 cap 再由 ffmpeg scale）
+async function __buildWatermarkPngBytes(text, W, H) {
+  const CAP_W = 1920;
+  const CAP_H = 1080;
+  let w = W, h = H;
+  if (w > CAP_W || h > CAP_H) {
+    const r = Math.min(CAP_W / w, CAP_H / h);
+    w = Math.max(640, Math.round(w * r));
+    h = Math.max(360, Math.round(h * r));
+  }
+
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const g = c.getContext("2d");
+  g.clearRect(0, 0, w, h);
+  __drawWatermarkPattern(g, w, h, text);
+
+  return await __watermarkCanvasToPngBytes(c);
+}
+
 async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {}) {
   const type = (file && file.type) || "";
   if (type.startsWith("video/")) {
@@ -197,138 +290,91 @@ async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {})
   }
 }
 
-// ===============================
-// FFmpeg WASM：單例載入（避免每支影片都 load 一次）
-// ===============================
-let __ffmpeg = null;
-let __ffmpegLoading = null;
-
-async function __ensureFFmpegLoaded() {
-  if (__ffmpeg) return __ffmpeg;
-  if (__ffmpegLoading) return __ffmpegLoading;
-
-  __ffmpegLoading = (async () => {
-    const { toBlobURL } = window.FFmpegUtil;
-
-    const ff = new window.FFmpegWASM.FFmpeg();
-
-    const coreBase = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
-    const ffmpegBase = "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm";
-
-    await ff.load({
-      coreURL: await toBlobURL(`${coreBase}/ffmpeg-core.js`, "text/javascript"),
-      wasmURL: await toBlobURL(`${coreBase}/ffmpeg-core.wasm`, "application/wasm"),
-
-      // ✅ 關鍵：worker 也轉成 blob，避免 cross-origin worker 被擋
-      workerURL: await toBlobURL(`${ffmpegBase}/worker.js`, "text/javascript"),
-    });
-
-    __ffmpeg = ff;
-    return ff;
-  })();
-
-  return __ffmpegLoading;
-}
-
-// 讀影片寬高（用於產生同尺寸 watermark PNG）
-async function __getVideoSize(file) {
-  const src = URL.createObjectURL(file);
-  try {
-    const v = document.createElement("video");
-    v.preload = "metadata";
-    v.src = src;
-    v.muted = true;
-    v.playsInline = true;
-
-    await new Promise((res, rej) => {
-      v.onloadedmetadata = () => res();
-      v.onerror = () => rej(new Error("載入影片失敗（讀取寬高）"));
-    });
-
-    return {
-      width: v.videoWidth || 1280,
-      height: v.videoHeight || 720,
-    };
-  } finally {
-    URL.revokeObjectURL(src);
-  }
-}
-
-// 產生「全畫面斜紋」浮水印 PNG（透明背景）
-async function __makeWatermarkPngBytes(W, H, text) {
-  const c = document.createElement("canvas");
-  c.width = W;
-  c.height = H;
-  const g = c.getContext("2d");
-  g.clearRect(0, 0, W, H);
-
-  // 你原本的 pattern（水印樣式完全沿用）
-  __drawWatermarkPattern(g, W, H, text);
-
-  const blob = await new Promise((r) => c.toBlob(r, "image/png"));
-  const buf = await blob.arrayBuffer();
-  return new Uint8Array(buf);
-}
-
-function __pickInputExt(file) {
-  const name = (file?.name || "input").toLowerCase();
-  const m = name.match(/\.([a-z0-9]+)$/i);
-  if (m) return m[1];
-  const type = file?.type || "";
-  if (type.includes("mp4")) return "mp4";
-  if (type.includes("webm")) return "webm";
-  if (type.includes("ogg")) return "ogg";
-  if (type.includes("quicktime")) return "mov";
-  return "mp4";
-}
-
-// ===============================
-// 影片浮水印：改用 FFmpeg WASM（overlay watermark PNG）
-// ===============================
 async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}) {
-  const ffmpeg = await __ensureFFmpegLoaded();
-  const { fetchFile } = window.FFmpegUtil;
+  // FFmpeg WASM：把「透明浮水印 PNG」overlay 到影片上
+  const ffmpeg = await __loadFFmpegWasm();
+  const fetchFile = ffmpeg.__fetchFile;
 
-  // 1) 讀影片寬高 → 2) 產生同尺寸 watermark PNG
-  const { width: W, height: H } = await __getVideoSize(file);
-  const wmPng = await __makeWatermarkPngBytes(W, H, text);
+  const { W, H } = await __getVideoSize(file);
+  const wmPng = await __buildWatermarkPngBytes(text, W, H);
 
-  // 3) 寫入 FFmpeg FS
-  const inExt = __pickInputExt(file);
-  const inName = `input.${inExt}`;
-  const wmName = "wm.png";
-  const outName = "output.webm";
+  const inBase = __sanitizeFsName(file.name || "video");
+  const inExt = (String(inBase).match(/\.([a-zA-Z0-9]+)$/)?.[1] || "mp4").toLowerCase();
 
-  await ffmpeg.writeFile(inName, await fetchFile(file));
-  await ffmpeg.writeFile(wmName, wmPng);
+  const ts = Date.now();
+  const inPath = `in_${ts}.${inExt}`;
+  const wmPath = `wm_${ts}.png`;
+  const outPath = `out_${ts}.mp4`;
 
-  // 4) 合成：overlay 疊滿整張（wm.png 已經是全畫面透明 pattern）
-  //    -map 0:a?：有音軌就帶上
-  //    輸出用 webm(vp9/opus) 走最通用的瀏覽器路線
-  await ffmpeg.exec([
-    "-i", inName,
-    "-i", wmName,
-    "-filter_complex", "[0:v][1:v]overlay=0:0:format=auto",
+  await ffmpeg.writeFile(inPath, await fetchFile(file));
+  await ffmpeg.writeFile(wmPath, wmPng);
+
+  // 若 watermark png 尺寸被 cap，這裡會自動 scale 到主影片尺寸再 overlay
+  // [1:v]scale=main_w:main_h[wm];[0:v][wm]overlay=0:0
+  const filter = "[1:v]scale=main_w:main_h[wm];[0:v][wm]overlay=0:0";
+
+  // 音訊：
+  //  - 先嘗試 copy（最快），不行就轉 AAC
+  // 視訊：
+  //  - 先嘗試 libx264，不行就退回 mpeg4（取決於你使用的 ffmpeg core build）
+  const baseArgsCopyAudio = [
+    "-i", inPath,
+    "-i", wmPath,
+    "-filter_complex", filter,
     "-map", "0:v:0",
     "-map", "0:a?",
-    "-c:v", "libvpx-vp9",
-    "-b:v", "0",
-    "-crf", "32",
-    "-c:a", "libopus",
-    outName,
-  ]);
+    "-shortest",
+    "-c:a", "copy",
+    "-movflags", "+faststart",
+  ];
 
-  // 5) 讀回檔案 → File
-  const data = await ffmpeg.readFile(outName);
-  const blob = new Blob([data.buffer], { type: "video/webm" });
-  const name = (file.name || "video").replace(/\.[^.]+$/, ".webm");
+  const baseArgsAac = [
+    "-i", inPath,
+    "-i", wmPath,
+    "-filter_complex", filter,
+    "-map", "0:v:0",
+    "-map", "0:a?",
+    "-shortest",
+    "-c:a", "aac",
+    "-b:a", "128k",
+    "-movflags", "+faststart",
+  ];
 
-  // 可選：清掉 FS 檔案，避免累積（視你的使用量）
-  try { await ffmpeg.deleteFile(inName); } catch (_) { }
-  try { await ffmpeg.deleteFile(wmName); } catch (_) { }
-  try { await ffmpeg.deleteFile(outName); } catch (_) { }
+  async function __execWithVideoCodec(baseArgs, vCodec) {
+    // 這裡固定輸出 mp4，方便後續上傳/播放
+    await ffmpeg.exec(baseArgs.concat(["-c:v", vCodec, "-pix_fmt", "yuv420p", outPath]));
+  }
 
-  return new File([blob], name, { type: "video/webm" });
+  async function __runEncode(baseArgs) {
+    try {
+      await __execWithVideoCodec(baseArgs, "libx264");
+      return;
+    } catch (_) {
+      // fallback：有些 core build 沒有 x264
+      await __execWithVideoCodec(baseArgs, "mpeg4");
+    }
+  }
+
+  try {
+    try {
+      await __runEncode(baseArgsCopyAudio);
+    } catch (_) {
+      // audio copy 失敗 → 轉 AAC
+      await __runEncode(baseArgsAac);
+    }
+
+    const outData = await ffmpeg.readFile(outPath);
+    const blob = new Blob([outData.buffer], { type: "video/mp4" });
+
+    // 維持你的上傳流程：回傳 File / Blob 皆可；這裡回傳 File，name 改成 .mp4
+    const name = (file.name || "video").replace(/\.[^.]+$/, ".mp4");
+    return new File([blob], name, { type: "video/mp4" });
+  } finally {
+    // cleanup
+    await __safeDeleteFF(ffmpeg, inPath);
+    await __safeDeleteFF(ffmpeg, wmPath);
+    await __safeDeleteFF(ffmpeg, outPath);
+  }
 }
 
 // ===============================
