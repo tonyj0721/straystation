@@ -1,30 +1,3 @@
-/* 讓圖片容器用同張圖做模糊延伸背景 */
-.blur-fit {
-  position: relative;
-  overflow: hidden;
-}
-
-.blur-fit::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: var(--bg) center/cover no-repeat;
-  /* 這裡吃 inline style 的 --bg */
-  filter: blur(24px);
-  transform: scale(1.1);
-  /* 放大避免邊緣露白 */
-}
-
-.blur-fit>img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  z-index: 1;
-  /* 上層放原圖，保持比例 */
-}
-
 dialog::backdrop {
   background: rgba(0, 0, 0, 0.9);
 }
