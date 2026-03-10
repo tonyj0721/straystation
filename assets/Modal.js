@@ -231,6 +231,7 @@ async function __getFFmpeg() {
     await ffmpeg.load({
       coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
       wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+      classWorkerURL: `${location.origin}/assets/ffmpeg/worker.js`,
     });
 
     // 掛在 window 方便你 debug（可刪）
