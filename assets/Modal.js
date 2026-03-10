@@ -170,6 +170,42 @@ function __drawWatermarkPattern(g, W, H, text) {
   g.restore();
 }
 
+async function __getVideoDims(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const v = document.createElement("video");
+    v.preload = "metadata";
+    v.muted = true;
+    v.src = url;
+
+    await new Promise((resolve, reject) => {
+      v.onloadedmetadata = () => resolve();
+      v.onerror = () => reject(new Error("load video metadata failed"));
+    });
+
+    return { w: v.videoWidth || 1280, h: v.videoHeight || 720 };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+// 產生「跟影片同尺寸」的透明 PNG，內容完全沿用你現有 __drawWatermarkPattern()
+async function __makeWatermarkFullFramePng({ w, h, text }) {
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const g = c.getContext("2d");
+
+  // 透明底
+  g.clearRect(0, 0, w, h);
+
+  // ✅ 1:1：直接呼叫你原本的斜角鋪滿邏輯
+  __drawWatermarkPattern(g, w, h, text);
+
+  const blob = await new Promise((r) => c.toBlob(r, "image/png"));
+  return blob;
+}
+
 async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {}) {
   const type = (file && file.type) || "";
   if (type.startsWith("video/")) {
@@ -248,43 +284,28 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
   const ffmpeg = await __getFFmpeg();
   const fetchFile = window.__ffmpegFetchFile;
 
-  // 1) 準備輸入 / 輸出檔名
-  const inName = `in_${Date.now()}.mp4`;        // 名稱而已，不影響實際格式
+  // 1) 影片尺寸
+  const { w, h } = await __getVideoDims(file);
+
+  // 2) 用原本 __drawWatermarkPattern 產生「全畫面斜角鋪滿」透明 PNG
+  const wmBlob = await __makeWatermarkFullFramePng({ w, h, text });
+
+  // 3) 寫入 FFmpeg MEMFS
+  const inName = `in_${Date.now()}.mp4`;
+  const wmName = `wm_${Date.now()}.png`;
   const outName = `out_${Date.now()}.mp4`;
 
-  // 2) 寫入影片到 MEMFS
   await ffmpeg.writeFile(inName, await fetchFile(file));
+  await ffmpeg.writeFile(wmName, await fetchFile(wmBlob));
 
-  // 3) 寫入字型（一定要有，否則中文字會掛）
-  // 你要確保這個檔案存在：assets/fonts/TaipeiSansTCBeta-Regular.ttf
-  const fontPathInFS = "/font.ttf";
-  await ffmpeg.writeFile(
-    "font.ttf",
-    await fetchFile("assets/fonts/TaipeiSansTCBeta-Regular.ttf")
-  );
-
-  // 4) 濾鏡：用多個 drawtext 做「分散式浮水印」
-  // （drawtext 本身不方便做你原本那種旋轉鋪滿 pattern；先用 3x3 分散版，穩、簡單）
-  const wm = __escapeDrawtextText(text);
-
-  const vf = [
-    // 中
-    `drawtext=fontfile=${fontPathInFS}:text='${wm}':fontsize=h*0.05:fontcolor=white@0.25:x=(w-text_w)/2:y=(h-text_h)/2`,
-    // 左上 / 右上
-    `drawtext=fontfile=${fontPathInFS}:text='${wm}':fontsize=h*0.045:fontcolor=white@0.22:x=w*0.08:y=h*0.12`,
-    `drawtext=fontfile=${fontPathInFS}:text='${wm}':fontsize=h*0.045:fontcolor=white@0.22:x=w*0.62:y=h*0.12`,
-    // 左下 / 右下
-    `drawtext=fontfile=${fontPathInFS}:text='${wm}':fontsize=h*0.045:fontcolor=white@0.22:x=w*0.08:y=h*0.78`,
-    `drawtext=fontfile=${fontPathInFS}:text='${wm}':fontsize=h*0.045:fontcolor=white@0.22:x=w*0.62:y=h*0.78`,
-  ].join(",");
-
-  // 5) 跑 FFmpeg
-  // 盡量保留原音軌：-c:a copy
-  // 視你的 core build 支援狀況：優先用 libx264，不行就退回 mpeg4（至少可播）
+  // 4) overlay 疊圖（wm.png 已經是斜角鋪滿 + 透明）
+  // format=auto 會處理 alpha
   try {
     await ffmpeg.exec([
       "-i", inName,
-      "-vf", vf,
+      "-i", wmName,
+      "-filter_complex",
+      "[1:v]format=rgba[wm];[0:v][wm]overlay=0:0:format=auto",
       "-c:v", "libx264",
       "-preset", "veryfast",
       "-crf", "23",
@@ -296,7 +317,9 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
     console.warn("libx264 failed, fallback to mpeg4:", e);
     await ffmpeg.exec([
       "-i", inName,
-      "-vf", vf,
+      "-i", wmName,
+      "-filter_complex",
+      "[1:v]format=rgba[wm];[0:v][wm]overlay=0:0:format=auto",
       "-c:v", "mpeg4",
       "-q:v", "5",
       "-c:a", "copy",
@@ -304,15 +327,14 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
     ]);
   }
 
-  // 6) 讀出結果
+  // 5) 讀出結果
   const data = await ffmpeg.readFile(outName);
   const blob = new Blob([data.buffer], { type: "video/mp4" });
 
-  // 7) 清理 MEMFS（避免越用越肥）
+  // 6) 清理
   try { await ffmpeg.deleteFile(inName); } catch (_) { }
+  try { await ffmpeg.deleteFile(wmName); } catch (_) { }
   try { await ffmpeg.deleteFile(outName); } catch (_) { }
-  // font.ttf 可留著（下次不用再寫），也可刪：看你要不要省一點 mem
-  // try { await ffmpeg.deleteFile("font.ttf"); } catch (_) {}
 
   const name = (file.name || "video").replace(/\.[^.]+$/, ".mp4");
   return new File([blob], name, { type: "video/mp4" });
