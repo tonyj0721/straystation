@@ -261,6 +261,32 @@ async function __getFFmpeg() {
 
     const ffmpeg = new FFmpeg();
 
+    // === 簡單 log 收集（ring buffer）===
+    const __logs = [];
+    const __MAX_LOGS = 1200;
+
+    function __pushLog(item) {
+      __logs.push({ t: new Date().toISOString(), ...item });
+      if (__logs.length > __MAX_LOGS) __logs.splice(0, __logs.length - __MAX_LOGS);
+    }
+
+    // 文字 log（含 ffmpeg 輸出，例如 Duration / fps / drop 等）
+    ffmpeg.on("log", ({ type, message }) => {
+      __pushLog({ kind: "log", type, message });
+      // 你也可以把下一行打開，直接在 Console 看
+      // console.log(`[ffmpeg:${type}]`, message);
+    });
+
+    // 進度（progress: 0~1，time: 微秒 or 秒，依版本）
+    ffmpeg.on("progress", (p) => {
+      __pushLog({ kind: "progress", ...p });
+    });
+
+    // 掛到 window 方便你在 console 取用
+    window.__ffmpegLogs = __logs;
+    window.getFFmpegLogs = () => __logs.slice();      // 拿一份拷貝
+    window.clearFFmpegLogs = () => { __logs.length = 0; };
+
     // 官方常見作法：用 toBlobURL 避免跨域 / mime 問題
     // core 版本可依你需求調整
     const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
