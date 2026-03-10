@@ -710,8 +710,12 @@
     async function startGoogleLogin() {
       if (auth.currentUser) return; // 已登入就不重複登入
       try { await ensurePersistence(); } catch (_) { }
-      try { sessionStorage.setItem("__pendingGoogleLogin", "1"); } catch (_) { }
-      try { await signInWithRedirect(auth, provider); } catch (_) { }
+      try {
+        await signInWithPopup(auth, provider);
+      } catch (err) {
+        console.error("Google login failed", err);
+        alert("登入失敗，請再試一次。");
+      }
     }
 
     // 狗掌：單點回 index.html；長按 >= 650ms 觸發登入（不用放開）
