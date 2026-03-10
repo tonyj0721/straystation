@@ -180,7 +180,7 @@ async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {})
   try {
     // 讀圖 & 畫原圖
     const img = await new Promise((res, rej) => {
-      const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = url;
+      const im = new Image(); im.crossOrigin = "anonymous"; im.onload = () => res(im); im.onerror = rej; im.src = url;
     });
     const W = img.naturalWidth, H = img.naturalHeight;
     const c = document.createElement("canvas");
@@ -378,6 +378,7 @@ async function __decodeToBitmap(file) {
     const vUrl = URL.createObjectURL(file);
     try {
       const v = document.createElement("video");
+      v.crossOrigin = "anonymous";
       __forceMute(v);
       v.preload = "metadata";
       v.src = vUrl;
@@ -469,6 +470,7 @@ async function __decodeToBitmap(file) {
   try {
     const img = await new Promise((res, rej) => {
       const im = new Image();
+      im.crossOrigin = "anonymous";
       im.onload = () => res(im);
       im.onerror = rej;
       im.src = raw;
@@ -603,6 +605,7 @@ function startProgressBar(btn, opts = {}) {
   barWrap.appendChild(fill);
 
   const cat = document.createElement("img");
+  cat.crossOrigin = "anonymous";
   cat.src = imgSrc;
   cat.alt = "";
   cat.decoding = "async";
@@ -799,6 +802,7 @@ async function openDialog(id) {
       if (isVid) {
         dlgImg.classList.add("hidden");
         dlgVideo.classList.remove("hidden");
+        dlgVideo.crossOrigin = "anonymous";
         dlgVideo.src = url;
         dlgVideo.playsInline = true;
         dlgVideo.controls = true;
@@ -809,10 +813,12 @@ async function openDialog(id) {
         } catch (_) { }
         dlgVideo.classList.add("hidden");
         dlgImg.classList.remove("hidden");
+        dlgImg.crossOrigin = "anonymous";
         dlgImg.src = url;
       }
     } else if (dlgImg) {
-      dlgImg.src = url;
+      dlgImg.crossOrigin = "anonymous";
+        dlgImg.src = url;
     }
 
     if (dlgBg) {
@@ -843,6 +849,7 @@ async function openDialog(id) {
       }
 
       // 只有真的有圖才塞 src，避免誤把影片網址塞進 <img> 變成破圖
+      dlgBg.crossOrigin = "anonymous";
       dlgBg.src = bgSrc;
     }
 
@@ -883,10 +890,12 @@ async function openDialog(id) {
 
       if (videoThumb) {
         const img = document.createElement("img");
+        img.crossOrigin = "anonymous";
         img.src = videoThumb;
         wrapper.appendChild(img);
       } else {
         const v = document.createElement("video");
+        v.crossOrigin = "anonymous";
         v.className = "thumb-video";
         v.preload = "metadata";
         v.muted = true;
@@ -910,6 +919,7 @@ async function openDialog(id) {
       wrapper.appendChild(badge);
     } else {
       const img = document.createElement("img");
+      img.crossOrigin = "anonymous";
       img.src = url;
       wrapper.appendChild(img);
     }
@@ -1448,6 +1458,7 @@ function __makeEditTile(it) {
 
   if (isVid) {
     const v = document.createElement("video");
+    v.crossOrigin = "anonymous";
     v.className = "w-full aspect-square object-cover rounded-lg bg-gray-100 video-preview";
     v.preload = "metadata";
     v.playsInline = true;
@@ -1535,6 +1546,7 @@ function __makeEditTile(it) {
     mediaEl = v;
   } else {
     const img = document.createElement("img");
+    img.crossOrigin = "anonymous";
     img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
     img.alt = "預覽";
     img.decoding = "async";
@@ -1777,6 +1789,7 @@ function __makeAdoptedTile(file) {
   wrap.addEventListener("contextmenu", (e) => e.preventDefault());
 
   const img = document.createElement("img");
+  img.crossOrigin = "anonymous";
   img.className = "w-full aspect-square object-cover rounded-lg bg-gray-100";
   img.alt = "預覽";
   img.decoding = "async";
