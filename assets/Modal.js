@@ -208,26 +208,19 @@ async function __ensureFFmpegLoaded() {
   if (__ffmpegLoading) return __ffmpegLoading;
 
   __ffmpegLoading = (async () => {
-    // UMD globals:
-    // - FFmpegWASM.FFmpeg (from @ffmpeg/ffmpeg)
-    // - FFmpegUtil.fetchFile / FFmpegUtil.toBlobURL (from @ffmpeg/util)
-    if (!window.FFmpegWASM?.FFmpeg) {
-      throw new Error("FFmpeg WASM 尚未載入（缺少 FFmpegWASM.FFmpeg）");
-    }
-    if (!window.FFmpegUtil?.fetchFile || !window.FFmpegUtil?.toBlobURL) {
-      throw new Error("FFmpeg WASM util 尚未載入（缺少 FFmpegUtil.fetchFile/toBlobURL）");
-    }
-
     const { toBlobURL } = window.FFmpegUtil;
 
     const ff = new window.FFmpegWASM.FFmpeg();
 
-    // 依官方 Usage：用 toBlobURL 避免 CORS
-    const baseURL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
+    const coreBase = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
+    const ffmpegBase = "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm";
+
     await ff.load({
-      coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-      wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
-      // 不用 multi-thread 版就先不放 workerURL
+      coreURL: await toBlobURL(`${coreBase}/ffmpeg-core.js`, "text/javascript"),
+      wasmURL: await toBlobURL(`${coreBase}/ffmpeg-core.wasm`, "application/wasm"),
+
+      // ✅ 關鍵：worker 也轉成 blob，避免 cross-origin worker 被擋
+      workerURL: await toBlobURL(`${ffmpegBase}/worker.js`, "text/javascript"),
     });
 
     __ffmpeg = ff;
