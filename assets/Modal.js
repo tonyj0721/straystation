@@ -197,101 +197,124 @@ async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {})
   }
 }
 
+// ===============================
+// FFmpeg WASM：影片浮水印（取代 MediaRecorder 方案）
+// ===============================
+let __ffmpegInstancePromise = null;
+
+function __escapeDrawtextText(s) {
+  // drawtext 需要跳脫: \  :  '  [ ]
+  // 這裡用最保守做法，避免濾鏡字串爆掉
+  return String(s ?? "")
+    .replace(/\\/g, "\\\\")
+    .replace(/:/g, "\\:")
+    .replace(/'/g, "\\'")
+    .replace(/\[/g, "\\[")
+    .replace(/\]/g, "\\]");
+}
+
+async function __getFFmpeg() {
+  if (__ffmpegInstancePromise) return __ffmpegInstancePromise;
+
+  __ffmpegInstancePromise = (async () => {
+    // 動態 import：不需要把 Modal.js 改成 module
+    const [{ FFmpeg }, { fetchFile, toBlobURL }] = await Promise.all([
+      import("https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js"),
+      import("https://unpkg.com/@ffmpeg/util@0.12.1/dist/esm/index.js"),
+    ]);
+
+    const ffmpeg = new FFmpeg();
+
+    // 官方常見作法：用 toBlobURL 避免跨域 / mime 問題
+    // core 版本可依你需求調整
+    const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
+    await ffmpeg.load({
+      coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
+      wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+    });
+
+    // 掛在 window 方便你 debug（可刪）
+    window.__ffmpeg = ffmpeg;
+    window.__ffmpegFetchFile = fetchFile;
+
+    return ffmpeg;
+  })();
+
+  return __ffmpegInstancePromise;
+}
+
 async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}) {
-  const testCanvas = document.createElement("canvas");
-  if (!testCanvas.captureStream || typeof MediaRecorder === "undefined") {
-    throw new Error("目前瀏覽器不支援影片浮水印（缺少 MediaRecorder 或 captureStream）");
-  }
+  const ffmpeg = await __getFFmpeg();
+  const fetchFile = window.__ffmpegFetchFile;
 
-  const src = URL.createObjectURL(file);
+  // 1) 準備輸入 / 輸出檔名
+  const inName = `in_${Date.now()}.mp4`;        // 名稱而已，不影響實際格式
+  const outName = `out_${Date.now()}.mp4`;
+
+  // 2) 寫入影片到 MEMFS
+  await ffmpeg.writeFile(inName, await fetchFile(file));
+
+  // 3) 寫入字型（一定要有，否則中文字會掛）
+  // 你要確保這個檔案存在：assets/fonts/NotoSansTC-Regular.ttf
+  const fontPathInFS = "/font.ttf";
+  await ffmpeg.writeFile(
+    "font.ttf",
+    await fetchFile("assets/fonts/NotoSansTC-Regular.ttf")
+  );
+
+  // 4) 濾鏡：用多個 drawtext 做「分散式浮水印」
+  // （drawtext 本身不方便做你原本那種旋轉鋪滿 pattern；先用 3x3 分散版，穩、簡單）
+  const wm = __escapeDrawtextText(text);
+
+  const vf = [
+    // 中
+    `drawtext=fontfile=${fontPathInFS}:text='${wm}':fontsize=h*0.05:fontcolor=white@0.25:x=(w-text_w)/2:y=(h-text_h)/2`,
+    // 左上 / 右上
+    `drawtext=fontfile=${fontPathInFS}:text='${wm}':fontsize=h*0.045:fontcolor=white@0.22:x=w*0.08:y=h*0.12`,
+    `drawtext=fontfile=${fontPathInFS}:text='${wm}':fontsize=h*0.045:fontcolor=white@0.22:x=w*0.62:y=h*0.12`,
+    // 左下 / 右下
+    `drawtext=fontfile=${fontPathInFS}:text='${wm}':fontsize=h*0.045:fontcolor=white@0.22:x=w*0.08:y=h*0.78`,
+    `drawtext=fontfile=${fontPathInFS}:text='${wm}':fontsize=h*0.045:fontcolor=white@0.22:x=w*0.62:y=h*0.78`,
+  ].join(",");
+
+  // 5) 跑 FFmpeg
+  // 盡量保留原音軌：-c:a copy
+  // 視你的 core build 支援狀況：優先用 libx264，不行就退回 mpeg4（至少可播）
   try {
-    const video = document.createElement("video");
-    video.src = src;
-    video.muted = true;
-    video.playsInline = true;
-    video.crossOrigin = "anonymous";
-
-    await new Promise((res, rej) => {
-      video.onloadedmetadata = () => res();
-      video.onerror = (e) => rej(e || new Error("載入影片失敗"));
-    });
-
-    const W = video.videoWidth || 1280;
-    const H = video.videoHeight || 720;
-
-    const canvas = document.createElement("canvas");
-    canvas.width = W;
-    canvas.height = H;
-    const g = canvas.getContext("2d");
-
-    const stream = canvas.captureStream();
-    try {
-      if (video.captureStream) {
-        const vStream = video.captureStream();
-        vStream.getAudioTracks().forEach((track) => stream.addTrack(track));
-      }
-    } catch (_) {
-      // audio 失敗可以忽略，至少保留畫面
-    }
-
-    const chunks = [];
-    const canUseVP9 = typeof MediaRecorder !== "undefined" &&
-      MediaRecorder.isTypeSupported("video/webm;codecs=vp9");
-    const canUseVP8 = typeof MediaRecorder !== "undefined" &&
-      MediaRecorder.isTypeSupported("video/webm;codecs=vp8");
-
-    const mime = canUseVP9
-      ? "video/webm;codecs=vp9"
-      : (canUseVP8 ? "video/webm;codecs=vp8" : "video/webm");
-
-    const recorder = new MediaRecorder(stream, { mimeType: mime });
-    recorder.ondataavailable = (e) => {
-      if (e.data && e.data.size > 0) chunks.push(e.data);
-    };
-    const finished = new Promise((resolve) => {
-      recorder.onstop = () => resolve();
-    });
-
-    recorder.start();
-
-    const useRVFC = typeof video.requestVideoFrameCallback === "function";
-
-    function drawFrame() {
-      g.clearRect(0, 0, W, H);
-      g.drawImage(video, 0, 0, W, H);
-      __drawWatermarkPattern(g, W, H, text);
-    }
-
-    if (useRVFC) {
-      const cb = () => {
-        if (video.paused || video.ended) return;
-        drawFrame();
-        video.requestVideoFrameCallback(cb);
-      };
-      video.requestVideoFrameCallback(cb);
-    } else {
-      const t = setInterval(() => {
-        if (video.paused || video.ended) {
-          clearInterval(t);
-          return;
-        }
-        drawFrame();
-      }, 40);
-    }
-
-    await video.play();
-    await new Promise((res) => { video.onended = () => res(); });
-
-    recorder.stop();
-    await finished;
-
-    const blob = new Blob(chunks, { type: mime });
-    const ext = ".webm";
-    const name = (file.name || "video").replace(/\.[^.]+$/, ext);
-    return new File([blob], name, { type: mime });
-  } finally {
-    URL.revokeObjectURL(src);
+    await ffmpeg.exec([
+      "-i", inName,
+      "-vf", vf,
+      "-c:v", "libx264",
+      "-preset", "veryfast",
+      "-crf", "23",
+      "-pix_fmt", "yuv420p",
+      "-c:a", "copy",
+      outName,
+    ]);
+  } catch (e) {
+    console.warn("libx264 failed, fallback to mpeg4:", e);
+    await ffmpeg.exec([
+      "-i", inName,
+      "-vf", vf,
+      "-c:v", "mpeg4",
+      "-q:v", "5",
+      "-c:a", "copy",
+      outName,
+    ]);
   }
+
+  // 6) 讀出結果
+  const data = await ffmpeg.readFile(outName);
+  const blob = new Blob([data.buffer], { type: "video/mp4" });
+
+  // 7) 清理 MEMFS（避免越用越肥）
+  try { await ffmpeg.deleteFile(inName); } catch (_) { }
+  try { await ffmpeg.deleteFile(outName); } catch (_) { }
+  // font.ttf 可留著（下次不用再寫），也可刪：看你要不要省一點 mem
+  // try { await ffmpeg.deleteFile("font.ttf"); } catch (_) {}
+
+  const name = (file.name || "video").replace(/\.[^.]+$/, ".mp4");
+  return new File([blob], name, { type: "video/mp4" });
 }
 
 // ===============================
