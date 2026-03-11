@@ -183,14 +183,14 @@ async function __loadFFmpegWasm() {
   if (__ffmpegLoading) return __ffmpegLoading;
 
   __ffmpegLoading = (async () => {
-    // ✅ 用 CDN ESM 完整 URL（避免「@ffmpeg/ffmpeg」無法解析）
-    const { FFmpeg } = await import("https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/esm/index.js");
-    const { toBlobURL, fetchFile } = await import("https://unpkg.com/@ffmpeg/util@0.12.6/dist/esm/index.js");
+    // ✅ 用 jsDelivr 的 ESM 檔案（CORS OK）
+    const { FFmpeg } = await import("https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm/index.js");
+    const { toBlobURL, fetchFile } = await import("https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/esm/index.js");
 
     const ffmpeg = new FFmpeg();
 
-    // ffmpeg core（固定版本）
-    const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
+    // ✅ single-thread core（避免 COOP/COEP / SharedArrayBuffer）
+    const baseURL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm";
 
     await ffmpeg.load({
       coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
