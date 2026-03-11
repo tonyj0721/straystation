@@ -188,7 +188,7 @@ async function getFFmpeg() {
 
     const ffmpeg = createFFmpeg({
       log: false,
-      // 若你想指定 corePath，可加：corePath: "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/ffmpeg-core.js"
+      corePath: "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js",
     });
 
     await ffmpeg.load();
