@@ -183,19 +183,18 @@ async function __loadFFmpegWasm() {
   if (__ffmpegLoading) return __ffmpegLoading;
 
   __ffmpegLoading = (async () => {
-    // ✅ 用 jsDelivr 的 ESM 檔案（CORS OK）
     const { FFmpeg } = await import("https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm/index.js");
     const { toBlobURL, fetchFile } = await import("https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/esm/index.js");
 
     const ffmpeg = new FFmpeg();
 
-    // ✅ single-thread core（避免 COOP/COEP / SharedArrayBuffer）
+    // ✅ single-thread core：只有 js + wasm，沒有 worker 檔
     const baseURL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm";
 
     await ffmpeg.load({
       coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
       wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
-      workerURL: await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, "text/javascript"),
+      // ❌ 不要 workerURL（你現在 404 就是這行）
     });
 
     ffmpeg.__fetchFile = fetchFile;
@@ -290,89 +289,82 @@ async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {})
 }
 
 async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}) {
-  // FFmpeg WASM：把「透明浮水印 PNG」overlay 到影片上
   const ffmpeg = await __loadFFmpegWasm();
   const fetchFile = ffmpeg.__fetchFile;
 
   const { W, H } = await __getVideoSize(file);
   const wmPng = await __buildWatermarkPngBytes(text, W, H);
 
-  const inBase = __sanitizeFsName(file.name || "video");
-  const inExt = (String(inBase).match(/\.([a-zA-Z0-9]+)$/)?.[1] || "mp4").toLowerCase();
-
   const ts = Date.now();
+  const inExt = (String(file.name || "").match(/\.([a-zA-Z0-9]+)$/)?.[1] || "mp4").toLowerCase();
   const inPath = `in_${ts}.${inExt}`;
   const wmPath = `wm_${ts}.png`;
   const outPath = `out_${ts}.mp4`;
 
-  await ffmpeg.writeFile(inPath, await fetchFile(file));
-  await ffmpeg.writeFile(wmPath, wmPng);
+  // write FS
+  ffmpeg.FS("writeFile", inPath, await fetchFile(file));
+  ffmpeg.FS("writeFile", wmPath, wmPng);
 
-  // 若 watermark png 尺寸被 cap，這裡會自動 scale 到主影片尺寸再 overlay
+  // watermark overlay
   // [1:v]scale=main_w:main_h[wm];[0:v][wm]overlay=0:0
   const filter = "[1:v]scale=main_w:main_h[wm];[0:v][wm]overlay=0:0";
 
-  // 音訊：
-  //  - 先嘗試 copy（最快），不行就轉 AAC
-  // 視訊：
-  //  - 先嘗試 libx264，不行就退回 mpeg4（取決於你使用的 ffmpeg core build）
-  const baseArgsCopyAudio = [
-    "-i", inPath,
-    "-i", wmPath,
-    "-filter_complex", filter,
-    "-map", "0:v:0",
-    "-map", "0:a?",
-    "-shortest",
-    "-c:a", "copy",
-    "-movflags", "+faststart",
-  ];
-
-  const baseArgsAac = [
-    "-i", inPath,
-    "-i", wmPath,
-    "-filter_complex", filter,
-    "-map", "0:v:0",
-    "-map", "0:a?",
-    "-shortest",
-    "-c:a", "aac",
-    "-b:a", "128k",
-    "-movflags", "+faststart",
-  ];
-
-  async function __execWithVideoCodec(baseArgs, vCodec) {
-    // 這裡固定輸出 mp4，方便後續上傳/播放
-    await ffmpeg.exec(baseArgs.concat(["-c:v", vCodec, "-pix_fmt", "yuv420p", outPath]));
-  }
-
-  async function __runEncode(baseArgs) {
+  // 先嘗試「音訊 copy」→ 失敗再 AAC
+  // 視訊先嘗試 libx264 → 失敗再 mpeg4（某些 core build 沒 x264）
+  async function runEncode({ audioCodec }) {
+    // try libx264
     try {
-      await __execWithVideoCodec(baseArgs, "libx264");
+      await ffmpeg.run(
+        "-i", inPath,
+        "-i", wmPath,
+        "-filter_complex", filter,
+        "-map", "0:v:0",
+        "-map", "0:a?",
+        "-shortest",
+        "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",
+        "-c:a", audioCodec,
+        ...(audioCodec === "aac" ? ["-b:a", "128k"] : []),
+        "-movflags", "+faststart",
+        outPath
+      );
       return;
-    } catch (_) {
-      // fallback：有些 core build 沒有 x264
-      await __execWithVideoCodec(baseArgs, "mpeg4");
+    } catch (e1) {
+      // fallback mpeg4
+      await ffmpeg.run(
+        "-i", inPath,
+        "-i", wmPath,
+        "-filter_complex", filter,
+        "-map", "0:v:0",
+        "-map", "0:a?",
+        "-shortest",
+        "-c:v", "mpeg4",
+        "-pix_fmt", "yuv420p",
+        "-c:a", audioCodec,
+        ...(audioCodec === "aac" ? ["-b:a", "128k"] : []),
+        "-movflags", "+faststart",
+        outPath
+      );
     }
   }
 
   try {
     try {
-      await __runEncode(baseArgsCopyAudio);
+      await runEncode({ audioCodec: "copy" });
     } catch (_) {
-      // audio copy 失敗 → 轉 AAC
-      await __runEncode(baseArgsAac);
+      // audio copy 失敗 → aac
+      await runEncode({ audioCodec: "aac" });
     }
 
-    const outData = await ffmpeg.readFile(outPath);
+    const outData = ffmpeg.FS("readFile", outPath);
     const blob = new Blob([outData.buffer], { type: "video/mp4" });
-
-    // 維持你的上傳流程：回傳 File / Blob 皆可；這裡回傳 File，name 改成 .mp4
     const name = (file.name || "video").replace(/\.[^.]+$/, ".mp4");
     return new File([blob], name, { type: "video/mp4" });
   } finally {
     // cleanup
-    await __safeDeleteFF(ffmpeg, inPath);
-    await __safeDeleteFF(ffmpeg, wmPath);
-    await __safeDeleteFF(ffmpeg, outPath);
+    try { ffmpeg.FS("unlink", inPath); } catch (_) { }
+    try { ffmpeg.FS("unlink", wmPath); } catch (_) { }
+    try { ffmpeg.FS("unlink", outPath); } catch (_) { }
   }
 }
 
