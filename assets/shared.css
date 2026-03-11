@@ -76,12 +76,6 @@ dialog::backdrop {
   --stageW: 100vw;
 }
 
-/* 影片模式：只讓 #lbWrap 自己到底（不影響照片） */
-#lbWrap.lb-video-mode {
-  align-self: flex-end;
-  /* 影片：貼底 */
-}
-
 #lightbox #lbImg,
 #lightbox #lbVideo {
   max-height: calc(100dvh - 122px);
@@ -89,8 +83,7 @@ dialog::backdrop {
 }
 
 #lbThumbs {
-  /* 🔥 貼齊 iPhone 下方 UI */
-  bottom: env(safe-area-inset-bottom);
+  /* 由 #lbBottom 統一處理 safe-area 貼底 */
 }
 
 /* 🔥 Lightbox 縮圖：改用 wrapper（支援影片） */
@@ -370,17 +363,131 @@ video.video-preview::-webkit-media-controls-enclosure {
   }
 }
 
-/* Lightbox：影片時，把關閉按鈕移到影片右邊（紅圈位置附近） */
-#lbWrap.lb-video-mode #lbClose {
-  right: -30px;
-  top: -30px;
-  /* 可以依實際感覺微調 */
+/* ===============================
+   Lightbox 影片控制列（iPhone 相簿風格）
+   =============================== */
+
+/* 讓控制列 + 縮圖列一組貼齊底部（含 safe area） */
+#lbBottom {
+  bottom: env(safe-area-inset-bottom);
+  pointer-events: none;
+  /* 只讓內部元件可以點 */
 }
 
-/* 桌機寬一點時可以再往右一些 */
-@media (min-width: 768px) {
-  #lbWrap.lb-video-mode #lbClose {
-    right: -36px;
-    top: -36px;
-  }
+#lbControls,
+#lbThumbs {
+  pointer-events: auto;
+}
+
+/* 時間列（預設隱藏；拖曳時顯示） */
+#lbControls {
+  position: relative;
+  transition: padding .5s ease, gap .5s ease;
+}
+
+/* 進度條拖曳中：控制列上移、增加上方空間、隱藏左右按鈕、顯示時間 */
+#lbBottom.lb-seeking #lbControls {
+  padding-top: 36px;
+  gap: 12px;
+}
+
+#lbBottom.lb-seeking .lb-seek-time {
+  display: flex;
+}
+
+#lbBottom.lb-seeking #lbPlayBtn,
+#lbBottom.lb-seeking #lbMuteBtn {
+  opacity: 0;
+  width: 0;
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+}
+
+/* 讓縮圖列在拖曳時淡出（更接近 iPhone 相簿） */
+#lbThumbs {
+  transition: opacity .5s ease;
+}
+
+#lbBottom.lb-seeking #lbThumbs {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 拖曳進度條時：避免誤觸，先把返回鍵隱藏 */
+#lbBackBtn {
+  top: 3px;
+  left: 3px;
+  transition: opacity .5s ease;
+}
+
+#lightbox.lb-seeking #lbBackBtn {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 進度條：已播(淺) / 未播(深) 兩色 */
+.lb-seek {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 9999px;
+  background: linear-gradient(to right,
+      rgba(255, 255, 255, 0.75) 0%,
+      rgba(255, 255, 255, 0.75) var(--p, 0%),
+      rgba(0, 0, 0, 0.45) var(--p, 0%),
+      rgba(0, 0, 0, 0.45) 100%);
+  outline: none;
+}
+
+/* iOS / Chrome：range thumb */
+.lb-seek::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+.lb-seek::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+/* Firefox track */
+.lb-seek::-moz-range-track {
+  height: 6px;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.lb-seek-time {
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  top: .6rem;
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.92);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+/* Lightbox 主影片：不顯示原生控制列（避免播放時跑出一套） */
+#lbVideo::-webkit-media-controls,
+#lbVideo::-webkit-media-controls-panel,
+#lbVideo::-webkit-media-controls-play-button,
+#lbVideo::-webkit-media-controls-start-playback-button,
+#lbVideo::-webkit-media-controls-enclosure {
+  display: none !important;
+  -webkit-appearance: none;
 }
