@@ -190,19 +190,20 @@ async function __getFFmpegUMD() {
   if (__ffmpegUMDPromise) return __ffmpegUMDPromise;
 
   __ffmpegUMDPromise = (async () => {
-    // 這是 UMD 版，會掛在 window.FFmpeg 上
-    await __loadScript("https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.min.js");
+    await __loadScript("https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js");
+
+    if (!window.FFmpeg) {
+      throw new Error("FFmpeg script 載入後 window.FFmpeg 仍不存在（可能被 CSP 擋、或網址錯）");
+    }
 
     const { createFFmpeg, fetchFile } = window.FFmpeg;
+
     const ffmpeg = createFFmpeg({
       log: false,
-      // corePath 指向同版本 core（UMD 會自己再載 wasm）
       corePath: "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.js",
     });
 
     await ffmpeg.load();
-
-    // 包一層讓下面 addWatermarkToVideo 可以用一致介面
     return { ffmpeg, fetchFile };
   })();
 
