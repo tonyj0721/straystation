@@ -171,56 +171,32 @@ function __drawWatermarkPattern(g, W, H, text) {
 }
 
 // ===============================
-// FFmpeg WASM（單例）
-//  - 用 GitHub 討論串的「CDN + toBlobURL」方式，避免 bundler
-//  - 預設走 single-thread core：不要求 COOP/COEP（crossOriginIsolated）
+// FFmpeg.wasm：單例載入
 // ===============================
-let __ffmpegSingleton = null;
+let __ffmpeg = null;
 let __ffmpegLoading = null;
 
-async function __toBlobURL(url, mimeType) {
-  const resp = await fetch(url);
-  const body = await resp.blob();
-  return URL.createObjectURL(new Blob([body], { type: mimeType }));
-}
-
-async function __toBlobURLPatched(url, mimeType, patcher) {
-  const resp = await fetch(url);
-  let body = await resp.text();
-  if (patcher) body = patcher(body);
-  return URL.createObjectURL(new Blob([body], { type: mimeType }));
-}
-
 async function getFFmpeg() {
-  if (__ffmpegSingleton) return __ffmpegSingleton;
+  if (__ffmpeg) return __ffmpeg;
   if (__ffmpegLoading) return __ffmpegLoading;
 
   __ffmpegLoading = (async () => {
-    // 版本建議 pin 住，避免 CDN 更新造成不相容
-    const baseURLFFMPEG = "https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/umd";
-    const baseURLCore = "https://unpkg.com/@ffmpeg/core@0.12.3/dist/umd";
+    const { createFFmpeg, fetchFile } = window.FFmpeg || {};
+    if (!createFFmpeg || !fetchFile) {
+      throw new Error("FFmpeg WASM 尚未載入（請確認已在 admin.html 引入 @ffmpeg/ffmpeg）");
+    }
 
-    // 這段 patch 來自官方 repo 討論串範例（讓 workerLoadURL 可被指定）
-    const ffmpegBlobURL = await __toBlobURLPatched(
-      `${baseURLFFMPEG}/ffmpeg.js`,
-      "text/javascript",
-      (js) => js.replace("new URL(e.p+e.u(814),e.b)", "r.workerLoadURL")
-    );
-
-    await import(ffmpegBlobURL); // 會把全域 FFmpegWASM 掛起來（UMD）
-
-    const ffmpeg = new FFmpegWASM.FFmpeg();
-    // 你想看 log 的話可以打開
-    // ffmpeg.on("log", ({ message }) => console.log("[ffmpeg]", message));
-    // ffmpeg.on("progress", ({ progress }) => console.log("[ffmpeg progress]", progress));
-
-    await ffmpeg.load({
-      workerLoadURL: await __toBlobURL(`${baseURLFFMPEG}/814.ffmpeg.js`, "text/javascript"),
-      coreURL: await __toBlobURL(`${baseURLCore}/ffmpeg-core.js`, "text/javascript"),
-      wasmURL: await __toBlobURL(`${baseURLCore}/ffmpeg-core.wasm`, "application/wasm"),
+    const ffmpeg = createFFmpeg({
+      log: false,
+      // 若你想指定 corePath，可加：corePath: "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/ffmpeg-core.js"
     });
 
-    __ffmpegSingleton = ffmpeg;
+    await ffmpeg.load();
+
+    // 把 fetchFile 掛回去方便後面用
+    ffmpeg.__fetchFile = fetchFile;
+
+    __ffmpeg = ffmpeg;
     return ffmpeg;
   })();
 
@@ -254,96 +230,85 @@ async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {})
   }
 }
 
-async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}) {
-  // 1) 讀影片 metadata 拿尺寸（只拿寬高，不做轉檔）
-  const src = URL.createObjectURL(file);
-  let W = 1280, H = 720;
-
-  try {
-    const v = document.createElement("video");
-    v.preload = "metadata";
-    v.src = src;
-    v.muted = true;
-    v.playsInline = true;
-
-    await new Promise((res, rej) => {
-      v.onloadedmetadata = () => res();
-      v.onerror = () => rej(new Error("載入影片 metadata 失敗"));
-    });
-
-    W = v.videoWidth || W;
-    H = v.videoHeight || H;
-  } finally {
-    URL.revokeObjectURL(src);
-  }
-
-  // 2) 生成同尺寸透明 PNG 浮水印
-  const wmCanvas = document.createElement("canvas");
-  wmCanvas.width = W;
-  wmCanvas.height = H;
-
-  const g = wmCanvas.getContext("2d");
-  g.clearRect(0, 0, W, H);
-  __drawWatermarkPattern(g, W, H, text);
-
-  const wmPngBlob = await new Promise((r) => wmCanvas.toBlob(r, "image/png"));
-  if (!wmPngBlob) throw new Error("產生浮水印 PNG 失敗");
-
-  // 3) FFmpeg WASM overlay -> MP4（H.264 失敗就 fallback mpeg4）
+async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園", onProgress } = {}) {
   const ffmpeg = await getFFmpeg();
+  const fetchFile = ffmpeg.__fetchFile;
 
-  const safeBase = (file.name || "video").replace(/[^\w.\-]+/g, "_");
-  const inName = `in_${Date.now()}_${safeBase}`;
-  const wmName = `wm_${Date.now()}.png`;
+  // 1) 準備檔名
+  const inName = `in_${Date.now()}.mp4`;      // 容器名隨便；實際內容是原檔 bytes
   const outName = `out_${Date.now()}.mp4`;
 
-  await ffmpeg.writeFile(inName, new Uint8Array(await file.arrayBuffer()));
-  await ffmpeg.writeFile(wmName, new Uint8Array(await wmPngBlob.arrayBuffer()));
+  // 2) 寫入 input
+  ffmpeg.FS("writeFile", inName, await fetchFile(file));
 
-  // 共同參數：
-  // - 用 overlay 產生一個輸出視訊流 [v]
-  // - -map 0:a?：有音訊就帶，沒有也不報錯（重點）
-  // - yuv420p + faststart：相容性/seek 表現更好
-  // - shortest：避免某些情況音訊/視訊長度不一致造成尾端怪異
-  const common = [
-    "-i", inName,
-    "-i", wmName,
-    "-filter_complex", "[0:v][1:v]overlay=0:0:format=auto[v]",
-    "-map", "[v]",
-    "-map", "0:a?",
-    "-pix_fmt", "yuv420p",
-    "-movflags", "+faststart",
-    "-shortest",
-  ];
+  // 3) 進度（ffmpeg.wasm 的 ratio: 0~1）
+  //    你原本的上傳進度是用 bytes 算，這裡是「轉檔進度」。
+  //    想接到你外面的 progressBar，可從 addWatermarkToFile 傳入 onProgress。
+  ffmpeg.setProgress(({ ratio }) => {
+    if (typeof onProgress === "function") onProgress(Math.max(0, Math.min(1, ratio || 0)));
+  });
 
+  // 4) 浮水印：用 drawtext 疊文字（斜線滿版 pattern 也能做，但會更吃效能）
+  //    先給你「右下角」版：最穩、最快。
+  //    ⚠️ 中文要字型檔才會正常顯示。若你沒放 fontfile，可能變成方塊/空白。
+  //
+  //    建議做法：把 NotoSansTC 字型（或子集）放到 /assets/fonts/NotoSansTC-Regular.otf
+  //    然後用 fetch + ffmpeg.FS 寫進去（下面有示範）。
+  //
+  let fontReady = false;
   try {
-    // 優先試 H.264（若你的 core 沒帶 libx264，這裡會 throw）
-    await ffmpeg.exec([
-      ...common,
-      "-c:v", "libx264",
-      "-preset", "veryfast",
-      "-crf", "23",
-      "-c:a", "aac",
-      "-b:a", "128k",
-      outName,
-    ]);
-  } catch (e) {
-    // fallback：mpeg4（Part 2），幾乎所有 build 都有，但檔案可能較大
-    await ffmpeg.exec([
-      ...common,
-      "-c:v", "mpeg4",
-      "-q:v", "4",
-      "-c:a", "aac",
-      "-b:a", "128k",
-      outName,
-    ]);
+    // 你若沒有字型檔，可先整段 try/catch，沒有就不指定 fontfile（但中文可能不顯示）
+    const fontUrl = "assets/fonts/NotoSansTC-Regular.otf";
+    const fontBytes = await (await fetch(fontUrl)).arrayBuffer();
+    ffmpeg.FS("writeFile", "font.otf", new Uint8Array(fontBytes));
+    fontReady = true;
+  } catch (_) {
+    fontReady = false;
   }
 
-  const out = await ffmpeg.readFile(outName);
-  const outBlob = new Blob([out.buffer], { type: "video/mp4" });
-  const outFileName = (file.name || "video").replace(/\.[^.]+$/, ".mp4");
+  // 右下角半透明文字
+  const drawtext = fontReady
+    ? `drawtext=fontfile=font.otf:text='${escapeDrawtext(text)}':x=w-tw-24:y=h-th-20:fontsize=h*0.045:fontcolor=white@0.28:shadowcolor=black@0.15:shadowx=2:shadowy=2`
+    : `drawtext=text='${escapeDrawtext(text)}':x=w-tw-24:y=h-th-20:fontsize=h*0.045:fontcolor=white@0.28:shadowcolor=black@0.15:shadowx=2:shadowy=2`;
 
-  return new File([outBlob], outFileName, { type: "video/mp4" });
+  // 5) 轉檔輸出（H.264 + AAC）
+  //    -movflags +faststart：讓 mp4 可邊載邊播（對網頁友善）
+  await ffmpeg.run(
+    "-i", inName,
+    "-vf", drawtext,
+    "-c:v", "libx264",
+    "-preset", "veryfast",
+    "-crf", "23",
+    "-c:a", "aac",
+    "-b:a", "128k",
+    "-movflags", "+faststart",
+    outName
+  );
+
+  // 6) 取出結果
+  const out = ffmpeg.FS("readFile", outName);
+  const blob = new Blob([out.buffer], { type: "video/mp4" });
+
+  // 7) 清理
+  safeUnlink(ffmpeg, inName);
+  safeUnlink(ffmpeg, outName);
+  if (fontReady) safeUnlink(ffmpeg, "font.otf");
+
+  const name = (file.name || "video").replace(/\.[^.]+$/, ".mp4");
+  return new File([blob], name, { type: "video/mp4" });
+}
+
+// drawtext 需要跳脫部分字元（尤其 : \ '）
+function escapeDrawtext(s) {
+  return String(s ?? "")
+    .replace(/\\/g, "\\\\")
+    .replace(/:/g, "\\:")
+    .replace(/'/g, "\\'")
+    .replace(/\n/g, " ");
+}
+
+function safeUnlink(ffmpeg, path) {
+  try { ffmpeg.FS("unlink", path); } catch (_) { }
 }
 
 // ===============================
