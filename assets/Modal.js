@@ -1,54 +1,5 @@
 const q = (sel) => document.querySelector(sel);
 
-// ===============================
-// FFmpeg WASM (lazy-load, ESM)
-// ===============================
-let __ffmpegPromise = null;
-
-async function __toBlobURL(url, mimeType) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Fetch failed: ${url}`);
-  const blob = await res.blob();
-  const out = mimeType ? new Blob([blob], { type: mimeType }) : blob;
-  return URL.createObjectURL(out);
-}
-
-async function __fetchFile(input) {
-  if (input instanceof Uint8Array) return input;
-  if (input instanceof Blob) {
-    return new Uint8Array(await input.arrayBuffer());
-  }
-  // string url
-  const res = await fetch(String(input));
-  if (!res.ok) throw new Error(`Fetch failed: ${input}`);
-  return new Uint8Array(await res.arrayBuffer());
-}
-
-async function __getFFmpeg() {
-  if (__ffmpegPromise) return __ffmpegPromise;
-
-  __ffmpegPromise = (async () => {
-    // 0.12+ 的 FFmpeg 類別在 ESM 版（cdnjs 有提供 esm/index.min.js）:contentReference[oaicite:1]{index=1}
-    const { FFmpeg } = await import(
-      "https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.12.15/esm/index.min.js"
-    );
-
-    const ffmpeg = new FFmpeg();
-
-    // core/wasm 用 @ffmpeg/core（cdnjs 有 ffmpeg-core 0.12.10 的 umd 檔）:contentReference[oaicite:2]{index=2}
-    const baseURL = "https://cdnjs.cloudflare.com/ajax/libs/ffmpeg-core/0.12.10/umd";
-
-    await ffmpeg.load({
-      coreURL: await __toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-      wasmURL: await __toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
-    });
-
-    return ffmpeg;
-  })();
-
-  return __ffmpegPromise;
-}
-
 function isVideoUrl(url) {
   if (!url) return false;
   const u = String(url).split("?", 1)[0];
@@ -219,6 +170,45 @@ function __drawWatermarkPattern(g, W, H, text) {
   g.restore();
 }
 
+// ===============================
+// FFmpeg WASM (UMD, no-module; auto inject scripts)
+// ===============================
+let __ffmpegUMDPromise = null;
+
+function __loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = src;
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("Failed to load script: " + src));
+    document.head.appendChild(s);
+  });
+}
+
+async function __getFFmpegUMD() {
+  if (__ffmpegUMDPromise) return __ffmpegUMDPromise;
+
+  __ffmpegUMDPromise = (async () => {
+    // 這是 UMD 版，會掛在 window.FFmpeg 上
+    await __loadScript("https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.min.js");
+
+    const { createFFmpeg, fetchFile } = window.FFmpeg;
+    const ffmpeg = createFFmpeg({
+      log: false,
+      // corePath 指向同版本 core（UMD 會自己再載 wasm）
+      corePath: "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.js",
+    });
+
+    await ffmpeg.load();
+
+    // 包一層讓下面 addWatermarkToVideo 可以用一致介面
+    return { ffmpeg, fetchFile };
+  })();
+
+  return __ffmpegUMDPromise;
+}
+
 async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {}) {
   const type = (file && file.type) || "";
   if (type.startsWith("video/")) {
@@ -247,7 +237,7 @@ async function addWatermarkToFile(file, { text = "台中簡媽媽狗園" } = {})
 }
 
 async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}) {
-  // 先用 <video> 取寬高（不做繪製，只拿 metadata）
+  // 拿影片尺寸
   const src = URL.createObjectURL(file);
   let W = 1280, H = 720;
   try {
@@ -259,7 +249,7 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
 
     await new Promise((res, rej) => {
       v.onloadedmetadata = () => res();
-      v.onerror = (e) => rej(e || new Error("載入影片 metadata 失敗"));
+      v.onerror = () => rej(new Error("載入影片 metadata 失敗"));
     });
 
     W = v.videoWidth || W;
@@ -268,7 +258,7 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
     URL.revokeObjectURL(src);
   }
 
-  // 產生透明 PNG 浮水印遮罩（用你原本的 __drawWatermarkPattern）
+  // 產生透明 PNG 浮水印遮罩（沿用你原本的 __drawWatermarkPattern）
   const wmCanvas = document.createElement("canvas");
   wmCanvas.width = W;
   wmCanvas.height = H;
@@ -279,21 +269,20 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
   const wmBlob = await new Promise((r) => wmCanvas.toBlob(r, "image/png"));
   if (!wmBlob) throw new Error("產生浮水印 PNG 失敗");
 
-  // FFmpeg overlay
-  const ffmpeg = await __getFFmpeg();
+  // 載入 ffmpeg (UMD)
+  const { ffmpeg, fetchFile } = await __getFFmpegUMD();
 
-  // 檔名：避免奇怪字元
   const inName = "input" + (file.name.match(/\.[^.]+$/)?.[0] || ".mp4");
   const wmName = "wm.png";
   const outName = "output.mp4";
 
-  // 寫入 FS
-  await ffmpeg.writeFile(inName, await __fetchFile(file));
-  await ffmpeg.writeFile(wmName, await __fetchFile(wmBlob));
+  ffmpeg.FS("writeFile", inName, await fetchFile(file));
+  ffmpeg.FS("writeFile", wmName, await fetchFile(wmBlob));
 
-  // 先試：保留原音訊（-c:a copy）
+  // overlay -> mp4
+  // 先試 copy 音訊，失敗再轉 aac
   try {
-    await ffmpeg.exec([
+    await ffmpeg.run(
       "-i", inName,
       "-i", wmName,
       "-filter_complex", "overlay=0:0:format=auto",
@@ -303,10 +292,9 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
       "-crf", "23",
       "-c:a", "copy",
       outName
-    ]);
+    );
   } catch (e) {
-    // 如果某些檔案音訊 copy 會失敗，就 fallback 重編碼音訊
-    await ffmpeg.exec([
+    await ffmpeg.run(
       "-i", inName,
       "-i", wmName,
       "-filter_complex", "overlay=0:0:format=auto",
@@ -317,10 +305,10 @@ async function addWatermarkToVideo(file, { text = "台中簡媽媽狗園" } = {}
       "-c:a", "aac",
       "-b:a", "128k",
       outName
-    ]);
+    );
   }
 
-  const data = await ffmpeg.readFile(outName);
+  const data = ffmpeg.FS("readFile", outName);
   const outBlob = new Blob([data.buffer], { type: "video/mp4" });
 
   const base = (file.name || "video").replace(/\.[^.]+$/, "");
