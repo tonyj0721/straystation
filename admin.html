@@ -649,37 +649,16 @@
   <div id="lightbox" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[9999]">
     <div id="lbWrap" class="relative inline-block">
       <img id="lbImg" class="object-contain rounded-lg" />
-      <video id="lbVideo" playsinline class="object-contain rounded-lg hidden"></video>
+      <video id="lbVideo" playsinline controls class="object-contain rounded-lg hidden"></video>
+      <button id="lbClose" class="ui-close-btn absolute top-1 right-1 z-10" aria-label="關閉"><svg viewBox="0 0 24 24"
+          aria-hidden="true" focusable="false" class="ui-close-icon">
+          <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
+        </svg></button>
       <button id="lbPrev" class="absolute text-white text-4xl select-none">❮</button>
       <button id="lbNext" class="absolute text-white text-4xl select-none">❯</button>
     </div>
-    <button id="lbBackBtn" class="w-8 h-8 absolute items-center justify-center" aria-label="返回">
-      <img id="lbBackIcon" src="images/icons/back.png" alt="" class="w-6 h-6 object-contain pointer-events-none">
-    </button>
-    <div id="lbBottom" class="absolute left-0 w-full flex flex-col items-center px-4">
-      <!-- iPhone 相簿風格：影片控制列（固定顯示、不自動隱藏；貼齊縮圖列上方） -->
-      <div id="lbControls"
-        class="w-full max-w-[720px] px-4 py-3 rounded-2xl bg-white/15 backdrop-blur flex items-center gap-3 hidden">
-        <!-- 拖曳進度條時顯示時間（圖 2 效果） -->
-        <div id="lbSeekTime" class="lb-seek-time" aria-hidden="true">
-          <span id="lbTimeCur">00:00</span>
-          <span id="lbTimeDur">00:00</span>
-        </div>
-        <button id="lbPlayBtn" class="w-8 h-8 flex items-center justify-center" aria-label="播放/暫停">
-          <img id="lbPlayIcon" src="images/icons/play.png" alt="" class="w-6 h-6 object-contain pointer-events-none">
-        </button>
-
-        <input id="lbSeek" type="range" min="0" max="1000" value="0" aria-label="播放進度" class="lb-seek flex-1">
-
-        <button id="lbMuteBtn" class="w-8 h-8 flex items-center justify-center" aria-label="音量/靜音">
-          <img id="lbVolumeIcon" src="images/icons/volume.png" alt=""
-            class="w-6 h-6 object-contain pointer-events-none">
-        </button>
-      </div>
-
-      <div id="lbThumbs" class="w-full flex justify-center px-4 py-2">
-        <div id="lbThumbsInner" class="flex gap-2"></div>
-      </div>
+    <div id="lbThumbs" class="absolute w-full flex justify-center px-4 py-2">
+      <div id="lbThumbsInner" class="flex gap-2"></div>
     </div>
   </div>
 
@@ -1468,9 +1447,6 @@
         showOnCats: true,
         showOnDogs: true,
         showOnIndex: true,
-        // 浮水印處理狀態（有上傳媒體就先設為未就緒）
-        mediaReady: (selectedFiles.length === 0),
-        wmPending: [],
         createdAt: serverTimestamp(), // Firestore 伺服器時間
       };
 
@@ -1511,36 +1487,45 @@
 
         // 2) 逐張上傳圖片，取得 Storage URL
         const urls = [];
-        const plans = [];
-        const pendingPaths = [];
 
         const __progressTotalBytes = selectedFiles.reduce((s, f) => s + (f?.size || 0), 0) || 1;
         let __progressUploadedBytes = 0;
 
-        // 先算出這批上傳會用到的 Storage paths，並先寫回 Firestore（避免後端處理比 images 更新更早完成）
         for (const f of selectedFiles) {
-          // 後端才做浮水印/轉檔/縮圖：前端直接上傳原檔
-          const type = (f && f.type) || '';
-          // 路徑副檔名固定用 jpg/mp4，讓後端覆蓋後檔名/格式一致（避免 iPhone/WebM 問題）
-          let ext = 'bin';
-          if (type.startsWith('image/')) ext = 'jpg';
-          else if (type.startsWith('video/')) ext = 'mp4';
+          const origType = (f && f.type) || "";
+          const isVid = origType.startsWith("video/");
+          let blobToUpload = f;
+          let type = origType;
+          let ext = "bin";
 
-          const base = f.name.replace(/\.[^.]+$/, '');
-          const path = `pets/${docRef.id}/${Date.now()}_${base}.${ext}`;
-          plans.push({ f, type, path });
-          pendingPaths.push(path);
-        }
+          // 圖片：仍在前端加浮水印
+          if (!isVid) {
+            blobToUpload = await addWatermarkToFile(f);       // ← 圖片才加浮水印
+            type = blobToUpload.type || "";
+            if (type.startsWith("image/")) {
+              ext = type === "image/png" ? "png" : "jpg";
+            } else {
+              // fallback
+              ext = (f.name && f.name.split(".").pop()) || "bin";
+            }
+          } else {
+            // 影片：直接上傳原檔（不在前端轉檔/浮水印）
+            const byName = (f.name && f.name.split(".").pop()) || "";
+            if (byName) ext = byName.toLowerCase();
+            else if (type.includes("webm")) ext = "webm";
+            else if (type.includes("ogg")) ext = "ogg";
+            else if (type.includes("mp4") || type.includes("mpeg")) ext = "mp4";
+            else if (type.includes("quicktime")) ext = "mov";
+            else ext = "mp4";
+          }
 
-        if (pendingPaths.length) {
-          await updateDoc(doc(db, "pets", docRef.id), { mediaReady: false, wmPending: pendingPaths });
-        }
+          const base = (f.name || "file").replace(/\.[^.]+$/, "");
+          const prefix = isVid ? "upload" : "pets";
+          const path = `${prefix}/${docRef.id}/${Date.now()}_${base}.${ext}`;
+          const r = sRef(storage, path);
 
-        // 逐檔上傳
-        for (const pl of plans) {
-          const r = sRef(storage, pl.path);
           await new Promise((resolve, reject) => {
-            const task = uploadBytesResumable(r, pl.f, { contentType: pl.type || 'application/octet-stream' });
+            const task = uploadBytesResumable(r, blobToUpload, { contentType: type || "application/octet-stream" });
             task.on("state_changed",
               (snap) => {
                 const base = __progressUploadedBytes || 0;
@@ -1550,12 +1535,13 @@
               },
               (err) => reject(err),
               () => {
-                __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || pl.f?.size || 0);
+                __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || blobToUpload?.size || 0);
                 prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
                 resolve();
               }
             );
           });
+
           urls.push(await getDownloadURL(r));
         }
 
@@ -1582,73 +1568,28 @@
         fileCount.textContent = "已選 0 / 5 張";
         syncBreedSelectors();
 
+        // 先啟動重新載入列表（避免等到提示結束才開始抓資料）
+        const reloadPromise = loadPets();
+
         // ★ 建檔完成 → 捲到最上方（先 smooth，最後再硬捲補正）
         window.scrollTo({ top: 0, behavior: "smooth" });
         setTimeout(forceScrollTop, 250); // smooth 途中若被打斷，250ms 後硬捲補正
 
-        // 若有媒體：等待後端完成浮水印後才「顯示建檔完成」並把資料放進列表（避免空窗被點開）
-        if (pendingPaths.length) {
-          Swal.fire({
-            icon: "info",
-            title: "浮水印處理中…",
-            text: "處理完成後才會顯示在列表，並自動開啟詳情。",
-            allowOutsideClick: false,
-            allowEscapeKey: false,
-            showConfirmButton: false,
-            didOpen: () => {
-              Swal.showLoading();
-            },
-            returnFocus: false,
-          });
-
-          try {
-            await __waitPetMediaReady(docRef.id);
-          } catch (e) {
-            console.error("waitPetMediaReady error:", e);
-          }
-
-          // 完成後才載入列表
-          try {
-            await loadPets();
-          } catch (e) {
-            console.error("loadPets error:", e);
-          }
-
-          Swal.close();
-
-          await Swal.fire({
-            icon: "success",
-            title: "已建檔！",
-            showConfirmButton: false,
-            timer: 1500,
-            returnFocus: false,
-          });
-
-          forceScrollTop();
-
-          openDialog(docRef.id);
-        } else {
-          // 沒有媒體：直接更新列表與提示
-          const reloadPromise = loadPets();
-
-          await Swal.fire({
-            icon: "success",
-            title: "已建檔！",
-            showConfirmButton: false,
-            timer: 1500,
-            returnFocus: false, // 避免關閉後把焦點還給原 input 而導致捲動回彈
-          });
-
-          try {
-            await reloadPromise;
-          } catch (e) {
-            console.error("loadPets error:", e);
-          }
-
-          forceScrollTop(); // ✅ 保證捲到最上面（不會卡在一半）
-
-          openDialog(docRef.id);
+        // 成功提示後直接打開詳情
+        await Swal.fire({
+          icon: "success",
+          title: "已建檔！",
+          showConfirmButton: false,
+          timer: 1500,
+          returnFocus: false, // 避免關閉後把焦點還給原 input 而導致捲動回彈
+        });
+        try {
+          await reloadPromise;
+        } catch (e) {
+          console.error("loadPets error:", e);
         }
+        forceScrollTop(); // ✅ 保證捲到最上面（不會卡在一半）
+        openDialog(docRef.id);
       } catch (err) {
         await Swal.fire({ icon: "error", title: "建檔失敗", text: err.message });
       } finally {
@@ -1667,7 +1608,6 @@
       const snap = await getDocs(q);
       pets.length = 0;
       pets.push(...snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-      /*pets.push(...snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p && p.mediaReady !== false));看不見*/
       applyFilterAndRender();
     }
 
@@ -1780,7 +1720,6 @@
           );
           const snapPrefix = await getDocs(qPrefix);
           prefix = snapPrefix.docs.map(d => ({ id: d.id, ...d.data() }));
-          /*prefix = snapPrefix.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p && p.mediaReady !== false);看不見*/
         } catch (e) {
           console.warn("prefix search skipped:", e);
         }
@@ -1806,7 +1745,6 @@
 
         const contains = recentDocs
           .map(d => ({ id: d.id, ...d.data() }))
-          /*.filter(p => p && p.mediaReady !== false)看不見*/
           .filter(p => {
             const nm = String(p.name || "");
             const nmLower = String(p.nameLower || nm).toLowerCase();
