@@ -205,19 +205,16 @@ let __ffmpegSingleton = null;
 async function getFFmpeg() {
   if (__ffmpegSingleton) return __ffmpegSingleton;
 
-  // 這裡用 ESM CDN 動態載入（不用打包器也能用）
-  // 你也可以改成自己 host 檔案，避免 CDN 不穩
   const { FFmpeg } = await import("https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js");
   const { toBlobURL } = await import("https://unpkg.com/@ffmpeg/util@0.12.1/dist/esm/index.js");
 
   const ffmpeg = new FFmpeg();
 
-  // 核心 wasm/worker 也用 CDN；若要更穩，建議改成本機路徑
-  const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
+  // ✅ 改用 jsDelivr + 單執行緒 core（沒有 worker）
+  const baseURL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd";
   await ffmpeg.load({
     coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
     wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
-    workerURL: await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, "text/javascript"),
   });
 
   __ffmpegSingleton = ffmpeg;
