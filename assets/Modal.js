@@ -1158,39 +1158,22 @@ async function saveEdit() {
 
       if (it.kind === "file") {
         const f = it.file;
-        const origType = (f && f.type) || "";
-        const isVid = origType.startsWith("video/");
-        let blobToUpload = f;
-        let type = origType;
-        let ext = "bin";
-
-        // 圖片：仍在前端加浮水印
-        if (!isVid) {
-          blobToUpload = await addWatermarkToFile(f);       // ← 圖片才加浮水印
-          type = blobToUpload.type || "";
-          if (type.startsWith("image/")) {
-            ext = type === "image/png" ? "png" : "jpg";
-          } else {
-            ext = (f.name && f.name.split(".").pop()) || "bin";
-          }
-        } else {
-          // 影片：直接上傳原檔到 upload/（後端再加浮水印轉 mp4）
-          const byName = (f.name && f.name.split(".").pop()) || "";
-          if (byName) ext = byName.toLowerCase();
-          else if (type.includes("webm")) ext = "webm";
-          else if (type.includes("ogg")) ext = "ogg";
-          else if (type.includes("mp4") || type.includes("mpeg")) ext = "mp4";
-          else if (type.includes("quicktime")) ext = "mov";
-          else ext = "mp4";
+        const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+        const type = wmBlob.type || '';
+        let ext = 'bin';
+        if (type.startsWith('image/')) {
+          ext = type === 'image/png' ? 'png' : 'jpg';
+        } else if (type.startsWith('video/')) {
+          if (type.includes('webm')) ext = 'webm';
+          else if (type.includes('ogg')) ext = 'ogg';
+          else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
+          else ext = 'mp4';
         }
-
-        const base = (f.name || "file").replace(/\.[^.]+$/, "");
-        const prefix = isVid ? "upload" : "pets";
-        const path = `${prefix}/${currentDocId}/${Date.now()}_${base}.${ext}`;
+        const base = f.name.replace(/\.[^.]+$/, '');
+        const path = `pets/${currentDocId}/${Date.now()}_${base}.${ext}`;
         const r = sRef(storage, path);
-
         await new Promise((resolve, reject) => {
-          const task = uploadBytesResumable(r, blobToUpload, { contentType: type || "application/octet-stream" });
+          const task = uploadBytesResumable(r, wmBlob, { contentType: wmBlob.type || 'application/octet-stream' });
           task.on("state_changed",
             (snap) => {
               const base = __progressUploadedBytes || 0;
@@ -1201,7 +1184,8 @@ async function saveEdit() {
             (err) => reject(err),
             async () => {
               try {
-                __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || blobToUpload?.size || 0);
+                // 完成一檔：累加已完成 bytes
+                __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || wmBlob?.size || 0);
                 prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
                 resolve();
               } catch (e) {
@@ -1210,7 +1194,6 @@ async function saveEdit() {
             }
           );
         });
-
         newUrls.push(await getDownloadURL(r));
       }
     }
@@ -1967,39 +1950,22 @@ async function onConfirmAdopted() {
 
   try {
     for (const f of files) {
-      const origType = (f && f.type) || "";
-      const isVid = origType.startsWith("video/");
-      let blobToUpload = f;
-      let type = origType;
-      let ext = "bin";
-
-      // 圖片：前端加浮水印
-      if (!isVid) {
-        blobToUpload = await addWatermarkToFile(f);
-        type = blobToUpload.type || "";
-        if (type.startsWith("image/")) {
-          ext = type === "image/png" ? "png" : "jpg";
-        } else {
-          ext = (f.name && f.name.split(".").pop()) || "bin";
-        }
-      } else {
-        // 影片：直接上傳原檔到 upload/
-        const byName = (f.name && f.name.split(".").pop()) || "";
-        if (byName) ext = byName.toLowerCase();
-        else if (type.includes("webm")) ext = "webm";
-        else if (type.includes("ogg")) ext = "ogg";
-        else if (type.includes("mp4") || type.includes("mpeg")) ext = "mp4";
-        else if (type.includes("quicktime")) ext = "mov";
-        else ext = "mp4";
+      const wmBlob = await addWatermarkToFile(f);       // ← 新增：先加浮水印
+      const type = wmBlob.type || '';
+      let ext = 'bin';
+      if (type.startsWith('image/')) {
+        ext = type === 'image/png' ? 'png' : 'jpg';
+      } else if (type.startsWith('video/')) {
+        if (type.includes('webm')) ext = 'webm';
+        else if (type.includes('ogg')) ext = 'ogg';
+        else if (type.includes('mp4') || type.includes('mpeg')) ext = 'mp4';
+        else ext = 'mp4';
       }
-
-      const base = (f.name || "file").replace(/\.[^.]+$/, "");
-      const prefix = isVid ? "upload" : "pets";
-      const path = `${prefix}/${currentDocId}/${Date.now()}_${base}.${ext}`;
+      const base = f.name.replace(/\.[^.]+$/, '');
+      const path = `adopted/${currentDocId}/${Date.now()}_${base}.${ext}`;
       const r = sRef(storage, path);
-
       await new Promise((resolve, reject) => {
-        const task = uploadBytesResumable(r, blobToUpload, { contentType: type || "application/octet-stream" });
+        const task = uploadBytesResumable(r, wmBlob, { contentType: wmBlob.type || 'application/octet-stream' });
         task.on("state_changed",
           (snap) => {
             const base = __progressUploadedBytes || 0;
@@ -2009,13 +1975,12 @@ async function onConfirmAdopted() {
           },
           (err) => reject(err),
           () => {
-            __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || blobToUpload?.size || 0);
+            __progressUploadedBytes = (__progressUploadedBytes || 0) + (task.snapshot?.totalBytes || wmBlob?.size || 0);
             prog.update((__progressTotalBytes > 0) ? (__progressUploadedBytes / __progressTotalBytes) * 100 : 100);
             resolve();
           }
         );
       });
-
       urls.push(await getDownloadURL(r));
     }
 
