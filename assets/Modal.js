@@ -183,13 +183,13 @@ async function __loadFFmpegWasm() {
   if (__ffmpegLoading) return __ffmpegLoading;
 
   __ffmpegLoading = (async () => {
-    // 以 dynamic import 方式載入，避免整個檔案變成 <script type="module">
-    const { FFmpeg } = await import("@ffmpeg/ffmpeg");
-    const { toBlobURL, fetchFile } = await import("@ffmpeg/util");
+    // ✅ 用 CDN ESM 完整 URL（避免「@ffmpeg/ffmpeg」無法解析）
+    const { FFmpeg } = await import("https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/esm/index.js");
+    const { toBlobURL, fetchFile } = await import("https://unpkg.com/@ffmpeg/util@0.12.6/dist/esm/index.js");
 
     const ffmpeg = new FFmpeg();
 
-    // 你也可以改成自家 host，這裡用 unpkg（版本請固定，避免未來破壞性變更）
+    // ffmpeg core（固定版本）
     const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
 
     await ffmpeg.load({
@@ -198,7 +198,6 @@ async function __loadFFmpegWasm() {
       workerURL: await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, "text/javascript"),
     });
 
-    // 掛在 instance 上，方便後續使用
     ffmpeg.__fetchFile = fetchFile;
     __ffmpeg = ffmpeg;
     return ffmpeg;
