@@ -1,5 +1,4 @@
 const q = (sel) => document.querySelector(sel);
-
 function isVideoUrl(url) {
   if (!url) return false;
   const u = String(url).split("?", 1)[0];
