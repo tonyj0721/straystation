@@ -972,6 +972,8 @@ async function openDialog(id) {
     __lockDialogScroll();
     dlg.showModal();
   }
+
+  scrollDialogTop();
 }
 
 function scrollDialogTop() {
