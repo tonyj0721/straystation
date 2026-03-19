@@ -617,7 +617,6 @@ function startProgressBar(btn, opts = {}) {
 
     if (restore) {
       // 恢復同排按鈕與格數
-      if (wrap && wrapClass != null) wrap.className = wrapClass;
       for (const s of siblingStates) {
         if (!s.el) continue;
         if (!s.wasHidden) s.el.classList.remove("hidden");
