@@ -1405,6 +1405,32 @@
       }, 80);
     }
 
+    async function probeVideoDuration(file, label = "file") {
+      return await new Promise((resolve) => {
+        const url = URL.createObjectURL(file);
+        const v = document.createElement("video");
+        v.preload = "metadata";
+        v.onloadedmetadata = () => {
+          console.log(label, {
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            duration: v.duration,
+            videoWidth: v.videoWidth,
+            videoHeight: v.videoHeight,
+          });
+          URL.revokeObjectURL(url);
+          resolve(v.duration);
+        };
+        v.onerror = () => {
+          console.log(label, "metadata load failed");
+          URL.revokeObjectURL(url);
+          resolve(NaN);
+        };
+        v.src = url;
+      });
+    }
+
     // ===============================
     // 表單送出：新增動物資料
     // ===============================
@@ -1492,6 +1518,9 @@
         let __progressUploadedBytes = 0;
 
         for (const f of selectedFiles) {
+          const f = it.file;
+
+          await probeVideoDuration(f, "original");
           const wmBlob = f;       // ← 新增：先加浮水印
           const type = wmBlob.type || '';
           let ext = 'bin';
