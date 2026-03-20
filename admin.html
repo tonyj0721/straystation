@@ -1518,10 +1518,9 @@
         let __progressUploadedBytes = 0;
 
         for (const f of selectedFiles) {
-          const f = it.file;
-
           await probeVideoDuration(f, "original");
-          const wmBlob = f;       // ← 新增：先加浮水印
+
+          const wmBlob = f;
           await probeVideoDuration(wmBlob, "direct-upload");
           const type = wmBlob.type || '';
           let ext = 'bin';
