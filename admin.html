@@ -1520,8 +1520,8 @@
         for (const f of selectedFiles) {
           await probeVideoDuration(f, "original");
 
-          const wmBlob = f;
-          await probeVideoDuration(wmBlob, "direct-upload");
+          const wmBlob = await addWatermarkToFile(f);
+          await probeVideoDuration(wmBlob, "watermarked");
           const type = wmBlob.type || '';
           let ext = 'bin';
           if (type.startsWith('image/')) {
