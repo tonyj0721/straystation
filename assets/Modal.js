@@ -670,6 +670,83 @@ async function isNameTaken(name, exceptId = null) {
 let currentDocId = null;
 let currentDoc = null;
 
+// ===============================
+// 浮水印處理：避免短時間看到「未浮水印」
+//  - mediaReady: false 表示後端還在覆蓋浮水印檔
+//  - wmPending:  待處理的 Storage paths（前端先寫進 Firestore；後端處理完會逐一移除）
+// ===============================
+function __hasMediaForWatermark(p) {
+  const media = (Array.isArray(p?.images) && p.images.length > 0)
+    ? p.images
+    : (p?.image ? [p.image] : []);
+  return media.length > 0;
+}
+
+function __renderProcessingState(p = null) {
+  const dlgImg = document.getElementById("dlgImg");
+  const dlgVideo = document.getElementById("dlgVideo");
+  const dlgBg = document.getElementById("dlgBg");
+  const dlgThumbs = document.getElementById("dlgThumbs");
+  const dlgHint = document.getElementById("dlgHint");
+  const dlgStageWrap = document.getElementById("dlgStageWrap");
+
+  // 媒體區先清空，避免看到未浮水印 / 也避免殘留上一筆
+  if (dlgHint) dlgHint.textContent = "浮水印處理中，請稍候…";
+  if (dlgThumbs) dlgThumbs.innerHTML = "";
+
+  if (dlgBg) dlgBg.removeAttribute("src");
+
+  if (dlgImg) {
+    dlgImg.src = "";
+    dlgImg.classList.add("hidden");
+  }
+
+  if (dlgVideo) {
+    try { dlgVideo.pause(); } catch (_) { }
+    dlgVideo.src = "";
+    dlgVideo.classList.add("hidden");
+  }
+
+  if (dlgStageWrap) dlgStageWrap.classList.remove("dlg-video-mode");
+
+  // 文字區：先把這筆的基本資料填上（避免畫面看起來「怪/全空」）
+  try {
+    if (p) {
+      document.getElementById('dlgName').textContent = p.name ?? "—";
+      document.getElementById('dlgDesc').textContent = p.desc ?? "";
+      document.getElementById('dlgTagBreed').textContent = p.breed ?? "";
+      document.getElementById('dlgTagAge').textContent = p.age ?? "";
+      document.getElementById('dlgTagGender').textContent = p.gender ?? "";
+
+      const isNeutered = !!p.neutered;
+      const isVaccinated = !!p.vaccinated;
+      document.getElementById('dlgTagNeutered').textContent = isNeutered ? '已結紮' : '未結紮';
+      document.getElementById('dlgTagVaccinated').textContent = isVaccinated ? '已注射預防針' : '未注射預防針';
+    }
+  } catch (_) { /* ignore */ }
+}
+
+async function __waitPetMediaReady(petId, { maxTries = 120, intervalMs = 800 } = {}) {
+  for (let i = 0; i < maxTries; i++) {
+    const snap = await getDoc(doc(db, "pets", petId));
+    if (!snap.exists()) return null;
+    const data = snap.data() || {};
+    const p = { id: snap.id, ...data };
+
+    // 沒有媒體 → 不用等
+    if (!__hasMediaForWatermark(p)) return p;
+
+    // mediaReady !== false 視為已就緒（包含 undefined / true）
+    if (p.mediaReady !== false) return p;
+
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+
+  // 超時：回傳最後一次資料（避免永遠卡住）
+  const snap = await getDoc(doc(db, "pets", petId));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
 // 開啟 + 渲染 + 編輯預填，全部合併在這一支
 async function openDialog(id) {
   // 1. 先拿資料：先從 pets 找，沒有就去 Firestore 抓一次
@@ -686,6 +763,22 @@ async function openDialog(id) {
       await swalInDialog({ icon: "error", title: "讀取資料失敗", text: String(e) });
       return;
     }
+  }
+
+  // 1.5 若媒體還在後端浮水印處理：先顯示「處理中」並等待（避免看到未浮水印）
+  if (__hasMediaForWatermark(p) && p.mediaReady === false) {
+    const dlg = document.getElementById("petDialog");
+    if (dlg && !dlg.open) {
+      __lockDialogScroll();
+      dlg.showModal();
+    }
+    __renderProcessingState(p);
+    const latest = await __waitPetMediaReady(id);
+    if (!latest) {
+      await swalInDialog({ icon: "error", title: "找不到這筆資料" });
+      return;
+    }
+    p = latest;
   }
 
   // 2. 共用狀態 + URL
