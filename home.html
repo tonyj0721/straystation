@@ -619,7 +619,7 @@
     async function loadPets() {
       const qRef = query(collection(db, 'pets'), where('status', '==', 'adopted'), orderBy('createdAt', 'desc'));
       const snap = await getDocs(qRef);
-      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const all = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p && p.mediaReady !== false);
 
       const list = all;
       if (grid) grid.innerHTML = list.map(cardHTML).join('');

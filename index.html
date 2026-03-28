@@ -1044,7 +1044,10 @@
     async function loadPets() {
       const qRef = query(collection(db, "pets"), where("status", "==", "available"), orderBy("createdAt", "desc"));
       const snap = await getDocs(qRef);
-      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const all = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p && p.mediaReady !== false);
+
+      updateHomeStatsFromAll(all);
+      computeWeeklyAdoptedFromAll(all);
 
       const cats = all.filter(p => p.species === "貓").slice(0, 6);
       const dogs = all.filter(p => p.species === "狗").slice(0, 6);
@@ -1132,7 +1135,6 @@
       });
     };
 
-    // --- Weekly adopted counter (dynamic, pure index) ---
     function getWeekStartLocal() {
       const now = new Date();
       const day = now.getDay(); // 0(日)~6(六)
@@ -1143,46 +1145,54 @@
       return d;
     }
 
-    async function computeWeeklyAdopted() {
-      const coll = collection(db, "pets");
+    function updateHomeStatsFromAll(all) {
+      const cats = all.filter(p => p.status === "available" && p.species === "貓").length;
+      const dogs = all.filter(p => p.status === "available" && p.species === "狗").length;
+      const adopted = all.filter(p => p.status === "adopted").length;
 
-      // 有全域/前面已宣告的 getWeekStartLocal 就用；沒有就用內建小函式計算
-      const weekStart = (typeof getWeekStartLocal === 'function')
-        ? getWeekStartLocal()
-        : (() => {
-          const now = new Date();
-          const day = now.getDay();                 // 0(日)~6(六)
-          const diffToMon = (day === 0 ? -6 : 1 - day);
-          const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          d.setDate(d.getDate() + diffToMon);
-          d.setHours(0, 0, 0, 0);
-          return d;
-        })();
+      const statCats = document.getElementById("statCats");
+      const statDogs = document.getElementById("statDogs");
+      const statAdopted = document.getElementById("statAdopted");
 
-      const weekTs = Timestamp.fromDate(weekStart);
+      if (statCats) statCats.textContent = cats.toLocaleString();
+      if (statDogs) statDogs.textContent = dogs.toLocaleString();
+      if (statAdopted) statAdopted.textContent = adopted.toLocaleString();
+    }
 
-      // 只用 adoptedAt（需要複合索引：status Asc, adoptedAt Asc；__name__ 自動附加沒問題）
-      const snap = await getCountFromServer(
-        query(coll, where("status", "==", "adopted"), where("adoptedAt", ">=", weekTs))
-      );
+    function computeWeeklyAdoptedFromAll(all) {
+      const weekStart = getWeekStartLocal();
 
-      const n = snap.data().count || 0;
+      const n = all.filter(p => {
+        if (p.status !== "adopted") return false;
+        if (!p.adoptedAt) return false;
+
+        let adoptedDate = null;
+
+        if (typeof p.adoptedAt?.toDate === "function") {
+          adoptedDate = p.adoptedAt.toDate();
+        } else if (p.adoptedAt instanceof Date) {
+          adoptedDate = p.adoptedAt;
+        } else {
+          adoptedDate = new Date(p.adoptedAt);
+        }
+
+        return adoptedDate instanceof Date
+          && !isNaN(adoptedDate)
+          && adoptedDate >= weekStart;
+      }).length;
 
       const el = document.getElementById("statWeeklyAdopted");
-      const titleP = el?.closest("p");                 // 第一行
-      const subtitleP = titleP?.nextElementSibling;    // 第二行（灰字那行）
+      const titleP = el?.closest("p");
+      const subtitleP = titleP?.nextElementSibling;
 
       if (!titleP || !subtitleP) return;
 
-      // 確保第二行是灰字（就算你之後改到 class 也能補回來）
       subtitleP.classList.add("text-gray-500");
 
       if (n === 0) {
-        // n = 0
         titleP.textContent = "這週持續媒合中，謝謝您願意看看牠們";
         subtitleP.textContent = "也謝謝每位辛苦的志工";
       } else {
-        // n > 0
         titleP.innerHTML = `這週 <span id="statWeeklyAdopted">${n.toLocaleString()}</span> 位毛孩找到新家`;
         subtitleP.textContent = "感謝每位認養人與辛苦的志工";
       }
@@ -1190,8 +1200,6 @@
 
     window.loadPets = loadPets;
     loadPets();
-
-    computeWeeklyAdopted();
   </script>
 
   <!-- SEO: organization schema -->
